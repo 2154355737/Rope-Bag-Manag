@@ -24,7 +24,7 @@
         </div>
         <div class="welcome-icon">
           <el-icon :size="56">
-            <House />
+            <Setting />
           </el-icon>
         </div>
       </div>
@@ -858,11 +858,11 @@ onUnmounted(() => {
 }
 
 .welcome-card {
-  margin-bottom: 24px;
+  margin-bottom: 1.5rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: var(--text-primary);
   border: none;
-  border-radius: 16px;
+  border-radius: 1rem;
 }
 
 .welcome-content {
@@ -872,25 +872,25 @@ onUnmounted(() => {
 }
 
 .welcome-text h2 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
+  margin: 0 0 0.5rem 0;
+  font-size: 1.75rem;
   font-weight: bold;
 }
 
 .welcome {
-  margin: 0 0 8px 0;
-  font-size: 16px;
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
   opacity: 0.9;
 }
 
 .time {
   margin: 0;
-  font-size: 14px;
+  font-size: 0.875rem;
   opacity: 0.8;
 }
 
 .welcome-icon {
-  font-size: 56px;
+  font-size: 3.5rem;
   opacity: 0.4;
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
@@ -902,44 +902,44 @@ onUnmounted(() => {
 
 .stats-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(15.625rem, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
 }
 
 .stat-card {
-  border-radius: 12px;
+  border-radius: 0.75rem;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-0.125rem);
+  box-shadow: 0 0.5rem 1.5625rem rgba(0, 0, 0, 0.1);
 }
 
 .stat-content {
   display: flex;
   align-items: center;
-  padding: 8px 0;
+  padding: 0.5rem 0;
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
+  width: 3.75rem;
+  height: 3.75rem;
+  border-radius: 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
+  font-size: 1.625rem;
   color: #fff;
-  margin-right: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-right: 1rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.15);
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .stat-card:hover .stat-icon {
   transform: scale(1.05);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0.375rem 1.25rem rgba(0, 0, 0, 0.2);
 }
 
 .user-icon { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
@@ -953,19 +953,19 @@ onUnmounted(() => {
 
 .stat-label {
   color: var(--text-secondary);
-  font-size: 14px;
-  margin-bottom: 4px;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 1.75rem;
   font-weight: bold;
   color: var(--text-primary);
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
 }
 
 .stat-change {
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 500;
 }
 
@@ -980,23 +980,23 @@ onUnmounted(() => {
 .dashboard-content {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  gap: 24px;
+  gap: 1.5rem;
 }
 
 .left-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 1.5rem;
 }
 
 .right-content {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 1.5rem;
 }
 
 .chart-card, .activity-card, .status-card, .quick-actions-card, .popular-card {
-  border-radius: 12px;
+  border-radius: 0.75rem;
 }
 
 .card-header {
@@ -1004,6 +1004,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   font-weight: bold;
+  font-size: 1rem;
 }
 
 .header-left {
@@ -1014,9 +1015,9 @@ onUnmounted(() => {
 .update-info {
   display: flex;
   align-items: center;
-  margin-left: 15px;
-  color: #666;
-  font-size: 12px;
+  margin-left: 0.9375rem;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
 }
 
 .header-right {
@@ -1025,7 +1026,7 @@ onUnmounted(() => {
 }
 
 .chart-container {
-  height: 300px;
+  height: 18.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1039,12 +1040,12 @@ onUnmounted(() => {
 
 .chart-placeholder {
   text-align: center;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .chart-placeholder i {
-  font-size: 48px;
-  margin-bottom: 16px;
+  font-size: 3rem;
+  margin-bottom: 1rem;
   opacity: 0.5;
 }
 
@@ -1079,7 +1080,7 @@ onUnmounted(() => {
 }
 
 .activity-list {
-  max-height: 300px;
+  max-height: 18.75rem;
   overflow-y: auto;
 }
 
@@ -1088,15 +1089,15 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 2.5rem 1.25rem;
   text-align: center;
 }
 
 .activity-item {
   display: flex;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .activity-item:last-child {
@@ -1104,16 +1105,16 @@ onUnmounted(() => {
 }
 
 .activity-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 12px;
-  font-size: 18px;
+  margin-right: 0.75rem;
+  font-size: 1.125rem;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.1);
   transition: transform 0.2s ease;
 }
 
@@ -1132,45 +1133,49 @@ onUnmounted(() => {
 
 .activity-title {
   font-weight: 500;
-  margin-bottom: 4px;
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
 }
 
 .activity-time {
-  font-size: 12px;
-  color: #999;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .status-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .status-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 0.5rem 0;
 }
 
 .status-label {
   font-weight: 500;
+  font-size: 0.875rem;
 }
 
 .quick-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .quick-actions .el-button {
   width: auto;
   justify-content: center;
   margin: 0 auto;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
 }
 
 .popular-list {
-  max-height: 200px;
+  max-height: 12.5rem;
   overflow-y: auto;
 }
 
@@ -1178,8 +1183,8 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .popular-item:last-child {
@@ -1188,11 +1193,12 @@ onUnmounted(() => {
 
 .package-name {
   font-weight: 500;
-  margin-bottom: 2px;
+  margin-bottom: 0.125rem;
+  font-size: 0.875rem;
 }
 
 .package-author {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary);
 }
 
@@ -1200,41 +1206,41 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 4px;
+  gap: 0.25rem;
 }
 
 .package-downloads {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-secondary);
   font-weight: 500;
 }
 
 .trend-tag {
-  font-size: 10px;
-  padding: 2px 6px;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.375rem;
 }
 
 .auto-refresh-status {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  border: 1px solid #ebeef5;
+  padding: 0.75rem 1.25rem;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .status-info {
   display: flex;
   align-items: center;
-  color: #606266;
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .status-info .el-icon {
-  margin-right: 8px;
-  font-size: 18px;
+  margin-right: 0.5rem;
+  font-size: 1.125rem;
   color: #409eff;
   animation: rotating 2s linear infinite;
 }
@@ -1259,11 +1265,11 @@ onUnmounted(() => {
 
 .update-notification {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 0.625rem;
+  right: 0.625rem;
   z-index: 1000;
-  width: 300px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 18.75rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
 }
 
 @media (max-width: 1200px) {
@@ -1272,7 +1278,7 @@ onUnmounted(() => {
   }
   
   .stats-cards {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
   }
 }
 
@@ -1287,7 +1293,19 @@ onUnmounted(() => {
   }
   
   .welcome-icon {
-    margin-top: 16px;
+    margin-top: 1rem;
+  }
+  
+  .chart-container {
+    height: 15rem;
+  }
+  
+  .activity-list {
+    max-height: 15rem;
+  }
+  
+  .popular-list {
+    max-height: 10rem;
   }
 }
 </style> 

@@ -554,8 +554,38 @@ function handleNetworkError(error: any) {
 .search-section {
   margin-bottom: 20px;
   padding: 20px;
-  background-color: #f5f7fa;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
+}
+
+.search-section .el-row {
+  align-items: center;
+}
+
+.search-section .el-col {
+  margin-bottom: 10px;
+}
+
+.search-section .el-button {
+  margin-right: 8px;
+  margin-bottom: 5px;
+}
+
+.search-section .el-button:last-child {
+  margin-right: 0;
+}
+
+@media (max-width: 768px) {
+  .search-section .el-col {
+    margin-bottom: 15px;
+  }
+  
+  .search-section .el-button {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
 }
 
 .pagination {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown } from '@element-plus/icons-vue'
+import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown, ZoomIn, ZoomOut, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserInfo, clearLoginStatus } from './utils/auth'
 
@@ -11,6 +11,11 @@ const activeMenu = computed(() => route.path)
 const isLoginPage = computed(() => route.path === '/login')
 const sidebarOpen = ref(false)
 
+// 缩放控制
+const scaleFactor = ref(1)
+const minScale = 0.8
+const maxScale = 1.4
+
 // 用户信息
 const userInfo = ref({
   username: '管理员',
@@ -19,6 +24,31 @@ const userInfo = ref({
 
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
+}
+
+// 缩放控制函数
+function zoomIn() {
+  if (scaleFactor.value < maxScale) {
+    scaleFactor.value = Math.min(scaleFactor.value + 0.1, maxScale)
+    updateScale()
+  }
+}
+
+function zoomOut() {
+  if (scaleFactor.value > minScale) {
+    scaleFactor.value = Math.max(scaleFactor.value - 0.1, minScale)
+    updateScale()
+  }
+}
+
+function resetZoom() {
+  scaleFactor.value = 1
+  updateScale()
+}
+
+function updateScale() {
+  document.documentElement.style.setProperty('--scale-factor', scaleFactor.value.toString())
+  localStorage.setItem('scale-factor', scaleFactor.value.toString())
 }
 
 // 退出登录
@@ -46,6 +76,14 @@ onMounted(() => {
   document.body.style.height = '100%'
   const app = document.getElementById('app')
   if (app) app.style.height = '100%'
+  
+  // 初始化缩放
+  const savedScale = localStorage.getItem('scale-factor')
+  if (savedScale) {
+    scaleFactor.value = parseFloat(savedScale)
+    updateScale()
+  }
+  
   // 初始化暗色模式
   const dark = localStorage.getItem('theme-dark') === '1'
   isDark.value = dark
@@ -87,6 +125,20 @@ function setDarkClass(val: boolean) {
         <span class="brand">绳包管理系统</span>
       </div>
       <div class="nav-right">
+        <!-- 缩放控制 -->
+        <div class="zoom-controls">
+          <el-button size="small" circle @click="zoomOut" :disabled="scaleFactor <= minScale">
+            <el-icon><ZoomOut /></el-icon>
+          </el-button>
+          <span class="zoom-text">{{ Math.round(scaleFactor * 100) }}%</span>
+          <el-button size="small" circle @click="zoomIn" :disabled="scaleFactor >= maxScale">
+            <el-icon><ZoomIn /></el-icon>
+          </el-button>
+          <el-button size="small" circle @click="resetZoom" :disabled="scaleFactor === 1">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </div>
+        
         <el-switch
           v-model="isDark"
           active-color="#222"
@@ -206,7 +258,24 @@ function setDarkClass(val: boolean) {
   background: var(--bg-primary);
   display: flex;
   flex-direction: column;
+  transform: scale(var(--scale-factor, 1));
+  transform-origin: top left;
 }
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 18px;
+}
+
+.zoom-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+
 .main-layout {
   background: var(--bg-primary);
   border-radius: 18px;
@@ -217,6 +286,7 @@ function setDarkClass(val: boolean) {
   min-height: 0;
   height: calc(100vh - 84px);
 }
+
 .top-nav {
   display: flex;
   justify-content: space-between;
@@ -232,26 +302,32 @@ function setDarkClass(val: boolean) {
   transition: box-shadow 0.3s;
   margin: 10px;
 }
+
 .nav-left {
   display: flex;
   align-items: center;
 }
+
 .menu-btn {
   margin-right: 18px;
   display: none;
 }
+
 .brand {
   font-size: 20px;
   font-weight: bold;
   color: var(--brand-color);
 }
+
 .nav-right {
   display: flex;
   align-items: center;
 }
+
 .side-drawer {
   display: none;
 }
+
 .side-aside {
   background: var(--bg-sidebar);
   min-height: 0;
@@ -263,6 +339,7 @@ function setDarkClass(val: boolean) {
   flex-direction: column;
   padding-bottom: 12px;
 }
+
 .side-menu {
   border-right: none;
   min-height: 0;
@@ -270,9 +347,11 @@ function setDarkClass(val: boolean) {
   font-size: 16px;
   flex: 1;
 }
+
 .side-menu-static {
   display: block;
 }
+
 .main-content {
   padding: 0;
   min-height: 0;
@@ -284,6 +363,7 @@ function setDarkClass(val: boolean) {
   flex-direction: column;
   min-width: 0;
 }
+
 .content-scroll {
   padding: 32px 32px 0 32px;
   min-height: 0;
@@ -292,6 +372,7 @@ function setDarkClass(val: boolean) {
   overflow-y: auto;
   box-sizing: border-box;
 }
+
 @media (max-width: 1200px) {
   .main-layout {
     padding: 8px;
@@ -303,7 +384,11 @@ function setDarkClass(val: boolean) {
   .content-scroll {
     padding: 18px 8px 0 8px;
   }
+  .zoom-controls {
+    margin-right: 12px;
+  }
 }
+
 @media (max-width: 900px) {
   .main-layout {
     padding: 2px;
@@ -315,24 +400,29 @@ function setDarkClass(val: boolean) {
   .content-scroll {
     padding: 12px 2px 0 2px;
   }
+  .zoom-controls {
+    margin-right: 8px;
+  }
+  .zoom-text {
+    display: none;
+  }
 }
+
 @media (max-width: 600px) {
-  .top-nav {
-    padding: 0 8px;
-    border-radius: 0 0 10px 10px;
-    font-size: 15px;
-  }
-  .brand {
-    font-size: 16px;
-  }
   .main-layout {
     padding: 0;
     margin: 0;
     border-radius: 0;
     box-shadow: none;
   }
+  .top-nav {
+    margin: 0;
+  }
   .content-scroll {
     padding: 6px 0 0 0;
+  }
+  .zoom-controls {
+    display: none;
   }
 }
 </style>
