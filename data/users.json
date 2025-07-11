@@ -1,0 +1,24 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "admin123",
+    "nickname": "管理员",
+    "star": 5,
+    "banned": false,
+    "sign_days": 0,
+    "sign_total": 0,
+    "last_sign": "",
+    "is_admin": true
+  },
+  "2154355737": {
+    "username": "2154355737",
+    "password": "ahk12378dx",
+    "nickname": "ki",
+    "star": 1,
+    "banned": false,
+    "sign_days": 0,
+    "sign_total": 1,
+    "last_sign": "2025-07-11",
+    "is_admin": false
+  }
+}
