@@ -109,6 +109,7 @@ export async function getApiCallStats() {
   const res = await api.get('/stats/api-calls', {
     params: { username }
   })
+  // 直接返回完整data，包含api_last_used
   return res.data
 }
 

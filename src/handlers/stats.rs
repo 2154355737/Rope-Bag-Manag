@@ -445,11 +445,13 @@ pub async fn get_api_call_stats(
         user_activity,
         performance_summary,
     };
-    
+    // 新增：组装带api_last_used的返回结构
+    let mut resp = serde_json::to_value(&api_call_stats).unwrap();
+    resp["api_last_used"] = serde_json::to_value(stats.api_last_used.clone()).unwrap();
     HttpResponse::Ok().json(ApiResponse { 
         code: 0, 
         msg: "获取API调用统计成功".to_string(), 
-        data: Some(&api_call_stats) 
+        data: Some(resp)
     })
 }
 

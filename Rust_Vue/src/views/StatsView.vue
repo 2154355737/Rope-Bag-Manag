@@ -227,12 +227,10 @@ const apiDetailsArr = computed(() => {
   if (!stats.value?.api_counts) return []
   
   const total = totalApiCalls.value
-  const now = Date.now()
-  
+  // 真实最后使用时间
+  const lastUsedMap = stats.value.api_last_used || {}
   return Object.entries(stats.value.api_counts).map(([api, count]) => {
-    // 模拟最后使用时间（基于调用次数生成一个相对时间）
-    const lastUsed = now - (Math.random() * 24 * 60 * 60 * 1000) // 随机生成过去24小时内的时间
-    
+    const lastUsed = lastUsedMap[api] || 0
     return {
       api,
       count: count as number,
@@ -339,6 +337,13 @@ function updateChart() {
   trendChart.setOption(option, true)
 }
 
+// 多色调色板
+const colorPalette = [
+  '#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE',
+  '#3BA272', '#FC8452', '#9A60B4', '#EA7CCC', '#FFB300',
+  '#00B8A9', '#F6416C', '#43D8C9', '#FFDE7D', '#B2A4FF'
+]
+
 function getChartOption() {
   const data = apiCountsArr.value.slice(0, 10) // 只显示前10个API
   
@@ -346,59 +351,84 @@ function getChartOption() {
   const isDark = document.body.classList.contains('dark') || 
                  document.documentElement.classList.contains('dark')
   
-  const textColor = isDark ? '#ffffff' : '#333333'
-  const backgroundColor = isDark ? '#1a1a1a' : '#ffffff'
-  const axisLineColor = isDark ? '#444444' : '#e4e7ed'
-  const gridColor = isDark ? '#333333' : '#f5f5f5'
+  // 主题配置
+  const theme = {
+    textColor: isDark ? '#ffffff' : '#333333',
+    backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+    axisLineColor: isDark ? '#444444' : '#e4e7ed',
+    gridColor: isDark ? '#333333' : '#f5f5f5',
+    tooltipBg: isDark ? '#2a2a2a' : '#ffffff',
+    tooltipBorder: isDark ? '#444444' : '#e4e7ed',
+    labelBg: isDark ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+    shadowColor: isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.2)'
+  }
   
   if (chartType.value === 'pie') {
     return {
-      backgroundColor: backgroundColor,
+      color: colorPalette,
+      backgroundColor: theme.backgroundColor,
       title: {
         text: 'API调用量分布',
         left: 'center',
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       tooltip: {
         trigger: 'item',
         formatter: '{a} <br/>{b}: {c} ({d}%)',
-        backgroundColor: isDark ? '#2a2a2a' : '#ffffff',
-        borderColor: isDark ? '#444444' : '#e4e7ed',
+        backgroundColor: theme.tooltipBg,
+        borderColor: theme.tooltipBorder,
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       series: [{
         name: 'API调用量',
         type: 'pie',
-        radius: '50%',
+        radius: ['40%', '70%'],
+        center: ['50%', '50%'],
         data: data.map(item => ({
           name: item.api,
           value: item.count,
           itemStyle: {
-            color: getApiBarColor(item.count)
+            color: getApiGradientColor(item.count),
+            borderRadius: 4,
+            borderWidth: 2,
+            borderColor: theme.backgroundColor
           }
-        }))
+        })),
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        animationType: 'scale',
+        animationEasing: 'elasticOut',
+        animationDelay: function (idx: number) {
+          return Math.random() * 200;
+        }
       }]
     }
   } else if (chartType.value === 'line') {
     return {
-      backgroundColor: backgroundColor,
+      color: colorPalette,
+      backgroundColor: theme.backgroundColor,
       title: {
         text: 'API调用量趋势',
         left: 'center',
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: isDark ? '#2a2a2a' : '#ffffff',
-        borderColor: isDark ? '#444444' : '#e4e7ed',
+        backgroundColor: theme.tooltipBg,
+        borderColor: theme.tooltipBorder,
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       xAxis: {
@@ -407,11 +437,11 @@ function getChartOption() {
         axisLabel: {
           rotate: 45,
           fontSize: 10,
-          color: textColor
+          color: theme.textColor
         },
         axisLine: {
           lineStyle: {
-            color: axisLineColor
+            color: theme.axisLineColor
           }
         }
       },
@@ -419,19 +449,19 @@ function getChartOption() {
         type: 'value',
         name: '调用次数',
         nameTextStyle: {
-          color: textColor
+          color: theme.textColor
         },
         axisLabel: {
-          color: textColor
+          color: theme.textColor
         },
         axisLine: {
           lineStyle: {
-            color: axisLineColor
+            color: theme.axisLineColor
           }
         },
         splitLine: {
           lineStyle: {
-            color: gridColor
+            color: theme.gridColor
           }
         }
       },
@@ -451,21 +481,44 @@ function getChartOption() {
           }
         })),
         smooth: true,
+        lineStyle: {
+          width: 3,
+          shadowBlur: 5,
+          shadowColor: 'rgba(0, 0, 0, 0.2)'
+        },
+        symbol: 'circle',
+        symbolSize: 8,
         label: {
           show: true,
           position: 'top',
-          color: textColor
-        }
+          color: theme.textColor,
+          fontSize: 10,
+          fontWeight: 'bold',
+          backgroundColor: isDark ? 'rgba(26, 26, 26, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+          borderRadius: 4,
+          padding: [4, 8]
+        },
+        emphasis: {
+          lineStyle: {
+            width: 5,
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.3)'
+          },
+          symbolSize: 12
+        },
+        animationDuration: 1000,
+        animationEasing: 'cubicOut'
       }]
     }
   } else {
     return {
-      backgroundColor: backgroundColor,
+      color: colorPalette,
+      backgroundColor: theme.backgroundColor,
       title: {
         text: 'API调用量统计',
         left: 'center',
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       tooltip: {
@@ -473,7 +526,7 @@ function getChartOption() {
         backgroundColor: isDark ? '#2a2a2a' : '#ffffff',
         borderColor: isDark ? '#444444' : '#e4e7ed',
         textStyle: {
-          color: textColor
+          color: theme.textColor
         }
       },
       xAxis: {
@@ -482,11 +535,11 @@ function getChartOption() {
         axisLabel: {
           rotate: 45,
           fontSize: 10,
-          color: textColor
+          color: theme.textColor
         },
         axisLine: {
           lineStyle: {
-            color: axisLineColor
+            color: theme.axisLineColor
           }
         }
       },
@@ -494,19 +547,19 @@ function getChartOption() {
         type: 'value',
         name: '调用次数',
         nameTextStyle: {
-          color: textColor
+          color: theme.textColor
         },
         axisLabel: {
-          color: textColor
+          color: theme.textColor
         },
         axisLine: {
           lineStyle: {
-            color: axisLineColor
+            color: theme.axisLineColor
           }
         },
         splitLine: {
           lineStyle: {
-            color: gridColor
+            color: theme.gridColor
           }
         }
       },
@@ -522,14 +575,29 @@ function getChartOption() {
         data: data.map(item => ({
           value: item.count,
           itemStyle: {
-            color: getApiBarColor(item.count)
+            color: getApiGradientColor(item.count),
+            borderRadius: [4, 4, 0, 0],
+            shadowBlur: 5,
+            shadowColor: 'rgba(0, 0, 0, 0.2)',
+            shadowOffsetY: 2
           }
         })),
         label: {
           show: true,
           position: 'top',
-          color: textColor
-        }
+          color: theme.textColor,
+          fontSize: 10,
+          fontWeight: 'bold'
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.3)',
+            shadowOffsetY: 4
+          }
+        },
+        animationDuration: 1000,
+        animationEasing: 'cubicOut'
       }]
     }
   }
@@ -543,11 +611,103 @@ function getBarColor(count: number): string {
 }
 
 function getApiBarColor(count: number): string {
-  if (count >= 1000) return '#ff4757' // 红色 - 高频调用
-  if (count >= 500) return '#ffa502'   // 橙色 - 中高频调用
-  if (count >= 100) return '#2ed573'   // 绿色 - 中频调用
-  if (count >= 50) return '#70a1ff'    // 蓝色 - 低频调用
-  return '#a4b0be'                     // 灰色 - 极低频调用
+  // 根据真实API使用频率设计的美观颜色方案
+  if (count >= 1000) return '#ff6b6b' // 鲜艳红色 - 超高频调用
+  if (count >= 500) return '#ffd93d'   // 金黄色 - 高频调用
+  if (count >= 200) return '#6bcf7f'   // 翠绿色 - 中高频调用
+  if (count >= 100) return '#74c0fc'   // 天蓝色 - 中频调用
+  if (count >= 50) return '#a8e6cf'    // 薄荷绿 - 低频调用
+  if (count >= 20) return '#dda0dd'    // 淡紫色 - 较低频调用
+  return '#f8f9fa'                     // 浅灰色 - 极低频调用
+}
+
+// 根据API使用频率获取渐变颜色
+function getApiGradientColor(count: number): any {
+  const isDark = document.body.classList.contains('dark') || 
+                 document.documentElement.classList.contains('dark')
+  
+  // 获取当前API调用数据的统计信息
+  const apiCounts = apiCountsArr.value
+  if (apiCounts.length === 0) {
+    return getApiBarColor(count)
+  }
+  
+  // 计算数据分布
+  const counts = apiCounts.map(item => item.count)
+  const maxCount = Math.max(...counts)
+  const minCount = Math.min(...counts)
+  const avgCount = counts.reduce((sum, count) => sum + count, 0) / counts.length
+  
+  // 根据数据分布动态调整颜色阈值
+  const highThreshold = Math.max(1000, maxCount * 0.8)
+  const mediumThreshold = Math.max(500, avgCount * 2)
+  const lowThreshold = Math.max(100, avgCount)
+  const veryLowThreshold = Math.max(50, avgCount * 0.5)
+  
+  if (count >= highThreshold) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#ff6b6b' },
+        { offset: 1, color: '#ff4757' }
+      ]
+    }
+  } else if (count >= mediumThreshold) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#ffd93d' },
+        { offset: 1, color: '#ffa502' }
+      ]
+    }
+  } else if (count >= lowThreshold) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#6bcf7f' },
+        { offset: 1, color: '#2ed573' }
+      ]
+    }
+  } else if (count >= veryLowThreshold) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#74c0fc' },
+        { offset: 1, color: '#409eff' }
+      ]
+    }
+  } else if (count >= 20) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#a8e6cf' },
+        { offset: 1, color: '#6bcf7f' }
+      ]
+    }
+  } else if (count >= 10) {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: '#dda0dd' },
+        { offset: 1, color: '#c44569' }
+      ]
+    }
+  } else {
+    return {
+      type: 'linear',
+      x: 0, y: 0, x2: 0, y2: 1,
+      colorStops: [
+        { offset: 0, color: isDark ? '#444444' : '#f8f9fa' },
+        { offset: 1, color: isDark ? '#333333' : '#e9ecef' }
+      ]
+    }
+  }
 }
 
 // 导出功能

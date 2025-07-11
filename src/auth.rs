@@ -125,6 +125,9 @@ pub fn record_api_call(
     
     // 添加API调用记录
     stats_guard.api_calls.push(api_call_record.clone());
+
+    // 记录API最后调用时间
+    stats_guard.api_last_used.insert(api_name.to_string(), end_time);
     
     // 限制记录数量，保留最近1000条记录
     if stats_guard.api_calls.len() > 1000 {

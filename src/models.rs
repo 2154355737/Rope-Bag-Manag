@@ -36,6 +36,7 @@ pub struct Stats {
     pub downloads: HashMap<String, u32>,
     pub api_calls: Vec<ApiCallRecord>,
     pub api_performance: HashMap<String, ApiPerformance>,
+    pub api_last_used: HashMap<String, u64>, // 新增字段
 }
 
 // ====== API调用记录结构 ======
