@@ -10,11 +10,22 @@
     "last_sign": "",
     "is_admin": true
   },
+  "2154355738": {
+    "username": "2154355738",
+    "password": "ahk12378dx",
+    "nickname": "cs",
+    "star": 1,
+    "banned": false,
+    "sign_days": 0,
+    "sign_total": 0,
+    "last_sign": "",
+    "is_admin": false
+  },
   "2154355737": {
     "username": "2154355737",
     "password": "ahk12378dx",
     "nickname": "ki",
-    "star": 4,
+    "star": 5,
     "banned": false,
     "sign_days": 0,
     "sign_total": 1,

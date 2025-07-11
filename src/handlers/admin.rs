@@ -44,10 +44,10 @@ pub async fn admin_set_user(
 
     let mut users = data.users.lock().unwrap();
     if let Some(user) = users.get_mut(target) {
-        if let Some(n) = params.get("new_name") {
+        if let Some(n) = params.get("nickname") {
             user.nickname = n.clone();
         }
-        if let Some(p) = params.get("new_password") {
+        if let Some(p) = params.get("password") {
             user.password = p.clone();
         }
         save_json("data/users.json", &*users);
@@ -100,7 +100,7 @@ pub async fn admin_ban_user(
         Some(t) => t,
         None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标".to_string(), data: None }),
     };
-    let ban = match params.get("ban") {
+    let ban = match params.get("banned") {
         Some(b) => *b == "true",
         None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少封禁状态".to_string(), data: None }),
     };
@@ -148,6 +148,9 @@ pub async fn admin_add_rope_package(
 
     let mut ropes = data.ropes.lock().unwrap();
     let id = ropes.len() as u32 + 1;
+    // 获取当前时间作为上架时间
+    let upload_time = chrono::Local::now().format("%Y-%m-%d").to_string();
+    
     ropes.insert(id, crate::models::RopePackage {
         id,
         name: name.clone(),
@@ -156,6 +159,7 @@ pub async fn admin_add_rope_package(
         desc: desc.clone(),
         url: url.clone(),
         downloads: 0,
+        upload_time,
     });
     save_json("data/data.json", &*ropes);
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包添加成功".to_string(), data: None })

@@ -5,12 +5,12 @@ use crate::models::{RopePackages};
 use crate::utils::{load_json, save_json};
 use std::process::Command;
 
-pub fn start_command_listener(users: Users, ropes: RopePackages, config: crate::config::AppConfig) {
+pub fn start_command_listener(users: Users, ropes: RopePackages, _config: crate::config::AppConfig) {
     thread::spawn(move || {
         let stdin = io::stdin();
-        let mut users_ref = users.clone();
-        let mut ropes_ref = ropes.clone();
-        let mut config_ref = config.clone();
+        let users_ref = users.clone();
+        let ropes_ref = ropes.clone();
+        // let config_ref = config.clone(); // 已不使用
         for line in stdin.lock().lines() {
             let input = line.unwrap();
             let args: Vec<&str> = input.trim().split_whitespace().collect();
@@ -46,6 +46,9 @@ pub fn start_command_listener(users: Users, ropes: RopePackages, config: crate::
                     let url = args[5];
                     let mut ropes = ropes_ref.lock().unwrap();
                     let id = ropes.len() as u32 + 1;
+                    // 获取当前时间作为上架时间
+                    let upload_time = chrono::Local::now().format("%Y-%m-%d").to_string();
+                    
                     ropes.insert(id, crate::models::RopePackage {
                         id,
                         name: name.to_string(),
@@ -54,6 +57,7 @@ pub fn start_command_listener(users: Users, ropes: RopePackages, config: crate::
                         desc: desc.to_string(),
                         url: url.to_string(),
                         downloads: 0,
+                        upload_time,
                     });
                     save_json("data/data.json", &*ropes);
                     println!("[CMD] 绳包添加成功");
@@ -92,7 +96,25 @@ pub fn start_command_listener(users: Users, ropes: RopePackages, config: crate::
                     std::process::exit(0);
                 }
                 "help" => {
-                    println!("[CMD] 支持的指令: reload-config | show-users | clear-logs | exit | add-rope | delete-rope | reload-users | safe-exit | restart | help");
+                    println!("\n=== 绳包管理器命令帮助 ===");
+                    println!("[常用命令]");
+                    println!("  show-users         显示所有用户");
+                    println!("  reload-users       重新加载用户数据库");
+                    println!("  clear-logs         清空日志文件");
+                    println!("  exit               立即关闭服务端");
+                    println!("  safe-exit          安全关闭服务端（推荐）");
+                    println!("  restart            重启服务端");
+                    println!("");
+                    println!("[绳包管理]");
+                    println!("  add-rope <name> <author> <version> <desc> <url>   添加绳包（本地/管理员）");
+                    println!("  delete-rope <id>                                   删除绳包（本地/管理员）");
+                    println!("");
+                    println!("[说明]");
+                    println!("  1. 管理员相关API请用Web接口，终端命令仅限本地维护。");
+                    println!("  2. 参数如有空格请用引号包裹，url需完整。");
+                    println!("  3. 详细API请查阅 docs/接口文档.md 或输入 help-api。");
+                    println!("");
+                    println!("更多命令可根据实际需求扩展。\n");
                 }
                 other => {
                     println!("[CMD] 未知指令: {}", other);

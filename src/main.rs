@@ -49,7 +49,8 @@ async fn main() -> std::io::Result<()> {
             version: item.版本,
             desc: item.简介,
             url: item.项目直链,
-            downloads: 0,
+            downloads: item.下载次数,
+            upload_time: item.上架时间,
         });
     }
 
@@ -70,10 +71,10 @@ async fn main() -> std::io::Result<()> {
     log::info!("数据加载完成，启动HTTP服务...");
     log::info!("服务地址: {}:{}", app_config.server.host, app_config.server.port);
 
-    // 启动服务
+    // 启动服务 
     HttpServer::new(move || {
         App::new()
-            .wrap(RequestLogger)
+            .wrap(RequestLogger)      
             .app_data(web::Data::new(AppState {
                 users: users.clone(),
                 ropes: ropes.clone(),
@@ -102,6 +103,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::admin_add_rope_package)
             .service(handlers::admin_delete_rope_package)
             .service(handlers::set_admin)
+            .service(handlers::get_dashboard_data)
             .service(handlers::stats_downloads)
             .service(handlers::stats_api_counts)
             .service(handlers::get_users_db)

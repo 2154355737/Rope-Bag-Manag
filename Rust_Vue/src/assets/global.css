@@ -1,0 +1,62 @@
+html, body, #app {
+  height: 100%;
+  min-height: 100%;
+  width: 100%;
+  min-width: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 浅色模式变量 */
+:root {
+  --bg-primary: #f6f8fa;
+  --bg-card: #fff;
+  --bg-nav: #fff;
+  --bg-sidebar: #fff;
+  --text-primary: #333;
+  --text-secondary: #666;
+  --border-color: #f0f1f2;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --brand-color: #42b983;
+}
+
+/* 暗黑模式变量 */
+.dark {
+  --bg-primary: #1a1a1a;
+  --bg-card: #2d2d2d;
+  --bg-nav: #2d2d2d;
+  --bg-sidebar: #2d2d2d;
+  --text-primary: #e5e5e5;
+  --text-secondary: #b0b0b0;
+  --border-color: #404040;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --brand-color: #67c23a;
+}
+
+/* 全局暗黑模式样式 */
+.dark body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.dark .el-card {
+  background-color: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.dark .el-menu {
+  background-color: var(--bg-card);
+}
+
+.dark .el-menu-item {
+  color: var(--text-primary);
+}
+
+.dark .el-menu-item:hover {
+  background-color: var(--border-color);
+}
+
+.dark .el-menu-item.is-active {
+  color: var(--brand-color);
+} 

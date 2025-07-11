@@ -26,13 +26,14 @@ pub struct RopePackage {
     pub desc: String,
     pub url: String,
     pub downloads: u32,
+    pub upload_time: String,
 }
 
 // ====== 统计数据结构 ======
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Stats {
     pub api_counts: HashMap<String, u32>,
-    pub downloads: HashMap<u32, u32>,
+    pub downloads: HashMap<String, u32>,
 }
 
 // ====== 配置数据结构 ======
@@ -79,6 +80,10 @@ pub struct RawRopePackage {
     pub 版本: String,
     pub 简介: String,
     pub 项目直链: String,
+    #[serde(default)]
+    pub 下载次数: u32,
+    #[serde(default)]
+    pub 上架时间: String,
 }
 
 // ====== 原始数据JSON结构 ======

@@ -1,7 +1,7 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": 15201,
+    "port": 15202,
     "workers": 4
   },
   "logging": {

@@ -1,10 +1,10 @@
 use actix_web::{web, HttpResponse, Responder, get};
-use crate::models::{AppState, RopePackage};
+use crate::models::{AppState};
 use crate::utils::{parse_query_params, save_json, load_json};
 use crate::auth::check_rate_limit;
 use serde::Serialize;
-use crate::models::{RawDataJson, RawRopePackage, DatabaseConfig};
 use chrono::Local;
+use crate::models::{RawDataJson, RawRopePackage};
 
 #[derive(Serialize)]
 struct ApiResponse<T> {
@@ -83,6 +83,9 @@ pub async fn add_rope_package(
     // 读取原始数据库
     let mut raw_data: RawDataJson = load_json("data/data.json");
     let new_id = raw_data.绳包列表.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+    // 获取当前时间作为上架时间
+    let upload_time = Local::now().format("%Y-%m-%d").to_string();
+    
     raw_data.绳包列表.push(RawRopePackage {
         id: new_id,
         绳包名称: name.clone(),
@@ -90,6 +93,8 @@ pub async fn add_rope_package(
         版本: version.clone(),
         简介: desc.clone(),
         项目直链: url.clone(),
+        下载次数: 0,
+        上架时间: upload_time,
     });
     // 自动更新数据库配置
     raw_data.数据库配置.数据库名称 = "结绳绳包数据库".to_string();
@@ -119,10 +124,20 @@ pub async fn download_rope_package(
     let mut ropes = data.ropes.lock().unwrap();
     if let Some(rope) = ropes.get_mut(&id) {
         rope.downloads += 1;
-        save_json("data/data.json", &*ropes);
+        
+        // 同时更新数据库文件中的下载次数
+        let mut raw_data: RawDataJson = load_json("data/data.json");
+        for raw_rope in &mut raw_data.绳包列表 {
+            if raw_rope.id == id {
+                raw_rope.下载次数 = rope.downloads;
+                break;
+            }
+        }
+        save_json("data/data.json", &raw_data);
         
         let mut stats = data.stats.lock().unwrap();
-        *stats.downloads.entry(id).or_insert(0) += 1;
+        let id_str = id.to_string();
+        *stats.downloads.entry(id_str).or_insert(0) += 1;
         save_json("data/stats.json", &*stats);
         return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "下载统计成功".to_string(), data: None });
     }

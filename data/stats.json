@@ -1,4 +1,10 @@
 {
-  "api_counts": {},
-  "downloads": {}
-} 
+  "api_counts": {
+    "login": 1,
+    "register": 2,
+    "download_rope_package": 5
+  },
+  "downloads": {
+    "11": 4
+  }
+}
