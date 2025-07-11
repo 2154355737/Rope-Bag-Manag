@@ -860,7 +860,7 @@ onUnmounted(() => {
 .welcome-card {
   margin-bottom: 24px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: 16px;
 }
@@ -952,7 +952,7 @@ onUnmounted(() => {
 }
 
 .stat-label {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 14px;
   margin-bottom: 4px;
 }
@@ -960,7 +960,7 @@ onUnmounted(() => {
 .stat-value {
   font-size: 28px;
   font-weight: bold;
-  color: #333;
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
@@ -1164,8 +1164,9 @@ onUnmounted(() => {
 }
 
 .quick-actions .el-button {
-  width: 100%;
-  justify-content: flex-start;
+  width: auto;
+  justify-content: center;
+  margin: 0 auto;
 }
 
 .popular-list {
@@ -1192,7 +1193,7 @@ onUnmounted(() => {
 
 .package-author {
   font-size: 12px;
-  color: #999;
+  color: var(--text-secondary);
 }
 
 .package-stats {
@@ -1204,7 +1205,7 @@ onUnmounted(() => {
 
 .package-downloads {
   font-size: 12px;
-  color: #666;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 

@@ -148,8 +148,8 @@ function setDarkClass(val: boolean) {
           </el-menu-item>
         </el-menu>
     </el-drawer>
-    <!-- 主内容区 -->
-    <div v-if="!isLoginPage" class="main-content-wrap">
+    <!-- 统一背景和圆角的主布局容器 -->
+    <div v-if="!isLoginPage" class="main-layout">
       <el-container class="full-height">
         <el-aside class="side-aside" width="180px">
           <el-menu :default-active="activeMenu" router background-color="#fff" text-color="#333" active-text-color="#42b983" class="side-menu side-menu-static">
@@ -207,6 +207,16 @@ function setDarkClass(val: boolean) {
   display: flex;
   flex-direction: column;
 }
+.main-layout {
+  background: var(--bg-primary);
+  border-radius: 18px;
+  box-shadow: 0 2px 16px var(--shadow-color);
+  padding: 24px;
+  margin: 10px;
+  display: flex;
+  min-height: 0;
+  height: calc(100vh - 84px);
+}
 .top-nav {
   display: flex;
   justify-content: space-between;
@@ -242,29 +252,12 @@ function setDarkClass(val: boolean) {
 .side-drawer {
   display: none;
 }
-.main-content-wrap {
-  margin-top: 12px;
-  flex: 1;
-  min-height: 0;
-  height: calc(100vh - 60px);
-  display: flex;
-}
-.full-height {
-  height: 100% !important;
-  min-height: 0 !important;
-  flex: 1;
-}
-.el-container {
-  height: 100%;
-  min-height: 0;
-  flex: 1;
-}
 .side-aside {
   background: var(--bg-sidebar);
   min-height: 0;
   height: 100%;
   box-shadow: 2px 0 8px var(--shadow-color);
-  border-radius: 0 18px 18px 0;
+  border-radius: 18px;
   transition: box-shadow 0.3s;
   display: flex;
   flex-direction: column;
@@ -300,23 +293,24 @@ function setDarkClass(val: boolean) {
   box-sizing: border-box;
 }
 @media (max-width: 1200px) {
+  .main-layout {
+    padding: 8px;
+    margin: 4px;
+  }
+  .top-nav {
+    margin: 4px;
+  }
   .content-scroll {
     padding: 18px 8px 0 8px;
   }
 }
 @media (max-width: 900px) {
-  .side-aside {
-    display: none;
+  .main-layout {
+    padding: 2px;
+    margin: 2px;
   }
-  .side-drawer {
-    display: block !important;
-  }
-  .menu-btn {
-    display: inline-flex;
-  }
-  .main-content {
-    padding: 0;
-    border-radius: 12px;
+  .top-nav {
+    margin: 2px;
   }
   .content-scroll {
     padding: 12px 2px 0 2px;
@@ -330,6 +324,12 @@ function setDarkClass(val: boolean) {
   }
   .brand {
     font-size: 16px;
+  }
+  .main-layout {
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
   .content-scroll {
     padding: 6px 0 0 0;
