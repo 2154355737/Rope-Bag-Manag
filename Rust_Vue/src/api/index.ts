@@ -44,7 +44,22 @@ export async function getUsers() {
 }
 
 export async function getPackages() {
-  const res = await api.get('/get-data-db')
+  // 从localStorage获取当前用户信息
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin' // 默认使用admin
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
+  }
+  
+  const res = await api.get('/get-data-db', {
+    params: { username }
+  })
   return res.data
 }
 

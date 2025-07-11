@@ -101,6 +101,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::admin_set_star)
             .service(handlers::admin_ban_user)
             .service(handlers::admin_add_rope_package)
+            .service(handlers::admin_update_rope_package)
             .service(handlers::admin_delete_rope_package)
             .service(handlers::set_admin)
             .service(handlers::get_dashboard_data)

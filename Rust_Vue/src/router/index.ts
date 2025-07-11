@@ -27,6 +27,11 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   { 
+    path: '/packages-mobile', 
+    component: () => import('../views/PackageManageMobile.vue'),
+    meta: { requiresAuth: true }
+  },
+  { 
     path: '/logs', 
     component: () => import('../views/LogView.vue'),
     meta: { requiresAuth: true }

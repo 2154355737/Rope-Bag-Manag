@@ -43,10 +43,30 @@ function autoSwitchUserManagePage() {
   }
 }
 
+// 自动切换到合适的绳包管理页面
+function autoSwitchPackageManagePage() {
+  const currentPath = route.path
+  if (currentPath === '/packages' || currentPath === '/packages-mobile') {
+    const shouldUseMobile = shouldUseMobileVersion()
+    const targetPath = shouldUseMobile ? '/packages-mobile' : '/packages'
+    
+    if (currentPath !== targetPath) {
+      router.push(targetPath)
+    }
+  }
+}
+
 // 导航到用户管理页面（自动选择合适版本）
 function navigateToUserManage() {
   const shouldUseMobile = shouldUseMobileVersion()
   const targetPath = shouldUseMobile ? '/users-mobile' : '/users'
+  router.push(targetPath)
+}
+
+// 导航到绳包管理页面（自动选择合适版本）
+function navigateToPackageManage() {
+  const shouldUseMobile = shouldUseMobileVersion()
+  const targetPath = shouldUseMobile ? '/packages-mobile' : '/packages'
   router.push(targetPath)
 }
 
@@ -123,6 +143,7 @@ onMounted(() => {
   screenSizeCleanup = onScreenSizeChange((deviceType) => {
     // 当设备类型改变时，自动切换到合适的页面
     autoSwitchUserManagePage()
+    autoSwitchPackageManagePage()
   })
 })
 
@@ -217,7 +238,7 @@ function setDarkClass(val: boolean) {
         <el-icon><User /></el-icon>
         <span>用户</span>
       </div>
-      <div class="mobile-nav-item" :class="{ active: activeMenu === '/packages' }" @click="router.push('/packages')">
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/packages' || activeMenu === '/packages-mobile' }" @click="navigateToPackageManage">
         <el-icon><Box /></el-icon>
         <span>绳包</span>
       </div>
@@ -250,7 +271,7 @@ function setDarkClass(val: boolean) {
           </el-icon>
           <span>用户管理</span>
         </el-menu-item>
-        <el-menu-item index="/packages">
+        <el-menu-item index="/packages" @click="navigateToPackageManage">
           <el-icon>
             <Box />
           </el-icon>
@@ -295,7 +316,7 @@ function setDarkClass(val: boolean) {
               </el-icon>
               用户管理
             </el-menu-item>
-            <el-menu-item index="/packages">
+            <el-menu-item index="/packages" @click="navigateToPackageManage">
               <el-icon>
                 <Box />
               </el-icon>
