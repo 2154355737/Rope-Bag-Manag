@@ -36,9 +36,12 @@
         <el-icon :class="{ 'rotating': isLoading }">
           <Refresh />
         </el-icon>
-        <span v-if="isLoading">正在更新数据...</span>
-        <span v-else-if="autoRefreshEnabled">自动刷新已启用 ({{ Math.round(refreshInterval / 1000) }}秒间隔)</span>
-        <span v-else>自动刷新已禁用</span>
+        <span v-if="isLoading" class="status-text">正在更新数据...</span>
+        <span v-else-if="autoRefreshEnabled" class="status-text">
+          <span class="desktop-only">自动刷新已启用 ({{ Math.round(refreshInterval / 1000) }}秒间隔)</span>
+          <span class="mobile-only">自动刷新已启用</span>
+        </span>
+        <span v-else class="status-text">自动刷新已禁用</span>
       </div>
       <div class="status-actions">
         <el-button 
@@ -46,14 +49,16 @@
           type="primary" 
           :loading="isLoading"
           @click="refreshData"
+          class="refresh-btn"
         >
-          立即刷新
+          <span class="desktop-only">立即刷新</span>
+          <span class="mobile-only">刷新</span>
         </el-button>
       </div>
     </div>
 
     <!-- 统计卡片 -->
-    <div class="stats-cards">
+    <div class="stats-cards" :key="`stats-${forceUpdate}`">
       <el-card class="stat-card" :class="{ 'data-update': !isLoading }">
         <div class="stat-content">
           <div class="stat-icon user-icon">
@@ -124,7 +129,7 @@
     </div>
 
     <!-- 图表和详细信息 -->
-    <div class="dashboard-content">
+    <div class="dashboard-content" :key="`content-${forceUpdate}`">
       <!-- 左侧：图表和活动 -->
       <div class="left-content">
         <!-- 神包下载趋势图 -->
@@ -159,7 +164,13 @@
             </div>
           </template>
           <div class="chart-container">
-            <v-chart v-if="packageDownloadTrends.length > 0" :option="packageChartOption" class="chart" />
+            <v-chart 
+              v-if="packageDownloadTrends.length > 0" 
+              :option="packageChartOption" 
+              class="chart"
+              :key="`chart-${forceUpdate}`"
+              @resize="handleChartResize"
+            />
             <div v-else class="chart-placeholder">
               <el-icon :size="48">
                 <DataAnalysis />
@@ -256,29 +267,33 @@
             </div>
           </template>
           <div class="quick-actions">
-            <el-button type="primary" @click="goToUsers">
+            <el-button type="primary" @click="goToUsers" class="action-btn">
               <el-icon>
                 <User />
               </el-icon>
-              添加用户
+              <span class="desktop-only">添加用户</span>
+              <span class="mobile-only">用户</span>
             </el-button>
-            <el-button type="success" @click="goToPackages">
+            <el-button type="success" @click="goToPackages" class="action-btn">
               <el-icon>
                 <Box />
               </el-icon>
-              添加绳包
+              <span class="desktop-only">添加绳包</span>
+              <span class="mobile-only">绳包</span>
             </el-button>
-            <el-button type="warning" @click="goToLogs">
+            <el-button type="warning" @click="goToLogs" class="action-btn">
               <el-icon>
                 <Document />
               </el-icon>
-              查看日志
+              <span class="desktop-only">查看日志</span>
+              <span class="mobile-only">日志</span>
             </el-button>
-            <el-button type="info" @click="goToStats">
+            <el-button type="info" @click="goToStats" class="action-btn">
               <el-icon>
                 <DataAnalysis />
               </el-icon>
-              查看统计
+              <span class="desktop-only">查看统计</span>
+              <span class="mobile-only">统计</span>
             </el-button>
           </div>
         </el-card>
@@ -317,7 +332,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboardData } from '../api'
 import VChart from 'vue-echarts'
@@ -388,6 +403,62 @@ const recentActivities = ref<any[]>([])
 
 // 热门绳包数据
 const popularPackages = ref<any[]>([])
+
+// 响应式布局相关
+const isMobile = ref(false)
+const isTablet = ref(false)
+const windowWidth = ref(0)
+const forceUpdate = ref(0)
+let resizeTimeout: number | null = null
+
+// 检测设备类型
+const detectDeviceType = () => {
+  const width = window.innerWidth
+  const oldWidth = windowWidth.value
+  windowWidth.value = width
+  isMobile.value = width <= 768
+  isTablet.value = width > 768 && width <= 1200
+  
+  // 只在宽度真正变化时记录日志
+  if (oldWidth !== width) {
+    console.log('设备检测:', { 
+      oldWidth, 
+      newWidth: width, 
+      isMobile: isMobile.value, 
+      isTablet: isTablet.value,
+      timestamp: new Date().toLocaleTimeString()
+    })
+  }
+}
+
+// 处理窗口大小变化
+const handleResize = () => {
+  // 清除之前的定时器
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+  }
+  
+  // 防抖处理，300ms后执行
+  resizeTimeout = window.setTimeout(() => {
+    detectDeviceType()
+    // 强制重新渲染图表和布局
+    forceUpdate.value++
+    
+    // 延迟执行，确保DOM更新完成
+    nextTick(() => {
+      // 触发图表重新渲染
+      if (packageDownloadTrends.value.length > 0) {
+        // 这里可以触发ECharts的resize事件
+        console.log('窗口大小变化，触发重新渲染')
+      }
+    })
+  }, 300)
+}
+
+// 处理图表大小变化
+const handleChartResize = () => {
+  console.log('图表大小变化事件触发')
+}
 
 // 根据活动类型获取图标组件
 const getActivityIcon = (iconName: string) => {
@@ -831,6 +902,13 @@ const goToStats = () => router.push('/stats')
 
 onMounted(() => {
   console.log('仪表盘组件挂载，开始初始化...')
+  
+  // 初始化设备检测
+  detectDeviceType()
+  
+  // 添加窗口大小变化监听
+  window.addEventListener('resize', handleResize)
+  
   loadData()
   updateTime()
   updateLastRefreshTime()
@@ -845,6 +923,14 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 移除窗口大小变化监听
+  window.removeEventListener('resize', handleResize)
+  
+  // 清理定时器
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+  }
+  
   if (timeInterval) {
     clearInterval(timeInterval)
   }
@@ -1272,15 +1358,47 @@ onUnmounted(() => {
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
 }
 
-/* 手机端适配 */
-@media (max-width: 768px) {
-  .dashboard {
-    padding: 0;
+/* 响应式适配 */
+
+/* 平板适配 (768px - 1200px) */
+@media (max-width: 1200px) {
+  .dashboard-content {
+    grid-template-columns: 1fr;
   }
   
+  .stats-cards {
+    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  }
+  
+  .chart-container {
+    height: 16rem;
+  }
+  
+  .activity-list {
+    max-height: 16rem;
+  }
+  
+  .popular-list {
+    max-height: 12rem;
+  }
+}
+
+/* 手机端适配 (≤768px) */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 0.5rem;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* 欢迎卡片优化 */
   .welcome-card {
     margin-bottom: 1rem;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 1rem;
   }
   
   .welcome-content {
@@ -1291,10 +1409,12 @@ onUnmounted(() => {
   
   .welcome-text h2 {
     font-size: 1.5rem;
+    margin-bottom: 0.5rem;
   }
   
   .welcome {
     font-size: 0.875rem;
+    margin-bottom: 0.5rem;
   }
   
   .time {
@@ -1303,166 +1423,595 @@ onUnmounted(() => {
   
   .welcome-icon {
     font-size: 2.5rem;
+    margin-top: 0.5rem;
   }
   
+  /* 统计卡片优化 */
   .stats-cards {
     grid-template-columns: 1fr;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 1rem;
   }
   
   .stat-card {
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+  
+  .stat-card:active {
+    transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
   
   .stat-content {
-    padding: 1rem 0;
+    padding: 0.75rem 0;
   }
   
   .stat-icon {
-    width: 3rem;
-    height: 3rem;
-    font-size: 1.25rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    font-size: 1.125rem;
     margin-right: 0.75rem;
+    border-radius: 0.75rem;
   }
   
   .stat-value {
     font-size: 1.5rem;
+    line-height: 1.2;
   }
   
-  .dashboard-content {
-    grid-template-columns: 1fr;
-    gap: 1rem;
+  .stat-label {
+    font-size: 0.8rem;
   }
   
-  .left-content, .right-content {
-    gap: 1rem;
+  .stat-change {
+    font-size: 0.7rem;
   }
   
-  .chart-container {
-    height: 15rem;
-  }
-  
-  .activity-list {
-    max-height: 15rem;
-  }
-  
-  .popular-list {
-    max-height: 10rem;
-  }
-  
-  .quick-actions .el-button {
-    width: 100%;
-    padding: 1rem;
-    font-size: 1rem;
-    height: 3rem;
-  }
-  
+  /* 自动刷新状态栏优化 */
   .auto-refresh-status {
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.75rem;
     padding: 1rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
   }
   
   .status-info {
     justify-content: center;
+    font-size: 0.8rem;
+  }
+  
+  .status-info .el-icon {
+    font-size: 1rem;
+    margin-right: 0.5rem;
   }
   
   .status-actions {
     justify-content: center;
   }
   
-  .update-notification {
-    width: calc(100vw - 2rem);
-    right: 1rem;
-    left: 1rem;
+  .status-actions .el-button {
+    width: 100%;
+    max-width: 12rem;
   }
   
+  /* 更新通知优化 */
+  .update-notification {
+    width: calc(100vw - 1rem);
+    right: 0.5rem;
+    left: 0.5rem;
+    top: 0.5rem;
+    border-radius: 0.75rem;
+  }
+  
+  /* 主要内容区域优化 */
+  .dashboard-content {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .left-content, .right-content {
+    gap: 0.75rem;
+  }
+  
+  /* 图表容器优化 */
+  .chart-container {
+    height: 14rem;
+    border-radius: 0.75rem;
+  }
+  
+  .chart-placeholder {
+    padding: 2rem 1rem;
+  }
+  
+  .chart-placeholder .el-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .chart-placeholder p {
+    font-size: 0.875rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .chart-placeholder small {
+    font-size: 0.75rem;
+  }
+  
+  /* 卡片头部优化 */
   .card-header {
     font-size: 0.875rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .header-left {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
   
   .update-info {
     display: none;
   }
   
+  .header-right .el-button {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* 活动列表优化 */
+  .activity-list {
+    max-height: 14rem;
+    padding: 0 0.5rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  .activity-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .activity-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .activity-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
+  }
+  
   .activity-item {
-    padding: 1rem 0;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  
+  .activity-item:hover {
+    background-color: rgba(64, 158, 255, 0.05);
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    margin: 0 -0.5rem;
+    border-radius: 0.5rem;
+  }
+  
+  .activity-item:active {
+    background-color: rgba(64, 158, 255, 0.1);
+  }
+  
+  .activity-item:last-child {
+    border-bottom: none;
   }
   
   .activity-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    font-size: 1rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.875rem;
+    margin-right: 0.75rem;
+    border-radius: 0.5rem;
   }
   
   .activity-title {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    line-height: 1.3;
   }
   
   .activity-time {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    margin-top: 0.25rem;
+  }
+  
+  /* 系统状态优化 */
+  .status-list {
+    gap: 0.5rem;
+    padding: 0 0.5rem;
   }
   
   .status-item {
     padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+  
+  .status-item:last-child {
+    border-bottom: none;
   }
   
   .status-label {
+    font-size: 0.8rem;
+    line-height: 1.3;
+  }
+  
+  .status-label .el-icon {
     font-size: 0.875rem;
+    margin-right: 0.5rem;
+  }
+  
+  /* 快速操作优化 */
+  .quick-actions {
+    gap: 0.5rem;
+    padding: 0 0.5rem;
+  }
+  
+  .quick-actions .el-button {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+    height: 2.75rem;
+    border-radius: 0.5rem;
+    justify-content: center;
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+  }
+  
+  .quick-actions .el-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .quick-actions .el-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  
+  .quick-actions .el-button .el-icon {
+    margin-right: 0.5rem;
+    font-size: 1rem;
+  }
+  
+  /* 热门绳包优化 */
+  .popular-list {
+    max-height: 12rem;
+    padding: 0 0.5rem;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+  }
+  
+  .popular-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  .popular-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .popular-list::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 2px;
   }
   
   .popular-item {
     padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  
+  .popular-item:hover {
+    background-color: rgba(103, 194, 58, 0.05);
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    margin: 0 -0.5rem;
+    border-radius: 0.5rem;
+  }
+  
+  .popular-item:active {
+    background-color: rgba(103, 194, 58, 0.1);
+  }
+  
+  .popular-item:last-child {
+    border-bottom: none;
   }
   
   .package-name {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
   }
   
   .package-author {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    line-height: 1.2;
   }
   
   .package-downloads {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
+    margin-bottom: 0.25rem;
+  }
+  
+  .trend-tag {
+    font-size: 0.6rem;
+    padding: 0.125rem 0.375rem;
+  }
+  
+  /* 空状态优化 */
+  .empty-state {
+    padding: 2rem 1rem;
+  }
+  
+  .empty-state .el-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  
+  .empty-state p {
+    font-size: 0.875rem;
+    margin: 0;
   }
 }
 
-@media (max-width: 1200px) {
-  .dashboard-content {
-    grid-template-columns: 1fr;
+/* 桌面端和移动端显示控制 */
+.desktop-only {
+  display: inline;
+}
+
+.mobile-only {
+  display: none;
+}
+
+/* 强制响应式重新渲染 */
+.dashboard {
+  will-change: transform;
+  transform: translateZ(0);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* 确保所有容器都能正确响应 */
+.dashboard * {
+  box-sizing: border-box;
+}
+
+/* 响应式过渡效果 */
+.stats-cards,
+.dashboard-content,
+.chart-container {
+  transition: all 0.3s ease;
+}
+
+/* 确保网格布局在窗口大小变化时正确重新计算 */
+.stats-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15.625rem, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+/* 确保图表容器响应式 */
+.chart-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.chart {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 超小屏幕适配 (≤480px) */
+@media (max-width: 480px) {
+  .desktop-only {
+    display: none;
+  }
+  
+  .mobile-only {
+    display: inline;
+  }
+  
+  .dashboard {
+    padding: 0.25rem;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .welcome-card {
+    padding: 0.75rem;
+  }
+  
+  .welcome-text h2 {
+    font-size: 1.25rem;
+  }
+  
+  .welcome {
+    font-size: 0.8rem;
+  }
+  
+  .time {
+    font-size: 0.7rem;
+  }
+  
+  .welcome-icon {
+    font-size: 2rem;
   }
   
   .stats-cards {
-    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+    gap: 0.5rem;
+  }
+  
+  .stat-card {
+    padding: 0.75rem;
+  }
+  
+  .stat-content {
+    padding: 0.5rem 0;
+  }
+  
+  .stat-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+    margin-right: 0.5rem;
+  }
+  
+  .stat-value {
+    font-size: 1.25rem;
+  }
+  
+  .stat-label {
+    font-size: 0.75rem;
+  }
+  
+  .stat-change {
+    font-size: 0.65rem;
+  }
+  
+  .auto-refresh-status {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+  
+  .status-info {
+    font-size: 0.75rem;
+  }
+  
+  .chart-container {
+    height: 12rem;
+  }
+  
+  .activity-list {
+    max-height: 12rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .popular-list {
+    max-height: 10rem;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .quick-actions .el-button {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    height: 2.5rem;
+  }
+  
+  .card-header {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  .activity-item {
+    padding: 0.5rem 0;
+  }
+  
+  .activity-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.75rem;
+    margin-right: 0.5rem;
+  }
+  
+  .activity-title {
+    font-size: 0.75rem;
+  }
+  
+  .activity-time {
+    font-size: 0.65rem;
+  }
+  
+  .status-item {
+    padding: 0.5rem 0;
+  }
+  
+  .status-label {
+    font-size: 0.75rem;
+  }
+  
+  .popular-item {
+    padding: 0.5rem 0;
+  }
+  
+  .package-name {
+    font-size: 0.75rem;
+  }
+  
+  .package-author {
+    font-size: 0.65rem;
+  }
+  
+  .package-downloads {
+    font-size: 0.65rem;
+  }
+  
+  .trend-tag {
+    font-size: 0.55rem;
+    padding: 0.1rem 0.25rem;
+  }
+  
+  .empty-state {
+    padding: 1.5rem 0.75rem;
+  }
+  
+  .empty-state .el-icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .empty-state p {
+    font-size: 0.8rem;
+  }
+}
+
+/* 移动端显示控制 (≤768px) */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  
+  .mobile-only {
+    display: inline !important;
+  }
+}
+
+/* 确保响应式布局立即生效 */
+@media (max-width: 1200px) {
+  .dashboard-content {
+    grid-template-columns: 1fr !important;
   }
 }
 
 @media (max-width: 768px) {
   .stats-cards {
-    grid-template-columns: 1fr;
-  }
-  
-  .welcome-content {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .welcome-icon {
-    margin-top: 1rem;
-  }
-  
-  .chart-container {
-    height: 15rem;
-  }
-  
-  .activity-list {
-    max-height: 15rem;
-  }
-  
-  .popular-list {
-    max-height: 10rem;
+    grid-template-columns: 1fr !important;
   }
 }
 </style> 
