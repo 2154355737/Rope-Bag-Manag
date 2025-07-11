@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, LoginResponse};
-use crate::utils::{parse_query_params};
+use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
 use log::{info, warn};
 
@@ -20,7 +20,7 @@ pub async fn login(
         Some(u) => u,
         None => {
             warn!("登录失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().body("缺少用户名");
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None });
         }
     };
     
@@ -28,7 +28,7 @@ pub async fn login(
         Some(p) => p,
         None => {
             warn!("登录失败: 缺少密码参数");
-            return HttpResponse::BadRequest().body("缺少密码");
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少密码".to_string(), data: None });
         }
     };
 
@@ -40,7 +40,7 @@ pub async fn login(
         if user.password == *password {
             if user.banned {
                 warn!("被封禁用户尝试登录: {}", username);
-                return HttpResponse::Forbidden().body("用户已被封禁");
+                return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "用户已被封禁".to_string(), data: None });
             }
 
             info!("用户登录成功: {}", username);
@@ -54,10 +54,10 @@ pub async fn login(
                 is_admin: user.is_admin,
             };
 
-            return HttpResponse::Ok().json(response);
+            return HttpResponse::Ok().json(ApiResponse { code: 0, msg: "登录成功".to_string(), data: Some(response) });
         }
     }
 
     warn!("登录失败: 用户名或密码错误 - {}", username);
-    HttpResponse::Unauthorized().body("用户名或密码错误")
+    HttpResponse::Unauthorized().json(ApiResponse::<()> { code: 1, msg: "用户名或密码错误".to_string(), data: None })
 }

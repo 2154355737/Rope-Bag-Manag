@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 use chrono::Local;
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
 use std::path::Path;
+use urlencoding::decode;
 
 // ====== 加载函数 ======
 pub fn load_json<T: for<'a> Deserialize<'a> + Default>(path: &str) -> T {
@@ -40,7 +41,9 @@ pub fn parse_query_params(query_string: &str) -> HashMap<String, String> {
         .filter_map(|kv| {
             let mut it = kv.splitn(2, '=');
             if let (Some(k), Some(v)) = (it.next(), it.next()) {
-                Some((k.to_string(), v.to_string()))
+                let key = decode(k).unwrap_or_else(|_| k.into()).to_string();
+                let val = decode(v).unwrap_or_else(|_| v.into()).to_string();
+                Some((key, val))
             } else {
                 None
             }
@@ -164,4 +167,11 @@ pub fn log_error_with_context(error: &dyn std::error::Error, context: &str) {
 #[allow(dead_code)]
 pub fn log_warning_with_context(warning: &str, context: &str) {
     log::warn!("{}: {}", context, warning);
+}
+
+#[derive(Serialize)]
+pub struct ApiResponse<T> {
+    pub code: i32,
+    pub msg: String,
+    pub data: Option<T>,
 }

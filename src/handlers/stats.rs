@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState};
 use crate::auth::check_rate_limit;
+use crate::utils::ApiResponse;
 
 // 查询所有绳包下载量
 #[get("/api/stats/downloads")]
@@ -13,7 +14,7 @@ pub async fn stats_downloads(
     }
 
     let stats = data.stats.lock().unwrap();
-    HttpResponse::Ok().json(&stats.downloads)
+    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(&stats.downloads) })
 }
 
 // 查询所有接口访问次数
@@ -27,7 +28,7 @@ pub async fn stats_api_counts(
     }
 
     let stats = data.stats.lock().unwrap();
-    HttpResponse::Ok().json(&stats.api_counts)
+    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(&stats.api_counts) })
 }
 
 // 获取用户数据库
@@ -41,5 +42,5 @@ pub async fn get_users_db(
     }
 
     let users = data.users.lock().unwrap();
-    HttpResponse::Ok().json(&*users)
+    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(&*users) })
 }

@@ -37,9 +37,6 @@ async fn main() -> std::io::Result<()> {
     // 加载用户数据
     let users: Users = Arc::new(Mutex::new(load_json("data/users.json")));
 
-    // 启动后台命令监听线程
-    start_command_listener(users.clone());
-
     // 加载绳包数据并转换为 HashMap<u32, RopePackage>
     let raw_data: RawDataJson = load_json("data/data.json");
     let mut ropes_map: HashMap<u32, RopePackage> = HashMap::new();
@@ -57,6 +54,9 @@ async fn main() -> std::io::Result<()> {
     }
 
     let ropes: RopePackages = Arc::new(Mutex::new(ropes_map));
+
+    // 启动后台命令监听线程
+    start_command_listener(users.clone(), ropes.clone(), app_config.clone());
 
     // 加载其他数据
     let stats: StatsData = Arc::new(Mutex::new(load_json("data/stats.json")));
@@ -93,6 +93,8 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::add_rope_package)
             .service(handlers::download_rope_package)
             .service(handlers::get_data_db)
+            .service(handlers::delete_rope_package)
+            .service(handlers::update_rope_package)
             .service(handlers::admin_user_info)
             .service(handlers::admin_set_user)
             .service(handlers::admin_set_star)

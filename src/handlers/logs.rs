@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::AppState;
-use crate::utils::{parse_query_params};
+use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
 use log::{info, warn, error};
 use std::fs;
@@ -44,7 +44,7 @@ pub async fn get_log_stats(
         Some(u) => u,
         None => {
             warn!("获取日志统计失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().body("缺少用户名");
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None });
         }
     };
 
@@ -52,11 +52,11 @@ pub async fn get_log_stats(
     if let Some(user) = users.get(username) {
         if !user.is_admin {
             warn!("非管理员用户尝试获取日志统计: {}", username);
-            return HttpResponse::Forbidden().body("需要管理员权限");
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "需要管理员权限".to_string(), data: None });
         }
     } else {
         warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().body("用户不存在");
+        return HttpResponse::Unauthorized().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None });
     }
 
     // 获取日志文件信息
@@ -80,7 +80,7 @@ pub async fn get_log_stats(
     };
 
     info!("管理员 {} 获取日志统计", username);
-    HttpResponse::Ok().json(stats)
+    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(stats) })
 }
 
 #[get("/api/logs/entries")]
@@ -99,7 +99,7 @@ pub async fn get_log_entries(
         Some(u) => u,
         None => {
             warn!("获取日志条目失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().body("缺少用户名");
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None });
         }
     };
 
@@ -107,11 +107,11 @@ pub async fn get_log_entries(
     if let Some(user) = users.get(username) {
         if !user.is_admin {
             warn!("非管理员用户尝试获取日志条目: {}", username);
-            return HttpResponse::Forbidden().body("需要管理员权限");
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "需要管理员权限".to_string(), data: None });
         }
     } else {
         warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().body("用户不存在");
+        return HttpResponse::Unauthorized().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None });
     }
 
     // 获取查询参数
@@ -124,7 +124,7 @@ pub async fn get_log_entries(
     // 读取日志文件
     let log_file_path = "logs/app.log";
     if !Path::new(log_file_path).exists() {
-        return HttpResponse::NotFound().body("日志文件不存在");
+        return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "日志文件不存在".to_string(), data: None });
     }
 
     match fs::read_to_string(log_file_path) {
@@ -152,7 +152,7 @@ pub async fn get_log_entries(
             }
 
             info!("管理员 {} 获取日志条目，数量: {}", username, entries.len());
-            HttpResponse::Ok().json(entries)
+            HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(entries) })
         }
         Err(e) => {
             error!("读取日志文件失败: {}", e);
@@ -198,18 +198,15 @@ pub async fn clear_logs(
         match fs::write(log_file_path, "") {
             Ok(_) => {
                 info!("管理员 {} 清除了日志文件", username);
-                HttpResponse::Ok().json(serde_json::json!({
-                    "success": true,
-                    "message": "日志已清除"
-                }))
+                HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "日志已清除".to_string(), data: None })
             }
             Err(e) => {
                 error!("清除日志文件失败: {}", e);
-                HttpResponse::InternalServerError().body("清除日志文件失败")
+                HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "清除日志文件失败".to_string(), data: None })
             }
         }
     } else {
-        HttpResponse::NotFound().body("日志文件不存在")
+        HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "日志文件不存在".to_string(), data: None })
     }
 }
 

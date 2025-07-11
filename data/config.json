@@ -23,5 +23,7 @@
     "enable_cors": true,
     "allowed_origins": ["*"],
     "session_timeout": 3600
-  }
+  },
+  "admin_username": "admin",
+  "admin_password": "admin123"
 }

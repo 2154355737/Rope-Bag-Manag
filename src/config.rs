@@ -18,6 +18,8 @@ pub struct AppConfig {
     pub logging: LogConfig,
     pub rate_limit: RateLimitConfig,
     pub security: SecurityConfig,
+    pub admin_username: String,
+    pub admin_password: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -93,6 +95,8 @@ impl Default for AppConfig {
             logging: LogConfig::default(),
             rate_limit: RateLimitConfig::default(),
             security: SecurityConfig::default(),
+            admin_username: "admin".to_string(),
+            admin_password: "admin123".to_string(),
         }
     }
 }

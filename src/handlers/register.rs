@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, User};
-use crate::utils::{parse_query_params, save_json};
+use crate::utils::{parse_query_params, save_json, ApiResponse};
 use crate::auth::check_rate_limit;
 
 #[get("/api/register")]
@@ -17,23 +17,23 @@ pub async fn register(
     
     let username = match params.get("username") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().body("缺少用户名"),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
     };
     
     let password = match params.get("password") {
         Some(p) => p,
-        None => return HttpResponse::BadRequest().body("缺少密码"),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少密码".to_string(), data: None }),
     };
     
     let nickname = match params.get("nickname") {
         Some(n) => n,
-        None => return HttpResponse::BadRequest().body("缺少昵称"),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少昵称".to_string(), data: None }),
     };
 
     let mut users = data.users.lock().unwrap();
     
     if users.contains_key(username) {
-        return HttpResponse::BadRequest().body("用户已存在");
+        return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "用户已存在".to_string(), data: None });
     }
 
     let new_user = User {
@@ -51,5 +51,5 @@ pub async fn register(
     users.insert(username.clone(), new_user);
     save_json("data/users.json", &*users);
 
-    HttpResponse::Ok().body("注册成功")
+    HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "注册成功".to_string(), data: None })
 }
