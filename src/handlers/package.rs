@@ -4,12 +4,28 @@ use crate::utils::{parse_query_params, save_json, load_json};
 use crate::auth::check_rate_limit;
 use serde::Serialize;
 use crate::models::{RawDataJson, RawRopePackage, DatabaseConfig};
+use chrono::Local;
 
 #[derive(Serialize)]
 struct ApiResponse<T> {
     code: i32,
     msg: String,
     data: Option<T>,
+}
+
+fn bump_version(version: &str) -> String {
+    let mut parts: Vec<u32> = version.split('.').filter_map(|s| s.parse().ok()).collect();
+    while parts.len() < 3 { parts.push(0); }
+    parts[2] += 1;
+    if parts[2] >= 10 {
+        parts[2] = 0;
+        parts[1] += 1;
+    }
+    if parts[1] >= 10 {
+        parts[1] = 0;
+        parts[0] += 1;
+    }
+    format!("{}.{}.{}", parts[0], parts[1], parts[2])
 }
 
 // 添加绳包（星级大于3）
@@ -75,6 +91,11 @@ pub async fn add_rope_package(
         简介: desc.clone(),
         项目直链: url.clone(),
     });
+    // 自动更新数据库配置
+    raw_data.数据库配置.数据库名称 = "结绳绳包数据库".to_string();
+    raw_data.数据库配置.数据库项目 = raw_data.绳包列表.len() as u32;
+    raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
+    raw_data.数据库配置.数据库更新时间 = Local::now().format("%Y%m%d").to_string();
     save_json("data/data.json", &raw_data);
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包添加成功".to_string(), data: None })
 }
@@ -164,6 +185,11 @@ pub async fn delete_rope_package(
     if before == after {
         return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "绳包不存在".to_string(), data: None });
     }
+    // 自动更新数据库配置
+    raw_data.数据库配置.数据库名称 = "结绳绳包数据库".to_string();
+    raw_data.数据库配置.数据库项目 = raw_data.绳包列表.len() as u32;
+    raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
+    raw_data.数据库配置.数据库更新时间 = Local::now().format("%Y%m%d").to_string();
     save_json("data/data.json", &raw_data);
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包删除成功".to_string(), data: None })
 }

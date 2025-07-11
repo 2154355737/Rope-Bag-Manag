@@ -16,7 +16,7 @@
   },
   "rate_limit": {
     "enabled": true,
-    "requests_per_minute": 60,
+    "requests_per_minute": 30,
     "burst_size": 10
   },
   "security": {
@@ -24,6 +24,6 @@
     "allowed_origins": ["*"],
     "session_timeout": 3600
   },
-  "admin_username": "admin",
-  "admin_password": "admin123"
+  "admin_username": "muteduanxing",
+  "admin_password": "ahk12378dx"
 }
