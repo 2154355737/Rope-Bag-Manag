@@ -357,6 +357,8 @@ function setDarkClass(val: boolean) {
   border-top: 1px solid var(--border-color);
   z-index: 1000;
   padding: 0.5rem 0;
+  height: 60px; /* 明确设置高度 */
+  box-sizing: border-box;
 }
 
 .mobile-nav-item {
@@ -566,7 +568,7 @@ function setDarkClass(val: boolean) {
     margin: 0;
     border-radius: 0;
     box-shadow: none;
-    height: calc(100vh - 120px);
+    height: calc(100vh - 120px); /* 顶部导航栏60px + 底部导航栏60px */
   }
   
   .top-nav {
@@ -582,7 +584,8 @@ function setDarkClass(val: boolean) {
   
   .content-scroll {
     padding: 1rem;
-    height: calc(100vh - 180px);
+    height: calc(100vh - 120px);
+    padding-bottom: 70px; /* 为底部导航栏留出空间，60px导航栏高度 + 10px安全间距 */
   }
   
   .side-drawer {
@@ -611,6 +614,7 @@ function setDarkClass(val: boolean) {
   
   .content-scroll {
     padding: 0.5rem;
+    padding-bottom: 70px; /* 确保超小屏幕也有足够的底部间距 */
   }
   
   .mobile-nav-item {

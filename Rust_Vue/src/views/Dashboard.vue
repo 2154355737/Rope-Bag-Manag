@@ -1387,6 +1387,7 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .dashboard {
     padding: 0.5rem;
+    padding-bottom: 0; /* 移除底部间距，避免与底部导航栏重叠 */
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
@@ -1837,6 +1838,7 @@ onUnmounted(() => {
   
   .dashboard {
     padding: 0.25rem;
+    padding-bottom: 0; /* 移除底部间距，避免与底部导航栏重叠 */
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
