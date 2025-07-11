@@ -34,6 +34,35 @@ pub struct RopePackage {
 pub struct Stats {
     pub api_counts: HashMap<String, u32>,
     pub downloads: HashMap<String, u32>,
+    pub api_calls: Vec<ApiCallRecord>,
+    pub api_performance: HashMap<String, ApiPerformance>,
+}
+
+// ====== API调用记录结构 ======
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ApiCallRecord {
+    pub timestamp: u64,
+    pub api_name: String,
+    pub username: String,
+    pub ip_address: String,
+    pub user_agent: String,
+    pub response_time_ms: u64,
+    pub status_code: u16,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+
+// ====== API性能统计结构 ======
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct ApiPerformance {
+    pub total_calls: u32,
+    pub success_calls: u32,
+    pub failed_calls: u32,
+    pub avg_response_time_ms: u64,
+    pub min_response_time_ms: u64,
+    pub max_response_time_ms: u64,
+    pub last_called: u64,
+    pub unique_users: std::collections::HashSet<String>,
 }
 
 // ====== 配置数据结构 ======

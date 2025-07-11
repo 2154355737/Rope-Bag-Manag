@@ -1,7 +1,8 @@
 use actix_web::{HttpRequest, HttpResponse};
-use crate::models::{Users, GlobalLimiter, GlobalCount};
+use crate::models::{Users, GlobalLimiter, GlobalCount, ApiCallRecord, ApiPerformance};
 use crate::config::AppConfig;
 use crate::utils::{now_ts, parse_query_params};
+
 
 // ====== 安全 API 限流函数 ======
 pub fn check_rate_limit(
@@ -72,6 +73,94 @@ pub fn check_rate_limit(
     drop(stats_guard);
 
     Ok(())
+}
+
+// ====== 记录API调用统计 ======
+pub fn record_api_call(
+    req_info: &str,
+    stats: &crate::models::StatsData,
+    api_name: &str,
+    start_time: u64,
+    status_code: u16,
+    success: bool,
+    error_message: Option<String>,
+) {
+    // 从请求信息中解析参数
+    let username = if req_info.contains("username=") {
+        // 简单的参数解析
+        if let Some(username_start) = req_info.find("username=") {
+            let username_part = &req_info[username_start..];
+            if let Some(username_end) = username_part.find('&') {
+                username_part[9..username_end].to_string()
+            } else {
+                username_part[9..].to_string()
+            }
+        } else {
+            "anonymous".to_string()
+        }
+    } else {
+        "anonymous".to_string()
+    };
+    
+    // 简化IP地址和User-Agent获取
+    let ip_address = "unknown".to_string();
+    let user_agent = "unknown".to_string();
+    
+    let end_time = now_ts();
+    let response_time_ms = end_time - start_time;
+    
+    let api_call_record = ApiCallRecord {
+        timestamp: end_time,
+        api_name: api_name.to_string(),
+        username,
+        ip_address,
+        user_agent,
+        response_time_ms,
+        status_code,
+        success,
+        error_message,
+    };
+    
+    let mut stats_guard = stats.lock().unwrap();
+    
+    // 添加API调用记录
+    stats_guard.api_calls.push(api_call_record.clone());
+    
+    // 限制记录数量，保留最近1000条记录
+    if stats_guard.api_calls.len() > 1000 {
+        stats_guard.api_calls.remove(0);
+    }
+    
+    // 更新API性能统计
+    let performance = stats_guard.api_performance
+        .entry(api_name.to_string())
+        .or_insert_with(ApiPerformance::default);
+    
+    performance.total_calls += 1;
+    if success {
+        performance.success_calls += 1;
+    } else {
+        performance.failed_calls += 1;
+    }
+    
+    // 更新响应时间统计
+    if performance.total_calls == 1 {
+        performance.min_response_time_ms = response_time_ms;
+        performance.max_response_time_ms = response_time_ms;
+        performance.avg_response_time_ms = response_time_ms;
+    } else {
+        performance.min_response_time_ms = performance.min_response_time_ms.min(response_time_ms);
+        performance.max_response_time_ms = performance.max_response_time_ms.max(response_time_ms);
+        
+        // 计算平均响应时间
+        let total_time = performance.avg_response_time_ms * ((performance.total_calls - 1) as u64) + response_time_ms;
+        performance.avg_response_time_ms = total_time / (performance.total_calls as u64);
+    }
+    
+    performance.last_called = end_time;
+    performance.unique_users.insert(api_call_record.username.clone());
+    
+    drop(stats_guard);
 }
 
 // ====== 管理员认证函数 ======

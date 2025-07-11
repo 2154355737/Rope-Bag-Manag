@@ -69,9 +69,89 @@ export async function getLogs() {
 }
 
 export async function getStats() {
-  const res = await api.get('/stats/api-counts')
-  const res2 = await api.get('/stats/downloads')
+  // 从localStorage获取当前用户信息
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin' // 默认使用admin
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
+  }
+  
+  const res = await api.get('/stats/api-counts', {
+    params: { username }
+  })
+  const res2 = await api.get('/stats/downloads', {
+    params: { username }
+  })
   return { code: 0, data: { api_counts: res.data.data, downloads: res2.data.data } }
+}
+
+// 获取API调用统计
+export async function getApiCallStats() {
+  // 从localStorage获取当前用户信息
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin' // 默认使用admin
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
+  }
+  
+  const res = await api.get('/stats/api-calls', {
+    params: { username }
+  })
+  return res.data
+}
+
+// 获取API性能详情
+export async function getApiPerformance() {
+  // 从localStorage获取当前用户信息
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin' // 默认使用admin
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
+  }
+  
+  const res = await api.get('/stats/api-performance', {
+    params: { username }
+  })
+  return res.data
+}
+
+// 获取最近API调用记录
+export async function getRecentCalls() {
+  // 从localStorage获取当前用户信息
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin' // 默认使用admin
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
+  }
+  
+  const res = await api.get('/stats/recent-calls', {
+    params: { username }
+  })
+  return res.data
 }
 
 export async function getDashboardData() {

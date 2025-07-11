@@ -5,6 +5,7 @@ mod handlers;
 mod logger;
 mod config;
 mod cmd;
+mod middleware;
 
 use actix_web::{web, App, HttpServer};
 use std::sync::{Arc, Mutex};
@@ -15,6 +16,7 @@ use utils::load_json;
 use logger::{init_logger, RequestLogger};
 use config::load_config;
 use cmd::start_command_listener;
+use middleware::ApiStatsMiddleware;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -74,7 +76,8 @@ async fn main() -> std::io::Result<()> {
     // 启动服务 
     HttpServer::new(move || {
         App::new()
-            .wrap(RequestLogger)      
+            .wrap(RequestLogger)
+            .wrap(ApiStatsMiddleware)
             .app_data(web::Data::new(AppState {
                 users: users.clone(),
                 ropes: ropes.clone(),
@@ -107,6 +110,9 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::get_dashboard_data)
             .service(handlers::stats_downloads)
             .service(handlers::stats_api_counts)
+            .service(handlers::get_api_call_stats)
+            .service(handlers::get_api_performance)
+            .service(handlers::get_recent_calls)
             .service(handlers::get_users_db)
             .service(handlers::get_log_stats)
             .service(handlers::get_log_entries)

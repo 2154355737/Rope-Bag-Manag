@@ -25,7 +25,7 @@
             :page-size="pageSize"
             :current-page="page"
             @current-change="loadLogs"
-            small
+            size="small"
           />
         </div>
       </div>

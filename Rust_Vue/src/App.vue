@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown, ZoomIn, ZoomOut, Refresh, Brush } from '@element-plus/icons-vue'
+import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown, ZoomIn, ZoomOut, Refresh, Brush, Connection } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserInfo, clearLoginStatus } from './utils/auth'
 import { onScreenSizeChange, shouldUseMobileVersion } from './utils/device'
@@ -250,6 +250,10 @@ function setDarkClass(val: boolean) {
         <el-icon><DataAnalysis /></el-icon>
         <span>统计</span>
       </div>
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/api-stats' }" @click="router.push('/api-stats')">
+        <el-icon><Connection /></el-icon>
+        <span>API统计</span>
+      </div>
     </div>
     
     <!-- 侧边栏抽屉 -->
@@ -288,6 +292,12 @@ function setDarkClass(val: boolean) {
             <DataAnalysis />
           </el-icon>
           <span>统计信息</span>
+        </el-menu-item>
+        <el-menu-item index="/api-stats">
+          <el-icon>
+            <Connection />
+          </el-icon>
+          <span>API统计</span>
         </el-menu-item>
         <el-menu-item index="/theme-test">
           <el-icon>
@@ -333,6 +343,12 @@ function setDarkClass(val: boolean) {
                 <DataAnalysis />
               </el-icon>
               统计信息
+            </el-menu-item>
+            <el-menu-item index="/api-stats">
+              <el-icon>
+                <Connection />
+              </el-icon>
+              API统计
             </el-menu-item>
             <el-menu-item index="/theme-test">
               <el-icon>

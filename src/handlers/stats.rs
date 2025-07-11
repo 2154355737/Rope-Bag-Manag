@@ -4,6 +4,7 @@ use crate::auth::check_rate_limit;
 use crate::utils::ApiResponse;
 use serde::Serialize;
 use chrono::Local;
+use std::collections::HashMap;
 
 // 仪表盘数据结构
 #[derive(Serialize)]
@@ -47,6 +48,52 @@ pub struct SystemStatus {
 pub struct DownloadTrend {
     pub date: String,
     pub downloads: u32,
+}
+
+// API调用统计数据结构
+#[derive(Serialize)]
+pub struct ApiCallStats {
+    pub total_calls: u32,
+    pub success_rate: f64,
+    pub avg_response_time_ms: u64,
+    pub top_apis: Vec<TopApi>,
+    pub recent_calls: Vec<RecentApiCall>,
+    pub user_activity: Vec<UserActivity>,
+    pub performance_summary: PerformanceSummary,
+}
+
+#[derive(Serialize)]
+pub struct TopApi {
+    pub api_name: String,
+    pub call_count: u32,
+    pub success_rate: f64,
+    pub avg_response_time_ms: u64,
+}
+
+#[derive(Serialize)]
+pub struct RecentApiCall {
+    pub timestamp: u64,
+    pub api_name: String,
+    pub username: String,
+    pub response_time_ms: u64,
+    pub success: bool,
+    pub status_code: u16,
+}
+
+#[derive(Serialize)]
+pub struct UserActivity {
+    pub username: String,
+    pub call_count: u32,
+    pub last_activity: u64,
+    pub favorite_apis: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct PerformanceSummary {
+    pub total_apis: usize,
+    pub total_users: usize,
+    pub system_uptime_hours: u64,
+    pub peak_concurrent_users: u32,
 }
 
 // 获取仪表盘数据
@@ -282,6 +329,196 @@ pub async fn get_dashboard_data(
         code: 0, 
         msg: "获取仪表盘数据成功".to_string(), 
         data: Some(&dashboard_data) 
+    })
+}
+
+// 获取API调用统计
+#[get("/api/stats/api-calls")]
+pub async fn get_api_call_stats(
+    req: actix_web::HttpRequest,
+    data: web::Data<AppState>,
+) -> impl Responder {
+    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "get_api_call_stats") {
+        return response;
+    }
+
+    let stats = data.stats.lock().unwrap();
+    
+    // 计算总体统计
+    let total_calls: u32 = stats.api_performance.values().map(|p| p.total_calls).sum();
+    let total_success: u32 = stats.api_performance.values().map(|p| p.success_calls).sum();
+    let success_rate = if total_calls > 0 {
+        (total_success as f64 / total_calls as f64) * 100.0
+    } else {
+        0.0
+    };
+    
+    let avg_response_time = if total_calls > 0 {
+        let total_time: u64 = stats.api_performance.values()
+            .map(|p| p.avg_response_time_ms * p.total_calls as u64)
+            .sum();
+        total_time / total_calls as u64
+    } else {
+        0
+    };
+    
+    // 生成热门API列表
+    let mut top_apis: Vec<TopApi> = stats.api_performance
+        .iter()
+        .map(|(api_name, perf)| {
+            let api_success_rate = if perf.total_calls > 0 {
+                (perf.success_calls as f64 / perf.total_calls as f64) * 100.0
+            } else {
+                0.0
+            };
+            
+            TopApi {
+                api_name: api_name.clone(),
+                call_count: perf.total_calls,
+                success_rate: api_success_rate,
+                avg_response_time_ms: perf.avg_response_time_ms,
+            }
+        })
+        .collect();
+    
+    // 按调用次数排序
+    top_apis.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+    top_apis.truncate(10);
+    
+    // 生成最近调用记录
+    let recent_calls: Vec<RecentApiCall> = stats.api_calls
+        .iter()
+        .rev() // 最新的在前
+        .take(20)
+        .map(|call| RecentApiCall {
+            timestamp: call.timestamp,
+            api_name: call.api_name.clone(),
+            username: call.username.clone(),
+            response_time_ms: call.response_time_ms,
+            success: call.success,
+            status_code: call.status_code,
+        })
+        .collect();
+    
+    // 生成用户活动统计
+    let mut user_activity_map: HashMap<String, (u32, u64, Vec<String>)> = HashMap::new();
+    
+    for call in &stats.api_calls {
+        let entry = user_activity_map.entry(call.username.clone()).or_insert((0, 0, Vec::new()));
+        entry.0 += 1; // 调用次数
+        entry.1 = entry.1.max(call.timestamp); // 最后活动时间
+        if !entry.2.contains(&call.api_name) {
+            entry.2.push(call.api_name.clone());
+        }
+    }
+    
+    let mut user_activity: Vec<UserActivity> = user_activity_map
+        .into_iter()
+        .map(|(username, (call_count, last_activity, favorite_apis))| {
+            UserActivity {
+                username,
+                call_count,
+                last_activity,
+                favorite_apis: favorite_apis.into_iter().take(5).collect(),
+            }
+        })
+        .collect();
+    
+    // 按调用次数排序
+    user_activity.sort_by(|a, b| b.call_count.cmp(&a.call_count));
+    user_activity.truncate(10);
+    
+    // 性能摘要
+    let performance_summary = PerformanceSummary {
+        total_apis: stats.api_performance.len(),
+        total_users: user_activity.len(),
+        system_uptime_hours: 24, // 简化处理
+        peak_concurrent_users: user_activity.iter().map(|u| u.call_count).max().unwrap_or(0),
+    };
+    
+    let api_call_stats = ApiCallStats {
+        total_calls,
+        success_rate,
+        avg_response_time_ms: avg_response_time,
+        top_apis,
+        recent_calls,
+        user_activity,
+        performance_summary,
+    };
+    
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "获取API调用统计成功".to_string(), 
+        data: Some(&api_call_stats) 
+    })
+}
+
+// 获取API性能详情
+#[get("/api/stats/api-performance")]
+pub async fn get_api_performance(
+    _req: actix_web::HttpRequest,
+    data: web::Data<AppState>,
+) -> impl Responder {
+    if let Err(response) = check_rate_limit(&_req, &data.config, &data.limiter, &data.global, &data.stats, "get_api_performance") {
+        return response;
+    }
+
+    let stats = data.stats.lock().unwrap();
+    
+    // 转换HashSet为Vec以便序列化
+    let mut performance_data: HashMap<String, serde_json::Value> = HashMap::new();
+    
+    for (api_name, perf) in &stats.api_performance {
+        let unique_users_count = perf.unique_users.len();
+        let performance_json = serde_json::json!({
+            "total_calls": perf.total_calls,
+            "success_calls": perf.success_calls,
+            "failed_calls": perf.failed_calls,
+            "avg_response_time_ms": perf.avg_response_time_ms,
+            "min_response_time_ms": perf.min_response_time_ms,
+            "max_response_time_ms": perf.max_response_time_ms,
+            "last_called": perf.last_called,
+            "unique_users_count": unique_users_count,
+            "success_rate": if perf.total_calls > 0 {
+                (perf.success_calls as f64 / perf.total_calls as f64) * 100.0
+            } else {
+                0.0
+            }
+        });
+        
+        performance_data.insert(api_name.clone(), performance_json);
+    }
+    
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "获取API性能详情成功".to_string(), 
+        data: Some(&performance_data) 
+    })
+}
+
+// 获取实时API调用记录
+#[get("/api/stats/recent-calls")]
+pub async fn get_recent_calls(
+    req: actix_web::HttpRequest,
+    data: web::Data<AppState>,
+) -> impl Responder {
+    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "get_recent_calls") {
+        return response;
+    }
+
+    let stats = data.stats.lock().unwrap();
+    
+    // 获取最近100条调用记录
+    let recent_calls: Vec<&crate::models::ApiCallRecord> = stats.api_calls
+        .iter()
+        .rev()
+        .take(100)
+        .collect();
+    
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "获取最近调用记录成功".to_string(), 
+        data: Some(&recent_calls) 
     })
 }
 
