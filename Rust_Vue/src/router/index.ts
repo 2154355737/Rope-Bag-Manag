@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { isLoggedIn, isLoginExpired } from '../utils/auth'
+import { getDeviceType, shouldUseMobileVersion } from '../utils/device'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/login' },
@@ -13,6 +14,11 @@ const routes: RouteRecordRaw[] = [
   { 
     path: '/users', 
     component: () => import('../views/UserManage.vue'),
+    meta: { requiresAuth: true }
+  },
+  { 
+    path: '/users-mobile', 
+    component: () => import('../views/UserManageMobile.vue'),
     meta: { requiresAuth: true }
   },
   { 
@@ -30,12 +36,30 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/StatsView.vue'),
     meta: { requiresAuth: true }
   },
+  { 
+    path: '/device-test', 
+    component: () => import('../views/DeviceTest.vue'),
+    meta: { requiresAuth: true }
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
 })
+
+// 自动设备检测和页面切换
+function autoRedirectToMobileVersion(to: any) {
+  // 如果是用户管理页面且应该使用移动端版本
+  if (to.path === '/users' && shouldUseMobileVersion()) {
+    return '/users-mobile'
+  }
+  // 如果是移动端用户管理页面但应该使用桌面端版本
+  if (to.path === '/users-mobile' && !shouldUseMobileVersion()) {
+    return '/users'
+  }
+  return null
+}
 
 // 路由守卫
 router.beforeEach((to: any, from: any, next: any) => {
@@ -64,6 +88,13 @@ router.beforeEach((to: any, from: any, next: any) => {
       next('/dashboard')
       return
     }
+  }
+  
+  // 自动设备检测和页面切换
+  const redirectPath = autoRedirectToMobileVersion(to)
+  if (redirectPath) {
+    next(redirectPath)
+    return
   }
   
   next()

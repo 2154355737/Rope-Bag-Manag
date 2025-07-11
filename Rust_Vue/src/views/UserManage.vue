@@ -1,5 +1,6 @@
 <template>
   <div class="user-manage">
+    <AutoSwitchNotice />
     <el-card>
       <div class="header">
         <h2>用户管理</h2>
@@ -189,6 +190,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { getUsers, banUser, setStar, setNickname, setPassword } from '../api'
 import { useRouter } from 'vue-router'
+import AutoSwitchNotice from '../components/AutoSwitchNotice.vue'
 
 // 响应式数据
 const users = ref<any[]>([])
@@ -606,5 +608,109 @@ function handleNetworkError(error: any) {
 :deep(.el-card) {
   border-radius: 12px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Element Plus 主题切换支持 */
+:deep(.dark) .user-manage {
+  background-color: var(--vt-c-black);
+  color: var(--vt-c-text-dark-1);
+}
+
+:deep(.dark) .search-section {
+  background-color: var(--vt-c-black-soft);
+  border-color: var(--vt-c-divider-dark-1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:deep(.dark) .header h2 {
+  color: var(--vt-c-text-dark-1);
+}
+
+:deep(.dark) .stats .el-tag {
+  border-color: var(--vt-c-divider-dark-1);
+  background-color: var(--vt-c-black-mute);
+}
+
+:deep(.dark) .el-card {
+  background-color: var(--vt-c-black-soft);
+  border-color: var(--vt-c-divider-dark-1);
+  color: var(--vt-c-text-dark-1);
+}
+
+:deep(.dark) .el-table {
+  background-color: var(--vt-c-black-soft);
+  color: var(--vt-c-text-dark-1);
+}
+
+:deep(.dark) .el-table th {
+  background-color: var(--vt-c-black-mute);
+  color: var(--vt-c-text-dark-1);
+  border-color: var(--vt-c-divider-dark-1);
+}
+
+:deep(.dark) .el-table td {
+  background-color: var(--vt-c-black-soft);
+  color: var(--vt-c-text-dark-1);
+  border-color: var(--vt-c-divider-dark-1);
+}
+
+:deep(.dark) .el-table--striped .el-table__body tr.el-table__row--striped td {
+  background-color: var(--vt-c-black-mute);
+}
+
+:deep(.dark) .el-table--enable-row-hover .el-table__body tr:hover > td {
+  background-color: var(--vt-c-black-mute);
+}
+
+/* 浅色模式优化 */
+:deep(.light) .user-manage {
+  background-color: var(--vt-c-white-soft);
+  color: var(--vt-c-text-light-1);
+}
+
+:deep(.light) .search-section {
+  background-color: var(--vt-c-white);
+  border-color: var(--vt-c-divider-light-1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.light) .header h2 {
+  color: var(--vt-c-text-light-1);
+}
+
+:deep(.light) .stats .el-tag {
+  border-color: var(--vt-c-divider-light-1);
+  background-color: var(--vt-c-white-mute);
+}
+
+:deep(.light) .el-card {
+  background-color: var(--vt-c-white);
+  border-color: var(--vt-c-divider-light-1);
+  color: var(--vt-c-text-light-1);
+}
+
+:deep(.light) .el-table {
+  background-color: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
+}
+
+:deep(.light) .el-table th {
+  background-color: var(--vt-c-white-mute);
+  color: var(--vt-c-text-light-1);
+  border-color: var(--vt-c-divider-light-1);
+}
+
+:deep(.light) .el-table td {
+  background-color: var(--vt-c-white);
+  color: var(--vt-c-text-light-1);
+  border-color: var(--vt-c-divider-light-1);
+}
+
+:deep(.light) .el-table--striped .el-table__body tr.el-table__row--striped td {
+  background-color: var(--vt-c-white-soft);
+}
+
+:deep(.light) .el-table--enable-row-hover .el-table__body tr:hover > td {
+  background-color: var(--vt-c-white-mute);
 }
 </style> 

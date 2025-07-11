@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown, ZoomIn, ZoomOut, Refresh } from '@element-plus/icons-vue'
+import { Sunny, Moon, Fold, House, User, Box, Document, DataAnalysis, ArrowDown, ZoomIn, ZoomOut, Refresh, Brush } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserInfo, clearLoginStatus } from './utils/auth'
+import { onScreenSizeChange, shouldUseMobileVersion } from './utils/device'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,8 +23,31 @@ const userInfo = ref({
   loginTime: ''
 })
 
+// 屏幕尺寸变化监听
+let screenSizeCleanup: (() => void) | null = null
+
 function toggleSidebar() {
   sidebarOpen.value = !sidebarOpen.value
+}
+
+// 自动切换到合适的用户管理页面
+function autoSwitchUserManagePage() {
+  const currentPath = route.path
+  if (currentPath === '/users' || currentPath === '/users-mobile') {
+    const shouldUseMobile = shouldUseMobileVersion()
+    const targetPath = shouldUseMobile ? '/users-mobile' : '/users'
+    
+    if (currentPath !== targetPath) {
+      router.push(targetPath)
+    }
+  }
+}
+
+// 导航到用户管理页面（自动选择合适版本）
+function navigateToUserManage() {
+  const shouldUseMobile = shouldUseMobileVersion()
+  const targetPath = shouldUseMobile ? '/users-mobile' : '/users'
+  router.push(targetPath)
 }
 
 // 缩放控制函数
@@ -94,6 +118,19 @@ onMounted(() => {
   if (savedUserInfo) {
     userInfo.value = savedUserInfo
   }
+  
+  // 初始化屏幕尺寸监听
+  screenSizeCleanup = onScreenSizeChange((deviceType) => {
+    // 当设备类型改变时，自动切换到合适的页面
+    autoSwitchUserManagePage()
+  })
+})
+
+// 清理屏幕尺寸监听
+onUnmounted(() => {
+  if (screenSizeCleanup) {
+    screenSizeCleanup()
+  }
 })
 
 const isDark = ref(false)
@@ -105,9 +142,13 @@ function setDarkClass(val: boolean) {
   if (val) {
     document.body.classList.add('dark')
     document.documentElement.classList.add('dark')
+    document.body.classList.remove('light')
+    document.documentElement.classList.remove('light')
   } else {
     document.body.classList.remove('dark')
     document.documentElement.classList.remove('dark')
+    document.body.classList.add('light')
+    document.documentElement.classList.add('light')
   }
 }
 </script>
@@ -125,8 +166,8 @@ function setDarkClass(val: boolean) {
         <span class="brand">绳包管理系统</span>
       </div>
       <div class="nav-right">
-        <!-- 缩放控制 -->
-        <div class="zoom-controls">
+        <!-- 缩放控制 - 桌面端显示 -->
+        <div class="zoom-controls desktop-only">
           <el-button size="small" circle @click="zoomOut" :disabled="scaleFactor <= minScale">
             <el-icon><ZoomOut /></el-icon>
           </el-button>
@@ -165,53 +206,90 @@ function setDarkClass(val: boolean) {
         </el-dropdown>
       </div>
     </el-header>
-    <!-- 侧边栏 --->
-    <el-drawer v-if="!isLoginPage" v-model="sidebarOpen" direction="ltr" :with-header="false" size="180px" class="side-drawer" :show-close="true" :modal="true" :append-to-body="true">
-              <el-menu :default-active="activeMenu" router background-color="#fff" text-color="#333" active-text-color="#42b983" class="side-menu">
-          <el-menu-item index="/dashboard">
-            <el-icon>
-              <House />
-            </el-icon>
-            仪表盘
-          </el-menu-item>
-          <el-menu-item index="/users">
-            <el-icon>
-              <User />
-            </el-icon>
-            用户管理
-          </el-menu-item>
-          <el-menu-item index="/packages">
-            <el-icon>
-              <Box />
-            </el-icon>
-            绳包管理
-          </el-menu-item>
-          <el-menu-item index="/logs">
-            <el-icon>
-              <Document />
-            </el-icon>
-            日志查看
-          </el-menu-item>
-          <el-menu-item index="/stats">
-            <el-icon>
-              <DataAnalysis />
-            </el-icon>
-            统计信息
-          </el-menu-item>
-        </el-menu>
+    
+    <!-- 移动端底部导航 -->
+    <div v-if="!isLoginPage" class="mobile-nav">
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/dashboard' }" @click="router.push('/dashboard')">
+        <el-icon><House /></el-icon>
+        <span>仪表盘</span>
+      </div>
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/users' || activeMenu === '/users-mobile' }" @click="navigateToUserManage">
+        <el-icon><User /></el-icon>
+        <span>用户</span>
+      </div>
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/packages' }" @click="router.push('/packages')">
+        <el-icon><Box /></el-icon>
+        <span>绳包</span>
+      </div>
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/logs' }" @click="router.push('/logs')">
+        <el-icon><Document /></el-icon>
+        <span>日志</span>
+      </div>
+      <div class="mobile-nav-item" :class="{ active: activeMenu === '/stats' }" @click="router.push('/stats')">
+        <el-icon><DataAnalysis /></el-icon>
+        <span>统计</span>
+      </div>
+    </div>
+    
+    <!-- 侧边栏抽屉 -->
+    <el-drawer v-if="!isLoginPage" v-model="sidebarOpen" direction="ltr" :with-header="false" size="280px" class="side-drawer" :show-close="true" :modal="true" :append-to-body="true">
+      <div class="drawer-header">
+        <h3>绳包管理系统</h3>
+        <p>管理员控制台</p>
+      </div>
+      <el-menu :default-active="activeMenu" router background-color="transparent" text-color="var(--text-primary)" active-text-color="var(--brand-color)" class="side-menu">
+        <el-menu-item index="/dashboard">
+          <el-icon>
+            <House />
+          </el-icon>
+          <span>仪表盘</span>
+        </el-menu-item>
+        <el-menu-item index="/users" @click="navigateToUserManage">
+          <el-icon>
+            <User />
+          </el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+        <el-menu-item index="/packages">
+          <el-icon>
+            <Box />
+          </el-icon>
+          <span>绳包管理</span>
+        </el-menu-item>
+        <el-menu-item index="/logs">
+          <el-icon>
+            <Document />
+          </el-icon>
+          <span>日志查看</span>
+        </el-menu-item>
+        <el-menu-item index="/stats">
+          <el-icon>
+            <DataAnalysis />
+          </el-icon>
+          <span>统计信息</span>
+        </el-menu-item>
+        <el-menu-item index="/theme-test">
+          <el-icon>
+            <Brush />
+          </el-icon>
+          <span>主题测试</span>
+        </el-menu-item>
+      </el-menu>
     </el-drawer>
-    <!-- 统一背景和圆角的主布局容器 -->
+    
+    <!-- 主内容区 -->
     <div v-if="!isLoginPage" class="main-layout">
       <el-container class="full-height">
-        <el-aside class="side-aside" width="180px">
-          <el-menu :default-active="activeMenu" router background-color="#fff" text-color="#333" active-text-color="#42b983" class="side-menu side-menu-static">
+        <!-- 桌面端侧边栏 -->
+        <el-aside class="side-aside desktop-only" width="180px">
+          <el-menu :default-active="activeMenu" router background-color="var(--bg-sidebar)" text-color="var(--text-primary)" active-text-color="var(--brand-color)" class="side-menu side-menu-static">
             <el-menu-item index="/dashboard">
               <el-icon>
                 <House />
               </el-icon>
               仪表盘
             </el-menu-item>
-            <el-menu-item index="/users">
+            <el-menu-item index="/users" @click="navigateToUserManage">
               <el-icon>
                 <User />
               </el-icon>
@@ -234,6 +312,12 @@ function setDarkClass(val: boolean) {
                 <DataAnalysis />
               </el-icon>
               统计信息
+            </el-menu-item>
+            <el-menu-item index="/theme-test">
+              <el-icon>
+                <Brush />
+              </el-icon>
+              主题测试
             </el-menu-item>
           </el-menu>
         </el-aside>
@@ -260,6 +344,59 @@ function setDarkClass(val: boolean) {
   flex-direction: column;
   transform: scale(var(--scale-factor, 1));
   transform-origin: top left;
+}
+
+/* 移动端底部导航 */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-nav);
+  border-top: 1px solid var(--border-color);
+  z-index: 1000;
+  padding: 0.5rem 0;
+}
+
+.mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.mobile-nav-item.active {
+  color: var(--brand-color);
+}
+
+.mobile-nav-item .el-icon {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* 抽屉样式 */
+.drawer-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.drawer-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+}
+
+.drawer-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
 }
 
 .zoom-controls {
@@ -373,6 +510,22 @@ function setDarkClass(val: boolean) {
   box-sizing: border-box;
 }
 
+/* 桌面端样式 */
+@media (min-width: 769px) {
+  .desktop-only {
+    display: block;
+  }
+  
+  .mobile-nav {
+    display: none;
+  }
+  
+  .menu-btn {
+    display: none;
+  }
+}
+
+/* 平板端样式 */
 @media (max-width: 1200px) {
   .main-layout {
     padding: 8px;
@@ -389,40 +542,84 @@ function setDarkClass(val: boolean) {
   }
 }
 
-@media (max-width: 900px) {
-  .main-layout {
-    padding: 2px;
-    margin: 2px;
+/* 手机端样式 */
+@media (max-width: 768px) {
+  .layout-root {
+    transform: none;
   }
-  .top-nav {
-    margin: 2px;
+  
+  .desktop-only {
+    display: none !important;
   }
-  .content-scroll {
-    padding: 12px 2px 0 2px;
+  
+  .mobile-nav {
+    display: flex;
+    justify-content: space-around;
   }
-  .zoom-controls {
-    margin-right: 8px;
+  
+  .menu-btn {
+    display: inline-flex;
   }
-  .zoom-text {
-    display: none;
-  }
-}
-
-@media (max-width: 600px) {
+  
   .main-layout {
     padding: 0;
     margin: 0;
     border-radius: 0;
     box-shadow: none;
+    height: calc(100vh - 120px);
   }
+  
   .top-nav {
     margin: 0;
+    border-radius: 0;
+    padding: 0 1rem;
+    height: 60px;
   }
+  
+  .brand {
+    font-size: 1rem;
+  }
+  
   .content-scroll {
-    padding: 6px 0 0 0;
+    padding: 1rem;
+    height: calc(100vh - 180px);
   }
-  .zoom-controls {
-    display: none;
+  
+  .side-drawer {
+    display: block !important;
+  }
+  
+  .side-menu {
+    background: transparent;
+  }
+  
+  .side-menu .el-menu-item {
+    height: 3rem;
+    line-height: 3rem;
+    font-size: 1rem;
+  }
+  
+  .side-menu .el-icon {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .top-nav {
+    padding: 0 0.5rem;
+  }
+  
+  .content-scroll {
+    padding: 0.5rem;
+  }
+  
+  .mobile-nav-item {
+    padding: 0.25rem;
+    font-size: 0.625rem;
+  }
+  
+  .mobile-nav-item .el-icon {
+    font-size: 1rem;
   }
 }
 </style>

@@ -9,7 +9,7 @@
           layout="prev, pager, next"
           :total="total"
           :page-size="pageSize"
-          :current-page.sync="page"
+          :current-page="page"
           @current-change="loadLogs"
           style="margin-left: 24px; display: inline-block;"
         />

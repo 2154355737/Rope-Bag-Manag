@@ -1272,6 +1272,163 @@ onUnmounted(() => {
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
 }
 
+/* 手机端适配 */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 0;
+  }
+  
+  .welcome-card {
+    margin-bottom: 1rem;
+    border-radius: 0.5rem;
+  }
+  
+  .welcome-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+  
+  .welcome-text h2 {
+    font-size: 1.5rem;
+  }
+  
+  .welcome {
+    font-size: 0.875rem;
+  }
+  
+  .time {
+    font-size: 0.75rem;
+  }
+  
+  .welcome-icon {
+    font-size: 2.5rem;
+  }
+  
+  .stats-cards {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .stat-card {
+    border-radius: 0.5rem;
+  }
+  
+  .stat-content {
+    padding: 1rem 0;
+  }
+  
+  .stat-icon {
+    width: 3rem;
+    height: 3rem;
+    font-size: 1.25rem;
+    margin-right: 0.75rem;
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .dashboard-content {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .left-content, .right-content {
+    gap: 1rem;
+  }
+  
+  .chart-container {
+    height: 15rem;
+  }
+  
+  .activity-list {
+    max-height: 15rem;
+  }
+  
+  .popular-list {
+    max-height: 10rem;
+  }
+  
+  .quick-actions .el-button {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+    height: 3rem;
+  }
+  
+  .auto-refresh-status {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .status-info {
+    justify-content: center;
+  }
+  
+  .status-actions {
+    justify-content: center;
+  }
+  
+  .update-notification {
+    width: calc(100vw - 2rem);
+    right: 1rem;
+    left: 1rem;
+  }
+  
+  .card-header {
+    font-size: 0.875rem;
+  }
+  
+  .update-info {
+    display: none;
+  }
+  
+  .activity-item {
+    padding: 1rem 0;
+  }
+  
+  .activity-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1rem;
+  }
+  
+  .activity-title {
+    font-size: 0.875rem;
+  }
+  
+  .activity-time {
+    font-size: 0.75rem;
+  }
+  
+  .status-item {
+    padding: 0.75rem 0;
+  }
+  
+  .status-label {
+    font-size: 0.875rem;
+  }
+  
+  .popular-item {
+    padding: 0.75rem 0;
+  }
+  
+  .package-name {
+    font-size: 0.875rem;
+  }
+  
+  .package-author {
+    font-size: 0.75rem;
+  }
+  
+  .package-downloads {
+    font-size: 0.75rem;
+  }
+}
+
 @media (max-width: 1200px) {
   .dashboard-content {
     grid-template-columns: 1fr;
