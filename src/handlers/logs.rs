@@ -18,7 +18,7 @@ pub struct LogStatsResponse {
     pub log_file_exists: bool,
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Clone)]
 pub struct LogEntryResponse {
     pub timestamp: String,
     pub level: String,
@@ -129,30 +129,26 @@ pub async fn get_log_entries(
 
     match fs::read_to_string(log_file_path) {
         Ok(content) => {
-            let mut entries: Vec<LogEntryResponse> = Vec::new();
-            
-            for line in content.lines().rev().take(limit) {
-                // 简单的日志解析（实际项目中可能需要更复杂的解析）
+            let mut all_entries: Vec<LogEntryResponse> = Vec::new();
+            for line in content.lines().rev() {
                 if let Some(entry) = parse_log_line(line) {
-                    // 应用过滤条件
                     if let Some(ref filter_level) = level {
                         if entry.level.to_lowercase() != filter_level.to_lowercase() {
                             continue;
                         }
                     }
-                    
                     if let Some(ref search_term) = search {
                         if !entry.message.to_lowercase().contains(&search_term.to_lowercase()) {
                             continue;
                         }
                     }
-                    
-                    entries.push(entry);
+                    all_entries.push(entry);
                 }
             }
-
+            let total = all_entries.len();
+            let entries = all_entries.into_iter().take(limit).collect::<Vec<_>>();
             info!("管理员 {} 获取日志条目，数量: {}", username, entries.len());
-            HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(entries) })
+            HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(serde_json::json!({"total": total, "entries": entries})) })
         }
         Err(e) => {
             error!("读取日志文件失败: {}", e);
