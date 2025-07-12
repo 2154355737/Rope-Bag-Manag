@@ -72,4 +72,20 @@ export function getDeviceInfo() {
     screenWidth: window.innerWidth,
     screenHeight: window.innerHeight
   }
+}
+
+// 调试函数：打印设备信息
+export function debugDeviceInfo() {
+  const info = getDeviceInfo()
+  console.log('🔍 设备检测信息:', {
+    '是否移动设备': info.isMobile,
+    '是否小屏幕': info.isSmallScreen,
+    '是否触摸设备': info.isTouch,
+    '设备类型': info.deviceType,
+    '屏幕宽度': info.screenWidth,
+    '屏幕高度': info.screenHeight,
+    '应该使用移动端版本': shouldUseMobileVersion(),
+    'User Agent': info.userAgent
+  })
+  return info
 } 

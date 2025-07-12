@@ -34,6 +34,11 @@ export function clearLoginStatus() {
   localStorage.removeItem('userInfo')
 }
 
+// 退出登录
+export function logout() {
+  clearLoginStatus()
+}
+
 // 检查登录是否过期（可选功能）
 export function isLoginExpired(): boolean {
   const userInfo = getUserInfo()
