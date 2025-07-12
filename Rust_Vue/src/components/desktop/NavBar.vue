@@ -398,13 +398,89 @@ const handleLogout = async () => {
   background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 
+/* 动画效果 */
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 页面加载动画 */
+.desktop-navbar {
+  animation: slide-down 0.6s ease-out;
+}
+
+/* 按钮悬停动画 */
+.theme-btn,
+.user-info {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-btn::before,
+.user-info::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.theme-btn:hover::before,
+.user-info:hover::before {
+  left: 100%;
+}
+
+/* 用户头像动画 */
+.user-avatar {
+  transition: all 0.3s ease;
+}
+
+.user-info:hover .user-avatar {
+  transform: scale(1.1);
+}
+
+/* 下拉图标动画 */
+.dropdown-icon {
+  transition: transform 0.3s ease;
+}
+
+.user-info:hover .dropdown-icon {
+  transform: rotate(180deg);
+}
+
 /* 减少动画模式 */
 @media (prefers-reduced-motion: reduce) {
-  .desktop-navbar,
+  .desktop-navbar {
+    animation: none;
+  }
+  
   .theme-btn,
   .user-info,
   .dropdown-icon {
     transition: none;
+  }
+  
+  .theme-btn::before,
+  .user-info::before {
+    display: none;
+  }
+  
+  .user-info:hover .user-avatar {
+    transform: none;
+  }
+  
+  .user-info:hover .dropdown-icon {
+    transform: none;
   }
 }
 </style> 

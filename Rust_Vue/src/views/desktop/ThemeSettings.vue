@@ -555,6 +555,174 @@ onMounted(() => {
   background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 
+/* 动画效果 */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.1);
+    opacity: 1;
+  }
+}
+
+/* 页面加载动画 */
+.page-header {
+  animation: slide-up 0.6s ease-out;
+}
+
+.theme-grid {
+  animation: slide-up 0.6s ease-out 0.2s both;
+}
+
+.theme-test-area {
+  animation: slide-up 0.6s ease-out 0.4s both;
+}
+
+.setting-actions {
+  animation: slide-up 0.6s ease-out 0.6s both;
+}
+
+/* 主题卡片悬停动画 */
+.theme-card {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.theme-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.theme-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  transition: transform 0.6s ease;
+}
+
+.theme-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-medium);
+}
+
+.theme-card:hover::before {
+  transform: scaleX(1);
+}
+
+.theme-card:hover::after {
+  transform: translateX(100%) translateY(100%) rotate(45deg);
+}
+
+/* 按钮光泽动画 */
+.el-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.el-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.el-button:hover::before {
+  left: 100%;
+}
+
+/* 测试区域动画 */
+.quick-test,
+.test-card,
+.test-form,
+.test-table {
+  transition: all 0.3s ease;
+}
+
+.quick-test:hover,
+.test-card:hover,
+.test-form:hover,
+.test-table:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-light);
+}
+
+/* 动画优化 */
+@media (prefers-reduced-motion: reduce) {
+  .page-header,
+  .theme-grid,
+  .theme-test-area,
+  .setting-actions {
+    animation: none;
+  }
+  
+  .theme-card {
+    transition: none;
+  }
+  
+  .theme-card:hover {
+    transform: none;
+  }
+  
+  .el-button::before {
+    display: none;
+  }
+  
+  .quick-test,
+  .test-card,
+  .test-form,
+  .test-table {
+    transition: none;
+  }
+  
+  .quick-test:hover,
+  .test-card:hover,
+  .test-form:hover,
+  .test-table:hover {
+    transform: none;
+  }
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .theme-grid {

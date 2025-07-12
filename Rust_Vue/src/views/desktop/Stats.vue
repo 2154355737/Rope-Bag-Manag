@@ -908,4 +908,216 @@ onUnmounted(() => {
 .purple .stat-card.info .stat-icon {
   background: linear-gradient(135deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
+
+/* 动画效果 */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-8px) scale(1.1);
+    opacity: 1;
+  }
+}
+
+/* 页面加载动画 */
+.page-header {
+  animation: slide-up 0.6s ease-out;
+}
+
+.stats-grid {
+  animation: slide-up 0.6s ease-out 0.2s both;
+}
+
+.chart-row {
+  animation: slide-up 0.6s ease-out 0.4s both;
+}
+
+.status-activity-section {
+  animation: slide-up 0.6s ease-out 0.6s both;
+}
+
+/* 卡片悬停动画 */
+.stat-card,
+.chart-card {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before,
+.chart-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.stat-card::after,
+.chart-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  transition: transform 0.6s ease;
+}
+
+.stat-card:hover,
+.chart-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-medium);
+}
+
+.stat-card:hover::before,
+.chart-card:hover::before {
+  transform: scaleX(1);
+}
+
+.stat-card:hover::after,
+.chart-card:hover::after {
+  transform: translateX(100%) translateY(100%) rotate(45deg);
+}
+
+/* 图标动画 */
+.stat-icon {
+  transition: transform 0.3s ease;
+}
+
+.stat-card:hover .stat-icon {
+  transform: scale(1.1);
+}
+
+/* 按钮光泽动画 */
+.el-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.el-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.el-button:hover::before {
+  left: 100%;
+}
+
+/* 图表动画 */
+.chart-container {
+  transition: all 0.3s ease;
+}
+
+.chart-card:hover .chart-container {
+  transform: scale(1.02);
+}
+
+/* 活动项动画 */
+.activity-item {
+  transition: all 0.3s ease;
+}
+
+.activity-item:hover {
+  transform: translateX(4px);
+}
+
+.activity-icon {
+  transition: transform 0.3s ease;
+}
+
+.activity-item:hover .activity-icon {
+  transform: scale(1.1);
+}
+
+/* 状态项动画 */
+.status-item {
+  transition: all 0.3s ease;
+}
+
+.status-item:hover {
+  transform: translateX(4px);
+}
+
+/* 动画优化 */
+@media (prefers-reduced-motion: reduce) {
+  .page-header,
+  .stats-grid,
+  .chart-row,
+  .status-activity-section {
+    animation: none;
+  }
+  
+  .stat-card,
+  .chart-card {
+    transition: none;
+  }
+  
+  .stat-card:hover,
+  .chart-card:hover {
+    transform: none;
+  }
+  
+  .stat-icon {
+    transition: none;
+  }
+  
+  .el-button::before {
+    display: none;
+  }
+  
+  .chart-container {
+    transition: none;
+  }
+  
+  .activity-item,
+  .status-item {
+    transition: none;
+  }
+  
+  .activity-item:hover,
+  .status-item:hover {
+    transform: none;
+  }
+  
+  .activity-icon {
+    transition: none;
+  }
+}
 </style> 

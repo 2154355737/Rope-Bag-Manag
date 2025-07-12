@@ -445,14 +445,81 @@ const handleLogout = async () => {
   background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 
+/* 动画效果 */
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 页面加载动画 */
+.mobile-header {
+  animation: slide-down 0.6s ease-out;
+}
+
+/* 按钮悬停动画 */
+.back-btn,
+.theme-btn,
+.user-btn {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.back-btn::before,
+.theme-btn::before,
+.user-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.5s ease;
+}
+
+.back-btn:hover::before,
+.theme-btn:hover::before,
+.user-btn:hover::before {
+  left: 100%;
+}
+
+/* 用户头像动画 */
+.user-avatar {
+  transition: all 0.3s ease;
+}
+
+.user-btn:hover .user-avatar {
+  transform: scale(1.1);
+}
+
 /* 减少动画模式 */
 @media (prefers-reduced-motion: reduce) {
-  .mobile-header,
+  .mobile-header {
+    animation: none;
+  }
+  
   .back-btn,
   .theme-btn,
   .user-btn,
   .user-avatar {
     transition: none;
+  }
+  
+  .back-btn::before,
+  .theme-btn::before,
+  .user-btn::before {
+    display: none;
+  }
+  
+  .user-btn:hover .user-avatar {
+    transform: none;
   }
 }
 </style> 

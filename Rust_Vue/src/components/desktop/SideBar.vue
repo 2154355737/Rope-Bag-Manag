@@ -308,12 +308,87 @@ const iconComponents: Record<string, any> = {
   }
 }
 
+/* 动画效果 */
+@keyframes slide-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 页面加载动画 */
+.desktop-sidebar {
+  animation: slide-in 0.6s ease-out;
+}
+
+/* 导航项动画 */
+.nav-item {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  transition: left 0.5s ease;
+}
+
+.nav-item:hover::before {
+  left: 100%;
+}
+
+/* 图标动画 */
+.nav-icon {
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
+  transform: scale(1.1);
+}
+
+/* 徽章动画 */
+.nav-badge {
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-badge {
+  transform: scale(1.1);
+}
+
 /* 减少动画模式 */
 @media (prefers-reduced-motion: reduce) {
-  .desktop-sidebar,
+  .desktop-sidebar {
+    animation: none;
+  }
+  
   .nav-item,
-  .nav-icon {
+  .nav-icon,
+  .nav-badge {
     transition: none;
+  }
+  
+  .nav-item::before {
+    display: none;
+  }
+  
+  .nav-item:hover .nav-icon,
+  .nav-item.active .nav-icon {
+    transform: none;
+  }
+  
+  .nav-item:hover .nav-badge {
+    transform: none;
   }
 }
 </style> 

@@ -306,12 +306,93 @@ const iconComponents: Record<string, any> = {
   }
 }
 
+/* 动画效果 */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 页面加载动画 */
+.mobile-tabbar {
+  animation: slide-up 0.6s ease-out;
+}
+
+/* 标签项动画 */
+.tab-item {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+  transition: left 0.5s ease;
+}
+
+.tab-item:hover::before {
+  left: 100%;
+}
+
+/* 图标动画 */
+.tab-icon {
+  transition: transform 0.3s ease;
+}
+
+.tab-item:hover .tab-icon,
+.tab-item.active .tab-icon {
+  transform: scale(1.1);
+}
+
+/* 指示器动画 */
+.tab-indicator {
+  transition: all 0.3s ease;
+}
+
+/* 徽章动画 */
+.tab-badge {
+  transition: transform 0.3s ease;
+}
+
+.tab-item:hover .tab-badge {
+  transform: scale(1.1);
+}
+
 /* 减少动画模式 */
 @media (prefers-reduced-motion: reduce) {
+  .mobile-tabbar {
+    animation: none;
+  }
+  
   .tab-item,
   .tab-icon,
-  .tab-indicator {
+  .tab-indicator,
+  .tab-badge {
     transition: none;
+  }
+  
+  .tab-item::before {
+    display: none;
+  }
+  
+  .tab-item:hover .tab-icon,
+  .tab-item.active .tab-icon {
+    transform: none;
+  }
+  
+  .tab-item:hover .tab-badge {
+    transform: none;
   }
 }
 
