@@ -1,8 +1,19 @@
 {
+  "2154355738": {
+    "username": "2154355738",
+    "nickname": "cs",
+    "password": "ahk12378dx",
+    "star": 3,
+    "banned": false,
+    "sign_days": 0,
+    "sign_total": 0,
+    "last_sign": "",
+    "is_admin": false
+  },
   "admin": {
     "username": "admin",
-    "password": "admin123",
     "nickname": "管理员",
+    "password": "admin123",
     "star": 5,
     "banned": false,
     "sign_days": 0,
@@ -10,21 +21,10 @@
     "last_sign": "",
     "is_admin": true
   },
-  "2154355738": {
-    "username": "2154355738",
-    "password": "ahk12378dx",
-    "nickname": "cs",
-    "star": 3,
-    "banned": true,
-    "sign_days": 0,
-    "sign_total": 0,
-    "last_sign": "",
-    "is_admin": false
-  },
   "2154355737": {
     "username": "2154355737",
-    "password": "ahk12378dx",
     "nickname": "ki",
+    "password": "ahk12378dx",
     "star": 5,
     "banned": true,
     "sign_days": 0,

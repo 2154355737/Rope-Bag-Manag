@@ -49,7 +49,10 @@ import {
   User,
   Box,
   Document,
-  DataAnalysis
+  DataAnalysis,
+  Collection,
+  Folder,
+  UserFilled
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -73,7 +76,7 @@ const menuItems = [
   },
   {
     path: '/packages',
-    title: '绳包管理',
+    title: '资源管理',
     icon: 'Box',
     badge: 0
   },
@@ -97,7 +100,10 @@ const iconComponents: Record<string, any> = {
   User,
   Box,
   Document,
-  DataAnalysis
+  DataAnalysis,
+  Collection,
+  Folder,
+  UserFilled
 }
 </script>
 

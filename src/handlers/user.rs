@@ -1,8 +1,9 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, UserInfoResponse, NicknameInfo};
-use crate::utils::{parse_query_params, save_json, today};
+use crate::utils::{parse_query_params, today};
 use crate::auth::check_rate_limit;
 use crate::utils::ApiResponse;
+use crate::storage::DataManager;
 
 // 查询用户信息（不含密码）
 #[get("/api/user-info")]
@@ -15,12 +16,25 @@ pub async fn user_info(
     }
 
     let params = parse_query_params(req.query_string());
-    let target = match params.get("target") {
+    let target = match params.get("username") {
         Some(t) => t,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标用户".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
 
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get(target) {
         let response = UserInfoResponse {
             username: user.username.clone(),
@@ -30,9 +44,18 @@ pub async fn user_info(
             sign_days: user.sign_days,
             sign_total: user.sign_total,
         };
-        return HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(response) });
+        return HttpResponse::Ok().json(ApiResponse { 
+            code: 0, 
+            msg: "查询成功".to_string(), 
+            data: Some(response) 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 用户签到
@@ -48,24 +71,64 @@ pub async fn sign_in(
     let params = parse_query_params(req.query_string());
     let username = match params.get("username") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(username) {
         if user.banned {
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "用户已被封禁".to_string(), data: None });
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "用户已被封禁".to_string(), 
+                data: None 
+            });
         }
+        
         let today_str = today();
         if user.last_sign == today_str {
-            return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "今日已签到".to_string(), data: None });
+            return HttpResponse::Ok().json(ApiResponse::<()> { 
+                code: 0, 
+                msg: "今日已签到".to_string(), 
+                data: None 
+            });
         }
+        
         user.sign_total += 1;
         user.last_sign = today_str;
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "签到成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "签到成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 修改密码
@@ -81,27 +144,70 @@ pub async fn change_password(
     let params = parse_query_params(req.query_string());
     let username = match params.get("username") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
     let old_password = match params.get("old_password") {
         Some(p) => p,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少旧密码".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少旧密码".to_string(), 
+            data: None 
+        }),
     };
     let new_password = match params.get("new_password") {
         Some(p) => p,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少新密码".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少新密码".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(username) {
         if user.password != *old_password {
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "旧密码错误".to_string(), data: None });
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "旧密码错误".to_string(), 
+                data: None 
+            });
         }
+        
         user.password = new_password.clone();
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "密码修改成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "密码修改成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 修改昵称
@@ -117,20 +223,54 @@ pub async fn change_nickname(
     let params = parse_query_params(req.query_string());
     let username = match params.get("username") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
     let nickname = match params.get("nickname") {
         Some(n) => n,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少昵称".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少昵称".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(username) {
         user.nickname = nickname.clone();
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "昵称修改成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "昵称修改成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 用户昵称列表及星级
@@ -143,12 +283,26 @@ pub async fn nicknames(
         return response;
     }
 
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     let list: Vec<NicknameInfo> = users.values()
         .map(|u| NicknameInfo {
             nickname: u.nickname.clone(),
             star: u.star,
         })
         .collect();
-    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(list) })
+        
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "查询成功".to_string(), 
+        data: Some(list) 
+    })
 }

@@ -48,7 +48,7 @@ where
         self.service.poll_ready(cx)
     }
 
-    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         let start_time = now_ts();
         let path = req.path().to_string();
         let method = req.method().as_str().to_string();

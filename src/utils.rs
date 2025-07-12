@@ -17,10 +17,18 @@ pub fn load_json<T: for<'a> Deserialize<'a> + Default>(path: &str) -> T {
     T::default()
 }
 
-pub fn save_json<T: Serialize>(path: &str, data: &T) {
-    if let Ok(s) = serde_json::to_string_pretty(data) {
-        let _ = fs::write(path, s);
-    }
+pub fn load_json_result<T: for<'a> Deserialize<'a>>(path: &str) -> Result<T, Box<dyn std::error::Error>> {
+    let mut f = File::open(path)?;
+    let mut s = String::new();
+    f.read_to_string(&mut s)?;
+    let data = serde_json::from_str(&s)?;
+    Ok(data)
+}
+
+pub fn save_json<T: Serialize>(path: &str, data: &T) -> Result<(), Box<dyn std::error::Error>> {
+    let s = serde_json::to_string_pretty(data)?;
+    fs::write(path, s)?;
+    Ok(())
 }
 
 // ====== 日期与时间 ======

@@ -232,6 +232,7 @@ import {
   Delete,
   Star
 } from '@element-plus/icons-vue'
+import { getStats, getUsers, getPackages } from '../../api'
 
 // 响应式数据
 const currentTime = ref('')
@@ -239,10 +240,10 @@ const currentDate = ref('')
 const timeRange = ref('7d')
 
 // 统计数据
-const totalUsers = ref(1256)
-const totalPackages = ref(342)
-const totalDownloads = ref(5678)
-const totalViews = ref(12345)
+const totalUsers = ref(0)
+const totalPackages = ref(0)
+const totalDownloads = ref(0)
+const totalViews = ref(0)
 
 // 系统状态
 const systemStatus = ref({
@@ -281,6 +282,34 @@ const recentActivities = ref([
 ])
 
 // 方法
+async function loadStats() {
+  try {
+    // 加载用户数据
+    const usersRes = await getUsers()
+    if (usersRes.code === 0 && usersRes.data) {
+      totalUsers.value = Object.keys(usersRes.data).length
+    }
+    
+    // 加载绳包数据
+    const packagesRes = await getPackages()
+    if (packagesRes.code === 0 && packagesRes.data) {
+      const packages = packagesRes.data.绳包列表 || []
+      totalPackages.value = packages.length
+      totalDownloads.value = packages.reduce((sum: number, pkg: any) => sum + (pkg.下载次数 || 0), 0)
+    }
+    
+    // 加载统计数据
+    const statsRes = await getStats()
+    if (statsRes.code === 0 && statsRes.data) {
+      // 这里可以根据实际的后端数据结构来更新统计信息
+      totalViews.value = 12345 // 后端暂无浏览量统计
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+    ElMessage.error('加载统计数据失败')
+  }
+}
+
 function updateTime() {
   const now = new Date()
   currentTime.value = now.toLocaleTimeString('zh-CN', { 
@@ -337,6 +366,7 @@ let timeInterval: NodeJS.Timeout
 onMounted(() => {
   updateTime()
   timeInterval = setInterval(updateTime, 1000)
+  loadStats()
 })
 
 onUnmounted(() => {

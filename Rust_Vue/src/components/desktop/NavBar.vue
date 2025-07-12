@@ -25,7 +25,7 @@
             class="theme-btn"
             :title="`当前主题: ${currentThemeLabel}`"
           >
-            <span class="theme-icon">{{ currentThemeIcon }}</span>
+            <span class="theme-icon" v-text="currentThemeIcon"></span>
             <span class="theme-label">{{ currentThemeLabel }}</span>
           </el-button>
           <template #dropdown>
@@ -37,7 +37,7 @@
                 :class="{ active: currentTheme === theme.name }"
               >
                 <div class="theme-option">
-                  <span class="theme-icon">{{ theme.icon }}</span>
+                  <span class="theme-icon" v-text="theme.icon"></span>
                   <div class="theme-info">
                     <div class="theme-label">{{ theme.label }}</div>
                     <div class="theme-description">{{ theme.description }}</div>

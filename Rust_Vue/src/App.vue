@@ -1,60 +1,82 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { initTheme } from './utils/theme'
-import { getDeviceType, shouldUseMobileVersion, debugDeviceInfo } from './utils/device'
+import { debugDeviceInfo } from './utils/device'
 import DesktopLayout from './layouts/DesktopLayout.vue'
-import MobileLayout from './layouts/MobileLayout.vue'
 
 // 初始化主题
 onMounted(() => {
   initTheme()
 })
 
-// 设备类型检测
-const isMobile = ref(false)
-const windowWidth = ref(0)
+const route = useRoute()
+const isLayoutReady = ref(false)
 
-// 检测设备类型
-const detectDeviceType = () => {
-  windowWidth.value = window.innerWidth
-  isMobile.value = shouldUseMobileVersion()
-  
-  // 调试信息
+// 调试信息
+const debugLayout = () => {
   debugDeviceInfo()
-  console.log('📱 当前布局:', isMobile.value ? '移动端' : '桌面端')
+  console.log('🖥️ 当前布局: 桌面端')
 }
 
-// 监听窗口大小变化
-const handleResize = () => {
-  detectDeviceType()
+// 判断当前路由的布局类型
+const routeLayout = computed(() => {
+  return route.meta?.layout || 'desktop'
+})
+
+// 判断是否需要独立布局
+const needsIndependentLayout = computed(() => {
+  return routeLayout.value === 'independent'
+})
+
+// 初始化布局
+const initLayout = async () => {
+  debugLayout()
+  
+  // 等待下一个tick确保路由信息已更新
+  await nextTick()
+  
+  // 设置布局就绪状态
+  isLayoutReady.value = true
+  
+  console.log('🎨 布局初始化完成:', {
+    route: route.path,
+    layout: routeLayout.value,
+    device: 'desktop',
+    isIndependent: needsIndependentLayout.value
+  })
 }
 
-// 计算当前布局
-const currentLayout = computed(() => {
-  return isMobile.value ? 'mobile' : 'desktop'
-})
-
-onMounted(() => {
-  detectDeviceType()
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
+onMounted(async () => {
+  await initLayout()
 })
 </script>
 
 <template>
   <div id="app" class="theme-transition">
-    <!-- 桌面端布局 -->
-    <DesktopLayout v-if="currentLayout === 'desktop'">
-      <router-view />
-    </DesktopLayout>
+    <!-- 加载状态 -->
+    <div v-if="!isLayoutReady" class="loading-container">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>正在加载...</p>
+      </div>
+    </div>
     
-    <!-- 移动端布局 -->
-    <MobileLayout v-else>
-      <router-view />
-    </MobileLayout>
+    <!-- 布局内容 -->
+    <template v-else>
+      <!-- 独立布局：资源社区和登录页面 -->
+      <template v-if="needsIndependentLayout">
+        <router-view />
+      </template>
+      
+      <!-- 后台管理布局 -->
+      <template v-else>
+        <!-- 桌面端布局 -->
+        <DesktopLayout>
+          <router-view />
+        </DesktopLayout>
+      </template>
+    </template>
   </div>
 </template>
 
@@ -86,5 +108,45 @@ onUnmounted(() => {
 #app > div {
   height: 100vh;
   width: 100vw;
+}
+
+/* 加载状态样式 */
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--el-bg-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.loading-spinner {
+  text-align: center;
+  color: var(--el-text-color-primary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--el-border-color-light);
+  border-top: 3px solid var(--el-color-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loading-spinner p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
 }
 </style>

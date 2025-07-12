@@ -22,7 +22,7 @@
             >
               <div class="theme-preview" :style="{ backgroundColor: getThemeColor(theme.key) }"></div>
               <div class="theme-info">
-                <span class="theme-icon">{{ theme.icon }}</span>
+                <span class="theme-icon" v-text="theme.icon"></span>
                 <span class="theme-name">{{ theme.name }}</span>
                 <span class="theme-desc">{{ theme.description }}</span>
               </div>
@@ -36,7 +36,7 @@
           <div class="theme-preview-card">
             <div class="preview-header">
               <h4>{{ currentThemeConfig.label }}</h4>
-              <span class="preview-icon">{{ currentThemeConfig.icon }}</span>
+              <span class="preview-icon" v-text="currentThemeConfig.icon"></span>
             </div>
             <div class="preview-content">
               <p>{{ currentThemeConfig.description }}</p>

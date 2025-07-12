@@ -207,47 +207,50 @@ defineOptions({
   name: 'LogView'
 })
 
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { 
   Document, 
-  Search, 
   Refresh, 
+  Search, 
   Download, 
   Delete, 
-  CircleCheck, 
-  Warning, 
-  Close, 
   Clock,
-  DataAnalysis
+  CircleCheck,
+  Warning,
+  Close,
+  TrendCharts
 } from '@element-plus/icons-vue'
 import { getLogEntries } from '../../api'
-import axios from 'axios'
-import { useRouter } from 'vue-router'
 
+const router = useRouter()
+
+// 响应式数据
 const logs = ref<any[]>([])
+const loading = ref(false)
 const page = ref(1)
-const pageSize = 20
+const pageSize = ref(20)
 const total = ref(0)
 const search = ref('')
 const level = ref('')
-const loading = ref(false)
-const router = useRouter()
+const dateRange = ref<any>(null)
+const module = ref('')
 
-// 计算不同级别的日志数量
-const infoCount = computed(() => logs.value.filter(log => log.level === 'INFO').length)
-const warnCount = computed(() => logs.value.filter(log => log.level === 'WARN').length)
-const errorCount = computed(() => logs.value.filter(log => log.level === 'ERROR').length)
+// 统计数据
+const infoCount = ref(0)
+const warnCount = ref(0)
+const errorCount = ref(0)
 
 function getUsername() {
-  const userInfo = localStorage.getItem('userInfo')
-  if (userInfo) {
-    try {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
       const user = JSON.parse(userInfo)
       return user.username || 'admin'
-    } catch {
-      return 'admin'
     }
+  } catch {
+    return 'admin'
   }
   return 'admin'
 }
@@ -271,16 +274,29 @@ async function loadLogs(val = 1) {
     const username = getUsername()
     const params: any = {
       page: page.value,
-      page_size: pageSize,
+      page_size: pageSize.value,
       username
     }
     if (search.value) params.search = search.value
     if (level.value) params.level = level.value
-    // 直接用axios，便于处理blob导出
-    const res = await axios.get('/api/logs/entries', { params })
-    if (res.data.code === 0 && res.data.data) {
-      logs.value = res.data.data.entries || []
-      total.value = res.data.data.total || 0
+    if (dateRange.value) {
+      params.start_time = dateRange.value[0]
+      params.end_time = dateRange.value[1]
+    }
+    if (module.value) params.module = module.value
+    
+    // 使用直接的axios调用，因为getLogEntries不支持参数
+    params.username = getUsername()
+    const res = await fetch(`http://127.0.0.1:15202/api/logs/entries?${new URLSearchParams(params)}`)
+    const data = await res.json()
+    if (data.code === 0 && data.data) {
+      logs.value = data.data.entries || []
+      total.value = data.data.total || 0
+      
+      // 更新统计数据
+      infoCount.value = logs.value.filter(log => log.level === 'INFO').length
+      warnCount.value = logs.value.filter(log => log.level === 'WARN').length
+      errorCount.value = logs.value.filter(log => log.level === 'ERROR').length
     }
   } catch (error) {
     console.error('加载日志失败:', error)
@@ -321,9 +337,16 @@ async function exportLogs() {
     }
     if (search.value) params.search = search.value
     if (level.value) params.level = level.value
-    const res = await axios.get('/api/logs/entries', { params })
-    if (res.data.code === 0 && res.data.data) {
-      const logText = (res.data.data.entries || []).map((l: any) => `[${l.timestamp}] [${l.level}] ${l.message}`).join('\n')
+    if (dateRange.value) {
+      params.start_time = dateRange.value[0]
+      params.end_time = dateRange.value[1]
+    }
+    if (module.value) params.module = module.value
+    
+    const res = await fetch(`http://127.0.0.1:15202/api/logs/entries?${new URLSearchParams(params)}`)
+    const data = await res.json()
+    if (data.code === 0 && data.data) {
+      const logText = (data.data.entries || []).map((l: any) => `[${l.timestamp}] [${l.level}] ${l.message}`).join('\n')
       const blob = new Blob([logText], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -342,12 +365,13 @@ async function clearLogs() {
   try {
     await ElMessageBox.confirm('确定要清空所有日志吗？此操作不可恢复！', '清空日志', { type: 'warning' })
     const username = getUsername()
-    const res = await axios.get('/api/logs/clear', { params: { username } })
-    if (res.data.code === 0) {
+    const res = await fetch(`http://127.0.0.1:15202/api/logs/clear?username=${username}`)
+    const data = await res.json()
+    if (data.code === 0) {
       ElMessage.success('日志已清空')
       loadLogs(1)
     } else {
-      ElMessage.error(res.data.msg || '清空失败')
+      ElMessage.error(data.msg || '清空失败')
     }
   } catch (e) {
     // 用户取消

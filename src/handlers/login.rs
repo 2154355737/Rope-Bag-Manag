@@ -34,7 +34,7 @@ pub async fn login(
 
     info!("用户尝试登录: {}", username);
 
-    let users = data.users.lock().unwrap();
+    let users = data.data_manager.get_users();
     
     if let Some(user) = users.get(username) {
         if user.password == *password {

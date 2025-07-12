@@ -1,7 +1,8 @@
 use actix_web::{web, HttpResponse, Responder, get};
-use crate::models::{AppState, RawDataJson, RawRopePackage};
-use crate::utils::{parse_query_params, save_json, load_json, ApiResponse};
+use crate::models::{AppState, RawRopePackage};
+use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::admin_auth;
+use crate::storage::DataManager;
 
 // 版本号递增函数
 fn bump_version(version: &str) -> String {
@@ -20,21 +21,47 @@ pub async fn admin_user_info(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "管理员认证失败".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
-    let target = match params.get("target") {
+    let target = match params.get("username") {
         Some(t) => t,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
 
-    let users = data.users.lock().unwrap();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get(target) {
-        return HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(user) });
+        return HttpResponse::Ok().json(ApiResponse { 
+            code: 0, 
+            msg: "查询成功".to_string(), 
+            data: Some(user) 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 管理员设置用户昵称/密码
@@ -43,17 +70,34 @@ pub async fn admin_set_user(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "管理员认证失败".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
     let target = match params.get("target") {
         Some(t) => t,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少目标".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(target) {
         if let Some(n) = params.get("nickname") {
             user.nickname = n.clone();
@@ -61,10 +105,27 @@ pub async fn admin_set_user(
         if let Some(p) = params.get("password") {
             user.password = p.clone();
         }
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "用户信息更新成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "用户信息更新成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 管理员设置用户星级
@@ -73,27 +134,65 @@ pub async fn admin_set_star(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "管理员认证失败".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
     let target = match params.get("target") {
         Some(t) => t,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少目标".to_string(), 
+            data: None 
+        }),
     };
     let star = match params.get("star") {
         Some(s) => s.parse::<u8>().unwrap_or(1),
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少星级".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少星级".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(target) {
         user.star = star;
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "用户星级更新成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "用户星级更新成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 管理员封禁/解封用户
@@ -102,27 +201,65 @@ pub async fn admin_ban_user(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "管理员认证失败".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
     let target = match params.get("target") {
         Some(t) => t,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少目标".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少目标".to_string(), 
+            data: None 
+        }),
     };
     let ban = match params.get("banned") {
         Some(b) => *b == "true",
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少封禁状态".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少封禁状态".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get_mut(target) {
         user.banned = ban;
-        save_json("data/users.json", &*users);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "用户封禁状态更新成功".to_string(), data: None });
+        
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存用户数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        return HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "用户封禁状态更新成功".to_string(), 
+            data: None 
+        });
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })
+    
+    HttpResponse::NotFound().json(ApiResponse::<()> { 
+        code: 1, 
+        msg: "用户不存在".to_string(), 
+        data: None 
+    })
 }
 
 // 管理员添加绳包
@@ -131,34 +268,67 @@ pub async fn admin_add_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "管理员认证失败".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
     let name = match params.get("绳包名称") {
         Some(n) => n,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少名称".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少名称".to_string(), 
+            data: None 
+        }),
     };
     let author = match params.get("作者") {
         Some(a) => a,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少作者".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少作者".to_string(), 
+            data: None 
+        }),
     };
     let version = match params.get("版本") {
         Some(v) => v,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少版本".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少版本".to_string(), 
+            data: None 
+        }),
     };
     let desc = match params.get("简介") {
         Some(d) => d,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少简介".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少简介".to_string(), 
+            data: None 
+        }),
     };
     let url = match params.get("项目直链") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少项目直链".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少项目直链".to_string(), 
+            data: None 
+        }),
     };
 
     // 读取原始数据库
-    let mut raw_data: RawDataJson = load_json("data/data.json");
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载绳包数据失败".to_string(), 
+            data: None 
+        }),
+    };
+    
     let new_id = raw_data.绳包列表.iter().map(|p| p.id).max().unwrap_or(0) + 1;
     // 获取当前时间作为上架时间
     let upload_time = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -180,22 +350,19 @@ pub async fn admin_add_rope_package(
     raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
     raw_data.数据库配置.数据库更新时间 = chrono::Local::now().format("%Y%m%d").to_string();
     
-    save_json("data/data.json", &raw_data);
+    if let Err(_) = data_manager.save_raw_data(&raw_data) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "保存绳包数据失败".to_string(), 
+            data: None 
+        });
+    }
     
-    // 同时更新内存中的ropes数据
-    let mut ropes = data.ropes.lock().unwrap();
-    ropes.insert(new_id, crate::models::RopePackage {
-        id: new_id,
-        name: name.clone(),
-        author: author.clone(),
-        version: version.clone(),
-        desc: desc.clone(),
-        url: url.clone(),
-        downloads: 0,
-        upload_time,
-    });
-    
-    HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包添加成功".to_string(), data: None })
+    HttpResponse::Ok().json(ApiResponse::<()> { 
+        code: 0, 
+        msg: "绳包添加成功".to_string(), 
+        data: None 
+    })
 }
 
 // 管理员更新绳包
@@ -204,7 +371,8 @@ pub async fn admin_update_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
     }
 
@@ -239,7 +407,10 @@ pub async fn admin_update_rope_package(
     };
 
     // 读取原始数据库
-    let mut raw_data: RawDataJson = load_json("data/data.json");
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "加载绳包数据失败".to_string(), data: None }),
+    };
     let mut found = false;
     
     for rope in &mut raw_data.绳包列表 {
@@ -265,17 +436,8 @@ pub async fn admin_update_rope_package(
     raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
     raw_data.数据库配置.数据库更新时间 = chrono::Local::now().format("%Y%m%d").to_string();
     
-    save_json("data/data.json", &raw_data);
-    
-    // 同时更新内存中的ropes数据
-    let mut ropes = data.ropes.lock().unwrap();
-    if let Some(rope) = ropes.get_mut(&id) {
-        rope.name = name.clone();
-        rope.author = author.clone();
-        rope.version = version.clone();
-        rope.desc = desc.clone();
-        rope.url = url.clone();
-        rope.downloads = downloads;
+    if let Err(_) = data_manager.save_raw_data(&raw_data) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "保存绳包数据失败".to_string(), data: None });
     }
     
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包更新成功".to_string(), data: None })
@@ -287,7 +449,8 @@ pub async fn admin_delete_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
     }
 
@@ -298,7 +461,10 @@ pub async fn admin_delete_rope_package(
     };
 
     // 读取原始数据库
-    let mut raw_data: RawDataJson = load_json("data/data.json");
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "加载绳包数据失败".to_string(), data: None }),
+    };
     let before = raw_data.绳包列表.len();
     raw_data.绳包列表.retain(|p| p.id != id);
     let after = raw_data.绳包列表.len();
@@ -313,11 +479,9 @@ pub async fn admin_delete_rope_package(
     raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
     raw_data.数据库配置.数据库更新时间 = chrono::Local::now().format("%Y%m%d").to_string();
     
-    save_json("data/data.json", &raw_data);
-    
-    // 同时更新内存中的ropes数据
-    let mut ropes = data.ropes.lock().unwrap();
-    ropes.remove(&id);
+    if let Err(_) = data_manager.save_raw_data(&raw_data) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "保存绳包数据失败".to_string(), data: None });
+    }
     
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包删除成功".to_string(), data: None })
 }
@@ -328,7 +492,8 @@ pub async fn set_admin(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if !admin_auth(&req, &data.config, &data.users) {
+    let data_manager = DataManager::new();
+    if !admin_auth(&req, &data.config, &data_manager) {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员认证失败".to_string(), data: None });
     }
 
@@ -342,10 +507,15 @@ pub async fn set_admin(
         None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少管理员状态".to_string(), data: None }),
     };
 
-    let mut users = data.users.lock().unwrap();
+    let mut users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "加载用户数据失败".to_string(), data: None }),
+    };
     if let Some(user) = users.get_mut(target) {
         user.is_admin = is_admin;
-        save_json("data/users.json", &*users);
+        if let Err(_) = data_manager.save_users(&users) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "保存用户数据失败".to_string(), data: None });
+        }
         return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "管理员状态更新成功".to_string(), data: None });
     }
     HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None })

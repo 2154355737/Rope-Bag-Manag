@@ -1,108 +1,46 @@
 use actix_web::{web, HttpResponse, Responder, get};
-use crate::models::{AppState};
-use crate::utils::{parse_query_params, save_json, load_json};
-use crate::auth::check_rate_limit;
-use serde::Serialize;
-use chrono::Local;
-use crate::models::{RawDataJson, RawRopePackage};
+use crate::models::{AppState, RawRopePackage};
+use crate::utils::{parse_query_params, ApiResponse};
+use crate::auth::{check_rate_limit, record_api_call};
+use crate::storage::DataManager;
 
-#[derive(Serialize)]
-struct ApiResponse<T> {
-    code: i32,
-    msg: String,
-    data: Option<T>,
-}
-
-fn bump_version(version: &str) -> String {
-    let mut parts: Vec<u32> = version.split('.').filter_map(|s| s.parse().ok()).collect();
-    while parts.len() < 3 { parts.push(0); }
-    parts[2] += 1;
-    if parts[2] >= 10 {
-        parts[2] = 0;
-        parts[1] += 1;
-    }
-    if parts[1] >= 10 {
-        parts[1] = 0;
-        parts[0] += 1;
-    }
-    format!("{}.{}.{}", parts[0], parts[1], parts[2])
-}
-
-// 添加绳包（星级大于3）
-#[get("/api/add-rope-package")]
-pub async fn add_rope_package(
+// 获取数据库数据
+#[get("/api/get-data-db")]
+pub async fn get_data_db(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "add_rope_package") {
+    let start_time = crate::utils::now_ts();
+    
+    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "get_data_db") {
         return response;
     }
-    let params = parse_query_params(req.query_string());
-    let username = match params.get("username") {
-        Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
+
+    let data_manager = DataManager::new();
+    let raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
     };
-    let admin_password = params.get("admin_password");
-    let admin_username = &data.config.admin_username;
-    let admin_pwd = &data.config.admin_password;
-    if username == admin_username {
-        match admin_password {
-            Some(pwd) if pwd == admin_pwd => {},
-            _ => return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员操作需提供正确密码".to_string(), data: None }),
-        }
-    }
-    let name = match params.get("name") {
-        Some(n) => n,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少name".to_string(), data: None }),
-    };
-    let author = match params.get("author") {
-        Some(a) => a,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少author".to_string(), data: None }),
-    };
-    let version = match params.get("version") {
-        Some(v) => v,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少version".to_string(), data: None }),
-    };
-    let desc = match params.get("desc") {
-        Some(d) => d,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少desc".to_string(), data: None }),
-    };
-    let url = match params.get("url") {
-        Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少url".to_string(), data: None }),
-    };
-    let users = data.users.lock().unwrap();
-    let user = match users.get(username) {
-        Some(u) => u,
-        None => return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None }),
-    };
-    if user.star < 3 {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "用户星级不足".to_string(), data: None });
-    }
-    drop(users);
-    // 读取原始数据库
-    let mut raw_data: RawDataJson = load_json("data/data.json");
-    let new_id = raw_data.绳包列表.iter().map(|p| p.id).max().unwrap_or(0) + 1;
-    // 获取当前时间作为上架时间
-    let upload_time = Local::now().format("%Y-%m-%d").to_string();
     
-    raw_data.绳包列表.push(RawRopePackage {
-        id: new_id,
-        绳包名称: name.clone(),
-        作者: author.clone(),
-        版本: version.clone(),
-        简介: desc.clone(),
-        项目直链: url.clone(),
-        下载次数: 0,
-        上架时间: upload_time,
-    });
-    // 自动更新数据库配置
-    raw_data.数据库配置.数据库名称 = "结绳绳包数据库".to_string();
-    raw_data.数据库配置.数据库项目 = raw_data.绳包列表.len() as u32;
-    raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
-    raw_data.数据库配置.数据库更新时间 = Local::now().format("%Y%m%d").to_string();
-    save_json("data/data.json", &raw_data);
-    HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包添加成功".to_string(), data: None })
+    record_api_call(
+        &req.query_string(),
+        &data.stats,
+        "get_data_db",
+        start_time,
+        200,
+        true,
+        None,
+    );
+
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "成功".to_string(), 
+        data: Some(raw_data) 
+    })
 }
 
 // 统计绳包下载量
@@ -111,50 +49,287 @@ pub async fn download_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
+    let start_time = crate::utils::now_ts();
+    
     if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "download_rope_package") {
         return response;
     }
 
     let params = parse_query_params(req.query_string());
     let id = match params.get("id") {
-        Some(i) => i.parse::<u32>().unwrap_or(0),
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少id".to_string(), data: None }),
+        Some(i) => match i.parse::<u32>() {
+            Ok(id) if id > 0 => id,
+            _ => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "无效的资源ID".to_string(), 
+                data: None 
+            }),
+        },
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少资源ID".to_string(), 
+            data: None 
+        }),
     };
 
-    let mut ropes = data.ropes.lock().unwrap();
-    if let Some(rope) = ropes.get_mut(&id) {
-        rope.downloads += 1;
-        
-        // 同时更新数据库文件中的下载次数
-        let mut raw_data: RawDataJson = load_json("data/data.json");
-        for raw_rope in &mut raw_data.绳包列表 {
-            if raw_rope.id == id {
-                raw_rope.下载次数 = rope.downloads;
-                break;
-            }
+    let data_manager = DataManager::new();
+    
+    // 加载原始数据
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    // 查找并更新下载次数
+    let mut found = false;
+    for package in &mut raw_data.绳包列表 {
+        if package.id == id {
+            package.下载次数 += 1;
+            found = true;
+            break;
         }
-        save_json("data/data.json", &raw_data);
+    }
+    
+    if found {
+        // 保存更新后的数据
+        if let Err(_) = data_manager.save_raw_data(&raw_data) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存数据失败".to_string(), 
+                data: None 
+            });
+        }
         
+        // 更新统计
         let mut stats = data.stats.lock().unwrap();
         let id_str = id.to_string();
         *stats.downloads.entry(id_str).or_insert(0) += 1;
-        save_json("data/stats.json", &*stats);
-        return HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "下载统计成功".to_string(), data: None });
+        
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "download_rope_package",
+            start_time,
+            200,
+            true,
+            None,
+        );
+        
+        HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "下载统计成功".to_string(), 
+            data: None 
+        })
+    } else {
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "download_rope_package",
+            start_time,
+            404,
+            false,
+            Some("绳包不存在".to_string()),
+        );
+        
+        HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "绳包不存在".to_string(), 
+            data: None 
+        })
     }
-    HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "绳包不存在".to_string(), data: None })
 }
 
-// 获取所有绳包
-#[get("/api/get-data-db")]
-pub async fn get_data_db(
+// 更新绳包（星级大于3）
+#[get("/api/update-rope-package")]
+pub async fn update_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "get_data_db") {
+    let start_time = crate::utils::now_ts();
+    
+    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "update_rope_package") {
         return response;
     }
-    let raw_data: RawDataJson = load_json("data/data.json");
-    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "成功".to_string(), data: Some(raw_data) })
+    
+    let params = parse_query_params(req.query_string());
+    let username = match params.get("username") {
+        Some(u) => u,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
+    };
+    let admin_password = params.get("admin_password");
+    let admin_username = &data.config.admin_username;
+    let admin_pwd = &data.config.admin_password;
+    if username == admin_username {
+        match admin_password {
+            Some(pwd) if pwd == admin_pwd => {},
+            _ => return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "管理员操作需提供正确密码".to_string(), 
+                data: None 
+            }),
+        }
+    }
+    let id = match params.get("id") {
+        Some(i) => match i.parse::<u32>() {
+            Ok(id) if id > 0 => id,
+            _ => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "无效的资源ID".to_string(), 
+                data: None 
+            }),
+        },
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少资源ID".to_string(), 
+            data: None 
+        }),
+    };
+    let name = match params.get("name") {
+        Some(n) => n,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少name".to_string(), 
+            data: None 
+        }),
+    };
+    let author = match params.get("author") {
+        Some(a) => a,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少author".to_string(), 
+            data: None 
+        }),
+    };
+    let version = match params.get("version") {
+        Some(v) => v,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少version".to_string(), 
+            data: None 
+        }),
+    };
+    let desc = match params.get("desc") {
+        Some(d) => d,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少desc".to_string(), 
+            data: None 
+        }),
+    };
+    let url = match params.get("url") {
+        Some(u) => u,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少url".to_string(), 
+            data: None 
+        }),
+    };
+    
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    let user = match users.get(username) {
+        Some(u) => u,
+        None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        }),
+    };
+    if user.star < 3 {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户星级不足".to_string(), 
+            data: None 
+        });
+    }
+    
+    let updates = RawRopePackage {
+        id,
+        绳包名称: name.clone(),
+        作者: author.clone(),
+        版本: version.clone(),
+        简介: desc.clone(),
+        项目直链: url.clone(),
+        下载次数: 0,
+        上架时间: chrono::Local::now().format("%Y-%m-%d").to_string(),
+    };
+    
+    // 加载原始数据并更新
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    let mut found = false;
+    for package in &mut raw_data.绳包列表 {
+        if package.id == id {
+            *package = updates;
+            found = true;
+            break;
+        }
+    }
+    
+    if found {
+        if let Err(_) = data_manager.save_raw_data(&raw_data) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "update_rope_package",
+            start_time,
+            200,
+            true,
+            None,
+        );
+        
+        HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "绳包更新成功".to_string(), 
+            data: None 
+        })
+    } else {
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "update_rope_package",
+            start_time,
+            404,
+            false,
+            Some("绳包不存在".to_string()),
+        );
+        
+        HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "绳包不存在".to_string(), 
+            data: None 
+        })
+    }
 }
 
 // 删除绳包（星级大于3）
@@ -163,6 +338,8 @@ pub async fn delete_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
+    let start_time = crate::utils::now_ts();
+    
     if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "delete_rope_package") {
         return response;
     }
@@ -181,47 +358,122 @@ pub async fn delete_rope_package(
         }
     }
     let id = match params.get("id") {
-        Some(i) => i.parse::<u32>().unwrap_or(0),
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少id".to_string(), data: None }),
+        Some(i) => match i.parse::<u32>() {
+            Ok(id) if id > 0 => id,
+            _ => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "无效的资源ID".to_string(), 
+                data: None 
+            }),
+        },
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少资源ID".to_string(), 
+            data: None 
+        }),
     };
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+    
     let user = match users.get(username) {
         Some(u) => u,
-        None => return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None }),
+        None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        }),
     };
     if user.star < 3 {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "用户星级不足".to_string(), data: None });
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户星级不足".to_string(), 
+            data: None 
+        });
     }
-    drop(users);
-    let mut raw_data: RawDataJson = load_json("data/data.json");
-    let before = raw_data.绳包列表.len();
+    
+    // 加载原始数据并删除
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    let initial_len = raw_data.绳包列表.len();
     raw_data.绳包列表.retain(|p| p.id != id);
-    let after = raw_data.绳包列表.len();
-    if before == after {
-        return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "绳包不存在".to_string(), data: None });
+    
+    if raw_data.绳包列表.len() < initial_len {
+        if let Err(_) = data_manager.save_raw_data(&raw_data) {
+            return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "保存数据失败".to_string(), 
+                data: None 
+            });
+        }
+        
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "delete_rope_package",
+            start_time,
+            200,
+            true,
+            None,
+        );
+        
+        HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "绳包删除成功".to_string(), 
+            data: None 
+        })
+    } else {
+        record_api_call(
+            &req.query_string(),
+            &data.stats,
+            "delete_rope_package",
+            start_time,
+            404,
+            false,
+            Some("绳包不存在".to_string()),
+        );
+        
+        HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "绳包不存在".to_string(), 
+            data: None 
+        })
     }
-    // 自动更新数据库配置
-    raw_data.数据库配置.数据库名称 = "结绳绳包数据库".to_string();
-    raw_data.数据库配置.数据库项目 = raw_data.绳包列表.len() as u32;
-    raw_data.数据库配置.数据库版本 = bump_version(&raw_data.数据库配置.数据库版本);
-    raw_data.数据库配置.数据库更新时间 = Local::now().format("%Y%m%d").to_string();
-    save_json("data/data.json", &raw_data);
-    HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包删除成功".to_string(), data: None })
 }
 
-// 修改绳包信息（星级大于3）
-#[get("/api/update-rope-package")]
-pub async fn update_rope_package(
+// 添加绳包
+#[get("/api/add-rope-package")]
+pub async fn add_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> impl Responder {
-    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "update_rope_package") {
+    let start_time = crate::utils::now_ts();
+    
+    if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "add_rope_package") {
         return response;
     }
+    
     let params = parse_query_params(req.query_string());
     let username = match params.get("username") {
         Some(u) => u,
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None }),
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少用户名".to_string(), 
+            data: None 
+        }),
     };
     let admin_password = params.get("admin_password");
     let admin_username = &data.config.admin_username;
@@ -229,38 +481,135 @@ pub async fn update_rope_package(
     if username == admin_username {
         match admin_password {
             Some(pwd) if pwd == admin_pwd => {},
-            _ => return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "管理员操作需提供正确密码".to_string(), data: None }),
+            _ => return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "管理员操作需提供正确密码".to_string(), 
+                data: None 
+            }),
         }
     }
-    let id = match params.get("id") {
-        Some(i) => i.parse::<u32>().unwrap_or(0),
-        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少id".to_string(), data: None }),
+    let name = match params.get("name") {
+        Some(n) => n,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少name".to_string(), 
+            data: None 
+        }),
     };
-    let users = data.users.lock().unwrap();
+    let author = match params.get("author") {
+        Some(a) => a,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少author".to_string(), 
+            data: None 
+        }),
+    };
+    let version = match params.get("version") {
+        Some(v) => v,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少version".to_string(), 
+            data: None 
+        }),
+    };
+    let desc = match params.get("desc") {
+        Some(d) => d,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少desc".to_string(), 
+            data: None 
+        }),
+    };
+    let url = match params.get("url") {
+        Some(u) => u,
+        None => return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "缺少url".to_string(), 
+            data: None 
+        }),
+    };
+    
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+    
     let user = match users.get(username) {
         Some(u) => u,
-        None => return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None }),
+        None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        }),
     };
     if user.star < 3 {
-        return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "用户星级不足".to_string(), data: None });
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户星级不足".to_string(), 
+            data: None 
+        });
     }
-    drop(users);
-    let mut raw_data: RawDataJson = load_json("data/data.json");
-    let mut found = false;
-    for rope in &mut raw_data.绳包列表 {
-        if rope.id == id {
-            if let Some(name) = params.get("name") { rope.绳包名称 = name.clone(); }
-            if let Some(author) = params.get("author") { rope.作者 = author.clone(); }
-            if let Some(version) = params.get("version") { rope.版本 = version.clone(); }
-            if let Some(desc) = params.get("desc") { rope.简介 = desc.clone(); }
-            if let Some(url) = params.get("url") { rope.项目直链 = url.clone(); }
-            found = true;
-            break;
-        }
+
+    // 获取新ID
+    let raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    let new_id = raw_data.绳包列表.iter().map(|p| p.id).max().unwrap_or(0) + 1;
+    
+    let package = RawRopePackage {
+        id: new_id,
+        绳包名称: name.clone(),
+        作者: author.clone(),
+        版本: version.clone(),
+        简介: desc.clone(),
+        项目直链: url.clone(),
+        下载次数: 0,
+        上架时间: chrono::Local::now().format("%Y-%m-%d").to_string(),
+    };
+    
+    // 加载原始数据并添加
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    raw_data.绳包列表.push(package);
+    
+    if let Err(_) = data_manager.save_raw_data(&raw_data) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "保存数据失败".to_string(), 
+            data: None 
+        });
     }
-    if !found {
-        return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "绳包不存在".to_string(), data: None });
-    }
-    save_json("data/data.json", &raw_data);
-    HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "绳包信息修改成功".to_string(), data: None })
+    
+    record_api_call(
+        &req.query_string(),
+        &data.stats,
+        "add_rope_package",
+        start_time,
+        200,
+        true,
+        None,
+    );
+    
+    HttpResponse::Ok().json(ApiResponse::<()> { 
+        code: 0, 
+        msg: "绳包添加成功".to_string(), 
+        data: None 
+    })
 }

@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::AppState;
 use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
+use crate::storage::DataManager;
 use log::{info, warn, error};
 use std::fs;
 use std::path::Path;
@@ -44,19 +45,40 @@ pub async fn get_log_stats(
         Some(u) => u,
         None => {
             warn!("获取日志统计失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None });
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "缺少用户名".to_string(), 
+                data: None 
+            });
         }
     };
 
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get(username) {
         if !user.is_admin {
             warn!("非管理员用户尝试获取日志统计: {}", username);
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "需要管理员权限".to_string(), data: None });
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "需要管理员权限".to_string(), 
+                data: None 
+            });
         }
     } else {
         warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None });
+        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        });
     }
 
     // 获取日志文件信息
@@ -80,7 +102,11 @@ pub async fn get_log_stats(
     };
 
     info!("管理员 {} 获取日志统计", username);
-    HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(stats) })
+    HttpResponse::Ok().json(ApiResponse { 
+        code: 0, 
+        msg: "查询成功".to_string(), 
+        data: Some(stats) 
+    })
 }
 
 #[get("/api/logs/entries")]
@@ -99,19 +125,40 @@ pub async fn get_log_entries(
         Some(u) => u,
         None => {
             warn!("获取日志条目失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少用户名".to_string(), data: None });
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "缺少用户名".to_string(), 
+                data: None 
+            });
         }
     };
 
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get(username) {
         if !user.is_admin {
             warn!("非管理员用户尝试获取日志条目: {}", username);
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { code: 1, msg: "需要管理员权限".to_string(), data: None });
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "需要管理员权限".to_string(), 
+                data: None 
+            });
         }
     } else {
         warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().json(ApiResponse::<()> { code: 1, msg: "用户不存在".to_string(), data: None });
+        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        });
     }
 
     // 获取查询参数
@@ -124,7 +171,11 @@ pub async fn get_log_entries(
     // 读取日志文件
     let log_file_path = "logs/app.log";
     if !Path::new(log_file_path).exists() {
-        return HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "日志文件不存在".to_string(), data: None });
+        return HttpResponse::NotFound().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "日志文件不存在".to_string(), 
+            data: None 
+        });
     }
 
     match fs::read_to_string(log_file_path) {
@@ -148,11 +199,19 @@ pub async fn get_log_entries(
             let total = all_entries.len();
             let entries = all_entries.into_iter().take(limit).collect::<Vec<_>>();
             info!("管理员 {} 获取日志条目，数量: {}", username, entries.len());
-            HttpResponse::Ok().json(ApiResponse { code: 0, msg: "查询成功".to_string(), data: Some(serde_json::json!({"total": total, "entries": entries})) })
+            HttpResponse::Ok().json(ApiResponse { 
+                code: 0, 
+                msg: "查询成功".to_string(), 
+                data: Some(serde_json::json!({"total": total, "entries": entries})) 
+            })
         }
         Err(e) => {
             error!("读取日志文件失败: {}", e);
-            HttpResponse::InternalServerError().body("读取日志文件失败")
+            HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "读取日志文件失败".to_string(), 
+                data: None 
+            })
         }
     }
 }
@@ -173,19 +232,40 @@ pub async fn clear_logs(
         Some(u) => u,
         None => {
             warn!("清除日志失败: 缺少用户名参数");
-            return HttpResponse::BadRequest().body("缺少用户名");
+            return HttpResponse::BadRequest().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "缺少用户名".to_string(), 
+                data: None 
+            });
         }
     };
 
-    let users = data.users.lock().unwrap();
+    let data_manager = DataManager::new();
+    let users = match data_manager.load_users() {
+        Ok(users) => users,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载用户数据失败".to_string(), 
+            data: None 
+        }),
+    };
+
     if let Some(user) = users.get(username) {
         if !user.is_admin {
             warn!("非管理员用户尝试清除日志: {}", username);
-            return HttpResponse::Forbidden().body("需要管理员权限");
+            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+                code: 1, 
+                msg: "需要管理员权限".to_string(), 
+                data: None 
+            });
         }
     } else {
         warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().body("用户不存在");
+        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户不存在".to_string(), 
+            data: None 
+        });
     }
 
     // 清除日志文件
@@ -194,15 +274,27 @@ pub async fn clear_logs(
         match fs::write(log_file_path, "") {
             Ok(_) => {
                 info!("管理员 {} 清除了日志文件", username);
-                HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "日志已清除".to_string(), data: None })
+                HttpResponse::Ok().json(ApiResponse::<()> { 
+                    code: 0, 
+                    msg: "日志已清除".to_string(), 
+                    data: None 
+                })
             }
             Err(e) => {
                 error!("清除日志文件失败: {}", e);
-                HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: "清除日志文件失败".to_string(), data: None })
+                HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+                    code: 1, 
+                    msg: "清除日志文件失败".to_string(), 
+                    data: None 
+                })
             }
         }
     } else {
-        HttpResponse::NotFound().json(ApiResponse::<()> { code: 1, msg: "日志文件不存在".to_string(), data: None })
+        HttpResponse::Ok().json(ApiResponse::<()> { 
+            code: 0, 
+            msg: "日志文件不存在，无需清除".to_string(), 
+            data: None 
+        })
     }
 }
 

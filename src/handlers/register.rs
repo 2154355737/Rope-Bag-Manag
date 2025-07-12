@@ -1,7 +1,8 @@
 use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, User};
-use crate::utils::{parse_query_params, save_json, ApiResponse};
+use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
+use uuid::Uuid;
 
 #[get("/api/register")]
 pub async fn register(
@@ -30,8 +31,7 @@ pub async fn register(
         None => return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "缺少昵称".to_string(), data: None }),
     };
 
-    let mut users = data.users.lock().unwrap();
-    
+    let users = data.data_manager.get_users();
     if users.contains_key(username) {
         return HttpResponse::BadRequest().json(ApiResponse::<()> { code: 1, msg: "用户已存在".to_string(), data: None });
     }
@@ -48,8 +48,9 @@ pub async fn register(
         is_admin: false,
     };
 
-    users.insert(username.clone(), new_user);
-    save_json("data/users.json", &*users);
+    if let Err(e) = data.data_manager.update_user(username.clone(), new_user) {
+        return HttpResponse::InternalServerError().json(ApiResponse::<()> { code: 1, msg: format!("注册失败: {}", e), data: None });
+    }
 
     HttpResponse::Ok().json(ApiResponse::<()> { code: 0, msg: "注册成功".to_string(), data: None })
 }

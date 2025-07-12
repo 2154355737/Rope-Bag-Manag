@@ -9,13 +9,17 @@
           </div>
           <div class="header-info">
             <h1 class="page-title">用户管理</h1>
-            <p class="page-subtitle">管理系统用户和权限</p>
+            <p class="page-subtitle">管理系统用户和社区用户</p>
           </div>
         </div>
         <div class="header-actions">
           <el-button type="primary" @click="showAddUserDialog">
             <el-icon><Plus /></el-icon>
             添加用户
+          </el-button>
+          <el-button @click="showUserStatsDialog = true">
+            <el-icon><DataAnalysis /></el-icon>
+            用户统计
           </el-button>
         </div>
       </div>
@@ -211,6 +215,44 @@
         <el-button type="primary" @click="saveUser">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 用户统计对话框 -->
+    <el-dialog
+      v-model="showUserStatsDialog"
+      title="用户统计"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="stats-dialog-content">
+        <div class="stats-chart">
+          <h3>用户分布</h3>
+          <div class="chart-container">
+            <!-- 这里可以添加图表组件 -->
+            <div class="chart-placeholder">
+              <el-icon :size="48"><DataAnalysis /></el-icon>
+              <p>用户统计图表</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="stats-details">
+          <h3>详细统计</h3>
+          <el-descriptions :column="2" border>
+            <el-descriptions-item label="总用户数">{{ totalUsers }}</el-descriptions-item>
+            <el-descriptions-item label="活跃用户">{{ activeUsers }}</el-descriptions-item>
+            <el-descriptions-item label="封禁用户">{{ bannedUsers }}</el-descriptions-item>
+            <el-descriptions-item label="管理员">{{ adminUsers }}</el-descriptions-item>
+            <el-descriptions-item label="普通用户">{{ totalUsers - adminUsers }}</el-descriptions-item>
+            <el-descriptions-item label="在线用户">{{ users.filter(u => u.status === 'online').length }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="showUserStatsDialog = false">关闭</el-button>
+        <el-button type="primary" @click="exportUserStats">导出统计</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -225,8 +267,10 @@ import {
   Close, 
   Star,
   Search,
-  Refresh
+  Refresh,
+  DataAnalysis
 } from '@element-plus/icons-vue'
+import { getUsers, adminSetUser, adminBanUser, setAdmin } from '../../api'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -236,6 +280,7 @@ const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(20)
 const editDialogVisible = ref(false)
+const showUserStatsDialog = ref(false)
 const editingUser = ref<any>({})
 
 // 用户数据
@@ -268,23 +313,55 @@ const filteredUsers = computed(() => {
   
   // 角色过滤
   if (roleFilter.value) {
-    filtered = filtered.filter(user => user.role === roleFilter.value)
+    filtered = filtered.filter(user => user.is_admin === (roleFilter.value === 'admin'))
   }
   
   return filtered
 })
 
 // 方法
+async function loadUsers() {
+  try {
+    loading.value = true
+    const res = await getUsers()
+    if (res.code === 0 && res.data) {
+      users.value = Object.entries(res.data).map(([username, user]: [string, any]) => ({
+        id: username,
+        username,
+        nickname: user.nickname || username,
+        role: user.is_admin ? 'admin' : 'user',
+        status: 'online', // 后端暂无在线状态
+        star: user.star || 0,
+        loginCount: user.sign_total || 0,
+        lastLogin: user.last_sign || '从未登录',
+        registerTime: user.register_time || '未知',
+        banned: user.banned || false,
+        is_admin: user.is_admin || false
+      }))
+      
+      // 更新统计数据
+      totalUsers.value = users.value.length
+      activeUsers.value = users.value.filter(u => !u.banned).length
+      bannedUsers.value = users.value.filter(u => u.banned).length
+      adminUsers.value = users.value.filter(u => u.is_admin).length
+    } else {
+      ElMessage.error('获取用户数据失败')
+    }
+  } catch (error) {
+    console.error('获取用户数据错误:', error)
+    ElMessage.error('获取用户数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 function handleSearch() {
   // 搜索逻辑
 }
 
-function refreshData() {
-  loading.value = true
-  setTimeout(() => {
-    loading.value = false
-    ElMessage.success('数据已刷新')
-  }, 1000)
+async function refreshData() {
+  await loadUsers()
+  ElMessage.success('数据已刷新')
 }
 
 function showAddUserDialog() {
@@ -297,28 +374,87 @@ function editUser(user: any) {
   editDialogVisible.value = true
 }
 
-function saveUser() {
-  // 保存用户信息
-  ElMessage.success('用户信息已保存')
-  editDialogVisible.value = false
+async function saveUser() {
+  try {
+    const admin_username = 'admin'
+    const admin_password = 'admin123'
+    
+    if (editingUser.value.id) {
+      // 更新用户
+      const updateData: any = {
+        target: editingUser.value.username,
+        admin_username,
+        admin_password
+      }
+      
+      if (editingUser.value.nickname !== editingUser.value.username) {
+        updateData.nickname = editingUser.value.nickname
+      }
+      
+      if (editingUser.value.password) {
+        updateData.password = editingUser.value.password
+      }
+      
+      const res = await adminSetUser(updateData)
+      if (res.code === 0) {
+        ElMessage.success('用户信息已保存')
+        editDialogVisible.value = false
+        await loadUsers()
+      } else {
+        ElMessage.error(res.msg || '保存失败')
+      }
+    } else {
+      // 添加用户
+      const addData: any = {
+        target: editingUser.value.username,
+        nickname: editingUser.value.nickname,
+        password: editingUser.value.password,
+        admin_username,
+        admin_password
+      }
+      
+      const res = await adminSetUser(addData)
+      if (res.code === 0) {
+        ElMessage.success('用户添加成功')
+        editDialogVisible.value = false
+        await loadUsers()
+      } else {
+        ElMessage.error(res.msg || '添加失败')
+      }
+    }
+  } catch (error) {
+    console.error('保存用户错误:', error)
+    ElMessage.error('保存失败')
+  }
 }
 
-function toggleBan(user: any) {
+async function toggleBan(user: any) {
   const action = user.banned ? '解封' : '封禁'
-  ElMessageBox.confirm(
-    `确定要${action}用户 ${user.username} 吗？`,
-    '确认操作',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+  try {
+    await ElMessageBox.confirm(
+      `确定要${action}用户 ${user.username} 吗？`,
+      '确认操作',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const res = await adminBanUser(user.username, !user.banned, 'admin', 'admin123')
+    if (res.code === 0) {
+      user.banned = !user.banned
+      ElMessage.success(`用户已${action}`)
+      await loadUsers() // 重新加载数据
+    } else {
+      ElMessage.error(res.msg || `${action}失败`)
     }
-  ).then(() => {
-    user.banned = !user.banned
-    ElMessage.success(`用户已${action}`)
-  }).catch(() => {
-    // 用户取消
-  })
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('封禁用户错误:', error)
+      ElMessage.error(`${action}失败`)
+    }
+  }
 }
 
 function handleSizeChange(size: number) {
@@ -334,64 +470,14 @@ function formatDate(date: string) {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 
+function exportUserStats() {
+  // 导出用户统计数据的逻辑
+  ElMessage.success('统计数据已导出')
+}
+
 // 初始化数据
 onMounted(() => {
-  // 模拟数据
-  users.value = [
-    {
-      id: 1,
-      username: 'admin',
-      nickname: '系统管理员',
-      role: 'admin',
-      status: 'online',
-      star: 5,
-      loginCount: 156,
-      lastLogin: '2小时前',
-      registerTime: '2024-01-01',
-      banned: false
-    },
-    {
-      id: 2,
-      username: 'user001',
-      nickname: '张三',
-      role: 'user',
-      status: 'online',
-      star: 3,
-      loginCount: 89,
-      lastLogin: '1天前',
-      registerTime: '2024-01-15',
-      banned: false
-    },
-    {
-      id: 3,
-      username: 'user002',
-      nickname: '李四',
-      role: 'user',
-      status: 'offline',
-      star: 2,
-      loginCount: 45,
-      lastLogin: '3天前',
-      registerTime: '2024-02-01',
-      banned: true
-    },
-    {
-      id: 4,
-      username: 'user003',
-      nickname: '王五',
-      role: 'user',
-      status: 'online',
-      star: 4,
-      loginCount: 120,
-      lastLogin: '30分钟前',
-      registerTime: '2024-01-20',
-      banned: false
-    }
-  ]
-  
-  totalUsers.value = users.value.length
-  activeUsers.value = users.value.filter(u => !u.banned && u.status === 'online').length
-  bannedUsers.value = users.value.filter(u => u.banned).length
-  adminUsers.value = users.value.filter(u => u.role === 'admin').length
+  loadUsers()
 })
 </script>
 
@@ -592,6 +678,58 @@ onMounted(() => {
   .user-manage-desktop {
     padding: 16px;
   }
+}
+
+
+/* 统计对话框样式 */
+.stats-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stats-chart {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.stats-chart h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.chart-container {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-placeholder {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.chart-placeholder p {
+  margin: 12px 0 0 0;
+  font-size: 14px;
+}
+
+.stats-details {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.stats-details h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
   
   .page-header {
     padding: 24px;
@@ -629,7 +767,8 @@ onMounted(() => {
   .search-left .el-select {
     width: 100% !important;
   }
-}
+
+
 
 /* 深色模式适配 */
 .dark .user-manage-desktop {
@@ -853,5 +992,55 @@ onMounted(() => {
   .el-table__row:hover {
     transform: none;
   }
+}
+
+/* 统计对话框样式 */
+.stats-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.stats-chart {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.stats-chart h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.chart-container {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-placeholder {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.chart-placeholder p {
+  margin: 12px 0 0 0;
+  font-size: 14px;
+}
+
+.stats-details {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.stats-details h3 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
 }
 </style> 

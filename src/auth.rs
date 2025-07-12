@@ -1,7 +1,8 @@
 use actix_web::{HttpRequest, HttpResponse};
-use crate::models::{Users, GlobalLimiter, GlobalCount, ApiCallRecord, ApiPerformance};
+use crate::models::{GlobalLimiter, GlobalCount, ApiCallRecord, ApiPerformance, StatsData};
 use crate::config::AppConfig;
 use crate::utils::{now_ts, parse_query_params};
+use std::sync::{Arc, Mutex};
 
 
 // ====== 安全 API 限流函数 ======
@@ -10,7 +11,7 @@ pub fn check_rate_limit(
     config: &AppConfig,
     limiter: &GlobalLimiter,
     global: &GlobalCount,
-    stats: &crate::models::StatsData,
+    stats: &Arc<Mutex<StatsData>>,
     api_name: &str,
 ) -> Result<(), HttpResponse> {
     let params = parse_query_params(req.query_string());
@@ -78,7 +79,7 @@ pub fn check_rate_limit(
 // ====== 记录API调用统计 ======
 pub fn record_api_call(
     req_info: &str,
-    stats: &crate::models::StatsData,
+    stats: &Arc<Mutex<StatsData>>,
     api_name: &str,
     start_time: u64,
     status_code: u16,
@@ -167,29 +168,25 @@ pub fn record_api_call(
 }
 
 // ====== 管理员认证函数 ======
-pub fn admin_auth(req: &HttpRequest, _config: &AppConfig, users: &Users) -> bool {
+pub fn admin_auth(req: &HttpRequest, config: &AppConfig, data_manager: &crate::storage::DataManager) -> bool {
     let params = parse_query_params(req.query_string());
-    
     let admin_user = params.get("admin_username");
     let admin_pass = params.get("admin_password");
-
     if admin_user.is_none() || admin_pass.is_none() {
         return false;
     }
-
-    // 检查配置中的管理员凭据（暂时使用默认值）
-    if **admin_user.as_ref().unwrap() == "admin" 
-        && **admin_pass.as_ref().unwrap() == "admin" {
+    // 检查配置中的管理员凭据
+    if admin_user.unwrap() == &config.admin_username 
+        && admin_pass.unwrap() == &config.admin_password {
         return true;
     }
-
     // 检查用户表中的管理员
-    let users_guard = users.lock().unwrap();
-    if let Some(user) = users_guard.get(admin_user.unwrap()) {
-        if user.is_admin && **admin_pass.unwrap() == user.password {
-            return true;
+    if let Ok(users) = data_manager.load_users() {
+        if let Some(user) = users.get(admin_user.unwrap()) {
+            if user.is_admin && admin_pass.unwrap() == &user.password {
+                return true;
+            }
         }
     }
-
     false
 }

@@ -65,6 +65,7 @@ pub struct CustomLogger {
 }
 
 impl CustomLogger {
+    #[allow(dead_code)]
     pub fn new(console_output: bool, file_output: bool, log_level: LevelFilter) -> io::Result<Self> {
         let log_file = if file_output {
             let file = OpenOptions::new()
@@ -209,6 +210,7 @@ impl LogLevel {
 }
 
 // ====== 日志初始化函数 ======
+#[allow(dead_code)]
 pub fn init_logger(console_output: bool, file_output: bool, log_level: &str) -> Result<(), Box<dyn std::error::Error>> {
     let level_filter = match log_level.to_lowercase().as_str() {
         "error" => LevelFilter::Error,

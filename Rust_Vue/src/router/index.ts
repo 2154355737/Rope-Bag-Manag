@@ -1,139 +1,178 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { isLoggedIn, isLoginExpired } from '../utils/auth'
-import { shouldUseMobileVersion } from '../utils/device'
+import { 
+  getRedirectPath, 
+  logRouteNavigation, 
+  preloadRoutes,
+  checkAuthStatus,
+  debugRouteInfo
+} from '../utils/router'
 
-// 动态懒加载组件，根据设备类型选择desktop或mobile版本
-const lazyLoad = (component: string, preload = false) => {
-  return () => {
-    if (preload) {
-      // 预加载时显示加载提示
-      console.log(`预加载组件: ${component}`)
-    }
-    
-    // 根据设备类型选择组件路径
-    const isMobile = shouldUseMobileVersion()
-    const componentPath = isMobile ? `../views/mobile/${component}.vue` : `../views/desktop/${component}.vue`
-    
-    return import(componentPath)
-  }
+// 路由类型定义
+export interface RouteMeta {
+  title?: string
+  requiresAuth?: boolean
+  requiresAdmin?: boolean
+  layout?: 'desktop' | 'independent'
+  preload?: boolean
+  device?: 'desktop' | 'all'
 }
 
-// 动态懒加载组件（指定版本）
-const lazyLoadVersion = (component: string, version: 'desktop' | 'mobile', preload = false) => {
-  return () => {
-    if (preload) {
-      console.log(`预加载组件: ${component} (${version})`)
-    }
-    return import(`../views/${version}/${component}.vue`)
-  }
+// 预加载重要页面
+const preloadImportantPages = () => {
+  preloadRoutes(routes)
 }
 
 const routes: RouteRecordRaw[] = [
-  { path: '/', redirect: '/login' },
+  // 首页重定向
+  { 
+    path: '/', 
+    redirect: '/community',
+    meta: { title: '首页' }
+  },
+
+  // 认证相关路由
   { 
     path: '/login', 
-    component: lazyLoad('Login'),
-    meta: { title: '登录' }
+    component: () => import('../views/desktop/Login.vue'),
+    meta: { 
+      title: '登录',
+      layout: 'independent',
+      device: 'all'
+    }
+  },
+
+  // 资源社区路由（独立布局）
+  { 
+    path: '/community', 
+    component: () => import('../views/community/desktop/CommunityHome.vue'),
+    meta: { 
+      title: '资源社区',
+      layout: 'independent',
+      device: 'all',
+      preload: true,
+      requiresAuth: false
+    }
   },
   { 
+    path: '/community/resource/:id', 
+    component: () => import('../views/community/desktop/CommunityHome.vue'),
+    meta: { 
+      title: '资源详情',
+      layout: 'independent',
+      device: 'all',
+      requiresAuth: false
+    }
+  },
+  { 
+    path: '/community/hot', 
+    component: () => import('../views/community/desktop/CommunityHome.vue'),
+    meta: { 
+      title: '热门资源',
+      layout: 'independent',
+      device: 'all',
+      requiresAuth: false
+    }
+  },
+  { 
+    path: '/community/latest', 
+    component: () => import('../views/community/desktop/CommunityHome.vue'),
+    meta: { 
+      title: '最新资源',
+      layout: 'independent',
+      device: 'all',
+      requiresAuth: false
+    }
+  },
+  { 
+    path: '/community/category/:category', 
+    component: () => import('../views/community/desktop/CommunityHome.vue'),
+    meta: { 
+      title: '分类资源',
+      layout: 'independent',
+      device: 'all',
+      requiresAuth: false
+    }
+  },
+
+  // 后台管理路由（桌面端）
+  { 
     path: '/dashboard', 
-    component: lazyLoad('Dashboard'),
+    component: () => import('../views/desktop/Dashboard.vue'),
     meta: { 
       requiresAuth: true, 
       title: '仪表盘',
-      preload: true // 预加载仪表盘
+      layout: 'desktop',
+      device: 'desktop',
+      preload: true
     }
   },
   { 
     path: '/users', 
-    component: lazyLoad('UserManage'),
+    component: () => import('../views/desktop/UserManage.vue'),
     meta: { 
       requiresAuth: true, 
       title: '用户管理',
-      preload: true // 预加载用户管理
+      layout: 'desktop',
+      device: 'desktop',
+      preload: true
     }
   },
   { 
     path: '/packages', 
-    component: lazyLoad('PackageManage'),
+    component: () => import('../views/desktop/PackageManage.vue'),
     meta: { 
       requiresAuth: true, 
-      title: '绳包管理',
-      preload: true // 预加载绳包管理
+      title: '资源管理',
+      layout: 'desktop',
+      device: 'desktop',
+      preload: true
     }
   },
   { 
     path: '/logs', 
-    component: lazyLoad('LogView'),
+    component: () => import('../views/desktop/LogView.vue'),
     meta: { 
       requiresAuth: true, 
-      title: '日志查看'
+      title: '日志查看',
+      layout: 'desktop',
+      device: 'desktop'
     }
   },
   { 
     path: '/stats', 
-    component: lazyLoad('Stats'),
+    component: () => import('../views/desktop/Stats.vue'),
     meta: { 
       requiresAuth: true, 
       title: '统计信息',
-      preload: true // 预加载统计页面
+      layout: 'desktop',
+      device: 'desktop',
+      preload: true
     }
   },
   { 
     path: '/theme-settings', 
-    component: lazyLoadVersion('ThemeSettings', 'desktop'),
+    component: () => import('../views/desktop/ThemeSettings.vue'),
     meta: { 
       requiresAuth: true, 
-      title: '主题设置'
+      title: '主题设置',
+      layout: 'desktop',
+      device: 'desktop'
     }
   },
-  // 移动端专用路由（可选，用于直接访问移动端版本）
+
+
+
+  // 404 页面
   { 
-    path: '/mobile/login', 
-    component: lazyLoadVersion('Login', 'mobile'),
-    meta: { title: '登录 (移动端)' }
-  },
-  { 
-    path: '/mobile/dashboard', 
-    component: lazyLoadVersion('Dashboard', 'mobile'),
+    path: '/:pathMatch(.*)*', 
+    component: () => import('../views/desktop/Dashboard.vue'),
     meta: { 
-      requiresAuth: true, 
-      title: '仪表盘 (移动端)'
+      title: '页面未找到',
+      layout: 'desktop',
+      device: 'all'
     }
-  },
-  { 
-    path: '/mobile/users', 
-    component: lazyLoadVersion('UserManage', 'mobile'),
-    meta: { 
-      requiresAuth: true, 
-      title: '用户管理 (移动端)'
-    }
-  },
-  { 
-    path: '/mobile/packages', 
-    component: lazyLoadVersion('PackageManage', 'mobile'),
-    meta: { 
-      requiresAuth: true, 
-      title: '绳包管理 (移动端)'
-    }
-  },
-  { 
-    path: '/mobile/logs', 
-    component: lazyLoadVersion('LogView', 'mobile'),
-    meta: { 
-      requiresAuth: true, 
-      title: '日志查看 (移动端)'
-    }
-  },
-  { 
-    path: '/mobile/stats', 
-    component: lazyLoadVersion('Stats', 'mobile'),
-    meta: { 
-      requiresAuth: true, 
-      title: '统计信息 (移动端)'
-    }
-  },
+  }
 ]
 
 const router = createRouter({
@@ -141,54 +180,30 @@ const router = createRouter({
   routes,
 })
 
-// 预加载重要页面
-const preloadImportantPages = () => {
-  const importantRoutes = routes.filter(route => route.meta?.preload)
-  importantRoutes.forEach(route => {
-    if (route.component && typeof route.component === 'function') {
-      // 调用懒加载函数来预加载组件
-      const componentLoader = route.component as () => Promise<any>
-      componentLoader().catch(err => {
-        console.warn(`预加载组件失败: ${route.path}`, err)
-      })
-    }
-  })
-}
-
 // 路由守卫
 router.beforeEach((to: any, from: any, next: any) => {
+  // 记录路由导航开始
+  logRouteNavigation(to, from, 'start')
+  
+  // 调试路由信息
+  debugRouteInfo(to, from)
+  
   // 设置页面标题
   if (to.meta?.title) {
     document.title = `${to.meta.title} - 绳包管理系统`
   }
-  
-  // 检查路由是否需要登录
-  if (to.meta.requiresAuth) {
-    // 检查是否已登录
-    if (!isLoggedIn()) {
-      // 未登录，重定向到登录页
-      next('/login')
-      return
-    }
-    
-    // 检查登录是否过期
-    if (isLoginExpired()) {
-      // 登录过期，清除状态并重定向到登录页
-      localStorage.removeItem('isLoggedIn')
-      localStorage.removeItem('userInfo')
-      next('/login')
-      return
-    }
+
+  // 检查是否需要重定向
+  const redirectPath = getRedirectPath(to, from)
+  if (redirectPath) {
+    console.log('🔄 路由重定向:', { from: to.path, to: redirectPath })
+    logRouteNavigation(to, from, 'redirect')
+    next(redirectPath)
+    return
   }
   
-  // 如果已登录且访问登录页，重定向到仪表盘
-  if (to.path === '/login') {
-    if (isLoggedIn() && !isLoginExpired()) {
-      next('/dashboard')
-      return
-    }
-  }
-  
+  // 记录路由导航完成
+  logRouteNavigation(to, from, 'complete')
   next()
 })
 

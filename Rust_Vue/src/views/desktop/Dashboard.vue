@@ -127,8 +127,8 @@
             <el-icon :size="32"><Box /></el-icon>
           </div>
           <div class="action-content">
-            <h3 class="action-title">绳包管理</h3>
-            <p class="action-desc">管理绳包信息和状态</p>
+            <h3 class="action-title">资源管理</h3>
+            <p class="action-desc">管理绳包资源和社区内容</p>
           </div>
           <div class="action-arrow">
             <el-icon><Right /></el-icon>
@@ -265,21 +265,25 @@ import {
   Warning
 } from '@element-plus/icons-vue'
 import { getDeviceInfo, shouldUseMobileVersion } from '../../utils/device'
+import { getUsers, getPackages, getDashboardData } from '../../api'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 
 // 响应式数据
-const userCount = ref(156)
-const packageCount = ref(342)
-const logCount = ref(1247)
-const activeUsers = ref(89)
-const availablePackages = ref(298)
-const todayLogs = ref(23)
+const userCount = ref(0)
+const packageCount = ref(0)
+const logCount = ref(0)
+const activeUsers = ref(0)
+const availablePackages = ref(0)
+const todayLogs = ref(0)
 const systemStatus = ref('正常')
 const uptime = ref('15天 8小时 32分钟')
 const cpuUsage = ref(45)
 const memoryUsage = ref(62)
 const networkStatus = ref('正常')
+const loading = ref(false)
+const totalDownloads = ref(0)
 
 // 设备信息（用于调试）
 const deviceInfo = ref(getDeviceInfo())
@@ -368,6 +372,42 @@ const recentActivities = ref([
 ])
 
 // 方法
+async function loadDashboardData() {
+  try {
+    loading.value = true
+    
+    // 加载用户数据
+    const usersRes = await getUsers()
+    if (usersRes.code === 0 && usersRes.data) {
+      const users = usersRes.data
+      userCount.value = Object.keys(users).length
+      activeUsers.value = Object.values(users).filter((user: any) => !user.banned).length
+    }
+    
+    // 加载绳包数据
+    const packagesRes = await getPackages()
+    if (packagesRes.code === 0 && packagesRes.data) {
+      const packages = packagesRes.data.绳包列表 || []
+      packageCount.value = packages.length
+      availablePackages.value = packages.length
+      totalDownloads.value = packages.reduce((sum: number, pkg: any) => sum + (pkg.下载次数 || 0), 0)
+    }
+    
+    // 加载仪表盘数据
+    const dashboardRes = await getDashboardData()
+    if (dashboardRes.code === 0 && dashboardRes.data) {
+      // 这里可以根据实际的后端数据结构来更新统计信息
+      logCount.value = dashboardRes.data.total_logs || 0
+      todayLogs.value = dashboardRes.data.today_logs || 0
+    }
+  } catch (error) {
+    console.error('加载仪表盘数据失败:', error)
+    ElMessage.error('加载仪表盘数据失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 function navigateTo(path: string) {
   router.push(path)
 }
@@ -380,6 +420,7 @@ function getProgressColor(percentage: number) {
 
 // 模拟数据更新
 onMounted(() => {
+  loadDashboardData()
   // 模拟实时数据更新
   setInterval(() => {
     cpuUsage.value = Math.floor(Math.random() * 30) + 30
