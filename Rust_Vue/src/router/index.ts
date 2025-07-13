@@ -155,13 +155,78 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/desktop/ThemeSettings.vue'),
     meta: { 
       requiresAuth: true, 
-      title: '主题设置',
+      title: '系统设置',
       layout: 'desktop',
       device: 'desktop'
     }
   },
 
-
+  // 新增管理页面路由
+  { 
+    path: '/comments', 
+    component: () => import('../views/desktop/CommentManage.vue'),
+    meta: { 
+      requiresAuth: true, 
+      requiresAdmin: true,
+      title: '评论管理',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
+  { 
+    path: '/user-actions', 
+    component: () => import('../views/desktop/UserActionLog.vue'),
+    meta: { 
+      requiresAuth: true, 
+      requiresAdmin: true,
+      title: '用户行为记录',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
+  { 
+    path: '/resource-records', 
+    component: () => import('../views/desktop/ResourceRecord.vue'),
+    meta: { 
+      requiresAuth: true, 
+      requiresAdmin: true,
+      title: '资源记录',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
+  { 
+    path: '/backup', 
+    component: () => import('../views/desktop/BackupManage.vue'),
+    meta: { 
+      requiresAuth: true, 
+      requiresAdmin: true,
+      title: '数据库备份',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
+  { 
+    path: '/announcements', 
+    component: () => import('../views/desktop/AnnouncementManage.vue'),
+    meta: { 
+      requiresAuth: true, 
+      requiresAdmin: true,
+      title: '公告管理',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
+  { 
+    path: '/user-dashboard', 
+    component: () => import('../views/desktop/UserDashboard.vue'),
+    meta: { 
+      requiresAuth: true, 
+      title: '用户后台',
+      layout: 'desktop',
+      device: 'desktop'
+    }
+  },
 
   // 404 页面
   { 

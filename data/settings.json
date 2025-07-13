@@ -1,0 +1,37 @@
+{
+  "theme": {
+    "community_theme": "default",
+    "admin_theme": "dark"
+  },
+  "system_mode": "Normal",
+  "feature_flags": {
+    "enable_registration": true,
+    "enable_community": true,
+    "enable_upload": true,
+    "enable_comments": true,
+    "enable_qq_binding": true
+  },
+  "backend_config": {
+    "proxy_address": "http://127.0.0.1:15202",
+    "api_timeout": 30,
+    "max_upload_size": 100
+  },
+  "backup_settings": {
+    "enable_auto_backup": true,
+    "backup_interval_hours": 24,
+    "backup_location": "./backups",
+    "max_backup_files": 30
+  },
+  "global_announcement": {
+    "id": 1,
+    "enabled": false,
+    "title": "",
+    "content": "",
+    "type_": "Info",
+    "start_time": "",
+    "end_time": null,
+    "priority": 5,
+    "create_time": "2024-01-01 00:00:00",
+    "update_time": "2024-01-01 00:00:00"
+  }
+} 

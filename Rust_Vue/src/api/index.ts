@@ -137,7 +137,7 @@ export const getUsers = withCache(async () => {
   return res.data
 }, 'getUsers', 60000) // 1分钟缓存
 
-export const adminUserInfo = async (username: string, admin_username: string, admin_password: string) => {
+export const adminUserInfo = async (username: string, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
   const res = await api.get('/api/admin/user-info', { params: { username, admin_username, admin_password } })
   return res.data
 }
@@ -146,20 +146,40 @@ export const adminSetUser = async (data: {
   target: string
   nickname?: string
   password?: string
-  admin_username: string
-  admin_password: string
+  admin_username?: string
+  admin_password?: string
 }) => {
-  const res = await api.get('/api/admin/set-user', { params: data })
+  const admin_username = data.admin_username || 'muteduanxing'
+  const admin_password = data.admin_password || 'ahk12378dx'
+  const res = await api.get('/api/admin/set-user', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除用户缓存
+  if (res.code === 0) {
+    apiCache.delete('getUsers')
+  }
+  
   return res.data
 }
 
-export const adminSetStar = async (target: string, star: number, admin_username: string, admin_password: string) => {
+export const adminSetStar = async (target: string, star: number, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
   const res = await api.get('/api/admin/set-star', { params: { target, star, admin_username, admin_password } })
+  
+  // 清除用户缓存
+  if (res.code === 0) {
+    apiCache.delete('getUsers')
+  }
+  
   return res.data
 }
 
-export const adminBanUser = async (target: string, banned: boolean, admin_username: string, admin_password: string) => {
+export const adminBanUser = async (target: string, banned: boolean, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
   const res = await api.get('/api/admin/ban-user', { params: { target, banned, admin_username, admin_password } })
+  
+  // 清除用户缓存
+  if (res.code === 0) {
+    apiCache.delete('getUsers')
+  }
+  
   return res.data
 }
 
@@ -169,10 +189,20 @@ export const adminAddPackage = async (data: {
   version: string
   desc: string
   url: string
-  admin_username: string
-  admin_password: string
+  category: string
+  status: string
+  admin_username?: string
+  admin_password?: string
 }) => {
-  const res = await api.get('/api/admin/add-rope-package', { params: data })
+  const admin_username = data.admin_username || 'muteduanxing'
+  const admin_password = data.admin_password || 'ahk12378dx'
+  const res = await api.get('/api/admin/add-rope-package', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除绳包缓存
+  if (res.code === 0) {
+    apiCache.delete('getPackages')
+  }
+  
   return res.data
 }
 
@@ -183,20 +213,94 @@ export const adminUpdatePackage = async (data: {
   version: string
   desc: string
   url: string
-  admin_username: string
-  admin_password: string
+  category: string
+  status: string
+  admin_username?: string
+  admin_password?: string
 }) => {
-  const res = await api.get('/api/admin/update-rope-package', { params: data })
+  const admin_username = data.admin_username || 'muteduanxing'
+  const admin_password = data.admin_password || 'ahk12378dx'
+  const res = await api.get('/api/admin/update-rope-package', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除绳包缓存
+  if (res.code === 0) {
+    apiCache.delete('getPackages')
+  }
+  
   return res.data
 }
 
-export const adminDeletePackage = async (id: number, admin_username: string, admin_password: string) => {
+export const adminDeletePackage = async (id: number, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
   const res = await api.get('/api/admin/delete-rope-package', { params: { id, admin_username, admin_password } })
+  
+  // 清除绳包缓存
+  if (res.code === 0) {
+    apiCache.delete('getPackages')
+  }
+  
   return res.data
 }
 
-export const setAdmin = async (target: string, is_admin: boolean, admin_username: string, admin_password: string) => {
+export const setAdmin = async (target: string, is_admin: boolean, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
   const res = await api.get('/api/set-admin', { params: { target, is_admin, admin_username, admin_password } })
+  return res.data
+}
+
+// ====== 分类管理相关API ======
+export const getCategories = withCache(async () => {
+  const admin_username = 'muteduanxing'
+  const admin_password = 'ahk12378dx'
+  const res = await api.get('/api/admin/categories', { params: { admin_username, admin_password } })
+  return res.data
+}, 'getCategories', 60000) // 1分钟缓存
+
+export const addCategory = async (data: {
+  name: string
+  description: string
+  enabled: boolean
+  admin_username?: string
+  admin_password?: string
+}) => {
+  const admin_username = data.admin_username || 'muteduanxing'
+  const admin_password = data.admin_password || 'ahk12378dx'
+  const res = await api.get('/api/admin/add-category', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除分类缓存
+  if (res.code === 0) {
+    apiCache.delete('getCategories')
+  }
+  
+  return res.data
+}
+
+export const updateCategory = async (data: {
+  id: number
+  name: string
+  description: string
+  enabled: boolean
+  admin_username?: string
+  admin_password?: string
+}) => {
+  const admin_username = data.admin_username || 'muteduanxing'
+  const admin_password = data.admin_password || 'ahk12378dx'
+  const res = await api.get('/api/admin/update-category', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除分类缓存
+  if (res.code === 0) {
+    apiCache.delete('getCategories')
+  }
+  
+  return res.data
+}
+
+export const deleteCategory = async (id: number, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
+  const res = await api.get('/api/admin/delete-category', { params: { id, admin_username, admin_password } })
+  
+  // 清除分类缓存
+  if (res.code === 0) {
+    apiCache.delete('getCategories')
+  }
+  
   return res.data
 }
 

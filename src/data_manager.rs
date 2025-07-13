@@ -30,6 +30,11 @@ impl DataManager {
                 url: raw_rope.项目直链.clone(),
                 downloads: raw_rope.下载次数,
                 upload_time: raw_rope.上架时间.clone(),
+                category: raw_rope.分类.clone(),
+                status: raw_rope.状态.clone(),
+                is_starred: raw_rope.是否标星,
+                star_time: raw_rope.标星时间.clone(),
+                star_by: raw_rope.标星人.clone(),
             });
         }
         drop(raw_guard);
@@ -61,6 +66,11 @@ impl DataManager {
             url: package.项目直链.clone(),
             downloads: package.下载次数,
             upload_time: package.上架时间.clone(),
+            category: package.分类.clone(),
+            status: package.状态.clone(),
+            is_starred: package.是否标星,
+            star_time: package.标星时间.clone(),
+            star_by: package.标星人.clone(),
         });
         
         // 更新数据库配置
@@ -224,6 +234,93 @@ impl DataManager {
     pub fn get_user(&self, username: &str) -> Option<User> {
         let users_guard = self.users.lock().unwrap();
         users_guard.get(username).cloned()
+    }
+
+    /// 加载用户数据
+    pub fn load_users(&self) -> Result<HashMap<String, User>, Box<dyn std::error::Error>> {
+        let users_guard = self.users.lock().unwrap();
+        Ok(users_guard.clone())
+    }
+
+    /// 保存用户数据
+    pub fn save_users(&self, users: &HashMap<String, User>) -> Result<(), Box<dyn std::error::Error>> {
+        let mut users_guard = self.users.lock().unwrap();
+        *users_guard = users.clone();
+        if let Err(e) = save_json("data/users.json", users) {
+            eprintln!("保存users.json失败: {}", e);
+            return Err(e.into());
+        }
+        Ok(())
+    }
+
+    // ====== 系统设置管理 ======
+    pub fn load_settings(&self) -> Result<crate::models::SystemSettings, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/settings.json")
+    }
+
+    pub fn save_settings(&self, settings: &crate::models::SystemSettings) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/settings.json", settings)
+    }
+
+    // ====== 评论管理 ======
+    pub fn load_comments(&self) -> Result<Vec<crate::models::Comment>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/comments.json")
+    }
+
+    pub fn save_comments(&self, comments: &Vec<crate::models::Comment>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/comments.json", comments)
+    }
+
+    // ====== 用户行为记录管理 ======
+    pub fn load_user_actions(&self) -> Result<Vec<crate::models::UserAction>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/user_actions.json")
+    }
+
+    pub fn save_user_actions(&self, actions: &Vec<crate::models::UserAction>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/user_actions.json", actions)
+    }
+
+    // ====== 资源记录管理 ======
+    pub fn load_resource_records(&self) -> Result<Vec<crate::models::ResourceRecord>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/resource_records.json")
+    }
+
+    pub fn save_resource_records(&self, records: &Vec<crate::models::ResourceRecord>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/resource_records.json", records)
+    }
+
+    // ====== 备份记录管理 ======
+    pub fn load_backup_records(&self) -> Result<Vec<crate::models::BackupRecord>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/backup_records.json")
+    }
+
+    pub fn save_backup_records(&self, records: &Vec<crate::models::BackupRecord>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/backup_records.json", records)
+    }
+
+    // ====== 原始数据管理 ======
+    pub fn load_raw_data(&self) -> Result<RawDataJson, Box<dyn std::error::Error>> {
+        let raw_guard = self.raw_data.lock().unwrap();
+        Ok(raw_guard.clone())
+    }
+
+    pub fn save_raw_data(&self, data: &RawDataJson) -> Result<(), Box<dyn std::error::Error>> {
+        let mut raw_guard = self.raw_data.lock().unwrap();
+        *raw_guard = data.clone();
+        if let Err(e) = save_json("data/data.json", data) {
+            eprintln!("保存data.json失败: {}", e);
+            return Err(e.into());
+        }
+        Ok(())
+    }
+
+    // ====== 分类管理 ======
+    pub fn load_categories(&self) -> Result<Vec<crate::models::Category>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/categories.json")
+    }
+
+    pub fn save_categories(&self, categories: &Vec<crate::models::Category>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/categories.json", categories)
     }
 }
 

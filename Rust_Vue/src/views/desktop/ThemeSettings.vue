@@ -1,142 +1,215 @@
 <template>
-  <div class="theme-settings">
+  <div class="system-settings">
     <el-card class="settings-card">
       <template #header>
         <div class="settings-header">
-          <h2>主题设置</h2>
-          <p>自定义您的界面主题和外观</p>
+          <h2>系统设置</h2>
+          <p>管理系统配置、主题、功能开关等设置</p>
         </div>
       </template>
 
       <div class="settings-content">
-        <!-- 主题选择 -->
+        <!-- 主题设置 -->
         <div class="setting-section">
-          <h3>主题选择</h3>
-          <div class="theme-grid">
-            <div 
-              v-for="theme in availableThemes" 
-              :key="theme.key"
-              class="theme-option"
-              :class="{ active: currentTheme === theme.key }"
-              @click="switchTheme(theme.key)"
-            >
-              <div class="theme-preview" :style="{ backgroundColor: getThemeColor(theme.key) }"></div>
-              <div class="theme-info">
-                <span class="theme-icon" v-text="theme.icon"></span>
-                <span class="theme-name">{{ theme.name }}</span>
-                <span class="theme-desc">{{ theme.description }}</span>
-              </div>
-            </div>
-          </div>
+          <h3>主题设置</h3>
+          <el-form :model="settings.theme" label-width="120px">
+            <el-form-item label="资源社区主题">
+              <el-select v-model="settings.theme.community_theme" placeholder="选择社区主题">
+                <el-option label="浅色主题" value="light" />
+                <el-option label="深色主题" value="dark" />
+                <el-option label="蓝色主题" value="blue" />
+                <el-option label="绿色主题" value="green" />
+                <el-option label="紫色主题" value="purple" />
+                <el-option label="橙色主题" value="orange" />
+                <el-option label="红色主题" value="red" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="后台管理主题">
+              <el-select v-model="settings.theme.admin_theme" placeholder="选择管理主题">
+                <el-option label="浅色主题" value="light" />
+                <el-option label="深色主题" value="dark" />
+                <el-option label="蓝色主题" value="blue" />
+                <el-option label="绿色主题" value="green" />
+                <el-option label="紫色主题" value="purple" />
+                <el-option label="橙色主题" value="orange" />
+                <el-option label="红色主题" value="red" />
+              </el-select>
+            </el-form-item>
+          </el-form>
         </div>
 
-        <!-- 当前主题预览 -->
+        <!-- 系统模式 -->
         <div class="setting-section">
-          <h3>当前主题预览</h3>
-          <div class="theme-preview-card">
-            <div class="preview-header">
-              <h4>{{ currentThemeConfig.label }}</h4>
-              <span class="preview-icon" v-text="currentThemeConfig.icon"></span>
-            </div>
-            <div class="preview-content">
-              <p>{{ currentThemeConfig.description }}</p>
-              <div class="preview-colors">
-                <div class="color-item">
-                  <div class="color-preview" style="background-color: var(--bg-primary)"></div>
-                  <span>主背景</span>
-                </div>
-                <div class="color-item">
-                  <div class="color-preview" style="background-color: var(--text-primary)"></div>
-                  <span>主文字</span>
-                </div>
-                <div class="color-item">
-                  <div class="color-preview" style="background-color: var(--brand-color)"></div>
-                  <span>品牌色</span>
-                </div>
+          <h3>系统模式</h3>
+          <el-form :model="settings" label-width="120px">
+            <el-form-item label="系统模式">
+              <el-radio-group v-model="settings.system_mode">
+                <el-radio label="Normal">正常运行</el-radio>
+                <el-radio label="Maintenance">维护中</el-radio>
+              </el-radio-group>
+              <div class="mode-description">
+                <p v-if="settings.system_mode === 'Normal'">
+                  <el-icon><InfoFilled /></el-icon>
+                  正常运行模式：所有功能正常开放，用户可以正常使用所有功能
+                </p>
+                <p v-else class="warning-text">
+                  <el-icon><WarningFilled /></el-icon>
+                  维护模式：仅管理员可登录，用户注册、上传等功能将被禁用
+                </p>
               </div>
-            </div>
-          </div>
+            </el-form-item>
+          </el-form>
         </div>
 
-        <!-- 快捷键帮助 -->
+        <!-- 功能开关 -->
         <div class="setting-section">
-          <h3>快捷键帮助</h3>
-          <div class="shortcut-list">
-            <div class="shortcut-item">
-              <kbd>Ctrl + T</kbd>
-              <span>快速切换浅色/深色模式</span>
-            </div>
-            <div class="shortcut-item">
-              <kbd>Ctrl + Shift + T</kbd>
-              <span>打开主题菜单</span>
-            </div>
-          </div>
+          <h3>功能开关</h3>
+          <el-form :model="settings.feature_flags" label-width="120px">
+            <el-form-item label="用户注册">
+              <el-switch v-model="settings.feature_flags.enable_registration" />
+              <span class="feature-desc">允许新用户注册账号</span>
+            </el-form-item>
+            <el-form-item label="资源社区">
+              <el-switch v-model="settings.feature_flags.enable_community" />
+              <span class="feature-desc">开放资源社区功能</span>
+            </el-form-item>
+            <el-form-item label="用户上传">
+              <el-switch v-model="settings.feature_flags.enable_upload" />
+              <span class="feature-desc">允许用户上传资源</span>
+            </el-form-item>
+            <el-form-item label="用户评论">
+              <el-switch v-model="settings.feature_flags.enable_comments" />
+              <span class="feature-desc">允许用户发表评论</span>
+            </el-form-item>
+            <el-form-item label="QQ绑定">
+              <el-switch v-model="settings.feature_flags.enable_qq_binding" />
+              <span class="feature-desc">允许用户绑定QQ账号</span>
+            </el-form-item>
+          </el-form>
         </div>
 
-        <!-- 主题测试区域 -->
+        <!-- 后端配置 -->
         <div class="setting-section">
-          <h3>主题测试区域</h3>
-          <div class="theme-test-area">
-            <!-- 快速测试按钮 -->
-            <div class="quick-test">
-              <h4>快速测试</h4>
-              <div class="test-buttons">
-                <el-button @click="testTheme('light')" type="primary">测试浅色</el-button>
-                <el-button @click="testTheme('dark')" type="primary">测试深色</el-button>
-                <el-button @click="testTheme('blue')" type="primary">测试蓝色</el-button>
-                <el-button @click="testTheme('green')" type="primary">测试绿色</el-button>
-                <el-button @click="testTheme('purple')" type="primary">测试紫色</el-button>
-                <el-button @click="testTheme('orange')" type="primary">测试橙色</el-button>
-                <el-button @click="testTheme('red')" type="primary">测试红色</el-button>
-              </div>
-              <p class="test-info">当前主题: {{ currentTheme }} | HTML类: {{ htmlClasses }} | Body类: {{ bodyClasses }}</p>
-            </div>
-            
-            <div class="test-card">
-              <h4>测试卡片</h4>
-              <p>这是一个测试卡片，用于验证主题切换效果。</p>
-              <div class="test-buttons">
-                <el-button type="primary">主要按钮</el-button>
-                <el-button type="success">成功按钮</el-button>
-                <el-button type="warning">警告按钮</el-button>
-                <el-button type="danger">危险按钮</el-button>
-              </div>
-            </div>
-            
-            <div class="test-form">
-              <h4>测试表单</h4>
-              <el-form label-width="80px">
-                <el-form-item label="用户名">
-                  <el-input placeholder="请输入用户名" />
-                </el-form-item>
-                <el-form-item label="密码">
-                  <el-input type="password" placeholder="请输入密码" />
-                </el-form-item>
-                <el-form-item label="选择">
-                  <el-select placeholder="请选择">
-                    <el-option label="选项1" value="1" />
-                    <el-option label="选项2" value="2" />
-                    <el-option label="选项3" value="3" />
-                  </el-select>
-                </el-form-item>
-              </el-form>
-            </div>
-            
-            <div class="test-table">
-              <h4>测试表格</h4>
-              <el-table :data="testTableData" style="width: 100%">
-                <el-table-column prop="name" label="姓名" />
-                <el-table-column prop="age" label="年龄" />
-                <el-table-column prop="city" label="城市" />
-              </el-table>
-            </div>
-          </div>
+          <h3>后端配置</h3>
+          <el-form :model="settings.backend_config" label-width="120px">
+            <el-form-item label="代理地址">
+              <el-input v-model="settings.backend_config.proxy_address" placeholder="设置后台代理地址" />
+            </el-form-item>
+            <el-form-item label="API超时时间">
+              <el-input-number 
+                v-model="settings.backend_config.api_timeout" 
+                :min="1" 
+                :max="300" 
+                placeholder="秒"
+              />
+              <span class="config-desc">API请求超时时间（秒）</span>
+            </el-form-item>
+            <el-form-item label="最大上传大小">
+              <el-input-number 
+                v-model="settings.backend_config.max_upload_size" 
+                :min="1" 
+                :max="1000" 
+                placeholder="MB"
+              />
+              <span class="config-desc">最大上传文件大小（MB）</span>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 备份设置 -->
+        <div class="setting-section">
+          <h3>数据库备份</h3>
+          <el-form :model="settings.backup_settings" label-width="120px">
+            <el-form-item label="自动备份">
+              <el-switch v-model="settings.backup_settings.enable_auto_backup" />
+              <span class="backup-desc">启用自动备份功能</span>
+            </el-form-item>
+            <el-form-item label="备份间隔">
+              <el-input-number 
+                v-model="settings.backup_settings.backup_interval_hours" 
+                :min="1" 
+                :max="168" 
+                placeholder="小时"
+                :disabled="!settings.backup_settings.enable_auto_backup"
+              />
+              <span class="backup-desc">备份间隔时间（小时）</span>
+            </el-form-item>
+            <el-form-item label="备份位置">
+              <el-input 
+                v-model="settings.backup_settings.backup_location" 
+                placeholder="备份文件存储路径"
+                :disabled="!settings.backup_settings.enable_auto_backup"
+              />
+            </el-form-item>
+            <el-form-item label="最大备份文件">
+              <el-input-number 
+                v-model="settings.backup_settings.max_backup_files" 
+                :min="1" 
+                :max="100" 
+                placeholder="个"
+                :disabled="!settings.backup_settings.enable_auto_backup"
+              />
+              <span class="backup-desc">保留的最大备份文件数量</span>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 全局公告 -->
+        <div class="setting-section">
+          <h3>全局公告</h3>
+          <el-form :model="settings.global_announcement" label-width="120px">
+            <el-form-item label="启用公告">
+              <el-switch v-model="settings.global_announcement.enabled" />
+              <span class="announcement-desc">在资源社区显示全局公告</span>
+            </el-form-item>
+            <el-form-item label="公告标题">
+              <el-input 
+                v-model="settings.global_announcement.title" 
+                placeholder="公告标题"
+                :disabled="!settings.global_announcement.enabled"
+              />
+            </el-form-item>
+            <el-form-item label="公告内容">
+              <el-input 
+                v-model="settings.global_announcement.content" 
+                type="textarea" 
+                :rows="4"
+                placeholder="公告内容"
+                :disabled="!settings.global_announcement.enabled"
+              />
+            </el-form-item>
+            <el-form-item label="公告类型">
+              <el-select 
+                v-model="settings.global_announcement.type_" 
+                placeholder="选择公告类型"
+                :disabled="!settings.global_announcement.enabled"
+              >
+                <el-option label="信息" value="Info" />
+                <el-option label="警告" value="Warning" />
+                <el-option label="错误" value="Error" />
+                <el-option label="成功" value="Success" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="优先级">
+              <el-input-number 
+                v-model="settings.global_announcement.priority" 
+                :min="1" 
+                :max="10" 
+                placeholder="1-10"
+                :disabled="!settings.global_announcement.enabled"
+              />
+              <span class="announcement-desc">公告显示优先级（1-10）</span>
+            </el-form-item>
+          </el-form>
         </div>
 
         <!-- 操作按钮 -->
         <div class="setting-actions">
-          <el-button type="primary" @click="saveSettings">保存设置</el-button>
+          <el-button type="primary" @click="saveSettings" :loading="saving">
+            保存设置
+          </el-button>
           <el-button @click="resetSettings">重置设置</el-button>
+          <el-button @click="testSettings">测试设置</el-button>
         </div>
       </div>
     </el-card>
@@ -144,598 +217,215 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { 
-  getCurrentTheme, 
-  applyTheme, 
-  themeConfigs, 
-  type ThemeType 
-} from '../../utils/theme'
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { getSettings, updateSettings } from '../../api/settings'
 
 // 响应式数据
-const currentTheme = ref(getCurrentTheme())
+const saving = ref(false)
 
-const availableThemes = computed(() => {
-  return Object.entries(themeConfigs).map(([key, config]) => ({
-    key: key as ThemeType,
-    name: config.label,
-    icon: config.icon,
-    description: config.description
-  }))
-})
-
-const currentThemeConfig = computed(() => {
-  return themeConfigs[currentTheme.value] || themeConfigs.light
-})
-
-// 测试数据
-const testTableData = ref([
-  { name: '张三', age: 25, city: '北京' },
-  { name: '李四', age: 30, city: '上海' },
-  { name: '王五', age: 28, city: '广州' }
-])
-
-// 计算当前HTML和Body的类名
-const htmlClasses = computed(() => {
-  return document.documentElement.className
-})
-
-const bodyClasses = computed(() => {
-  return document.body.className
+const settings = reactive({
+  theme: {
+    community_theme: 'light',
+    admin_theme: 'light'
+  },
+  system_mode: 'Normal',
+  feature_flags: {
+    enable_registration: true,
+    enable_community: true,
+    enable_upload: true,
+    enable_comments: true,
+    enable_qq_binding: true
+  },
+  backend_config: {
+    proxy_address: '',
+    api_timeout: 30,
+    max_upload_size: 100
+  },
+  backup_settings: {
+    enable_auto_backup: false,
+    backup_interval_hours: 24,
+    backup_location: './backups',
+    max_backup_files: 10
+  },
+  global_announcement: {
+    enabled: false,
+    title: '',
+    content: '',
+    type_: 'Info',
+    start_time: '',
+    end_time: '',
+    priority: 5
+  }
 })
 
 // 方法
-function switchTheme(themeKey: string) {
-  applyTheme(themeKey as ThemeType)
-  currentTheme.value = getCurrentTheme()
-  ElMessage.success(`已切换到${themeConfigs[themeKey as ThemeType].label}`)
-}
-
-// 测试主题切换
-function testTheme(theme: ThemeType) {
-  console.log('测试主题切换:', theme)
-  applyTheme(theme)
-  currentTheme.value = getCurrentTheme()
-  
-  // 显示测试结果
-  setTimeout(() => {
-    const htmlClass = document.documentElement.className
-    const bodyClass = document.body.className
-    console.log('测试结果:', {
-      theme,
-      htmlClass,
-      bodyClass,
-      hasThemeClass: htmlClass.includes(theme) || bodyClass.includes(theme)
-    })
-    
-    ElMessage.success(`测试主题: ${themeConfigs[theme].label}`)
-  }, 100)
-}
-
-function getThemeColor(themeKey: string): string {
-  const themeColors = {
-    light: '#409EFF',
-    dark: '#409EFF',
-    blue: '#1890FF',
-    green: '#52C41A',
-    purple: '#722ED1',
-    orange: '#FA8C16',
-    red: '#F5222D',
-    auto: '#409EFF'
+async function loadSettings() {
+  try {
+    const response = await getSettings()
+    if (response.code === 0 && response.data) {
+      Object.assign(settings, response.data)
+    }
+  } catch (error) {
+    console.error('加载设置失败:', error)
+    ElMessage.error('加载设置失败')
   }
-  return themeColors[themeKey as ThemeType] || '#409EFF'
 }
 
-function saveSettings() {
-  localStorage.setItem('theme-settings', JSON.stringify({
-    currentTheme: currentTheme.value
-  }))
-  ElMessage.success('设置已保存')
+async function saveSettings() {
+  saving.value = true
+  try {
+    const response = await updateSettings(settings)
+    if (response.code === 0) {
+      ElMessage.success('设置保存成功')
+    } else {
+      ElMessage.error(response.msg || '保存失败')
+    }
+  } catch (error) {
+    console.error('保存设置失败:', error)
+    ElMessage.error('保存设置失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 function resetSettings() {
-  applyTheme('light')
-  currentTheme.value = getCurrentTheme()
-  localStorage.removeItem('theme-settings')
-  ElMessage.success('设置已重置')
+  ElMessageBox.confirm(
+    '确定要重置所有设置吗？这将恢复默认配置。',
+    '确认重置',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  ).then(() => {
+    // 重置为默认值
+    Object.assign(settings, {
+      theme: {
+        community_theme: 'light',
+        admin_theme: 'light'
+      },
+      system_mode: 'Normal',
+      feature_flags: {
+        enable_registration: true,
+        enable_community: true,
+        enable_upload: true,
+        enable_comments: true,
+        enable_qq_binding: true
+      },
+      backend_config: {
+        proxy_address: '',
+        api_timeout: 30,
+        max_upload_size: 100
+      },
+      backup_settings: {
+        enable_auto_backup: false,
+        backup_interval_hours: 24,
+        backup_location: './backups',
+        max_backup_files: 10
+      },
+      global_announcement: {
+        enabled: false,
+        title: '',
+        content: '',
+        type_: 'Info',
+        start_time: '',
+        end_time: '',
+        priority: 5
+      }
+    })
+    ElMessage.success('设置已重置')
+  })
+}
+
+function testSettings() {
+  ElMessage.info('测试功能开发中...')
 }
 
 onMounted(() => {
-  // 加载保存的设置
-  const savedSettings = localStorage.getItem('theme-settings')
-  if (savedSettings) {
-    try {
-      const settings = JSON.parse(savedSettings)
-      if (settings.currentTheme) {
-        applyTheme(settings.currentTheme)
-        currentTheme.value = getCurrentTheme()
-      }
-    } catch (e) {
-      console.warn('Failed to load theme settings:', e)
-    }
-  }
+  loadSettings()
 })
 </script>
 
 <style scoped>
-.theme-settings {
+.system-settings {
   padding: 20px;
 }
 
 .settings-card {
-  max-width: 800px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
+.settings-header {
+  text-align: center;
+}
+
 .settings-header h2 {
-  margin: 0 0 8px 0;
-  color: var(--text-primary);
+  margin: 0 0 10px 0;
+  color: var(--el-text-color-primary);
 }
 
 .settings-header p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--el-text-color-secondary);
+}
+
+.settings-content {
+  padding: 20px 0;
 }
 
 .setting-section {
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  padding: 20px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 8px;
+  background: var(--el-bg-color);
 }
 
 .setting-section h3 {
-  margin: 0 0 16px 0;
-  color: var(--text-primary);
+  margin: 0 0 20px 0;
+  color: var(--el-text-color-primary);
   font-size: 18px;
   font-weight: 600;
 }
 
-.theme-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+.mode-description {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  background: var(--el-bg-color-page);
 }
 
-.theme-option {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  background-color: var(--bg-card);
-}
-
-.theme-option:hover {
-  border-color: var(--brand-color);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-base);
-}
-
-.theme-option.active {
-  border-color: var(--brand-color);
-  background-color: var(--bg-secondary);
-}
-
-.theme-preview {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  margin-right: 12px;
-  border: 2px solid var(--border-color);
-}
-
-.theme-info {
-  flex: 1;
-}
-
-.theme-icon {
-  font-size: 20px;
-  margin-right: 8px;
-}
-
-.theme-name {
-  display: block;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.theme-desc {
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.theme-preview-card {
-  padding: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background-color: var(--bg-card);
-}
-
-.preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.preview-header h4 {
+.mode-description p {
   margin: 0;
-  color: var(--text-primary);
-}
-
-.preview-icon {
-  font-size: 24px;
-}
-
-.preview-content p {
-  margin: 0 0 16px 0;
-  color: var(--text-secondary);
-}
-
-.preview-colors {
   display: flex;
-  gap: 16px;
-}
-
-.color-item {
-  display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
 }
 
-.color-preview {
-  width: 32px;
-  height: 32px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
+.warning-text {
+  color: var(--el-color-warning);
 }
 
-.color-item span {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.shortcut-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.shortcut-item kbd {
-  padding: 4px 8px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 12px;
-  color: var(--text-primary);
-}
-
-.shortcut-item span {
-  color: var(--text-secondary);
-}
-
-.theme-test-area {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 20px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background-color: var(--bg-card);
-}
-
-.quick-test {
-  padding: 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
-  margin-bottom: 20px;
-}
-
-.quick-test h4 {
-  margin: 0 0 15px 0;
-  color: var(--text-primary);
-}
-
-.test-buttons {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 15px;
-}
-
-.test-info {
+.feature-desc,
+.config-desc,
+.backup-desc,
+.announcement-desc {
+  margin-left: 10px;
+  color: var(--el-text-color-secondary);
   font-size: 14px;
-  color: var(--text-secondary);
+}
+
+.setting-actions {
   text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--el-border-color-light);
 }
 
-.test-card {
-  padding: 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
-}
-
-.test-card h4 {
-  margin: 0 0 10px 0;
-  color: var(--text-primary);
-}
-
-.test-card p {
-  margin: 0 0 15px 0;
-  color: var(--text-secondary);
-}
-
-.test-form {
-  padding: 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
-}
-
-.test-form .el-form-item {
-  margin-bottom: 15px;
-}
-
-.test-form .el-form-item label {
-  color: var(--text-primary);
-}
-
-.test-form .el-input,
-.test-form .el-select {
-  width: 100%;
-}
-
-.test-table {
-  padding: 15px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background-color: var(--bg-secondary);
-}
-
-.test-table .el-table {
-  border-radius: 6px;
-}
-
-.test-table .el-table th {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.test-table .el-table td {
-  color: var(--text-secondary);
-}
-
-.setting-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 32px;
-}
-
-/* 深色模式适配 */
-.dark .theme-settings-desktop {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-}
-
-.dark .page-header,
-.dark .theme-card,
-.dark .theme-preview-card,
-.dark .theme-test-area {
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
-  border-color: var(--border-color);
-}
-
-/* 主题适配 */
-.blue .theme-card::before {
-  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
-}
-
-.green .theme-card::before {
-  background: linear-gradient(90deg, var(--success-color) 0%, var(--success-color-light) 100%);
-}
-
-.orange .theme-card::before {
-  background: linear-gradient(90deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
-}
-
-.purple .theme-card::before {
-  background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
-}
-
-/* 动画效果 */
-@keyframes slide-up {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.9;
-  }
-}
-
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0) scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translateY(-8px) scale(1.1);
-    opacity: 1;
-  }
-}
-
-/* 页面加载动画 */
-.page-header {
-  animation: slide-up 0.6s ease-out;
-}
-
-.theme-grid {
-  animation: slide-up 0.6s ease-out 0.2s both;
-}
-
-.theme-test-area {
-  animation: slide-up 0.6s ease-out 0.4s both;
-}
-
-.setting-actions {
-  animation: slide-up 0.6s ease-out 0.6s both;
-}
-
-/* 主题卡片悬停动画 */
-.theme-card {
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.theme-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
-  transform: scaleX(0);
-  transition: transform 0.3s ease;
-}
-
-.theme-card::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-  transform: translateX(-100%) translateY(-100%) rotate(45deg);
-  transition: transform 0.6s ease;
-}
-
-.theme-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-medium);
-}
-
-.theme-card:hover::before {
-  transform: scaleX(1);
-}
-
-.theme-card:hover::after {
-  transform: translateX(100%) translateY(100%) rotate(45deg);
-}
-
-/* 按钮光泽动画 */
-.el-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.el-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.el-button:hover::before {
-  left: 100%;
-}
-
-/* 测试区域动画 */
-.quick-test,
-.test-card,
-.test-form,
-.test-table {
-  transition: all 0.3s ease;
-}
-
-.quick-test:hover,
-.test-card:hover,
-.test-form:hover,
-.test-table:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-light);
-}
-
-/* 动画优化 */
-@media (prefers-reduced-motion: reduce) {
-  .page-header,
-  .theme-grid,
-  .theme-test-area,
-  .setting-actions {
-    animation: none;
-  }
-  
-  .theme-card {
-    transition: none;
-  }
-  
-  .theme-card:hover {
-    transform: none;
-  }
-  
-  .el-button::before {
-    display: none;
-  }
-  
-  .quick-test,
-  .test-card,
-  .test-form,
-  .test-table {
-    transition: none;
-  }
-  
-  .quick-test:hover,
-  .test-card:hover,
-  .test-form:hover,
-  .test-table:hover {
-    transform: none;
-  }
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .theme-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .preview-colors {
-    flex-direction: column;
-    align-items: center;
-  }
-  
-  .setting-actions {
-    flex-direction: column;
-  }
+.setting-actions .el-button {
+  margin: 0 10px;
 }
 </style> 

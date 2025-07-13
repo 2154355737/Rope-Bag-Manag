@@ -35,6 +35,11 @@ impl DataManager {
                 url: raw_package.项目直链,
                 downloads: raw_package.下载次数,
                 upload_time: raw_package.上架时间,
+                category: raw_package.分类,
+                status: raw_package.状态,
+                is_starred: raw_package.是否标星,
+                star_time: raw_package.标星时间,
+                star_by: raw_package.标星人,
             };
             packages.insert(raw_package.id, package);
         }
@@ -45,6 +50,14 @@ impl DataManager {
     #[allow(dead_code)]
     pub fn save_packages(&self, packages: &HashMap<u32, RopePackage>) -> Result<(), Box<dyn std::error::Error>> {
         save_json("data/data.json", packages)
+    }
+
+    // 分类数据管理
+    pub fn load_categories(&self) -> Result<Vec<crate::models::Category>, Box<dyn std::error::Error>> {
+        crate::utils::load_json_result("data/categories.json")
+    }
+    pub fn save_categories(&self, categories: &Vec<crate::models::Category>) -> Result<(), Box<dyn std::error::Error>> {
+        crate::utils::save_json("data/categories.json", categories)
     }
 
     // 配置数据管理

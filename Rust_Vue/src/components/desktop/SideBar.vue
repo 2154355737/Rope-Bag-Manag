@@ -44,14 +44,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { 
+import {
   House,
   User,
   Box,
   Document,
   DataAnalysis,
-  Collection,
-  Folder,
+  Setting,
+  ChatDotRound,
+  Monitor,
+  Files,
+  Download,
+  Bell,
   UserFilled
 } from '@element-plus/icons-vue'
 
@@ -69,6 +73,12 @@ const menuItems = [
     badge: 0
   },
   {
+    path: '/user-dashboard',
+    title: '用户后台',
+    icon: 'UserFilled',
+    badge: 0
+  },
+  {
     path: '/users',
     title: '用户管理',
     icon: 'User',
@@ -78,6 +88,36 @@ const menuItems = [
     path: '/packages',
     title: '资源管理',
     icon: 'Box',
+    badge: 0
+  },
+  {
+    path: '/comments',
+    title: '评论管理',
+    icon: 'ChatDotRound',
+    badge: 0
+  },
+  {
+    path: '/user-actions',
+    title: '行为记录',
+    icon: 'Monitor',
+    badge: 0
+  },
+  {
+    path: '/resource-records',
+    title: '资源记录',
+    icon: 'Files',
+    badge: 0
+  },
+  {
+    path: '/backup',
+    title: '数据备份',
+    icon: 'Download',
+    badge: 0
+  },
+  {
+    path: '/announcements',
+    title: '公告管理',
+    icon: 'Bell',
     badge: 0
   },
   {
@@ -91,6 +131,12 @@ const menuItems = [
     title: '统计信息',
     icon: 'DataAnalysis',
     badge: 0
+  },
+  {
+    path: '/theme-settings',
+    title: '系统设置',
+    icon: 'Setting',
+    badge: 0
   }
 ]
 
@@ -101,8 +147,12 @@ const iconComponents: Record<string, any> = {
   Box,
   Document,
   DataAnalysis,
-  Collection,
-  Folder,
+  Setting,
+  ChatDotRound,
+  Monitor,
+  Files,
+  Download,
+  Bell,
   UserFilled
 }
 </script>
@@ -132,6 +182,7 @@ const iconComponents: Record<string, any> = {
 .sidebar-nav {
   flex: 1;
   padding: 16px 0;
+  overflow-y: auto;
 }
 
 .nav-item {
@@ -202,7 +253,7 @@ const iconComponents: Record<string, any> = {
 .sidebar-footer {
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-secondary);
 }
 
 .footer-info {
@@ -212,8 +263,7 @@ const iconComponents: Record<string, any> = {
 }
 
 .version-info {
-  display: flex;
-  justify-content: center;
+  text-align: center;
 }
 
 .version-text {
@@ -241,8 +291,8 @@ const iconComponents: Record<string, any> = {
 }
 
 .status-dot.online {
-  background-color: #67c23a;
-  box-shadow: 0 0 0 2px rgba(103, 194, 58, 0.2);
+  background-color: var(--success-color);
+  box-shadow: 0 0 6px var(--success-color);
 }
 
 .status-text {
@@ -250,151 +300,21 @@ const iconComponents: Record<string, any> = {
   color: var(--text-secondary);
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .desktop-sidebar {
-    display: none;
-  }
+/* 滚动条样式 */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
 }
 
-/* 深色模式适配 */
-.dark .desktop-sidebar {
-  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
-  border-color: var(--border-color);
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.dark .sidebar-footer {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  border-color: var(--border-color);
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
 }
 
-/* 主题适配 */
-.blue .desktop-sidebar::before {
-  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
-}
-
-.green .desktop-sidebar::before {
-  background: linear-gradient(90deg, var(--success-color) 0%, var(--success-color-light) 100%);
-}
-
-.orange .desktop-sidebar::before {
-  background: linear-gradient(90deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
-}
-
-.purple .desktop-sidebar::before {
-  background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
-}
-
-.blue .nav-item.active,
-.green .nav-item.active,
-.purple .nav-item.active,
-.orange .nav-item.active {
-  color: var(--brand-color);
-}
-
-.blue .nav-item.active::before,
-.green .nav-item.active::before,
-.purple .nav-item.active::before,
-.orange .nav-item.active::before {
-  background-color: var(--brand-color);
-}
-
-/* 高对比度模式 */
-@media (prefers-contrast: high) {
-  .nav-item.active::before {
-    width: 4px;
-  }
-  
-  .desktop-sidebar {
-    border-right-width: 2px;
-  }
-  
-  .sidebar-footer {
-    border-top-width: 2px;
-  }
-}
-
-/* 动画效果 */
-@keyframes slide-in {
-  0% {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* 页面加载动画 */
-.desktop-sidebar {
-  animation: slide-in 0.6s ease-out;
-}
-
-/* 导航项动画 */
-.nav-item {
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.nav-item::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-  transition: left 0.5s ease;
-}
-
-.nav-item:hover::before {
-  left: 100%;
-}
-
-/* 图标动画 */
-.nav-icon {
-  transition: transform 0.3s ease;
-}
-
-.nav-item:hover .nav-icon,
-.nav-item.active .nav-icon {
-  transform: scale(1.1);
-}
-
-/* 徽章动画 */
-.nav-badge {
-  transition: transform 0.3s ease;
-}
-
-.nav-item:hover .nav-badge {
-  transform: scale(1.1);
-}
-
-/* 减少动画模式 */
-@media (prefers-reduced-motion: reduce) {
-  .desktop-sidebar {
-    animation: none;
-  }
-  
-  .nav-item,
-  .nav-icon,
-  .nav-badge {
-    transition: none;
-  }
-  
-  .nav-item::before {
-    display: none;
-  }
-  
-  .nav-item:hover .nav-icon,
-  .nav-item.active .nav-icon {
-    transform: none;
-  }
-  
-  .nav-item:hover .nav-badge {
-    transform: none;
-  }
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
 }
 </style> 

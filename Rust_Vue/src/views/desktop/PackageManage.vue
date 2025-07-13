@@ -80,16 +80,21 @@
         />
         <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 150px">
           <el-option label="全部" value="" />
-          <el-option label="已发布" value="published" />
-          <el-option label="待审核" value="pending" />
-          <el-option label="已拒绝" value="rejected" />
+          <el-option label="正常" value="正常" />
+          <el-option label="已发布" value="已发布" />
+          <el-option label="待审核" value="待审核" />
+          <el-option label="已拒绝" value="已拒绝" />
+          <el-option label="维护中" value="维护中" />
         </el-select>
         <el-select v-model="typeFilter" placeholder="分类筛选" clearable style="width: 150px">
           <el-option label="全部" value="" />
-          <el-option label="教程" value="tutorial" />
-          <el-option label="工具" value="tool" />
-          <el-option label="模板" value="template" />
-          <el-option label="其他" value="other" />
+          <el-option 
+            v-for="cat in categories" 
+            :key="cat.id" 
+            :label="cat.name" 
+            :value="cat.name"
+            :disabled="!cat.enabled"
+          />
         </el-select>
       </div>
       <div class="search-right">
@@ -237,17 +242,22 @@
         </el-form-item>
         <el-form-item label="分类">
           <el-select v-model="newPackage.category" placeholder="选择分类">
-            <el-option label="教程" value="tutorial" />
-            <el-option label="工具" value="tool" />
-            <el-option label="模板" value="template" />
-            <el-option label="其他" value="other" />
+            <el-option 
+              v-for="cat in categories" 
+              :key="cat.id" 
+              :label="cat.name" 
+              :value="cat.name"
+              :disabled="!cat.enabled"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="newPackage.status" placeholder="选择状态">
-            <el-option label="已发布" value="published" />
-            <el-option label="待审核" value="pending" />
-            <el-option label="已拒绝" value="rejected" />
+            <el-option label="正常" value="正常" />
+            <el-option label="已发布" value="已发布" />
+            <el-option label="待审核" value="待审核" />
+            <el-option label="已拒绝" value="已拒绝" />
+            <el-option label="维护中" value="维护中" />
           </el-select>
         </el-form-item>
         <el-form-item label="描述">
@@ -258,10 +268,68 @@
             placeholder="请输入描述"
           />
         </el-form-item>
+        <el-form-item label="项目链接">
+          <el-input v-model="newPackage.url" placeholder="请输入项目链接" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="addPackage">添加</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑绳包对话框 -->
+    <el-dialog
+      v-model="editDialogVisible"
+      title="编辑资源"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="editingPackage" label-width="100px">
+        <el-form-item label="名称">
+          <el-input v-model="editingPackage.name" placeholder="请输入资源名称" />
+        </el-form-item>
+        <el-form-item label="作者">
+          <el-input v-model="editingPackage.author" placeholder="请输入作者" />
+        </el-form-item>
+        <el-form-item label="版本">
+          <el-input v-model="editingPackage.version" placeholder="请输入版本号" />
+        </el-form-item>
+        <el-form-item label="分类">
+          <el-select v-model="editingPackage.category" placeholder="选择分类">
+            <el-option 
+              v-for="cat in categories" 
+              :key="cat.id" 
+              :label="cat.name" 
+              :value="cat.name"
+              :disabled="!cat.enabled"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="editingPackage.status" placeholder="选择状态">
+            <el-option label="正常" value="正常" />
+            <el-option label="已发布" value="已发布" />
+            <el-option label="待审核" value="待审核" />
+            <el-option label="已拒绝" value="已拒绝" />
+            <el-option label="维护中" value="维护中" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input 
+            v-model="editingPackage.description" 
+            type="textarea" 
+            :rows="3"
+            placeholder="请输入描述"
+          />
+        </el-form-item>
+        <el-form-item label="项目链接">
+          <el-input v-model="editingPackage.url" placeholder="请输入项目链接" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="updatePackage">保存</el-button>
       </template>
     </el-dialog>
 
@@ -297,7 +365,7 @@
                 <el-icon><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button size="small" type="danger" @click="deleteCategory(row)">
+              <el-button size="small" type="danger" @click="deleteCategoryItem(row)">
                 <el-icon><Delete /></el-icon>
                 删除
               </el-button>
@@ -331,7 +399,36 @@
         </el-form>
         <template #footer>
           <el-button @click="showAddCategoryDialog = false">取消</el-button>
-          <el-button type="primary" @click="addCategory">添加</el-button>
+          <el-button type="primary" @click="addCategoryItem">添加</el-button>
+        </template>
+      </el-dialog>
+      
+      <!-- 编辑分类对话框 -->
+      <el-dialog
+        v-model="showEditCategoryDialog"
+        title="编辑分类"
+        width="500px"
+        append-to-body
+      >
+        <el-form :model="editingCategory" label-width="100px">
+          <el-form-item label="分类名称">
+            <el-input v-model="editingCategory.name" placeholder="请输入分类名称" />
+          </el-form-item>
+          <el-form-item label="描述">
+            <el-input 
+              v-model="editingCategory.description" 
+              type="textarea" 
+              :rows="3"
+              placeholder="请输入分类描述"
+            />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-switch v-model="editingCategory.enabled" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="showEditCategoryDialog = false">取消</el-button>
+          <el-button type="primary" @click="saveCategory">保存</el-button>
         </template>
       </el-dialog>
     </el-dialog>
@@ -355,7 +452,8 @@ import {
   User,
   Check
 } from '@element-plus/icons-vue'
-import { getPackages, adminAddPackage, adminUpdatePackage, adminDeletePackage, downloadPackage } from '../../api'
+import { getPackages, adminAddPackage, adminUpdatePackage, adminDeletePackage, downloadPackage, getCategories, addCategory, updateCategory, deleteCategory } from '../../api'
+import { apiCache } from '../../api/cache'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -366,8 +464,10 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const detailDialogVisible = ref(false)
 const addDialogVisible = ref(false)
+const editDialogVisible = ref(false)
 const showCategoryDialog = ref(false)
 const showAddCategoryDialog = ref(false)
+const showEditCategoryDialog = ref(false)
 const selectedPackage = ref<any>(null)
 
 // 绳包数据
@@ -378,39 +478,41 @@ const borrowedPackages = ref(0)
 const maintenancePackages = ref(0)
 
 // 分类数据
-const categories = ref([
-  {
-    id: 1,
-    name: '教程',
-    description: '学习教程、技术文档、使用指南等',
-    count: 450,
-    enabled: true
-  },
-  {
-    id: 2,
-    name: '工具',
-    description: '开发工具、实用软件、效率工具等',
-    count: 320,
-    enabled: true
-  },
-  {
-    id: 3,
-    name: '模板',
-    description: '项目模板、代码模板、设计模板等',
-    count: 280,
-    enabled: true
-  },
-  {
-    id: 4,
-    name: '其他',
-    description: '其他类型的资源文件',
-    count: 120,
-    enabled: false
-  }
-])
+const categories = ref<any[]>([])
+
+// 新绳包表单
+const newPackage = ref({
+  name: '',
+  author: '',
+  version: '1.0.0',
+  category: '未分类',
+  status: '正常',
+  description: '',
+  url: ''
+})
 
 // 新分类表单
 const newCategory = ref({
+  name: '',
+  description: '',
+  enabled: true
+})
+
+// 编辑绳包表单
+const editingPackage = ref({
+  id: 0,
+  name: '',
+  author: '',
+  version: '',
+  category: '',
+  status: '',
+  description: '',
+  url: ''
+})
+
+// 编辑分类表单
+const editingCategory = ref({
+  id: 0,
   name: '',
   description: '',
   enabled: true
@@ -428,14 +530,14 @@ const filteredPackages = computed(() => {
     )
   }
   
-  // 状态过滤 - 后端暂无状态字段，这里简化处理
+  // 状态过滤 - 使用后端状态名
   if (statusFilter.value) {
-    // 可以根据需要实现状态过滤
+    filtered = filtered.filter(pkg => pkg.status === statusFilter.value)
   }
   
-  // 类型过滤 - 后端暂无类型字段，这里简化处理
+  // 类型过滤 - 使用后端分类名
   if (typeFilter.value) {
-    // 可以根据需要实现类型过滤
+    filtered = filtered.filter(pkg => pkg.type === typeFilter.value)
   }
   
   return filtered
@@ -445,6 +547,8 @@ const filteredPackages = computed(() => {
 async function loadPackages() {
   try {
     loading.value = true
+    // 强制清除缓存
+    apiCache.delete('getPackages')
     const res = await getPackages()
     if (res.code === 0 && res.data) {
       packages.value = res.data.绳包列表?.map((pkg: any) => ({
@@ -452,20 +556,20 @@ async function loadPackages() {
         name: pkg.绳包名称,
         author: pkg.作者,
         version: pkg.版本,
-        type: 'tutorial', // 后端暂无类型字段
-        status: 'published', // 后端暂无状态字段
+        type: pkg.分类 || '未分类',
+        status: pkg.状态 || '正常',
         description: pkg.简介,
         downloads: pkg.下载次数,
         uploadTime: pkg.上架时间,
-        lastUpdate: pkg.上架时间, // 后端暂无最后更新字段
+        lastUpdate: pkg.上架时间,
         url: pkg.项目直链
       })) || []
       
       // 更新统计数据
       totalPackages.value = packages.value.length
       availablePackages.value = packages.value.length
-      borrowedPackages.value = 0 // 后端暂无借出状态
-      maintenancePackages.value = 0 // 后端暂无维护状态
+      borrowedPackages.value = 0
+      maintenancePackages.value = 0
     } else {
       ElMessage.error('获取绳包数据失败')
     }
@@ -477,12 +581,37 @@ async function loadPackages() {
   }
 }
 
+async function loadCategories() {
+  try {
+    // 强制清除缓存
+    apiCache.delete('getCategories')
+    const res = await getCategories()
+    if (res.code === 0 && res.data) {
+      categories.value = res.data
+    } else {
+      ElMessage.error('获取分类数据失败')
+    }
+  } catch (error) {
+    console.error('获取分类数据错误:', error)
+    ElMessage.error('获取分类数据失败')
+  }
+}
+
 function handleSearch() {
   // 搜索逻辑
 }
 
 async function refreshData() {
-  await loadPackages()
+  // 清除所有相关缓存
+  apiCache.delete('getPackages')
+  apiCache.delete('getCategories')
+  
+  // 重新加载数据
+  await Promise.all([
+    loadPackages(),
+    loadCategories()
+  ])
+  
   ElMessage.success('数据已刷新')
 }
 
@@ -509,19 +638,53 @@ async function downloadPackage(pkg: any) {
   }
 }
 
-async function editPackage(pkg: any) {
+function editPackage(pkg: any) {
+  // 复制数据到编辑表单
+  editingPackage.value = {
+    id: pkg.id,
+    name: pkg.name,
+    author: pkg.author,
+    version: pkg.version,
+    category: pkg.type || 'tutorial',
+    status: pkg.status || 'published',
+    description: pkg.description,
+    url: pkg.url
+  }
+  editDialogVisible.value = true
+}
+
+async function updatePackage() {
   try {
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
-    // 这里需要从表单获取数据，暂时使用当前数据
+    // 验证表单数据
+    if (!editingPackage.value.name.trim()) {
+      ElMessage.error('请输入绳包名称')
+      return
+    }
+    if (!editingPackage.value.author.trim()) {
+      ElMessage.error('请输入作者')
+      return
+    }
+    if (!editingPackage.value.description.trim()) {
+      ElMessage.error('请输入描述')
+      return
+    }
+    if (!editingPackage.value.url.trim()) {
+      ElMessage.error('请输入项目链接')
+      return
+    }
+    
     const updateData = {
-      id: pkg.id,
-      name: pkg.name,
-      author: pkg.author,
-      version: pkg.version,
-      desc: pkg.description,
-      url: pkg.url,
+      id: editingPackage.value.id,
+      name: editingPackage.value.name,
+      author: editingPackage.value.author,
+      version: editingPackage.value.version,
+      desc: editingPackage.value.description,
+      url: editingPackage.value.url,
+      category: editingPackage.value.category,
+      status: editingPackage.value.status,
       admin_username,
       admin_password
     }
@@ -529,7 +692,12 @@ async function editPackage(pkg: any) {
     const res = await adminUpdatePackage(updateData)
     if (res.code === 0) {
       ElMessage.success('绳包更新成功')
-      await loadPackages() // 重新加载数据
+      editDialogVisible.value = false
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadPackages() // 重新加载数据
+        await loadCategories() // 重新加载分类数据
+      }, 500)
     } else {
       ElMessage.error(res.msg || '更新失败')
     }
@@ -551,10 +719,14 @@ async function deletePackage(pkg: any) {
       }
     )
     
-    const res = await adminDeletePackage(pkg.id, 'admin', 'admin123')
+    const res = await adminDeletePackage(pkg.id, 'muteduanxing', 'ahk12378dx')
     if (res.code === 0) {
       ElMessage.success('绳包已删除')
-      await loadPackages() // 重新加载数据
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadPackages() // 重新加载数据
+        await loadCategories() // 重新加载分类数据
+      }, 500)
     } else {
       ElMessage.error(res.msg || '删除失败')
     }
@@ -568,16 +740,35 @@ async function deletePackage(pkg: any) {
 
 async function addPackage() {
   try {
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
-    // 这里需要从表单获取数据，暂时使用模拟数据
+    // 验证表单数据
+    if (!newPackage.value.name.trim()) {
+      ElMessage.error('请输入绳包名称')
+      return
+    }
+    if (!newPackage.value.author.trim()) {
+      ElMessage.error('请输入作者')
+      return
+    }
+    if (!newPackage.value.description.trim()) {
+      ElMessage.error('请输入描述')
+      return
+    }
+    if (!newPackage.value.url.trim()) {
+      ElMessage.error('请输入项目链接')
+      return
+    }
+    
     const packageData = {
-      name: '新绳包',
-      author: '管理员',
-      version: '1.0.0',
-      desc: '新添加的绳包',
-      url: 'https://example.com',
+      name: newPackage.value.name,
+      author: newPackage.value.author,
+      version: newPackage.value.version,
+      desc: newPackage.value.description,
+      url: newPackage.value.url,
+      category: newPackage.value.category,
+      status: newPackage.value.status,
       admin_username,
       admin_password
     }
@@ -586,7 +777,21 @@ async function addPackage() {
     if (res.code === 0) {
       ElMessage.success('绳包添加成功')
       addDialogVisible.value = false
-      await loadPackages() // 重新加载数据
+      // 重置表单
+      newPackage.value = {
+        name: '',
+        author: '',
+        version: '1.0.0',
+        category: '未分类',
+        status: '正常',
+        description: '',
+        url: ''
+      }
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadPackages() // 重新加载数据
+        await loadCategories() // 重新加载分类数据
+      }, 500)
     } else {
       ElMessage.error(res.msg || '添加失败')
     }
@@ -596,73 +801,169 @@ async function addPackage() {
   }
 }
 
-function addCategory() {
-  // 添加分类逻辑
-  ElMessage.success('分类添加成功')
-  showAddCategoryDialog.value = false
-  newCategory.value = { name: '', description: '', enabled: true }
+async function addCategoryItem() {
+  try {
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
+    
+    // 验证表单数据
+    if (!newCategory.value.name.trim()) {
+      ElMessage.error('请输入分类名称')
+      return
+    }
+    if (!newCategory.value.description.trim()) {
+      ElMessage.error('请输入分类描述')
+      return
+    }
+    
+    const categoryData = {
+      name: newCategory.value.name,
+      description: newCategory.value.description,
+      enabled: newCategory.value.enabled,
+      admin_username,
+      admin_password
+    }
+    
+    const res = await addCategory(categoryData)
+    if (res.code === 0) {
+      ElMessage.success('分类添加成功')
+      showAddCategoryDialog.value = false
+      // 重置表单
+      newCategory.value = { name: '', description: '', enabled: true }
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadCategories() // 重新加载分类数据
+        await loadPackages() // 重新加载资源数据
+      }, 500)
+    } else {
+      ElMessage.error(res.msg || '添加失败')
+    }
+  } catch (error) {
+    console.error('添加分类错误:', error)
+    ElMessage.error('添加失败')
+  }
 }
 
 function editCategory(category: any) {
-  ElMessage.info('编辑分类功能开发中')
+  // 复制数据到编辑表单
+  editingCategory.value = {
+    id: category.id,
+    name: category.name,
+    description: category.description,
+    enabled: category.enabled
+  }
+  showEditCategoryDialog.value = true
 }
 
-function deleteCategory(category: any) {
-  ElMessageBox.confirm(
-    `确定要删除分类 ${category.name} 吗？`,
-    '确认删除',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
+async function saveCategory() {
+  try {
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
+    
+    // 验证表单数据
+    if (!editingCategory.value.name.trim()) {
+      ElMessage.error('请输入分类名称')
+      return
     }
-  ).then(() => {
-    ElMessage.success('分类已删除')
-  }).catch(() => {
-    // 用户取消
-  })
+    if (!editingCategory.value.description.trim()) {
+      ElMessage.error('请输入分类描述')
+      return
+    }
+    
+    const categoryData = {
+      id: editingCategory.value.id,
+      name: editingCategory.value.name,
+      description: editingCategory.value.description,
+      enabled: editingCategory.value.enabled,
+      admin_username,
+      admin_password
+    }
+    
+    const res = await updateCategory(categoryData)
+    if (res.code === 0) {
+      ElMessage.success('分类更新成功')
+      showEditCategoryDialog.value = false
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadCategories() // 重新加载分类数据
+        await loadPackages() // 重新加载资源数据
+      }, 500)
+    } else {
+      ElMessage.error(res.msg || '更新失败')
+    }
+  } catch (error) {
+    console.error('编辑分类错误:', error)
+    ElMessage.error('更新失败')
+  }
+}
+
+async function deleteCategoryItem(category: any) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除分类 ${category.name} 吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
+    
+    const res = await deleteCategory(category.id, admin_username, admin_password)
+    if (res.code === 0) {
+      ElMessage.success('分类已删除')
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadCategories() // 重新加载分类数据
+        await loadPackages() // 重新加载资源数据
+      }, 500)
+    } else {
+      ElMessage.error(res.msg || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除分类错误:', error)
+      ElMessage.error('删除失败')
+    }
+  }
 }
 
 function getStatusText(status: string) {
   const statusMap: Record<string, string> = {
-    published: '已发布',
-    pending: '待审核',
-    rejected: '已拒绝',
-    available: '可用',
-    maintenance: '维护中',
-    borrowed: '已借出'
+    '正常': '正常',
+    '已发布': '已发布',
+    '待审核': '待审核',
+    '已拒绝': '已拒绝',
+    '维护中': '维护中'
   }
   return statusMap[status] || status
 }
 
 function getStatusType(status: string) {
   const typeMap: Record<string, string> = {
-    published: 'success',
-    pending: 'warning',
-    rejected: 'danger',
-    available: 'success',
-    maintenance: 'warning',
-    borrowed: 'danger'
+    '正常': 'success',
+    '已发布': 'success',
+    '待审核': 'warning',
+    '已拒绝': 'danger',
+    '维护中': 'warning'
   }
   return typeMap[status] || 'info'
 }
 
 function getCategoryText(category: string) {
-  const categoryMap: Record<string, string> = {
-    tutorial: '教程',
-    tool: '工具',
-    template: '模板',
-    other: '其他'
-  }
-  return categoryMap[category] || category
+  return category
 }
 
 function getCategoryType(category: string) {
   const typeMap: Record<string, string> = {
-    tutorial: 'primary',
-    tool: 'success',
-    template: 'warning',
-    other: 'info'
+    '教程': 'primary',
+    '工具': 'success', 
+    '模板': 'warning',
+    '其他': 'info',
+    '未分类': 'info'
   }
   return typeMap[category] || 'info'
 }
@@ -683,6 +984,7 @@ function formatDate(date: string) {
 // 初始化数据
 onMounted(() => {
   loadPackages()
+  loadCategories()
 })
 </script>
 

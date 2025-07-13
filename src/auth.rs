@@ -168,7 +168,7 @@ pub fn record_api_call(
 }
 
 // ====== 管理员认证函数 ======
-pub fn admin_auth(req: &HttpRequest, config: &AppConfig, data_manager: &crate::storage::DataManager) -> bool {
+pub fn admin_auth(req: &HttpRequest, config: &AppConfig, data_manager: &crate::data_manager::DataManager) -> bool {
     let params = parse_query_params(req.query_string());
     let admin_user = params.get("admin_username");
     let admin_pass = params.get("admin_password");

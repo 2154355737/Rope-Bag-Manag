@@ -401,17 +401,13 @@ export const communityUserApi = {
 
   // 更新用户
   updateUser: async (id: number, data: {
-    username?: string
-    email?: string
+    nickname?: string
     password?: string
-    role?: string
-    status?: string
-    bio?: string
     avatar?: File
   }) => {
     const username = getCurrentUsername()
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
     const updateData: any = { target: id.toString() }
     
@@ -440,8 +436,8 @@ export const communityUserApi = {
   // 更新用户状态
   updateUserStatus: async (id: number, status: string) => {
     const username = getCurrentUsername()
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
     if (status === 'banned') {
       return await adminBanUser(id.toString(), true, admin_username, admin_password)
@@ -465,8 +461,8 @@ export const communityUserApi = {
   // 更新用户角色
   updateUserRole: async (id: number, role: string) => {
     const username = getCurrentUsername()
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
     if (role === 'admin') {
       return await setAdmin(id.toString(), true, admin_username, admin_password)
@@ -480,8 +476,8 @@ export const communityUserApi = {
   // 更新用户星级
   updateUserStar: async (id: number, star: number) => {
     const username = getCurrentUsername()
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
     return await adminSetStar(id.toString(), star, admin_username, admin_password)
   },

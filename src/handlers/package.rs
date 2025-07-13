@@ -232,6 +232,14 @@ pub async fn update_rope_package(
             data: None 
         }),
     };
+    let category = match params.get("category") {
+        Some(c) => c,
+        None => "未分类",
+    };
+    let status = match params.get("status") {
+        Some(s) => s,
+        None => "正常",
+    };
     
     let data_manager = DataManager::new();
     let users = match data_manager.load_users() {
@@ -251,12 +259,41 @@ pub async fn update_rope_package(
             data: None 
         }),
     };
-    if user.star < 3 {
+    if user.star < 3.0 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 
             data: None 
         });
+    }
+    
+    // 加载原始数据并更新
+    let mut raw_data = match data_manager.load_raw_data() {
+        Ok(data) => data,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "加载数据库失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    // 分类计数维护
+    if let Ok(mut categories) = DataManager::new().load_categories() {
+        // 找到原分类
+        if let Some(pkg) = raw_data.绳包列表.iter().find(|p| p.id == id) {
+            let old_cat = &pkg.分类;
+            if old_cat != category {
+                // 原分类-1
+                if let Some(cat) = categories.iter_mut().find(|c| &c.name == old_cat) {
+                    if cat.count > 0 { cat.count -= 1; }
+                }
+                // 新分类+1
+                if let Some(cat) = categories.iter_mut().find(|c| &c.name == category) {
+                    cat.count += 1;
+                }
+                let _ = DataManager::new().save_categories(&categories);
+            }
+        }
     }
     
     let updates = RawRopePackage {
@@ -268,16 +305,11 @@ pub async fn update_rope_package(
         项目直链: url.clone(),
         下载次数: 0,
         上架时间: chrono::Local::now().format("%Y-%m-%d").to_string(),
-    };
-    
-    // 加载原始数据并更新
-    let mut raw_data = match data_manager.load_raw_data() {
-        Ok(data) => data,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载数据库失败".to_string(), 
-            data: None 
-        }),
+        分类: category.to_string(),
+        状态: status.to_string(),
+        是否标星: false,
+        标星时间: None,
+        标星人: None,
     };
     
     let mut found = false;
@@ -390,7 +422,7 @@ pub async fn delete_rope_package(
             data: None 
         }),
     };
-    if user.star < 3 {
+    if user.star < 3.0 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 
@@ -407,9 +439,23 @@ pub async fn delete_rope_package(
             data: None 
         }),
     };
-    
+    let mut deleted_category = None;
+    if let Some(pkg) = raw_data.绳包列表.iter().find(|p| p.id == id) {
+        deleted_category = Some(pkg.分类.clone());
+    }
     let initial_len = raw_data.绳包列表.len();
     raw_data.绳包列表.retain(|p| p.id != id);
+    // 分类计数-1
+    if let Some(cat_name) = deleted_category {
+        if let Ok(mut categories) = data_manager.load_categories() {
+            if let Some(cat) = categories.iter_mut().find(|c| c.name == cat_name) {
+                if cat.count > 0 {
+                    cat.count -= 1;
+                }
+            }
+            let _ = data_manager.save_categories(&categories);
+        }
+    }
     
     if raw_data.绳包列表.len() < initial_len {
         if let Err(_) = data_manager.save_raw_data(&raw_data) {
@@ -528,8 +574,26 @@ pub async fn add_rope_package(
             data: None 
         }),
     };
+    let category = match params.get("category") {
+        Some(c) => c,
+        None => "未分类",
+    };
+    let status = match params.get("status") {
+        Some(s) => s,
+        None => "正常",
+    };
     
     let data_manager = DataManager::new();
+    // 分类计数+1
+    if let Ok(mut categories) = data_manager.load_categories() {
+        for cat in &mut categories {
+            if &cat.name == category {
+                cat.count += 1;
+            }
+        }
+        let _ = data_manager.save_categories(&categories);
+    }
+    
     let users = match data_manager.load_users() {
         Ok(users) => users,
         Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
@@ -547,7 +611,7 @@ pub async fn add_rope_package(
             data: None 
         }),
     };
-    if user.star < 3 {
+    if user.star < 3.0 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 
@@ -575,6 +639,11 @@ pub async fn add_rope_package(
         项目直链: url.clone(),
         下载次数: 0,
         上架时间: chrono::Local::now().format("%Y-%m-%d").to_string(),
+        分类: category.to_string(),
+        状态: status.to_string(),
+        是否标星: false,
+        标星时间: None,
+        标星人: None,
     };
     
     // 加载原始数据并添加

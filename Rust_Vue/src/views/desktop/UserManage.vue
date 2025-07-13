@@ -263,14 +263,19 @@ import {
   User, 
   Plus, 
   Edit, 
-  Check, 
-  Close, 
-  Star,
+  Delete, 
   Search,
   Refresh,
+  Star,
+  Lock,
+  Unlock,
+  UserFilled,
+  Check,
+  Close,
   DataAnalysis
 } from '@element-plus/icons-vue'
-import { getUsers, adminSetUser, adminBanUser, setAdmin } from '../../api'
+import { getUsers, adminSetUser, adminBanUser, adminSetStar } from '../../api'
+import { apiCache } from '../../api/cache'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -289,6 +294,7 @@ const totalUsers = ref(0)
 const activeUsers = ref(0)
 const bannedUsers = ref(0)
 const adminUsers = ref(0)
+const normalUsers = ref(0)
 
 // 计算属性
 const filteredUsers = computed(() => {
@@ -323,27 +329,28 @@ const filteredUsers = computed(() => {
 async function loadUsers() {
   try {
     loading.value = true
+    // 强制清除缓存
+    apiCache.delete('getUsers')
     const res = await getUsers()
     if (res.code === 0 && res.data) {
-      users.value = Object.entries(res.data).map(([username, user]: [string, any]) => ({
-        id: username,
-        username,
-        nickname: user.nickname || username,
-        role: user.is_admin ? 'admin' : 'user',
-        status: 'online', // 后端暂无在线状态
-        star: user.star || 0,
-        loginCount: user.sign_total || 0,
-        lastLogin: user.last_sign || '从未登录',
-        registerTime: user.register_time || '未知',
-        banned: user.banned || false,
-        is_admin: user.is_admin || false
+      users.value = Object.values(res.data).map((user: any) => ({
+        id: user.username,
+        username: user.username,
+        nickname: user.nickname,
+        star: user.star,
+        banned: user.banned,
+        signDays: user.sign_days,
+        signTotal: user.sign_total,
+        lastSign: user.last_sign,
+        isAdmin: user.is_admin
       }))
       
       // 更新统计数据
       totalUsers.value = users.value.length
-      activeUsers.value = users.value.filter(u => !u.banned).length
+      adminUsers.value = users.value.filter(u => u.isAdmin).length
+      normalUsers.value = users.value.filter(u => !u.isAdmin).length
       bannedUsers.value = users.value.filter(u => u.banned).length
-      adminUsers.value = users.value.filter(u => u.is_admin).length
+      activeUsers.value = users.value.filter(u => !u.banned).length
     } else {
       ElMessage.error('获取用户数据失败')
     }
@@ -360,7 +367,12 @@ function handleSearch() {
 }
 
 async function refreshData() {
+  // 清除用户缓存
+  apiCache.delete('getUsers')
+  
+  // 重新加载数据
   await loadUsers()
+  
   ElMessage.success('数据已刷新')
 }
 
@@ -376,8 +388,8 @@ function editUser(user: any) {
 
 async function saveUser() {
   try {
-    const admin_username = 'admin'
-    const admin_password = 'admin123'
+    const admin_username = 'muteduanxing'
+    const admin_password = 'ahk12378dx'
     
     if (editingUser.value.id) {
       // 更新用户
@@ -399,7 +411,10 @@ async function saveUser() {
       if (res.code === 0) {
         ElMessage.success('用户信息已保存')
         editDialogVisible.value = false
-        await loadUsers()
+        // 延迟刷新数据，确保后端数据已更新
+        setTimeout(async () => {
+          await loadUsers()
+        }, 500)
       } else {
         ElMessage.error(res.msg || '保存失败')
       }
@@ -417,7 +432,10 @@ async function saveUser() {
       if (res.code === 0) {
         ElMessage.success('用户添加成功')
         editDialogVisible.value = false
-        await loadUsers()
+        // 延迟刷新数据，确保后端数据已更新
+        setTimeout(async () => {
+          await loadUsers()
+        }, 500)
       } else {
         ElMessage.error(res.msg || '添加失败')
       }
@@ -441,11 +459,14 @@ async function toggleBan(user: any) {
       }
     )
     
-    const res = await adminBanUser(user.username, !user.banned, 'admin', 'admin123')
+    const res = await adminBanUser(user.username, !user.banned, 'muteduanxing', 'ahk12378dx')
     if (res.code === 0) {
       user.banned = !user.banned
       ElMessage.success(`用户已${action}`)
-      await loadUsers() // 重新加载数据
+      // 延迟刷新数据，确保后端数据已更新
+      setTimeout(async () => {
+        await loadUsers() // 重新加载数据
+      }, 500)
     } else {
       ElMessage.error(res.msg || `${action}失败`)
     }

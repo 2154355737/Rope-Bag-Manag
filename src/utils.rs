@@ -43,8 +43,8 @@ pub fn now_ts() -> u64 {
 // ====== 查询参数解析 ======
 use std::collections::HashMap;
 
-pub fn parse_query_params(query_string: &str) -> HashMap<String, String> {
-    query_string
+pub fn parse_query_params(_query_string: &str) -> HashMap<String, String> {
+    _query_string
         .split('&')
         .filter_map(|kv| {
             let mut it = kv.splitn(2, '=');
@@ -182,4 +182,45 @@ pub struct ApiResponse<T> {
     pub code: i32,
     pub msg: String,
     pub data: Option<T>,
+}
+
+// ====== API调用记录 ======
+pub fn record_api_call(
+    query_string: &str,
+    stats: &std::sync::Arc<std::sync::Mutex<crate::models::StatsData>>,
+    api_name: &str,
+    start_time: u64,
+    status_code: u16,
+    success: bool,
+    error_message: Option<String>,
+) {
+    if let Ok(mut stats_guard) = stats.lock() {
+        let response_time = now_ts() - start_time;
+        
+        // 更新API调用计数
+        *stats_guard.api_counts.entry(api_name.to_string()).or_insert(0) += 1;
+        
+        // 记录API调用
+        let api_call = crate::models::ApiCallRecord {
+            timestamp: start_time,
+            api_name: api_name.to_string(),
+            username: "system".to_string(), // 可以从请求中获取
+            ip_address: "127.0.0.1".to_string(), // 可以从请求中获取
+            user_agent: "system".to_string(), // 可以从请求中获取
+            response_time_ms: response_time * 1000, // 转换为毫秒
+            status_code,
+            success,
+            error_message,
+        };
+        
+        stats_guard.api_calls.push(api_call);
+        
+        // 限制API调用记录数量，避免内存溢出
+        if stats_guard.api_calls.len() > 10000 {
+            stats_guard.api_calls.drain(0..1000);
+        }
+        
+        // 更新最后使用时间
+        stats_guard.api_last_used.insert(api_name.to_string(), start_time);
+    }
 }

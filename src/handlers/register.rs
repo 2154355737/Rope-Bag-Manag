@@ -2,7 +2,6 @@ use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, User};
 use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
-use uuid::Uuid;
 
 #[get("/api/register")]
 pub async fn register(
@@ -12,6 +11,34 @@ pub async fn register(
     // 检查限流
     if let Err(response) = check_rate_limit(&req, &data.config, &data.limiter, &data.global, &data.stats, "register") {
         return response;
+    }
+
+    // 检查系统维护模式
+    let settings = match data.data_manager.load_settings() {
+        Ok(s) => s,
+        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "系统配置加载失败".to_string(), 
+            data: None 
+        }),
+    };
+    
+    // 如果系统处于维护模式，禁止注册
+    if settings.system_mode == crate::models::SystemMode::Maintenance {
+        return HttpResponse::ServiceUnavailable().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "系统维护中，暂时禁止注册".to_string(), 
+            data: None 
+        });
+    }
+    
+    // 检查注册功能是否启用
+    if !settings.feature_flags.enable_registration {
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+            code: 1, 
+            msg: "用户注册功能已禁用".to_string(), 
+            data: None 
+        });
     }
 
     let params = parse_query_params(req.query_string());
@@ -40,11 +67,22 @@ pub async fn register(
         username: username.clone(),
         password: password.clone(),
         nickname: nickname.clone(),
-        star: 1,
+        star: 1.0,
+        role: crate::models::UserRole::Normal,
+        permissions: crate::models::UserPermissions::default(),
         banned: false,
+        ban_reason: None,
+        ban_time: None,
+        qq_number: None,
+        avatar_url: None,
+        sign_records: Vec::new(),
         sign_days: 0,
         sign_total: 0,
         last_sign: String::new(),
+        register_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        last_login: String::new(),
+        upload_count: 0,
+        download_count: 0,
         is_admin: false,
     };
 

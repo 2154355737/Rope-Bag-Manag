@@ -119,7 +119,7 @@
             <div class="quick-login-buttons">
               <el-button 
                 class="quick-btn admin-btn" 
-                @click="quickLogin('admin', 'admin123')"
+                @click="quickLogin('muteduanxing', 'ahk12378dx')"
               >
                 <el-icon><User /></el-icon>
                 管理员
