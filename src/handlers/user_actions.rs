@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, get, post, put, delete};
+use actix_web::{web, HttpResponse, get, post, delete};
 use serde::{Deserialize};
 use crate::models::{AppState, ApiResponse};
 use actix_web::HttpRequest;

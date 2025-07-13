@@ -228,6 +228,17 @@ pub async fn create_backup_record(
                 }
                 let _ = data.data_manager.save_backup_records(&records);
                 
+                // 记录失败的行为
+                crate::utils::record_user_action(
+                    "admin",
+                    crate::models::ActionType::Admin,
+                    "Backup",
+                    &new_id.to_string(),
+                    &format!("创建备份失败: {}", record_data.description),
+                    false,
+                    Some("备份文件创建失败".to_string()),
+                );
+                
                 return HttpResponse::InternalServerError().json(ApiResponse::<()> {
                     code: 500,
                     msg: "备份文件创建失败".to_string(),
@@ -253,6 +264,17 @@ pub async fn create_backup_record(
                 });
             }
             
+            // 记录成功的行为
+            crate::utils::record_user_action(
+                "admin",
+                crate::models::ActionType::Admin,
+                "Backup",
+                &new_id.to_string(),
+                &format!("创建备份成功: {} (文件大小: {} 字节)", record_data.description, file_size),
+                true,
+                None,
+            );
+            
             HttpResponse::Ok().json(ApiResponse {
                 code: 0,
                 msg: "备份创建成功".to_string(),
@@ -266,6 +288,17 @@ pub async fn create_backup_record(
                 record.status = BackupStatus::Failed;
             }
             let _ = data.data_manager.save_backup_records(&records);
+            
+            // 记录失败的行为
+            crate::utils::record_user_action(
+                "admin",
+                crate::models::ActionType::Admin,
+                "Backup",
+                &new_id.to_string(),
+                &format!("创建备份失败: {}", record_data.description),
+                false,
+                Some(format!("备份操作失败: {}", e)),
+            );
             
             HttpResponse::InternalServerError().json(ApiResponse::<()> {
                 code: 500,
@@ -535,6 +568,17 @@ pub async fn delete_backup_record(
     if let Some(path) = file_path {
         let _ = std::fs::remove_file(path);
     }
+
+    // 记录用户行为
+    crate::utils::record_user_action(
+        "admin",
+        crate::models::ActionType::Admin,
+        "Backup",
+        &backup_id.to_string(),
+        &format!("管理员删除了备份记录 ID: {}", backup_id),
+        true,
+        None,
+    );
 
     HttpResponse::Ok().json(ApiResponse::<()> {
         code: 0,

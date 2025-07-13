@@ -109,6 +109,17 @@ pub async fn login(
         });
     }
 
+    // 记录登录行为
+    crate::utils::record_user_action(
+        username,
+        crate::models::ActionType::Login,
+        "System",
+        "login",
+        &format!("用户 {} 登录系统成功", username),
+        true,
+        None,
+    );
+
     return HttpResponse::Ok().json(ApiResponse {
         code: 0,
         msg: "登录成功".to_string(),
@@ -161,6 +172,17 @@ pub async fn register(
     // 创建新用户
     match data.data_manager.create_user(username.to_string(), password.to_string()) {
         Ok(user_id) => {
+            // 记录注册行为
+            crate::utils::record_user_action(
+                username,
+                crate::models::ActionType::Register,
+                "System",
+                "register",
+                &format!("新用户 {} 注册成功 (ID: {})", username, user_id),
+                true,
+                None,
+            );
+            
             return HttpResponse::Ok().json(ApiResponse {
                 code: 0,
                 msg: "注册成功".to_string(),
@@ -168,6 +190,17 @@ pub async fn register(
             });
         },
         Err(e) => {
+            // 记录失败的注册行为
+            crate::utils::record_user_action(
+                username,
+                crate::models::ActionType::Register,
+                "System",
+                "register",
+                &format!("用户 {} 注册失败", username),
+                false,
+                Some(format!("注册失败: {}", e)),
+            );
+            
             return HttpResponse::BadRequest().json(ApiResponse::<()> {
                 code: 1,
                 msg: format!("注册失败: {}", e),

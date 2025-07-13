@@ -175,7 +175,7 @@ const routes: RouteRecordRaw[] = [
   },
   { 
     path: '/user-actions', 
-    component: () => import('../views/desktop/UserActionLog.vue'),
+    component: () => import('../views/desktop/UserActions.vue'),
     meta: { 
       requiresAuth: true, 
       requiresAdmin: true,

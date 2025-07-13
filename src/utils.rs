@@ -224,3 +224,42 @@ pub fn record_api_call(
         stats_guard.api_last_used.insert(api_name.to_string(), start_time);
     }
 }
+
+// 记录用户行为
+pub fn record_user_action(
+    user_id: &str,
+    action_type: crate::models::ActionType,
+    target_type: &str,
+    target_id: &str,
+    description: &str,
+    success: bool,
+    error_message: Option<String>,
+) {
+    let data_manager = crate::data_manager::DataManager::new();
+    let mut actions = match data_manager.load_user_actions() {
+        Ok(actions) => actions,
+        Err(_) => Vec::new(),
+    };
+    
+    let new_id = actions.len() as u32 + 1;
+    
+    let new_action = crate::models::UserAction {
+        id: new_id,
+        user_id: user_id.to_string(),
+        action_type,
+        target_type: target_type.to_string(),
+        target_id: target_id.to_string(),
+        description: description.to_string(),
+        ip_address: "unknown".to_string(),
+        user_agent: "unknown".to_string(),
+        timestamp: now_ts(),
+        success,
+        error_message,
+    };
+
+    actions.push(new_action);
+
+    if let Err(e) = data_manager.save_user_actions(&actions) {
+        eprintln!("保存用户行为记录失败: {}", e);
+    }
+}

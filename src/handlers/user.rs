@@ -85,7 +85,7 @@ pub async fn sign_in(
 
     let data_manager = DataManager::new();
     let user_result = match data_manager.find_user_by_username(username) {
-        Ok(Some((user_id, mut user))) => (user_id, user),
+        Ok(Some((user_id, user))) => (user_id, user),
         Ok(None) => return HttpResponse::NotFound().json(ApiResponse::<()> {
             code: 1,
             msg: "用户不存在".to_string(),
@@ -159,7 +159,7 @@ pub async fn change_password(
 
     let data_manager = DataManager::new();
     let user_result = match data_manager.find_user_by_username(username) {
-        Ok(Some((user_id, mut user))) => (user_id, user),
+        Ok(Some((user_id, user))) => (user_id, user),
         Ok(None) => return HttpResponse::NotFound().json(ApiResponse::<()> {
             code: 1,
             msg: "用户不存在".to_string(),
@@ -295,7 +295,7 @@ pub async fn bind_qq(
 
     let data_manager = DataManager::new();
     let user_result = match data_manager.find_user_by_username(username) {
-        Ok(Some((user_id, mut user))) => (user_id, user),
+        Ok(Some((user_id, user))) => (user_id, user),
         Ok(None) => return HttpResponse::NotFound().json(ApiResponse::<()> {
             code: 1,
             msg: "用户不存在".to_string(),
@@ -454,7 +454,7 @@ pub async fn set_user_role(
 
     let data_manager = DataManager::new();
     let user_result = match data_manager.find_user_by_username(target) {
-        Ok(Some((user_id, mut user))) => (user_id, user),
+        Ok(Some((user_id, user))) => (user_id, user),
         Ok(None) => return HttpResponse::NotFound().json(ApiResponse::<()> {
             code: 1,
             msg: "用户不存在".to_string(),
@@ -468,7 +468,7 @@ pub async fn set_user_role(
     };
 
     let (user_id, mut user) = user_result;
-    user.role = role;
+    user.role = role.clone();
     user.permissions = user.get_permissions();
     
     // 先克隆用户数据，避免借用冲突
@@ -481,6 +481,18 @@ pub async fn set_user_role(
             data: None
         });
     }
+    
+    // 记录用户行为
+    let role_for_log = role.clone();
+    crate::utils::record_user_action(
+        "admin",
+        crate::models::ActionType::Admin,
+        "User",
+        &user_id.to_string(),
+        &format!("管理员设置了用户 {} 的角色为: {:?}", target, role_for_log),
+        true,
+        None,
+    );
     
     return HttpResponse::Ok().json(ApiResponse {
         code: 0,
@@ -534,6 +546,17 @@ pub async fn delete_user(
         });
     }
     
+    // 记录用户行为
+    crate::utils::record_user_action(
+        "admin",
+        crate::models::ActionType::Admin,
+        "User",
+        &user_id.to_string(),
+        &format!("管理员删除了用户: {} (ID: {})", username, user_id),
+        true,
+        None,
+    );
+    
     HttpResponse::Ok().json(ApiResponse::<()> {
         code: 0,
         msg: format!("用户 {} 已删除", username),
@@ -566,7 +589,7 @@ pub async fn edit_user(
     
     // 检查用户是否存在
     let user_result = match data_manager.find_user_by_username(&username) {
-        Ok(Some((user_id, mut user))) => (user_id, user),
+        Ok(Some((user_id, user))) => (user_id, user),
         Ok(None) => return HttpResponse::NotFound().json(ApiResponse::<()> {
             code: 1,
             msg: "用户不存在".to_string(),
@@ -618,6 +641,17 @@ pub async fn edit_user(
             data: None
         });
     }
+    
+    // 记录用户行为
+    crate::utils::record_user_action(
+        "admin",
+        crate::models::ActionType::Admin,
+        "User",
+        &user_id.to_string(),
+        &format!("管理员编辑了用户信息: {} (ID: {})", username, user_id),
+        true,
+        None,
+    );
     
     HttpResponse::Ok().json(ApiResponse {
         code: 0,
@@ -676,6 +710,17 @@ pub async fn batch_delete_users(
     } else {
         format!("成功删除 {} 个用户，失败: {}", deleted_count, failed_users.join(", "))
     };
+    
+    // 记录用户行为
+    crate::utils::record_user_action(
+        "admin",
+        crate::models::ActionType::Admin,
+        "User",
+        "batch",
+        &format!("管理员批量删除了 {} 个用户", deleted_count),
+        true,
+        None,
+    );
     
     HttpResponse::Ok().json(ApiResponse::<()> {
         code: 0,
@@ -871,16 +916,40 @@ pub async fn add_user(
                 }
             }
 
+            // 记录用户行为
+            crate::utils::record_user_action(
+                "admin",
+                crate::models::ActionType::Admin,
+                "User",
+                &user_id.to_string(),
+                &format!("管理员添加了新用户: {} (ID: {})", username, user_id),
+                true,
+                None,
+            );
+
             HttpResponse::Ok().json(ApiResponse::<()> {
                 code: 0,
                 msg: "用户添加成功".to_string(),
                 data: None
             })
         },
-        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()> {
-            code: 1,
-            msg: format!("添加用户失败: {}", e),
-            data: None
-        })
+        Err(e) => {
+            // 记录失败的行为
+            crate::utils::record_user_action(
+                "admin",
+                crate::models::ActionType::Admin,
+                "User",
+                "0",
+                &format!("管理员尝试添加用户失败: {} - {}", username, e),
+                false,
+                Some(format!("添加用户失败: {}", e)),
+            );
+            
+            HttpResponse::InternalServerError().json(ApiResponse::<()> {
+                code: 1,
+                msg: format!("添加用户失败: {}", e),
+                data: None
+            })
+        }
     }
 }

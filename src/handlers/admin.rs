@@ -1,6 +1,5 @@
 use actix_web::{web, HttpResponse, get, Responder};
 use crate::models::{AppState, ApiResponse, BanStatus};
-use serde::{Deserialize};
 use crate::utils::{parse_query_params};
 use crate::auth::admin_auth;
 use crate::data_manager::DataManager;
@@ -109,7 +108,7 @@ pub async fn admin_set_star(
 
     // 通过用户名查找用户
     let mut target_user = None;
-    for (key, user) in &mut users {
+    for (_key, user) in &mut users {
         if user.username == *target {
             target_user = Some(user);
             break;
@@ -186,11 +185,9 @@ pub async fn admin_ban_user(
 
     // 通过用户名查找用户
     let mut target_user = None;
-    let mut target_key = None;
-    for (key, user) in &mut users {
+    for (_key, user) in &mut users {
         if user.username == *target {
             target_user = Some(user);
-            target_key = Some(key.clone());
             break;
         }
     }
@@ -293,7 +290,7 @@ pub async fn set_admin(
 
     // 通过用户名查找用户
     let mut target_user = None;
-    for (key, user) in &mut users {
+    for (_key, user) in &mut users {
         if user.username == *target {
             target_user = Some(user);
             break;

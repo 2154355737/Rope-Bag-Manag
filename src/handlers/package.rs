@@ -104,6 +104,18 @@ pub async fn download_rope_package(
             });
         }
         
+        // 记录用户行为
+        let username = params.get("username").unwrap_or(&"anonymous".to_string()).clone();
+        crate::utils::record_user_action(
+            &username,
+            crate::models::ActionType::Download,
+            "Package",
+            &id.to_string(),
+            &format!("用户 {} 下载了绳包 ID: {}", username, id),
+            true,
+            None,
+        );
+        
         // 更新统计
         let mut stats = data.stats.lock().unwrap();
         let id_str = id.to_string();
@@ -125,6 +137,18 @@ pub async fn download_rope_package(
             data: None 
         })
     } else {
+        // 记录失败的行为
+        let username = params.get("username").unwrap_or(&"anonymous".to_string()).clone();
+        crate::utils::record_user_action(
+            &username,
+            crate::models::ActionType::Download,
+            "Package",
+            &id.to_string(),
+            &format!("用户 {} 尝试下载不存在的绳包 ID: {}", username, id),
+            false,
+            Some("绳包不存在".to_string()),
+        );
+        
         record_api_call(
             &req.query_string(),
             &data.stats,
@@ -448,6 +472,17 @@ pub async fn delete_rope_package(
             });
         }
         
+        // 记录用户行为
+        crate::utils::record_user_action(
+            username,
+            crate::models::ActionType::Admin,
+            "Package",
+            &id.to_string(),
+            &format!("管理员 {} 删除了绳包 ID: {}", username, id),
+            true,
+            None,
+        );
+        
         record_api_call(
             &req.query_string(),
             &data.stats,
@@ -464,6 +499,17 @@ pub async fn delete_rope_package(
             data: None 
         })
     } else {
+        // 记录失败的行为
+        crate::utils::record_user_action(
+            username,
+            crate::models::ActionType::Admin,
+            "Package",
+            &id.to_string(),
+            &format!("管理员 {} 尝试删除不存在的绳包 ID: {}", username, id),
+            false,
+            Some("绳包不存在".to_string()),
+        );
+        
         record_api_call(
             &req.query_string(),
             &data.stats,
@@ -638,6 +684,17 @@ pub async fn add_rope_package(
             data: None 
         });
     }
+    
+    // 记录用户行为
+    crate::utils::record_user_action(
+        username,
+        crate::models::ActionType::Upload,
+        "Package",
+        &new_id.to_string(),
+        &format!("用户 {} 添加了绳包: {} (ID: {})", username, name, new_id),
+        true,
+        None,
+    );
     
     record_api_call(
         &req.query_string(),

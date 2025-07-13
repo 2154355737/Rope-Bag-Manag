@@ -18,7 +18,7 @@ pub type GlobalLimiter = Arc<Mutex<HashMap<String, (u64, u32)>>>;
 pub type GlobalCount = Arc<Mutex<(u64, u32)>>;
 
 // 用户身份枚举
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
 pub enum UserRole {
     Normal,     // 普通用户
     Developer,  // 开发者

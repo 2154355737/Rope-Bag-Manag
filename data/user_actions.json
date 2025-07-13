@@ -1,1 +1,67 @@
-[] 
+[
+  {
+    "id": 1,
+    "user_id": "admin",
+    "action_type": "Admin",
+    "target_type": "Backup",
+    "target_id": "2",
+    "description": "创建备份成功: 手动创建的备份 (文件大小: 3442 字节)",
+    "ip_address": "unknown",
+    "user_agent": "unknown",
+    "timestamp": 1752410853,
+    "success": true,
+    "error_message": null
+  },
+  {
+    "id": 2,
+    "user_id": "admin",
+    "action_type": "Admin",
+    "target_type": "Backup",
+    "target_id": "1",
+    "description": "管理员删除了备份记录 ID: 1",
+    "ip_address": "unknown",
+    "user_agent": "unknown",
+    "timestamp": 1752410871,
+    "success": true,
+    "error_message": null
+  },
+  {
+    "id": 3,
+    "user_id": "admin",
+    "action_type": "Admin",
+    "target_type": "Backup",
+    "target_id": "2",
+    "description": "管理员删除了备份记录 ID: 2",
+    "ip_address": "unknown",
+    "user_agent": "unknown",
+    "timestamp": 1752410872,
+    "success": true,
+    "error_message": null
+  },
+  {
+    "id": 4,
+    "user_id": "admin",
+    "action_type": "Admin",
+    "target_type": "User",
+    "target_id": "87654",
+    "description": "管理员删除了用户: 87654 (ID: 87654)",
+    "ip_address": "unknown",
+    "user_agent": "unknown",
+    "timestamp": 1752411250,
+    "success": true,
+    "error_message": null
+  },
+  {
+    "id": 5,
+    "user_id": "admin",
+    "action_type": "Admin",
+    "target_type": "User",
+    "target_id": "17524112891289",
+    "description": "管理员添加了新用户: gfjgfjgfiuyui (ID: 17524112891289)",
+    "ip_address": "unknown",
+    "user_agent": "unknown",
+    "timestamp": 1752411289,
+    "success": true,
+    "error_message": null
+  }
+]

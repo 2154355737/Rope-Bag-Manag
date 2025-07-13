@@ -153,6 +153,17 @@ pub async fn create_comment(
 
     match data.data_manager.save_comments(&comments) {
         Ok(_) => {
+            // 记录用户行为
+            crate::utils::record_user_action(
+                &username,
+                crate::models::ActionType::Comment,
+                &format!("{:?}", comment_data.target_type),
+                &comment_data.target_id.to_string(),
+                &format!("用户 {} 发表了评论: {}", username, comment_data.content),
+                true,
+                None,
+            );
+            
             HttpResponse::Ok().json(ApiResponse {
                 code: 200,
                 msg: "评论创建成功".to_string(),
@@ -160,6 +171,17 @@ pub async fn create_comment(
             })
         }
         Err(_) => {
+            // 记录失败的行为
+            crate::utils::record_user_action(
+                &username,
+                crate::models::ActionType::Comment,
+                &format!("{:?}", comment_data.target_type),
+                &comment_data.target_id.to_string(),
+                &format!("用户 {} 尝试发表评论失败: {}", username, comment_data.content),
+                false,
+                Some("保存评论失败".to_string()),
+            );
+            
             HttpResponse::InternalServerError().json(ApiResponse::<()> {
                 code: 500,
                 msg: "保存评论失败".to_string(),
@@ -249,6 +271,17 @@ pub async fn delete_comment(
 
     match data.data_manager.save_comments(&comments) {
         Ok(_) => {
+            // 记录用户行为
+            crate::utils::record_user_action(
+                &username,
+                crate::models::ActionType::Admin,
+                "Comment",
+                &comment_id.to_string(),
+                &format!("用户 {} 删除了评论 ID: {}", username, comment_id),
+                true,
+                None,
+            );
+            
             HttpResponse::Ok().json(ApiResponse::<()> {
                 code: 200,
                 msg: "评论删除成功".to_string(),
@@ -256,6 +289,17 @@ pub async fn delete_comment(
             })
         }
         Err(_) => {
+            // 记录失败的行为
+            crate::utils::record_user_action(
+                &username,
+                crate::models::ActionType::Admin,
+                "Comment",
+                &comment_id.to_string(),
+                &format!("用户 {} 尝试删除评论失败 ID: {}", username, comment_id),
+                false,
+                Some("删除评论失败".to_string()),
+            );
+            
             HttpResponse::InternalServerError().json(ApiResponse::<()> {
                 code: 500,
                 msg: "删除评论失败".to_string(),
