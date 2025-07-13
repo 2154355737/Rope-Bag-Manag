@@ -15,8 +15,10 @@ use std::sync::Arc;
 use crate::config::load_config;
 use crate::models::{AppState, StatsData};
 use crate::handlers::*;
-use crate::handlers::user::{bind_qq, get_user_permissions, check_user_permission, set_user_role, star_package};
+use crate::handlers::user::{bind_qq, get_user_permissions, check_user_permission, set_user_role};
 use crate::data_manager::DataManager;
+use crate::handlers::admin::get_users_db as admin_get_users_db;
+use crate::handlers::admin::get_categories;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -63,13 +65,16 @@ async fn main() -> std::io::Result<()> {
             .service(user_info)
             .service(sign_in)
             .service(change_password)
-            .service(change_nickname)
             .service(nicknames)
             .service(bind_qq)
             .service(get_user_permissions)
             .service(check_user_permission)
             .service(set_user_role)
-            .service(star_package)
+            .service(delete_user)
+            .service(edit_user)
+            .service(batch_delete_users)
+            .service(get_users)
+            .service(add_user)
             
             // 绳包相关路由
             .service(get_data_db)
@@ -80,20 +85,13 @@ async fn main() -> std::io::Result<()> {
             
             // 管理员路由
             .service(admin_user_info)
-            .service(admin_set_user)
             .service(admin_set_star)
             .service(admin_ban_user)
-            .service(admin_add_rope_package)
-            .service(admin_update_rope_package)
-            .service(admin_delete_rope_package)
+            .service(admin_set_user)
+            .service(admin_set_role)
             .service(set_admin)
-            .service(get_users_db)
-            
-            // 分类管理路由
+            .service(admin_get_users_db)
             .service(get_categories)
-            .service(add_category)
-            .service(update_category)
-            .service(delete_category)
             
             // 统计相关路由
             .service(get_dashboard_data)
@@ -115,58 +113,49 @@ async fn main() -> std::io::Result<()> {
             .service(check_feature)
             
             // 评论管理
-            .service(
-                web::scope("/comments")
-                    .route("", web::get().to(handlers::comments::get_comments))
-                    .route("", web::post().to(handlers::comments::create_comment))
-                    .route("/{id}", web::get().to(handlers::comments::get_comment))
-                    .route("/{id}", web::put().to(handlers::comments::update_comment))
-                    .route("/{id}", web::delete().to(handlers::comments::delete_comment))
-                    .route("/{id}/status", web::put().to(handlers::comments::update_comment_status))
-                    .route("/{id}/reply", web::post().to(handlers::comments::reply_comment))
-            )
+            .service(handlers::comments::get_comments)
+            .service(handlers::comments::create_comment)
+            .service(handlers::comments::get_comment)
+            .service(handlers::comments::delete_comment)
+            .service(handlers::comments::update_comment_status)
+            .service(handlers::comments::update_comment)
+            .service(handlers::comments::reply_comment)
             // 用户行为记录
-            .service(
-                web::scope("/user-actions")
-                    .route("", web::get().to(handlers::user_actions::get_user_actions))
-                    .route("", web::post().to(handlers::user_actions::create_user_action))
-                    .route("/stats", web::get().to(handlers::user_actions::get_user_action_stats))
-                    .route("/{id}", web::delete().to(handlers::user_actions::delete_user_action))
-                    .route("/batch", web::delete().to(handlers::user_actions::batch_delete_user_actions))
-                    .route("/export", web::get().to(handlers::user_actions::export_user_actions))
-            )
+            .service(handlers::user_actions::get_user_actions)
+            .service(handlers::user_actions::create_user_action)
+            .service(handlers::user_actions::get_user_action_stats)
+            .service(handlers::user_actions::delete_user_action)
+            .service(handlers::user_actions::batch_delete_user_actions)
+            .service(handlers::user_actions::export_user_actions)
             // 资源记录
-            .service(
-                web::scope("/resource-records")
-                    .route("", web::get().to(handlers::resource_records::get_resource_records))
-                    .route("", web::post().to(handlers::resource_records::create_resource_record))
-                    .route("/stats", web::get().to(handlers::resource_records::get_resource_record_stats))
-                    .route("/{id}", web::delete().to(handlers::resource_records::delete_resource_record))
-                    .route("/batch", web::delete().to(handlers::resource_records::batch_delete_resource_records))
-                    .route("/export", web::get().to(handlers::resource_records::export_resource_records))
-            )
+            .service(handlers::resource_records::get_resource_records)
+            .service(handlers::resource_records::create_resource_record)
+            .service(handlers::resource_records::get_resource_record_stats)
+            .service(handlers::resource_records::delete_resource_record)
+            .service(handlers::resource_records::batch_delete_resource_records)
+            .service(handlers::resource_records::export_resource_records)
             // 备份记录
+            .service(handlers::backup_records::get_backup_records)
+            .service(handlers::backup_records::create_backup_record)
+            .service(handlers::backup_records::configure_auto_backup)
+            .service(handlers::backup_records::delete_backup_record)
+            .service(handlers::backup_records::batch_delete_backup_records)
             .service(
-                web::scope("/backup-records")
-                    .route("", web::get().to(handlers::backup_records::get_backup_records))
-                    .route("", web::post().to(handlers::backup_records::create_backup_record))
+                web::scope("/api/backup-records")
                     .route("/{id}/download", web::get().to(handlers::backup_records::download_backup))
-                    .route("/{id}", web::delete().to(handlers::backup_records::delete_backup_record))
+                    .route("/{id}/restore", web::post().to(handlers::backup_records::restore_backup))
                     .route("/{id}/status", web::put().to(handlers::backup_records::update_backup_status))
                     .route("/stats", web::get().to(handlers::backup_records::get_backup_stats))
                     .route("/manual", web::post().to(handlers::backup_records::perform_manual_backup))
             )
             // 公告管理
-            .service(
-                web::scope("/announcements")
-                    .route("", web::get().to(handlers::announcements::get_announcements))
-                    .route("", web::post().to(handlers::announcements::create_announcement))
-                    .route("/{id}", web::get().to(handlers::announcements::get_announcement))
-                    .route("/{id}", web::put().to(handlers::announcements::update_announcement))
-                    .route("/{id}", web::delete().to(handlers::announcements::delete_announcement))
-                    .route("/active", web::get().to(handlers::announcements::get_active_announcements))
-                    .route("/stats", web::get().to(handlers::announcements::get_announcement_stats))
-            )
+            .service(handlers::announcements::get_announcements)
+            .service(handlers::announcements::create_announcement)
+            .service(handlers::announcements::get_announcement)
+            .service(handlers::announcements::update_announcement)
+            .service(handlers::announcements::delete_announcement)
+            .service(handlers::announcements::get_active_announcements)
+            .service(handlers::announcements::get_announcement_stats)
             
             // 健康检查
             .service(health_check)

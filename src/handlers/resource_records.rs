@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse, get, post, put, delete};
 use serde::{Deserialize};
-use crate::models::{AppState, ResourceRecord, ResourceType, ResourceAction, ApiResponse};
-use crate::data_manager::DataManager;
+use crate::models::{AppState, ApiResponse, ResourceRecord, ResourceType, ResourceAction};
+use actix_web::HttpRequest;
 use chrono::Utc;
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +25,7 @@ pub struct CreateResourceRecordRequest {
 }
 
 // 获取资源记录列表
+#[get("/api/resource-records")]
 pub async fn get_resource_records(
     query: web::Query<ResourceRecordQuery>,
     data: web::Data<AppState>,
@@ -88,6 +89,7 @@ pub async fn get_resource_records(
 }
 
 // 创建资源记录
+#[post("/api/resource-records")]
 pub async fn create_resource_record(
     req: HttpRequest,
     record_data: web::Json<CreateResourceRecordRequest>,
@@ -145,6 +147,7 @@ pub async fn create_resource_record(
 }
 
 // 获取资源记录统计
+#[get("/api/resource-records/stats")]
 pub async fn get_resource_record_stats(
     query: web::Query<ResourceRecordQuery>,
     data: web::Data<AppState>,
@@ -210,6 +213,7 @@ pub async fn get_resource_record_stats(
 }
 
 // 删除资源记录
+#[delete("/api/resource-records/{id}")]
 pub async fn delete_resource_record(
     path: web::Path<String>,
     data: web::Data<AppState>,
@@ -249,6 +253,7 @@ pub async fn delete_resource_record(
 }
 
 // 批量删除资源记录
+#[delete("/api/resource-records/batch")]
 pub async fn batch_delete_resource_records(
     delete_data: web::Json<serde_json::Value>,
     data: web::Data<AppState>,
@@ -300,6 +305,7 @@ pub async fn batch_delete_resource_records(
 }
 
 // 导出资源记录
+#[get("/api/resource-records/export")]
 pub async fn export_resource_records(
     query: web::Query<ResourceRecordQuery>,
     data: web::Data<AppState>,

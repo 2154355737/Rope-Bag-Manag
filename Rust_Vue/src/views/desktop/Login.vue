@@ -190,7 +190,8 @@ async function handleLogin() {
     
     if (response.code === 0) {
       // 登录成功
-      setLoginStatus(loginForm.username)
+      const token = btoa(`${loginForm.username}:${Date.now()}`) // 简单的 token 生成
+      setLoginStatus(loginForm.username, token)
       
       ElMessage.success('登录成功！')
       

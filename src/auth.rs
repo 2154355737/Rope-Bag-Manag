@@ -169,24 +169,51 @@ pub fn record_api_call(
 
 // ====== 管理员认证函数 ======
 pub fn admin_auth(req: &HttpRequest, config: &AppConfig, data_manager: &crate::data_manager::DataManager) -> bool {
+    // 首先尝试从查询参数获取认证信息
     let params = parse_query_params(req.query_string());
     let admin_user = params.get("admin_username");
     let admin_pass = params.get("admin_password");
-    if admin_user.is_none() || admin_pass.is_none() {
-        return false;
-    }
-    // 检查配置中的管理员凭据
-    if admin_user.unwrap() == &config.admin_username 
-        && admin_pass.unwrap() == &config.admin_password {
-        return true;
-    }
-    // 检查用户表中的管理员
-    if let Ok(users) = data_manager.load_users() {
-        if let Some(user) = users.get(admin_user.unwrap()) {
-            if user.is_admin && admin_pass.unwrap() == &user.password {
-                return true;
+    
+    if admin_user.is_some() && admin_pass.is_some() {
+        // 检查配置中的管理员凭据
+        if admin_user.unwrap() == &config.admin_username 
+            && admin_pass.unwrap() == &config.admin_password {
+            return true;
+        }
+        // 检查用户表中的管理员
+        if let Ok(users) = data_manager.load_users() {
+            if let Some(user) = users.get(admin_user.unwrap()) {
+                if user.is_admin && admin_pass.unwrap() == &user.password {
+                    return true;
+                }
             }
         }
     }
+    
+    // 尝试从 HTTP 头获取认证信息
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_value) = auth_header.to_str() {
+            if auth_value.starts_with("Bearer ") {
+                let token = &auth_value[7..]; // 去掉 "Bearer " 前缀
+                
+                // 从 X-Username 头获取用户名
+                if let Some(username_header) = req.headers().get("X-Username") {
+                    if let Ok(username) = username_header.to_str() {
+                        // 检查用户表中的管理员
+                        if let Ok(users) = data_manager.load_users() {
+                            if let Some(user) = users.get(username) {
+                                if user.is_admin {
+                                    // 这里可以添加更复杂的 token 验证逻辑
+                                    // 目前简单检查用户是否为管理员
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     false
 }

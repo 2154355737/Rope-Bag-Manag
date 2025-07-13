@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse, get, post, put, delete};
 use serde::{Deserialize};
-use crate::models::{AppState, UserAction, ActionType, ApiResponse};
-use crate::data_manager::DataManager;
+use crate::models::{AppState, ApiResponse};
+use actix_web::HttpRequest;
 use chrono::Utc;
 
 #[derive(Debug, Deserialize)]
@@ -16,7 +16,7 @@ pub struct UserActionQuery {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateUserActionRequest {
-    pub action_type: ActionType,
+    pub action_type: crate::models::ActionType,
     pub target_type: String,
     pub target_id: String,
     pub description: String,
@@ -25,6 +25,7 @@ pub struct CreateUserActionRequest {
 }
 
 // 获取用户行为记录列表
+#[get("/api/user-actions")]
 pub async fn get_user_actions(
     query: web::Query<UserActionQuery>,
     data: web::Data<AppState>,
@@ -45,7 +46,7 @@ pub async fn get_user_actions(
     }
     
     if let Some(action_type_str) = &query.action_type {
-        if let Ok(action_type) = serde_json::from_str::<ActionType>(&format!("\"{}\"", action_type_str)) {
+        if let Ok(action_type) = serde_json::from_str::<crate::models::ActionType>(&format!("\"{}\"", action_type_str)) {
             filtered_actions.retain(|a| a.action_type == action_type);
         }
     }
@@ -72,7 +73,7 @@ pub async fn get_user_actions(
             code: 200,
             msg: "暂无用户行为记录".to_string(),
             data: Some(serde_json::json!({
-                "actions": Vec::<UserAction>::new(),
+                "actions": Vec::<crate::models::UserAction>::new(),
                 "total": 0,
                 "page": page,
                 "size": size
@@ -82,6 +83,7 @@ pub async fn get_user_actions(
 }
 
 // 创建用户行为记录
+#[post("/api/user-actions")]
 pub async fn create_user_action(
     req: HttpRequest,
     action_data: web::Json<CreateUserActionRequest>,
@@ -111,7 +113,7 @@ pub async fn create_user_action(
     };
     let new_id = actions.len() as u32 + 1;
     
-    let new_action = UserAction {
+    let new_action = crate::models::UserAction {
         id: new_id,
         user_id: username.clone(),
         action_type: action_data.action_type.clone(),
@@ -146,6 +148,7 @@ pub async fn create_user_action(
 }
 
 // 获取用户行为统计
+#[get("/api/user-actions/stats")]
 pub async fn get_user_action_stats(
     query: web::Query<UserActionQuery>,
     data: web::Data<AppState>,
@@ -162,7 +165,7 @@ pub async fn get_user_action_stats(
     }
     
     if let Some(action_type_str) = &query.action_type {
-        if let Ok(action_type) = serde_json::from_str::<ActionType>(&format!("\"{}\"", action_type_str)) {
+        if let Ok(action_type) = serde_json::from_str::<crate::models::ActionType>(&format!("\"{}\"", action_type_str)) {
             filtered_actions.retain(|a| a.action_type == action_type);
         }
     }
@@ -199,6 +202,7 @@ pub async fn get_user_action_stats(
 }
 
 // 删除用户行为记录
+#[delete("/api/user-actions/{id}")]
 pub async fn delete_user_action(
     path: web::Path<String>,
     data: web::Data<AppState>,
@@ -238,6 +242,7 @@ pub async fn delete_user_action(
 }
 
 // 批量删除用户行为记录
+#[delete("/api/user-actions/batch")]
 pub async fn batch_delete_user_actions(
     delete_data: web::Json<serde_json::Value>,
     data: web::Data<AppState>,
@@ -289,6 +294,7 @@ pub async fn batch_delete_user_actions(
 }
 
 // 导出用户行为记录
+#[get("/api/user-actions/export")]
 pub async fn export_user_actions(
     query: web::Query<UserActionQuery>,
     data: web::Data<AppState>,
@@ -305,7 +311,7 @@ pub async fn export_user_actions(
     }
     
     if let Some(action_type_str) = &query.action_type {
-        if let Ok(action_type) = serde_json::from_str::<ActionType>(&format!("\"{}\"", action_type_str)) {
+        if let Ok(action_type) = serde_json::from_str::<crate::models::ActionType>(&format!("\"{}\"", action_type_str)) {
             filtered_actions.retain(|a| a.action_type == action_type);
         }
     }

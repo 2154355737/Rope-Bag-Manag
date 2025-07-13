@@ -1,12 +1,11 @@
-use actix_web::{web, HttpResponse, HttpRequest};
-use crate::models::{AppState, Comment, CommentStatus, CommentTargetType, ApiResponse};
+use actix_web::{web, HttpResponse, get, post, put, delete, Responder};
+use crate::models::{AppState, ApiResponse};
 use serde::{Deserialize};
-use crate::data_manager::DataManager;
-use chrono::{Utc, DateTime};
+use chrono::Utc;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateCommentRequest {
-    pub target_type: CommentTargetType,
+    pub target_type: crate::models::CommentTargetType,
     pub target_id: u32,
     pub content: String,
     pub parent_id: Option<u32>,
@@ -21,21 +20,33 @@ pub struct UpdateCommentRequest {
 pub struct CommentQuery {
     pub page: Option<usize>,
     pub size: Option<usize>,
-    pub target_type: Option<CommentTargetType>,
+    pub target_type: Option<crate::models::CommentTargetType>,
     pub target_id: Option<u32>,
     pub status: Option<String>,
     pub user_id: Option<String>,
 }
 
 // 获取评论列表
+#[get("/api/comments")]
 pub async fn get_comments(
-    query: web::Query<CommentQuery>,
+    req: actix_web::HttpRequest,
     data: web::Data<AppState>,
-) -> HttpResponse {
-    let page = query.page.unwrap_or(1);
-    let size = query.size.unwrap_or(10);
+) -> impl Responder {
+    let params = crate::utils::parse_query_params(req.query_string());
+    
+    let page = params.get("page")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(1);
+    let size = params.get("size")
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(10);
     let offset = (page - 1) * size;
 
+    let target_type = params.get("target_type").cloned();
+    let target_id = params.get("target_id")
+        .and_then(|s| s.parse::<u32>().ok());
+    let status = params.get("status").cloned();
+    let user_id = params.get("user_id").cloned();
     let comments = match data.data_manager.load_comments() {
         Ok(comments) => comments,
         Err(_) => Vec::new(),
@@ -43,22 +54,24 @@ pub async fn get_comments(
     
     // 应用过滤条件
     let mut filtered_comments = comments;
-    if let Some(target_type) = &query.target_type {
-        filtered_comments.retain(|c| c.target_type == *target_type);
-    }
-    
-    if let Some(target_id) = &query.target_id {
-        filtered_comments.retain(|c| c.target_id == *target_id);
-    }
-    
-    if let Some(status_str) = &query.status {
-        if let Ok(status) = serde_json::from_str::<CommentStatus>(&format!("\"{}\"", status_str)) {
-            filtered_comments.retain(|c| c.status == status);
+    if let Some(target_type_str) = &target_type {
+        if let Ok(target_type_enum) = serde_json::from_str::<crate::models::CommentTargetType>(&format!("\"{}\"", target_type_str)) {
+            filtered_comments.retain(|c| c.target_type == target_type_enum);
         }
     }
     
-    if let Some(user_id) = &query.user_id {
-        filtered_comments.retain(|c| c.user_id == *user_id);
+    if let Some(target_id_val) = &target_id {
+        filtered_comments.retain(|c| c.target_id == *target_id_val);
+    }
+    
+    if let Some(status_str) = &status {
+        if let Ok(status_enum) = serde_json::from_str::<crate::models::CommentStatus>(&format!("\"{}\"", status_str)) {
+            filtered_comments.retain(|c| c.status == status_enum);
+        }
+    }
+    
+    if let Some(user_id_val) = &user_id {
+        filtered_comments.retain(|c| c.user_id == *user_id_val);
     }
 
     let total = filtered_comments.len();
@@ -83,7 +96,7 @@ pub async fn get_comments(
             code: 200,
             msg: "暂无评论数据".to_string(),
             data: Some(serde_json::json!({
-                "comments": Vec::<Comment>::new(),
+                "comments": Vec::<crate::models::Comment>::new(),
                 "total": 0,
                 "page": page,
                 "size": size
@@ -93,8 +106,9 @@ pub async fn get_comments(
 }
 
 // 创建评论
+#[post("/api/comments")]
 pub async fn create_comment(
-    req: HttpRequest,
+    req: actix_web::HttpRequest,
     comment_data: web::Json<CreateCommentRequest>,
     data: web::Data<AppState>,
 ) -> HttpResponse {
@@ -113,7 +127,7 @@ pub async fn create_comment(
     };
     let new_id = comments.len() as u32 + 1;
     
-    let new_comment = Comment {
+    let new_comment = crate::models::Comment {
         id: new_id,
         user_id: username.clone(),
         target_type: comment_data.target_type.clone(),
@@ -124,7 +138,7 @@ pub async fn create_comment(
         likes: 0,
         dislikes: 0,
         parent_id: comment_data.parent_id,
-        status: CommentStatus::Active,
+        status: crate::models::CommentStatus::Active,
         replies: Vec::new(),
     };
 
@@ -156,6 +170,7 @@ pub async fn create_comment(
 }
 
 // 获取单个评论
+#[get("/api/comments/{id}")]
 pub async fn get_comment(
     path: web::Path<String>,
     data: web::Data<AppState>,
@@ -190,9 +205,10 @@ pub async fn get_comment(
 }
 
 // 删除评论
+#[delete("/api/comments/{id}")]
 pub async fn delete_comment(
     path: web::Path<String>,
-    req: HttpRequest,
+    req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> HttpResponse {
     let comment_id = match path.parse::<u32>() {
@@ -250,6 +266,7 @@ pub async fn delete_comment(
 }
 
 // 更新评论状态
+#[put("/api/comments/{id}/status")]
 pub async fn update_comment_status(
     path: web::Path<String>,
     status_data: web::Json<serde_json::Value>,
@@ -269,9 +286,9 @@ pub async fn update_comment_status(
         .unwrap_or("");
 
     let status = match status_str {
-        "active" => CommentStatus::Active,
-        "hidden" => CommentStatus::Hidden,
-        "deleted" => CommentStatus::Deleted,
+        "active" => crate::models::CommentStatus::Active,
+        "hidden" => crate::models::CommentStatus::Hidden,
+        "deleted" => crate::models::CommentStatus::Deleted,
         _ => return HttpResponse::BadRequest().json(ApiResponse::<()> {
             code: 400,
             msg: "无效的状态值".to_string(),
@@ -314,10 +331,11 @@ pub async fn update_comment_status(
 }
 
 // 更新评论内容
+#[put("/api/comments/{id}")]
 pub async fn update_comment(
     path: web::Path<String>,
     comment_data: web::Json<UpdateCommentRequest>,
-    req: HttpRequest,
+    req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> HttpResponse {
     let comment_id = match path.parse::<u32>() {
@@ -382,10 +400,11 @@ pub async fn update_comment(
 }
 
 // 回复评论
+#[post("/api/comments/{id}/reply")]
 pub async fn reply_comment(
     path: web::Path<String>,
     reply_data: web::Json<CreateCommentRequest>,
-    req: HttpRequest,
+    req: actix_web::HttpRequest,
     data: web::Data<AppState>,
 ) -> HttpResponse {
     let parent_id = match path.parse::<u32>() {
@@ -416,7 +435,7 @@ pub async fn reply_comment(
     if let Some(index) = parent_comment_index {
         let new_id = comments.len() as u32 + 1;
         
-        let reply_comment = Comment {
+        let reply_comment = crate::models::Comment {
             id: new_id,
             user_id: username.clone(),
             target_type: reply_data.target_type.clone(),
@@ -427,7 +446,7 @@ pub async fn reply_comment(
             likes: 0,
             dislikes: 0,
             parent_id: Some(parent_id),
-            status: CommentStatus::Active,
+            status: crate::models::CommentStatus::Active,
             replies: Vec::new(),
         };
 

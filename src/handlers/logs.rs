@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::AppState;
 use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::check_rate_limit;
-use crate::storage::DataManager;
+use crate::data_manager::DataManager;
 use log::{info, warn, error};
 use std::fs;
 use std::path::Path;
@@ -54,29 +54,22 @@ pub async fn get_log_stats(
     };
 
     let data_manager = DataManager::new();
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-
-    if let Some(user) = users.get(username) {
-        if !user.is_admin {
-            warn!("非管理员用户尝试获取日志统计: {}", username);
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+    let user = match data_manager.get_user(&username) {
+        Some(user) => user,
+        None => {
+            warn!("用户不存在: {}", username);
+            return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
                 code: 1, 
-                msg: "需要管理员权限".to_string(), 
+                msg: "用户不存在".to_string(), 
                 data: None 
             });
         }
-    } else {
-        warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+    };
+    if !user.is_admin {
+        warn!("非管理员用户尝试获取日志统计: {}", username);
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
-            msg: "用户不存在".to_string(), 
+            msg: "需要管理员权限".to_string(), 
             data: None 
         });
     }
@@ -134,29 +127,22 @@ pub async fn get_log_entries(
     };
 
     let data_manager = DataManager::new();
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-
-    if let Some(user) = users.get(username) {
-        if !user.is_admin {
-            warn!("非管理员用户尝试获取日志条目: {}", username);
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+    let user = match data_manager.get_user(&username) {
+        Some(user) => user,
+        None => {
+            warn!("用户不存在: {}", username);
+            return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
                 code: 1, 
-                msg: "需要管理员权限".to_string(), 
+                msg: "用户不存在".to_string(), 
                 data: None 
             });
         }
-    } else {
-        warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+    };
+    if !user.is_admin {
+        warn!("非管理员用户尝试获取日志条目: {}", username);
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
-            msg: "用户不存在".to_string(), 
+            msg: "需要管理员权限".to_string(), 
             data: None 
         });
     }
@@ -241,29 +227,22 @@ pub async fn clear_logs(
     };
 
     let data_manager = DataManager::new();
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-
-    if let Some(user) = users.get(username) {
-        if !user.is_admin {
-            warn!("非管理员用户尝试清除日志: {}", username);
-            return HttpResponse::Forbidden().json(ApiResponse::<()> { 
+    let user = match data_manager.get_user(&username) {
+        Some(user) => user,
+        None => {
+            warn!("用户不存在: {}", username);
+            return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
                 code: 1, 
-                msg: "需要管理员权限".to_string(), 
+                msg: "用户不存在".to_string(), 
                 data: None 
             });
         }
-    } else {
-        warn!("用户不存在: {}", username);
-        return HttpResponse::Unauthorized().json(ApiResponse::<()> { 
+    };
+    if !user.is_admin {
+        warn!("非管理员用户尝试清除日志: {}", username);
+        return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
-            msg: "用户不存在".to_string(), 
+            msg: "需要管理员权限".to_string(), 
             data: None 
         });
     }

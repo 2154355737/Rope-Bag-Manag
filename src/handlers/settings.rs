@@ -1,9 +1,8 @@
-use actix_web::{web, HttpResponse, HttpRequest, get, post, Responder};
-use crate::models::{AppState, SystemSettings, ApiResponse};
-use serde::{Deserialize};
-use crate::data_manager::DataManager;
+use actix_web::{get, post, web, HttpResponse, Responder};
+use crate::models::{ApiResponse, SystemSettings};
 use crate::utils::{parse_query_params, now_ts, record_api_call};
 use crate::auth::admin_auth;
+use crate::models::AppState;
 
 // 获取系统设置
 #[get("/api/settings")]

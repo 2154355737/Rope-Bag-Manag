@@ -187,7 +187,7 @@ pub async fn get_dashboard_data(
                 id: activity_id,
                 type_: "user".to_string(),
                 icon: "User".to_string(),
-                title: format!("用户 {} 注册", user.nickname),
+                title: format!("用户 {} 注册", user.username),
                 time: registration_time,
             });
             activity_id += 1;

@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Responder, get};
 use crate::models::{AppState, RawRopePackage};
 use crate::utils::{parse_query_params, ApiResponse};
 use crate::auth::{check_rate_limit, record_api_call};
-use crate::storage::DataManager;
+use crate::data_manager::DataManager;
 
 // 获取数据库数据
 #[get("/api/get-data-db")]
@@ -144,7 +144,7 @@ pub async fn download_rope_package(
 }
 
 // 更新绳包（星级大于3）
-#[get("/api/update-rope-package")]
+#[get("/api/admin/update-rope-package")]
 pub async fn update_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
@@ -242,24 +242,15 @@ pub async fn update_rope_package(
     };
     
     let data_manager = DataManager::new();
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-    
-    let user = match users.get(username) {
-        Some(u) => u,
+    let user_result = match data_manager.get_user(username) {
+        Some(user) => user,
         None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户不存在".to_string(), 
             data: None 
         }),
     };
-    if user.star < 3.0 {
+    if user_result.star < 3 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 
@@ -365,7 +356,7 @@ pub async fn update_rope_package(
 }
 
 // 删除绳包（星级大于3）
-#[get("/api/delete-rope-package")]
+#[get("/api/admin/delete-rope-package")]
 pub async fn delete_rope_package(
     req: actix_web::HttpRequest,
     data: web::Data<AppState>,
@@ -405,24 +396,15 @@ pub async fn delete_rope_package(
         }),
     };
     let data_manager = DataManager::new();
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-    
-    let user = match users.get(username) {
-        Some(u) => u,
+    let user_result = match data_manager.get_user(username) {
+        Some(user) => user,
         None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户不存在".to_string(), 
             data: None 
         }),
     };
-    if user.star < 3.0 {
+    if user_result.star < 3 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 
@@ -594,24 +576,15 @@ pub async fn add_rope_package(
         let _ = data_manager.save_categories(&categories);
     }
     
-    let users = match data_manager.load_users() {
-        Ok(users) => users,
-        Err(_) => return HttpResponse::InternalServerError().json(ApiResponse::<()> { 
-            code: 1, 
-            msg: "加载用户数据失败".to_string(), 
-            data: None 
-        }),
-    };
-    
-    let user = match users.get(username) {
-        Some(u) => u,
+    let user_result = match data_manager.get_user(username) {
+        Some(user) => user,
         None => return HttpResponse::NotFound().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户不存在".to_string(), 
             data: None 
         }),
     };
-    if user.star < 3.0 {
+    if user_result.star < 3 {
         return HttpResponse::Forbidden().json(ApiResponse::<()> { 
             code: 1, 
             msg: "用户星级不足".to_string(), 

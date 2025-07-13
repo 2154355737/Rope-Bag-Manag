@@ -306,7 +306,9 @@ import {
   getBackupRecords, 
   createBackup as createBackupApi,
   deleteBackupRecord,
-  downloadBackup as downloadBackupApi
+  downloadBackup as downloadBackupApi,
+  batchDeleteBackupRecords,
+  restoreBackup as restoreBackupApi
 } from '../../api/backupRecords'
 
 // 响应式数据
@@ -367,7 +369,11 @@ function updateStatus() {
 async function createBackup() {
   backupLoading.value = true
   try {
-    const response = await createBackupApi()
+    const backupData = {
+      backup_type: 'Manual',
+      description: '手动创建的备份'
+    }
+    const response = await createBackupApi(backupData)
     if (response.code === 0) {
       ElMessage.success('备份创建成功')
       loadBackups()
@@ -419,11 +425,16 @@ function viewBackup(backup: any) {
 
 async function downloadBackup(backup: any) {
   try {
-    const response = await downloadBackupApi(backup.id)
-    if (response.code === 0) {
-      ElMessage.success('下载链接已生成')
-      // 这里应该处理文件下载
-    }
+    // 创建一个隐藏的下载链接
+    const link = document.createElement('a')
+    link.href = `http://127.0.0.1:15202/api/backup-records/${backup.id}/download`
+    link.download = backup.filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    ElMessage.success('下载已开始')
   } catch (error) {
     ElMessage.error('下载失败')
   }
@@ -436,7 +447,14 @@ async function restoreBackup(backup: any) {
       '确认恢复',
       { type: 'warning' }
     )
-    ElMessage.success('恢复操作已开始')
+    
+    const response = await restoreBackupApi(backup.id)
+    if (response.code === 0) {
+      ElMessage.success('备份恢复成功')
+      loadBackups()
+    } else {
+      ElMessage.error(response.msg || '恢复失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('恢复失败')
@@ -467,8 +485,17 @@ async function batchDelete() {
   
   try {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedBackups.value.length} 个备份吗？`, '确认删除')
-    ElMessage.success('批量删除成功')
-    loadBackups()
+    
+    const ids = selectedBackups.value.map(backup => parseInt(backup.id))
+    const response = await batchDeleteBackupRecords(ids)
+    
+    if (response.code === 0) {
+      ElMessage.success('批量删除成功')
+      selectedBackups.value = []
+      loadBackups()
+    } else {
+      ElMessage.error(response.msg || '批量删除失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')

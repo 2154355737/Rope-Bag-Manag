@@ -133,7 +133,9 @@ export const downloadPackage = async (id: number) => {
 
 // ====== 管理员相关API ======
 export const getUsers = withCache(async () => {
-  const res = await api.get('/api/get-users-db')
+  const admin_username = 'muteduanxing'
+  const admin_password = 'ahk12378dx'
+  const res = await api.get('/api/get-users-db', { params: { admin_username, admin_password } })
   return res.data
 }, 'getUsers', 60000) // 1分钟缓存
 
@@ -152,6 +154,17 @@ export const adminSetUser = async (data: {
   const admin_username = data.admin_username || 'muteduanxing'
   const admin_password = data.admin_password || 'ahk12378dx'
   const res = await api.get('/api/admin/set-user', { params: { ...data, admin_username, admin_password } })
+  
+  // 清除用户缓存
+  if (res.code === 0) {
+    apiCache.delete('getUsers')
+  }
+  
+  return res.data
+}
+
+export const adminSetRole = async (target: string, role: string, admin_username: string = 'muteduanxing', admin_password: string = 'ahk12378dx') => {
+  const res = await api.get('/api/admin/set-role', { params: { target, role, admin_username, admin_password } })
   
   // 清除用户缓存
   if (res.code === 0) {

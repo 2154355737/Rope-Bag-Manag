@@ -97,10 +97,10 @@ export function deleteBackupRecord(id: string): Promise<ApiResponse<any>> {
 }
 
 // 批量删除备份记录
-export function batchDeleteBackupRecords(ids: string[]): Promise<ApiResponse<any>> {
+export function batchDeleteBackupRecords(ids: number[]): Promise<ApiResponse<any>> {
   return request({
     url: '/api/backup-records/batch',
-    method: 'DELETE',
+    method: 'POST', // 改为POST
     data: { ids }
   })
 }

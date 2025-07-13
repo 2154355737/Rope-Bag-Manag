@@ -20,8 +20,12 @@ export function getUserInfo() {
 }
 
 // 设置登录状态
-export function setLoginStatus(username: string) {
+export function setLoginStatus(username: string, token?: string) {
   localStorage.setItem('isLoggedIn', 'true')
+  localStorage.setItem('username', username)
+  if (token) {
+    localStorage.setItem('token', token)
+  }
   localStorage.setItem('userInfo', JSON.stringify({
     username,
     loginTime: new Date().toISOString()

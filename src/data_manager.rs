@@ -236,6 +236,49 @@ impl DataManager {
         users_guard.get(username).cloned()
     }
 
+    /// 创建新用户
+    pub fn create_user(&self, username: String, password: String) -> Result<u64, Box<dyn std::error::Error>> {
+        let mut users_guard = self.users.lock().unwrap();
+        
+        // 检查用户名是否已存在
+        if users_guard.contains_key(&username) {
+            return Err("用户名已存在".into());
+        }
+
+        let user_id = chrono::Utc::now().timestamp() as u64 * 10000 + (chrono::Utc::now().timestamp() % 10000) as u64;
+        let new_user = User {
+            id: user_id,
+            username: username.clone(),
+            password,
+            role: crate::models::UserRole::Normal,
+            star: 1,
+            online_status: crate::models::OnlineStatus::Offline,
+            ban_status: crate::models::BanStatus::Normal,
+            ban_reason: None,
+            register_time: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            login_count: 0,
+            qq_number: None,
+            avatar_url: None,
+            sign_records: Vec::new(),
+            sign_days: 0,
+            sign_total: 0,
+            last_sign: String::new(),
+            last_login: String::new(),
+            upload_count: 0,
+            download_count: 0,
+            permissions: crate::models::UserPermissions::default(),
+            is_admin: false,
+        };
+
+        users_guard.insert(username, new_user);
+        if let Err(e) = save_json("data/users.json", &*users_guard) {
+            eprintln!("保存users.json失败: {}", e);
+            return Err(e.into());
+        }
+        
+        Ok(user_id)
+    }
+
     /// 加载用户数据
     pub fn load_users(&self) -> Result<HashMap<String, User>, Box<dyn std::error::Error>> {
         let users_guard = self.users.lock().unwrap();
@@ -250,6 +293,37 @@ impl DataManager {
             eprintln!("保存users.json失败: {}", e);
             return Err(e.into());
         }
+        Ok(())
+    }
+
+    /// 根据用户名查找用户
+    pub fn find_user_by_username(&self, username: &str) -> Result<Option<(String, User)>, Box<dyn std::error::Error>> {
+        let users_guard = self.users.lock().unwrap();
+        
+        for (id, user) in users_guard.iter() {
+            if user.username == username {
+                return Ok(Some((id.clone(), user.clone())));
+            }
+        }
+        
+        Ok(None)
+    }
+
+    /// 删除用户
+    pub fn delete_user(&self, user_id: String) -> Result<(), Box<dyn std::error::Error>> {
+        let mut users_guard = self.users.lock().unwrap();
+        
+        if !users_guard.contains_key(&user_id) {
+            return Err("用户不存在".into());
+        }
+        
+        users_guard.remove(&user_id);
+        
+        if let Err(e) = save_json("data/users.json", &*users_guard) {
+            eprintln!("保存users.json失败: {}", e);
+            return Err(e.into());
+        }
+        
         Ok(())
     }
 

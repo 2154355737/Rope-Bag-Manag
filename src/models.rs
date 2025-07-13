@@ -31,6 +31,32 @@ impl Default for UserRole {
     }
 }
 
+// 在线状态枚举
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum OnlineStatus {
+    Online,     // 在线
+    Offline,    // 离线
+}
+
+impl Default for OnlineStatus {
+    fn default() -> Self {
+        OnlineStatus::Offline
+    }
+}
+
+// 封禁状态枚举
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum BanStatus {
+    Normal,     // 正常
+    Banned,     // 封禁
+}
+
+impl Default for BanStatus {
+    fn default() -> Self {
+        BanStatus::Normal
+    }
+}
+
 // 用户权限结构
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UserPermissions {
@@ -63,53 +89,55 @@ pub struct SignRecord {
     pub continuous_days: u32,   // 连续签到天数
 }
 
-// 用户结构体
+// 新的用户结构体
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
-    pub username: String,
-    pub nickname: String,
-    pub password: String,
-    pub star: f32,              // 星级，支持小数
-    pub role: UserRole,         // 用户身份
-    pub permissions: UserPermissions, // 用户权限
-    pub banned: bool,           // 是否被封禁
+    pub id: u64,                    // 唯一标识，整数类型
+    pub username: String,           // 用户昵称
+    pub password: String,           // 密码
+    pub role: UserRole,             // 用户权限组
+    pub star: u32,                  // 星级（1-5颗星）
+    pub online_status: OnlineStatus, // 在线状态
+    pub ban_status: BanStatus,      // 封禁状态
     pub ban_reason: Option<String>, // 封禁原因
-    pub ban_time: Option<String>,   // 封禁时间
-    pub qq_number: Option<String>,  // QQ号码
+    pub register_time: String,      // 注册时间
+    pub login_count: u32,           // 登录次数
+    pub qq_number: Option<String>,  // 绑定QQ
     pub avatar_url: Option<String>, // 头像URL
     pub sign_records: Vec<SignRecord>, // 签到记录
-    pub sign_days: u32,         // 总签到天数
-    pub sign_total: u32,        // 连续签到天数
-    pub last_sign: String,      // 最后签到时间
-    pub register_time: String,  // 注册时间
-    pub last_login: String,     // 最后登录时间
-    pub upload_count: u32,      // 上传资源数量
-    pub download_count: u32,    // 下载资源数量
-    pub is_admin: bool,         // 是否为管理员（仅配置文件中的管理员）
+    pub sign_days: u32,             // 总签到天数
+    pub sign_total: u32,            // 连续签到天数
+    pub last_sign: String,          // 最后签到时间
+    pub last_login: String,         // 最后登录时间
+    pub upload_count: u32,          // 上传资源数量
+    pub download_count: u32,        // 下载资源数量
+    pub permissions: UserPermissions, // 用户权限
+    pub is_admin: bool,             // 是否为管理员
 }
 
 impl Default for User {
     fn default() -> Self {
         Self {
+            id: 0,
             username: String::new(),
-            nickname: String::new(),
             password: String::new(),
-            star: 1.0,
             role: UserRole::Normal,
-            permissions: UserPermissions::default(),
-            banned: false,
+            star: 1,
+            online_status: OnlineStatus::Offline,
+            ban_status: BanStatus::Normal,
             ban_reason: None,
-            ban_time: None,
+            register_time: String::new(),
+            login_count: 0,
             qq_number: None,
             avatar_url: None,
             sign_records: Vec::new(),
             sign_days: 0,
             sign_total: 0,
             last_sign: String::new(),
-            register_time: String::new(),
             last_login: String::new(),
             upload_count: 0,
             download_count: 0,
+            permissions: UserPermissions::default(),
             is_admin: false,
         }
     }
@@ -118,7 +146,7 @@ impl Default for User {
 impl User {
     // 获取用户权限
     pub fn get_permissions(&self) -> UserPermissions {
-        if self.banned {
+        if self.ban_status == BanStatus::Banned {
             return UserPermissions {
                 can_download: false,
                 can_upload: false,
@@ -159,7 +187,7 @@ impl User {
 
     // 检查是否可以执行操作
     pub fn can_perform(&self, action: &str) -> bool {
-        if self.banned {
+        if self.ban_status == BanStatus::Banned {
             return false;
         }
 
@@ -176,15 +204,19 @@ impl User {
 
     // 更新用户身份（基于星级）
     pub fn update_role(&mut self) {
-        if self.star >= 3.0 && self.role == UserRole::Normal {
+        if self.star >= 3 && self.role == UserRole::Normal {
             self.role = UserRole::Developer;
+            self.permissions = self.get_permissions();
+        }
+        if self.star >= 5 && self.role == UserRole::Developer {
+            self.role = UserRole::Elder;
             self.permissions = self.get_permissions();
         }
     }
 
     // 签到
     pub fn sign_in(&mut self) -> (bool, String) {
-        if self.banned {
+        if self.ban_status == BanStatus::Banned {
             return (false, "用户已被封禁，无法签到".to_string());
         }
 
@@ -199,29 +231,28 @@ impl User {
         // 检查昨天是否签到（计算连续天数）
         let yesterday = chrono::Utc::now() - chrono::Duration::days(1);
         let yesterday_str = yesterday.format("%Y-%m-%d").to_string();
-        
         let continuous_days = if self.sign_records.iter().any(|record| record.date == yesterday_str) {
             self.sign_total + 1
         } else {
             1
         };
 
-        // 创建签到记录
+        // 添加签到记录
         let sign_record = SignRecord {
             date: today.clone(),
             timestamp: now,
             continuous_days,
         };
-
         self.sign_records.push(sign_record);
+
+        // 更新签到统计
         self.sign_days += 1;
         self.sign_total = continuous_days;
-        self.last_sign = today;
+        self.last_sign = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
-        // 连续签到7天以上，星级+0.5
-        if continuous_days >= 7 {
-            self.star += 0.5;
-            self.update_role();
+        // 签到奖励：增加星级
+        if continuous_days % 7 == 0 {
+            self.add_star(1);
         }
 
         (true, format!("签到成功！连续签到{}天", continuous_days))
@@ -229,28 +260,36 @@ impl User {
 
     // 设置QQ号码
     pub fn set_qq(&mut self, qq_number: String) {
-        self.qq_number = Some(qq_number.clone());
-        self.avatar_url = Some(format!("http://q1.qlogo.cn/g?b=qq&nk={}&s=100", qq_number));
+        self.qq_number = Some(qq_number);
     }
 
     // 封禁用户
     pub fn ban(&mut self, reason: String) {
-        self.banned = true;
+        self.ban_status = BanStatus::Banned;
         self.ban_reason = Some(reason);
-        self.ban_time = Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string());
     }
 
     // 解封用户
     pub fn unban(&mut self) {
-        self.banned = false;
+        self.ban_status = BanStatus::Normal;
         self.ban_reason = None;
-        self.ban_time = None;
     }
 
     // 增加星级
-    pub fn add_star(&mut self, amount: f32) {
-        self.star += amount;
+    pub fn add_star(&mut self, amount: u32) {
+        self.star = (self.star + amount).min(5); // 最大5颗星
         self.update_role();
+    }
+
+    // 设置在线状态
+    pub fn set_online_status(&mut self, status: OnlineStatus) {
+        self.online_status = status;
+    }
+
+    // 增加登录次数
+    pub fn increment_login_count(&mut self) {
+        self.login_count += 1;
+        self.last_login = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
     }
 }
 
@@ -329,11 +368,12 @@ pub struct ApiResponse<T> {
 // 登录响应结构
 #[derive(Debug, Serialize)]
 pub struct LoginResponse {
+    pub id: u64,
     pub username: String,
-    pub nickname: String,
-    pub star: f32,
+    pub star: u32,
     pub role: UserRole,
-    pub banned: bool,
+    pub online_status: OnlineStatus,
+    pub ban_status: BanStatus,
     pub ban_reason: Option<String>,
     pub qq_number: Option<String>,
     pub avatar_url: Option<String>,
@@ -347,11 +387,12 @@ pub struct LoginResponse {
 // 用户信息响应结构
 #[derive(Debug, Serialize)]
 pub struct UserInfoResponse {
+    pub id: u64,
     pub username: String,
-    pub nickname: String,
-    pub star: f32,
+    pub star: u32,
     pub role: UserRole,
-    pub banned: bool,
+    pub online_status: OnlineStatus,
+    pub ban_status: BanStatus,
     pub ban_reason: Option<String>,
     pub qq_number: Option<String>,
     pub avatar_url: Option<String>,
@@ -360,6 +401,7 @@ pub struct UserInfoResponse {
     pub last_sign: String,
     pub register_time: String,
     pub last_login: String,
+    pub login_count: u32,
     pub upload_count: u32,
     pub download_count: u32,
     pub permissions: UserPermissions,
@@ -369,9 +411,11 @@ pub struct UserInfoResponse {
 // 昵称信息结构
 #[derive(Debug, Serialize)]
 pub struct NicknameInfo {
-    pub nickname: String,
-    pub star: f32,
+    pub id: u64,
+    pub username: String,
+    pub star: u32,
     pub role: UserRole,
+    pub online_status: OnlineStatus,
     pub avatar_url: Option<String>,
 }
 
@@ -651,6 +695,8 @@ pub struct BackupRecord {
     pub status: BackupStatus,          // 备份状态
     pub description: String,            // 备份描述
     pub file_path: String,             // 文件路径
+    pub restore_time: Option<String>,  // 恢复时间
+    pub restore_by: Option<String>,    // 恢复人
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

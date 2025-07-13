@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use crate::models::{User, RopePackage, StatsData, RawDataJson};
 use crate::config::AppConfig;
 use crate::utils::{load_json_result, save_json};
+use chrono::Utc;
 
 pub struct DataManager;
 
@@ -10,13 +11,94 @@ impl DataManager {
         DataManager
     }
 
-    // 用户数据管理
-    pub fn load_users(&self) -> Result<HashMap<String, User>, Box<dyn std::error::Error>> {
+    // 生成用户ID
+    pub fn generate_user_id(&self) -> u64 {
+        let now = Utc::now();
+        let timestamp = now.timestamp() as u64;
+        let random_part = (timestamp % 10000) as u64;
+        timestamp * 10000 + random_part
+    }
+
+    // 用户数据管理 - 使用ID作为键
+    pub fn load_users(&self) -> Result<HashMap<u64, User>, Box<dyn std::error::Error>> {
         load_json_result("data/users.json")
     }
 
-    pub fn save_users(&self, users: &HashMap<String, User>) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn save_users(&self, users: &HashMap<u64, User>) -> Result<(), Box<dyn std::error::Error>> {
         save_json("data/users.json", users)
+    }
+
+    // 根据用户名查找用户
+    pub fn find_user_by_username(&self, username: &str) -> Result<Option<(u64, User)>, Box<dyn std::error::Error>> {
+        let users = self.load_users()?;
+        for (id, user) in users {
+            if user.username == username {
+                return Ok(Some((id, user)));
+            }
+        }
+        Ok(None)
+    }
+
+    // 创建新用户
+    pub fn create_user(&self, username: String, password: String) -> Result<u64, Box<dyn std::error::Error>> {
+        let mut users = self.load_users().unwrap_or_default();
+        
+        // 检查用户名是否已存在
+        for (_, user) in &users {
+            if user.username == username {
+                return Err("用户名已存在".into());
+            }
+        }
+
+        let user_id = self.generate_user_id();
+        let new_user = User {
+            id: user_id,
+            username,
+            password,
+            role: crate::models::UserRole::Normal,
+            star: 1,
+            online_status: crate::models::OnlineStatus::Offline,
+            ban_status: crate::models::BanStatus::Normal,
+            ban_reason: None,
+            register_time: Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            login_count: 0,
+            qq_number: None,
+            avatar_url: None,
+            sign_records: Vec::new(),
+            sign_days: 0,
+            sign_total: 0,
+            last_sign: String::new(),
+            last_login: String::new(),
+            upload_count: 0,
+            download_count: 0,
+            permissions: crate::models::UserPermissions::default(),
+            is_admin: false,
+        };
+
+        users.insert(user_id, new_user);
+        self.save_users(&users)?;
+        
+        Ok(user_id)
+    }
+
+    // 更新用户
+    pub fn update_user(&self, user_id: u64, user: User) -> Result<(), Box<dyn std::error::Error>> {
+        let mut users = self.load_users()?;
+        users.insert(user_id, user);
+        self.save_users(&users)
+    }
+
+    // 删除用户
+    pub fn delete_user(&self, user_id: u64) -> Result<(), Box<dyn std::error::Error>> {
+        let mut users = self.load_users()?;
+        users.remove(&user_id);
+        self.save_users(&users)
+    }
+
+    // 获取所有用户
+    pub fn get_all_users(&self) -> Result<Vec<(u64, User)>, Box<dyn std::error::Error>> {
+        let users = self.load_users()?;
+        Ok(users.into_iter().collect())
     }
 
     // 绳包数据管理

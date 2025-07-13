@@ -1,7 +1,6 @@
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse, get, post, put, delete};
+use crate::models::{AppState, ApiResponse, GlobalAnnouncement, AnnouncementType};
 use serde::{Deserialize};
-use crate::models::{AppState, GlobalAnnouncement, AnnouncementType, ApiResponse};
-use crate::data_manager::DataManager;
 use chrono::Utc;
 
 #[derive(Debug, Deserialize)]
@@ -25,6 +24,7 @@ pub struct CreateAnnouncementRequest {
 }
 
 // 获取公告列表
+#[get("/api/announcements")]
 pub async fn get_announcements(
     query: web::Query<AnnouncementQuery>,
     _data: web::Data<AppState>,
@@ -71,6 +71,7 @@ pub async fn get_announcements(
 }
 
 // 获取单个公告
+#[get("/api/announcements/{id}")]
 pub async fn get_announcement(
     path: web::Path<String>,
     _data: web::Data<AppState>,
@@ -93,6 +94,7 @@ pub async fn get_announcement(
 }
 
 // 创建公告
+#[post("/api/announcements")]
 pub async fn create_announcement(
     announcement_data: web::Json<CreateAnnouncementRequest>,
     _data: web::Data<AppState>,
@@ -120,6 +122,7 @@ pub async fn create_announcement(
 }
 
 // 更新公告
+#[put("/api/announcements/{id}")]
 pub async fn update_announcement(
     path: web::Path<String>,
     _announcement_data: web::Json<CreateAnnouncementRequest>,
@@ -143,6 +146,7 @@ pub async fn update_announcement(
 }
 
 // 删除公告
+#[delete("/api/announcements/{id}")]
 pub async fn delete_announcement(
     path: web::Path<String>,
     _data: web::Data<AppState>,
@@ -165,6 +169,7 @@ pub async fn delete_announcement(
 }
 
 // 获取活跃公告
+#[get("/api/announcements/active")]
 pub async fn get_active_announcements(
     _data: web::Data<AppState>,
 ) -> HttpResponse {
@@ -179,6 +184,7 @@ pub async fn get_active_announcements(
 }
 
 // 获取公告统计
+#[get("/api/announcements/stats")]
 pub async fn get_announcement_stats(
     _data: web::Data<AppState>,
 ) -> HttpResponse {
