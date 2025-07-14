@@ -1,15 +1,11 @@
-import { 
-  getPackages, 
-  addPackage, 
-  updatePackage, 
-  deletePackage, 
-  downloadPackage,
-  getUsers,
-  adminSetUser,
-  adminSetStar,
-  adminBanUser,
-  getStats
-} from './index'
+import { getDB } from '../utils/sqlite'
+
+export function getAllResources() {
+  const db = getDB()
+  const res = db.exec('SELECT * FROM resource')
+  return res[0] ? res[0].values : []
+}
+// 其他增删改查同理
 
 // 获取当前用户名的辅助函数
 function getCurrentUsername() {
@@ -38,62 +34,63 @@ export const communityApi = {
     status?: string
     search?: string
   }) => {
-    const res = await getPackages()
-    if (res.code === 0 && res.data) {
-      let resources = res.data.绳包列表 || []
-      
-      // 搜索过滤
-      if (params.search) {
-        resources = resources.filter((item: any) => 
-          item.绳包名称.toLowerCase().includes(params.search!.toLowerCase()) ||
-          item.简介.toLowerCase().includes(params.search!.toLowerCase()) ||
-          item.作者.toLowerCase().includes(params.search!.toLowerCase())
-        )
-      }
-      
-      // 分类过滤
-      if (params.category && params.category !== 'all') {
-        // 这里可以根据实际需求实现分类过滤
-        // 目前后端没有分类字段，可以基于作者或其他字段进行过滤
-      }
-      
-      // 分页处理
-      const total = resources.length
-      const page = params.page || 1
-      const pageSize = params.pageSize || 12
-      const start = (page - 1) * pageSize
-      const end = start + pageSize
-      const paginatedResources = resources.slice(start, end)
-      
-      return {
-        code: 0,
-        data: {
-          resources: paginatedResources,
-          total,
-          page,
-          pageSize,
-          totalPages: Math.ceil(total / pageSize)
-        }
-      }
+    const db = getDB()
+    let resources = []
+    let total = 0
+
+    if (params.search) {
+      const searchRes = await db.exec(`SELECT * FROM resource WHERE 绳包名称 LIKE '%${params.search}%' OR 简介 LIKE '%${params.search}%' OR 作者 LIKE '%${params.search}%'`)
+      resources = searchRes[0] ? searchRes[0].values : []
+      total = resources.length
+    } else {
+      const res = await db.exec('SELECT * FROM resource')
+      resources = res[0] ? res[0].values : []
+      total = resources.length
     }
-    return res
+    
+    // 分类过滤
+    if (params.category && params.category !== 'all') {
+      // 这里可以根据实际需求实现分类过滤
+      // 目前后端没有分类字段，可以基于作者或其他字段进行过滤
+    }
+    
+    // 分页处理
+    const page = params.page || 1
+    const pageSize = params.pageSize || 12
+    const start = (page - 1) * pageSize
+    const end = start + pageSize
+    const paginatedResources = resources.slice(start, end)
+    
+    return { code: 0, data: {
+      resources: paginatedResources,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    } }
   },
 
   // 获取资源详情
   getResource: async (id: number) => {
-    const res = await getPackages()
-    if (res.code === 0 && res.data) {
-      const resource = res.data.绳包列表.find((item: any) => item.id === id)
-      if (resource) {
-        return { code: 0, data: resource }
-      }
+    const db = getDB()
+    const res = await db.exec(`SELECT * FROM resource WHERE id = ${id}`)
+    if (res[0] && res[0].values.length > 0) {
+      return { code: 0, data: res[0].values[0] }
     }
     return { code: 1, msg: '资源不存在' }
   },
 
   // 下载资源
   downloadResource: async (id: number) => {
-    return await downloadPackage(id)
+    const db = getDB()
+    const res = await db.exec(`SELECT url FROM resource WHERE id = ${id}`)
+    if (res[0] && res[0].values.length > 0) {
+      const url = res[0].values[0][0]
+      // 模拟下载
+      console.log(`模拟下载资源: ${id}`)
+      return { code: 0, data: { url } }
+    }
+    return { code: 1, msg: '资源不存在' }
   },
 
   // 创建资源
@@ -107,14 +104,9 @@ export const communityApi = {
     cover?: File
   }) => {
     const username = getCurrentUsername()
-    return await addPackage({
-      name: data.title,
-      author: username,
-      version: '1.0.0',
-      desc: data.description,
-      url: data.file ? URL.createObjectURL(data.file) : '',
-      username
-    })
+    const db = getDB()
+    const res = await db.exec(`INSERT INTO resource (绳包名称, 简介, 作者, 版本, 分类, 标签, 状态, 文件名, 文件URL, 封面名, 封面URL, 上传时间, 更新时间) VALUES ('${data.title}', '${data.description}', '${username}', '1.0.0', '${data.category}', '${data.tags.join(',')}', '${data.status}', '${data.file?.name || ''}', '${data.file ? URL.createObjectURL(data.file) : ''}', '${data.cover?.name || ''}', '${data.cover ? URL.createObjectURL(data.cover) : ''}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
+    return { code: 0, msg: '资源创建成功' }
   },
 
   // 更新资源
@@ -128,49 +120,59 @@ export const communityApi = {
     cover?: File
   }) => {
     const username = getCurrentUsername()
-    return await updatePackage({
-      id,
-      name: data.title || '',
-      author: username,
-      version: '1.0.0',
-      desc: data.description || '',
-      url: data.file ? URL.createObjectURL(data.file) : '',
-      username
-    })
+    const db = getDB()
+    let updateSql = `UPDATE resource SET 绳包名称 = '${data.title || ''}'`
+    if (data.description) updateSql += `, 简介 = '${data.description}'`
+    if (data.category) updateSql += `, 分类 = '${data.category}'`
+    if (data.tags) updateSql += `, 标签 = '${data.tags.join(',')}'`
+    if (data.status) updateSql += `, 状态 = '${data.status}'`
+    if (data.file) updateSql += `, 文件名 = '${data.file.name}', 文件URL = '${URL.createObjectURL(data.file)}'`
+    if (data.cover) updateSql += `, 封面名 = '${data.cover.name}', 封面URL = '${URL.createObjectURL(data.cover)}'`
+    updateSql += `, 更新时间 = CURRENT_TIMESTAMP WHERE id = ${id}`
+    const res = await db.exec(updateSql)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '资源更新成功' } : { code: 1, msg: '资源不存在' }
   },
 
   // 删除资源
   deleteResource: async (id: number) => {
     const username = getCurrentUsername()
-    return await deletePackage(id, username)
+    const db = getDB()
+    const res = await db.exec(`DELETE FROM resource WHERE id = ${id} AND 作者 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '资源删除成功' } : { code: 1, msg: '资源不存在或无权限' }
   },
 
   // 批量删除资源
   batchDeleteResources: async (ids: number[]) => {
-    const results = []
-    for (const id of ids) {
-      const result = await deleteResource(id)
-      results.push({ id, result })
-    }
-    return { code: 0, data: results }
+    const username = getCurrentUsername()
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`DELETE FROM resource WHERE id IN (${placeholders}) AND 作者 = '${username}'`, ids)
+    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
   },
 
   // 更新资源状态
   updateResourceStatus: async (id: number, status: string) => {
-    // 后端暂不支持状态更新，这里可以扩展
-    return { code: 0, msg: '状态更新成功' }
+    const username = getCurrentUsername()
+    const db = getDB()
+    const res = await db.exec(`UPDATE resource SET 状态 = '${status}' WHERE id = ${id} AND 作者 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '状态更新成功' } : { code: 1, msg: '资源不存在或无权限' }
   },
 
   // 批量更新资源状态
   batchUpdateResourceStatus: async (ids: number[], status: string) => {
-    // 后端暂不支持状态更新，这里可以扩展
-    return { code: 0, msg: '批量状态更新成功' }
+    const username = getCurrentUsername()
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`UPDATE resource SET 状态 = '${status}' WHERE id IN (${placeholders}) AND 作者 = '${username}'`, ids)
+    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
   },
 
   // 获取资源统计
   getResourceStats: async () => {
-    const res = await getStats()
-    return res
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM resource')
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   }
 }
 
@@ -181,58 +183,37 @@ export const categoryApi = {
     enabled?: boolean
     search?: string
   }) => {
-    // 从资源数据中提取分类信息
-    const res = await getPackages()
-    if (res.code === 0 && res.data) {
-      const resources = res.data.绳包列表 || []
-      const categories = new Map()
-      
-      // 基于作者创建分类
-      resources.forEach((resource: any) => {
-        const author = resource.作者
-        if (!categories.has(author)) {
-          categories.set(author, {
-            id: categories.size + 1,
-            name: author,
-            description: `${author}的资源`,
-            icon: '📦',
-            color: '#409EFF',
-            sort: categories.size + 1,
-            enabled: true,
-            tags: [],
-            count: 0
-          })
-        }
-        categories.get(author).count++
-      })
-      
-      let categoryList = Array.from(categories.values())
-      
-      // 搜索过滤
-      if (params?.search) {
-        categoryList = categoryList.filter(cat => 
-          cat.name.toLowerCase().includes(params.search!.toLowerCase())
-        )
-      }
-      
-      // 状态过滤
-      if (params?.enabled !== undefined) {
-        categoryList = categoryList.filter(cat => cat.enabled === params.enabled)
-      }
-      
-      return { code: 0, data: categoryList }
+    const db = getDB()
+    let categories = []
+    let total = 0
+
+    const res = await db.exec('SELECT * FROM category')
+    categories = res[0] ? res[0].values : []
+    total = categories.length
+
+    // 搜索过滤
+    if (params?.search) {
+      categories = categories.filter(cat => 
+        String(cat[1]).toLowerCase().includes(params.search!.toLowerCase())
+      )
     }
-    return res
+    
+    // 状态过滤
+    if (params?.enabled !== undefined) {
+      categories = categories.filter(cat => cat[6] === params.enabled)
+    }
+    
+    return { code: 0, data: categories }
   },
 
   // 获取分类详情
   getCategory: async (id: number) => {
-    const res = await categoryApi.getCategories()
-    if (res.code === 0 && res.data) {
-      const category = res.data.find((cat: any) => cat.id === id)
-      return category ? { code: 0, data: category } : { code: 1, msg: '分类不存在' }
+    const db = getDB()
+    const res = await db.exec(`SELECT * FROM category WHERE id = ${id}`)
+    if (res[0] && res[0].values.length > 0) {
+      return { code: 0, data: res[0].values[0] }
     }
-    return res
+    return { code: 1, msg: '分类不存在' }
   },
 
   // 创建分类（模拟）
@@ -245,8 +226,9 @@ export const categoryApi = {
     enabled: boolean
     tags: string[]
   }) => {
-    // 这里可以扩展后端支持分类管理
-    return { code: 0, msg: '分类创建成功', data }
+    const db = getDB()
+    const res = await db.exec(`INSERT INTO category (名称, 描述, 图标, 颜色, 排序, 启用, 标签) VALUES ('${data.name}', '${data.description}', '${data.icon}', '${data.color}', ${data.sort}, ${data.enabled ? 1 : 0}, '${data.tags.join(',')}')`)
+    return { code: 0, msg: '分类创建成功', data: { id: res[0].lastID, ...data } }
   },
 
   // 更新分类（模拟）
@@ -259,53 +241,62 @@ export const categoryApi = {
     enabled?: boolean
     tags?: string[]
   }) => {
-    // 这里可以扩展后端支持分类管理
-    return { code: 0, msg: '分类更新成功', data: { id, ...data } }
+    const db = getDB()
+    let updateSql = `UPDATE category SET 名称 = '${data.name || ''}'`
+    if (data.description) updateSql += `, 描述 = '${data.description}'`
+    if (data.icon) updateSql += `, 图标 = '${data.icon}'`
+    if (data.color) updateSql += `, 颜色 = '${data.color}'`
+    if (data.sort !== undefined) updateSql += `, 排序 = ${data.sort}`
+    if (data.enabled !== undefined) updateSql += `, 启用 = ${data.enabled ? 1 : 0}`
+    if (data.tags) updateSql += `, 标签 = '${data.tags.join(',')}'`
+    updateSql += ` WHERE id = ${id}`
+    const res = await db.exec(updateSql)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '分类更新成功', data: { id, ...data } } : { code: 1, msg: '分类不存在' }
   },
 
   // 删除分类（模拟）
   deleteCategory: async (id: number) => {
-    // 这里可以扩展后端支持分类管理
-    return { code: 0, msg: '分类删除成功' }
+    const db = getDB()
+    const res = await db.exec(`DELETE FROM category WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '分类删除成功' } : { code: 1, msg: '分类不存在' }
   },
 
   // 批量删除分类（模拟）
   batchDeleteCategories: async (ids: number[]) => {
-    // 这里可以扩展后端支持分类管理
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`DELETE FROM category WHERE id IN (${placeholders})`)
     return { code: 0, msg: '批量删除成功' }
   },
 
   // 更新分类状态（模拟）
   updateCategoryStatus: async (id: number, enabled: boolean) => {
-    // 这里可以扩展后端支持分类管理
-    return { code: 0, msg: '状态更新成功' }
+    const db = getDB()
+    const res = await db.exec(`UPDATE category SET 启用 = ${enabled ? 1 : 0} WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '状态更新成功' } : { code: 1, msg: '分类不存在' }
   },
 
   // 批量更新分类状态（模拟）
   batchUpdateCategoryStatus: async (ids: number[], enabled: boolean) => {
-    // 这里可以扩展后端支持分类管理
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`UPDATE category SET 启用 = ${enabled ? 1 : 0} WHERE id IN (${placeholders})`)
     return { code: 0, msg: '批量状态更新成功' }
   },
 
   // 更新分类排序（模拟）
   updateCategorySort: async (id: number, sort: number) => {
-    // 这里可以扩展后端支持分类管理
-    return { code: 0, msg: '排序更新成功' }
+    const db = getDB()
+    const res = await db.exec(`UPDATE category SET 排序 = ${sort} WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '排序更新成功' } : { code: 1, msg: '分类不存在' }
   },
 
   // 获取分类统计
   getCategoryStats: async () => {
-    const res = await categoryApi.getCategories()
-    if (res.code === 0 && res.data) {
-      const stats = {
-        total: res.data.length,
-        enabled: res.data.filter((cat: any) => cat.enabled).length,
-        disabled: res.data.filter((cat: any) => !cat.enabled).length,
-        totalResources: res.data.reduce((sum: number, cat: any) => sum + cat.count, 0)
-      }
-      return { code: 0, data: stats }
-    }
-    return res
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM category')
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   }
 }
 
@@ -319,70 +310,67 @@ export const communityUserApi = {
     status?: string
     search?: string
   }) => {
-    const res = await getUsers()
-    if (res.code === 0 && res.data) {
-      let users = Object.entries(res.data).map(([username, user]: [string, any]) => ({
-        id: username,
-        username,
-        ...user
-      }))
-      
-      // 搜索过滤
-      if (params.search) {
-        users = users.filter(user => 
-          user.username.toLowerCase().includes(params.search!.toLowerCase()) ||
-          user.nickname.toLowerCase().includes(params.search!.toLowerCase())
-        )
-      }
-      
-      // 角色过滤
-      if (params.role) {
-        users = users.filter(user => {
-          if (params.role === 'admin') return user.is_admin
-          if (params.role === 'user') return !user.is_admin
-          return true
-        })
-      }
-      
-      // 状态过滤
-      if (params.status) {
-        users = users.filter(user => {
-          if (params.status === 'banned') return user.banned
-          if (params.status === 'active') return !user.banned
-          return true
-        })
-      }
-      
-      // 分页处理
-      const total = users.length
-      const page = params.page || 1
-      const pageSize = params.pageSize || 20
-      const start = (page - 1) * pageSize
-      const end = start + pageSize
-      const paginatedUsers = users.slice(start, end)
-      
-      return {
-        code: 0,
-        data: {
-          users: paginatedUsers,
-          total,
-          page,
-          pageSize,
-          totalPages: Math.ceil(total / pageSize)
-        }
+    const db = getDB()
+    let users = []
+    let total = 0
+
+    const res = await db.exec('SELECT * FROM user')
+    users = res[0] ? res[0].values : []
+    total = users.length
+
+    // 搜索过滤
+    if (params.search) {
+      users = users.filter(user => 
+        String(user[1]).toLowerCase().includes(params.search!.toLowerCase()) ||
+        String(user[2]).toLowerCase().includes(params.search!.toLowerCase())
+      )
+    }
+    
+    // 角色过滤
+    if (params.role) {
+      users = users.filter(user => {
+        if (params.role === 'admin') return user[5] // is_admin
+        if (params.role === 'user') return !user[5] // is_admin
+        return true
+      })
+    }
+    
+    // 状态过滤
+    if (params.status) {
+      users = users.filter(user => {
+        if (params.status === 'banned') return user[6] // banned
+        if (params.status === 'active') return !user[6] // banned
+        return true
+      })
+    }
+    
+    // 分页处理
+    const page = params.page || 1
+    const pageSize = params.pageSize || 20
+    const start = (page - 1) * pageSize
+    const end = start + pageSize
+    const paginatedUsers = users.slice(start, end)
+    
+    return {
+      code: 0,
+      data: {
+        users: paginatedUsers,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
       }
     }
-    return res
   },
 
   // 获取用户详情
   getUser: async (id: number) => {
-    const res = await getUsers()
-    if (res.code === 0 && res.data) {
-      const user = res.data[id]
-      return user ? { code: 0, data: { id, ...user } } : { code: 1, msg: '用户不存在' }
+    const db = getDB()
+    const res = await db.exec(`SELECT * FROM user WHERE id = ${id}`)
+    if (res[0] && res[0].values.length > 0) {
+      return { code: 0, data: res[0].values[0] }
     }
-    return res
+    return { code: 1, msg: '用户不存在' }
   },
 
   // 创建用户（模拟）
@@ -395,8 +383,9 @@ export const communityUserApi = {
     bio?: string
     avatar?: File
   }) => {
-    // 这里可以扩展后端支持用户注册
-    return { code: 0, msg: '用户创建成功', data }
+    const db = getDB()
+    const res = await db.exec(`INSERT INTO user (用户名, 邮箱, 密码, 角色, 状态, 简介, 头像URL) VALUES ('${data.username}', '${data.email}', '${data.password}', '${data.role}', '${data.status}', '${data.bio || ''}', '${data.avatar ? URL.createObjectURL(data.avatar) : ''}')`)
+    return { code: 0, msg: '用户创建成功', data: { id: res[0].lastID, ...data } }
   },
 
   // 更新用户
@@ -406,195 +395,220 @@ export const communityUserApi = {
     avatar?: File
   }) => {
     const username = getCurrentUsername()
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    const updateData: any = { target: id.toString() }
-    
-    if (data.nickname) updateData.nickname = data.nickname
-    if (data.password) updateData.password = data.password
-    
-    return await adminSetUser({
-      ...updateData,
-      admin_username,
-      admin_password
-    })
+    const db = getDB()
+    let updateSql = `UPDATE user SET 用户名 = '${data.nickname || username}'`
+    if (data.password) updateSql += `, 密码 = '${data.password}'`
+    if (data.avatar) updateSql += `, 头像URL = '${URL.createObjectURL(data.avatar)}'`
+    updateSql += ` WHERE id = ${id}`
+    const res = await db.exec(updateSql)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '用户更新成功' } : { code: 1, msg: '用户不存在' }
   },
 
   // 删除用户（模拟）
   deleteUser: async (id: number) => {
-    // 这里可以扩展后端支持用户删除
-    return { code: 0, msg: '用户删除成功' }
+    const username = getCurrentUsername()
+    const db = getDB()
+    const res = await db.exec(`DELETE FROM user WHERE id = ${id} AND 用户名 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '用户删除成功' } : { code: 1, msg: '用户不存在或无权限' }
   },
 
   // 批量删除用户（模拟）
   batchDeleteUsers: async (ids: number[]) => {
-    // 这里可以扩展后端支持用户删除
+    const username = getCurrentUsername()
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`DELETE FROM user WHERE id IN (${placeholders}) AND 用户名 = '${username}'`, ids)
     return { code: 0, msg: '批量删除成功' }
   },
 
   // 更新用户状态
   updateUserStatus: async (id: number, status: string) => {
     const username = getCurrentUsername()
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    if (status === 'banned') {
-      return await adminBanUser(id.toString(), true, admin_username, admin_password)
-    } else if (status === 'active') {
-      return await adminBanUser(id.toString(), false, admin_username, admin_password)
-    }
-    
-    return { code: 1, msg: '无效的状态' }
+    const db = getDB()
+    const res = await db.exec(`UPDATE user SET 状态 = '${status}' WHERE id = ${id} AND 用户名 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '状态更新成功' } : { code: 1, msg: '用户不存在或无权限' }
   },
 
   // 批量更新用户状态
   batchUpdateUserStatus: async (ids: number[], status: string) => {
-    const results = []
-    for (const id of ids) {
-      const result = await updateUserStatus(id, status)
-      results.push({ id, result })
-    }
-    return { code: 0, data: results }
+    const username = getCurrentUsername()
+    const db = getDB()
+    const placeholders = ids.map(() => '?').join(',')
+    const res = await db.exec(`UPDATE user SET 状态 = '${status}' WHERE id IN (${placeholders}) AND 用户名 = '${username}'`, ids)
+    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
   },
 
   // 更新用户角色
   updateUserRole: async (id: number, role: string) => {
     const username = getCurrentUsername()
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    if (role === 'admin') {
-      return await setAdmin(id.toString(), true, admin_username, admin_password)
-    } else if (role === 'user') {
-      return await setAdmin(id.toString(), false, admin_username, admin_password)
-    }
-    
-    return { code: 1, msg: '无效的角色' }
+    const db = getDB()
+    const res = await db.exec(`UPDATE user SET 角色 = '${role}' WHERE id = ${id} AND 用户名 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '角色更新成功' } : { code: 1, msg: '用户不存在或无权限' }
   },
 
   // 更新用户星级
   updateUserStar: async (id: number, star: number) => {
     const username = getCurrentUsername()
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    return await adminSetStar(id.toString(), star, admin_username, admin_password)
+    const db = getDB()
+    const res = await db.exec(`UPDATE user SET 星级 = ${star} WHERE id = ${id} AND 用户名 = '${username}'`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '星级更新成功' } : { code: 1, msg: '用户不存在或无权限' }
   },
 
   // 获取用户统计
   getUserStats: async () => {
-    const res = await getUsers()
-    if (res.code === 0 && res.data) {
-      const users = Object.values(res.data)
-      const stats = {
-        total: users.length,
-        admin: users.filter((user: any) => user.is_admin).length,
-        user: users.filter((user: any) => !user.is_admin).length,
-        banned: users.filter((user: any) => user.banned).length,
-        active: users.filter((user: any) => !user.banned).length
-      }
-      return { code: 0, data: stats }
-    }
-    return res
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM user')
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   }
 }
 
 // 社区统计API
 export const communityStatsApi = {
   // 获取社区总览统计
-  getOverviewStats: () => {
-    return request.get('/api/community/stats/overview')
+  getOverviewStats: async () => {
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM resource, user')
+    const totalResources = res[0] ? res[0].values[0][0] : 0
+    const totalUsers = res[1] ? res[1].values[0][0] : 0
+    return { code: 0, data: { totalResources, totalUsers } }
   },
 
   // 获取资源统计
-  getResourceStats: (params?: {
+  getResourceStats: async (params?: {
     period?: string
     category?: string
   }) => {
-    return request.get('/api/community/stats/resources', { params })
+    const db = getDB()
+    let sql = 'SELECT COUNT(*) FROM resource'
+    if (params?.category) {
+      sql += ` WHERE 分类 = '${params.category}'`
+    }
+    const res = await db.exec(sql)
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   },
 
   // 获取用户统计
-  getUserStats: (params?: {
+  getUserStats: async (params?: {
     period?: string
     role?: string
   }) => {
-    return request.get('/api/community/stats/users', { params })
+    const db = getDB()
+    let sql = 'SELECT COUNT(*) FROM user'
+    if (params?.role) {
+      sql += ` WHERE 角色 = '${params.role}'`
+    }
+    const res = await db.exec(sql)
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   },
 
   // 获取分类统计
-  getCategoryStats: (params?: {
+  getCategoryStats: async (params?: {
     period?: string
   }) => {
-    return request.get('/api/community/stats/categories', { params })
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM category')
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   },
 
   // 获取热门资源
-  getHotResources: (params?: {
+  getHotResources: async (params?: {
     period?: string
     limit?: number
   }) => {
-    return request.get('/api/community/stats/hot-resources', { params })
+    const db = getDB()
+    let sql = 'SELECT * FROM resource ORDER BY 下载次数 DESC'
+    if (params?.limit) {
+      sql += ` LIMIT ${params.limit}`
+    }
+    const res = await db.exec(sql)
+    return { code: 0, data: res[0] ? res[0].values : [] }
   },
 
   // 获取活跃用户
-  getActiveUsers: (params?: {
+  getActiveUsers: async (params?: {
     period?: string
     limit?: number
   }) => {
-    return request.get('/api/community/stats/active-users', { params })
+    const db = getDB()
+    let sql = 'SELECT * FROM user ORDER BY 活跃度 DESC'
+    if (params?.limit) {
+      sql += ` LIMIT ${params.limit}`
+    }
+    const res = await db.exec(sql)
+    return { code: 0, data: res[0] ? res[0].values : [] }
   }
 }
 
 // 社区内容审核API
 export const communityModerationApi = {
   // 获取待审核内容
-  getPendingContent: (params: {
+  getPendingContent: async (params: {
     page?: number
     pageSize?: number
     type?: 'resource' | 'comment' | 'user'
   }) => {
-    return request.get('/api/community/moderation/pending', { params })
+    const db = getDB()
+    let sql = 'SELECT * FROM moderation_queue'
+    if (params.type) {
+      sql += ` WHERE 类型 = '${params.type}'`
+    }
+    const res = await db.exec(sql)
+    return { code: 0, data: res[0] ? res[0].values : [] }
   },
 
   // 审核资源
-  reviewResource: (id: number, data: {
+  reviewResource: async (id: number, data: {
     action: 'approve' | 'reject'
     reason?: string
   }) => {
-    return request.post(`/api/community/moderation/resources/${id}/review`, data)
+    const db = getDB()
+    const res = await db.exec(`UPDATE moderation_queue SET 状态 = '${data.action}', 审核理由 = '${data.reason || ''}' WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '资源审核成功' } : { code: 1, msg: '审核不存在' }
   },
 
   // 审核评论
-  reviewComment: (id: number, data: {
+  reviewComment: async (id: number, data: {
     action: 'approve' | 'reject'
     reason?: string
   }) => {
-    return request.post(`/api/community/moderation/comments/${id}/review`, data)
+    const db = getDB()
+    const res = await db.exec(`UPDATE moderation_queue SET 状态 = '${data.action}', 审核理由 = '${data.reason || ''}' WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '评论审核成功' } : { code: 1, msg: '审核不存在' }
   },
 
   // 审核用户
-  reviewUser: (id: number, data: {
+  reviewUser: async (id: number, data: {
     action: 'approve' | 'reject'
     reason?: string
   }) => {
-    return request.post(`/api/community/moderation/users/${id}/review`, data)
+    const db = getDB()
+    const res = await db.exec(`UPDATE moderation_queue SET 状态 = '${data.action}', 审核理由 = '${data.reason || ''}' WHERE id = ${id}`)
+    return res[0] && res[0].changes > 0 ? { code: 0, msg: '用户审核成功' } : { code: 1, msg: '审核不存在' }
   },
 
   // 批量审核
-  batchReview: (data: {
+  batchReview: async (data: {
     ids: number[]
     type: 'resource' | 'comment' | 'user'
     action: 'approve' | 'reject'
     reason?: string
   }) => {
-    return request.post('/api/community/moderation/batch-review', data)
+    const db = getDB()
+    const placeholders = data.ids.map(() => '?').join(',')
+    const res = await db.exec(`UPDATE moderation_queue SET 状态 = '${data.action}', 审核理由 = '${data.reason || ''}' WHERE id IN (${placeholders}) AND 类型 = '${data.type}'`)
+    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
   },
 
   // 获取审核统计
-  getModerationStats: () => {
-    return request.get('/api/community/moderation/stats')
+  getModerationStats: async () => {
+    const db = getDB()
+    const res = await db.exec('SELECT COUNT(*) FROM moderation_queue')
+    const total = res[0] ? res[0].values[0][0] : 0
+    return { code: 0, data: { total } }
   }
 }
 

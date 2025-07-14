@@ -27,216 +27,129 @@ const routes: RouteRecordRaw[] = [
   // 首页重定向
   { 
     path: '/', 
-    redirect: '/community',
+    redirect: '/home',
     meta: { title: '首页' }
   },
-
-  // 认证相关路由
-  { 
-    path: '/login', 
-    component: () => import('../views/desktop/Login.vue'),
-    meta: { 
-      title: '登录',
-      layout: 'independent',
-      device: 'all'
-    }
+  // 主站相关
+  {
+    path: '/home',
+    component: () => import('../views/main/Home.vue'),
+    meta: { title: '资源主站', layout: 'independent', device: 'all', preload: true }
   },
-
-  // 资源社区路由（独立布局）
-  { 
-    path: '/community', 
-    component: () => import('../views/community/desktop/CommunityHome.vue'),
-    meta: { 
-      title: '资源社区',
-      layout: 'independent',
-      device: 'all',
-      preload: true,
-      requiresAuth: false
-    }
+  {
+    path: '/category/:category',
+    component: () => import('../views/main/Category.vue'),
+    meta: { title: '资源分类', layout: 'independent', device: 'all' }
   },
-  { 
-    path: '/community/resource/:id', 
-    component: () => import('../views/community/desktop/CommunityHome.vue'),
-    meta: { 
-      title: '资源详情',
-      layout: 'independent',
-      device: 'all',
-      requiresAuth: false
-    }
+  {
+    path: '/resource/:id',
+    component: () => import('../views/main/ResourceDetail.vue'),
+    meta: { title: '资源详情', layout: 'independent', device: 'all' }
   },
-  { 
-    path: '/community/hot', 
-    component: () => import('../views/community/desktop/CommunityHome.vue'),
-    meta: { 
-      title: '热门资源',
-      layout: 'independent',
-      device: 'all',
-      requiresAuth: false
-    }
+  {
+    path: '/resource/:id/comments',
+    component: () => import('../views/main/ResourceComment.vue'),
+    meta: { title: '资源评论', layout: 'independent', device: 'all' }
   },
-  { 
-    path: '/community/latest', 
-    component: () => import('../views/community/desktop/CommunityHome.vue'),
-    meta: { 
-      title: '最新资源',
-      layout: 'independent',
-      device: 'all',
-      requiresAuth: false
-    }
+  // 登录
+  {
+    path: '/login',
+    component: () => import('../views/auth/Login.vue'),
+    meta: { title: '登录', layout: 'independent', device: 'all' }
   },
-  { 
-    path: '/community/category/:category', 
-    component: () => import('../views/community/desktop/CommunityHome.vue'),
-    meta: { 
-      title: '分类资源',
-      layout: 'independent',
-      device: 'all',
-      requiresAuth: false
-    }
+  // 管理员后台
+  {
+    path: '/admin',
+    component: () => import('../views/admin/Dashboard.vue'),
+    meta: { title: '管理员后台', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', preload: true }
   },
-
-  // 后台管理路由（桌面端）
-  { 
-    path: '/dashboard', 
-    component: () => import('../views/desktop/Dashboard.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '仪表盘',
-      layout: 'desktop',
-      device: 'desktop',
-      preload: true
-    }
+  {
+    path: '/admin/users',
+    component: () => import('../views/admin/UserManage.vue'),
+    meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/users', 
-    component: () => import('../views/desktop/UserManage.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '用户管理',
-      layout: 'desktop',
-      device: 'desktop',
-      preload: true
-    }
+  {
+    path: '/admin/packages',
+    component: () => import('../views/admin/PackageManage.vue'),
+    meta: { title: '资源管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/packages', 
-    component: () => import('../views/desktop/PackageManage.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '资源管理',
-      layout: 'desktop',
-      device: 'desktop',
-      preload: true
-    }
+  {
+    path: '/admin/logs',
+    component: () => import('../views/admin/LogView.vue'),
+    meta: { title: '日志查看', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/logs', 
-    component: () => import('../views/desktop/LogView.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '日志查看',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/stats',
+    component: () => import('../views/admin/Stats.vue'),
+    meta: { title: '统计信息', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/stats', 
-    component: () => import('../views/desktop/Stats.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '统计信息',
-      layout: 'desktop',
-      device: 'desktop',
-      preload: true
-    }
+  {
+    path: '/admin/theme-settings',
+    component: () => import('../views/admin/ThemeSettings.vue'),
+    meta: { title: '系统设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/theme-settings', 
-    component: () => import('../views/desktop/ThemeSettings.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '系统设置',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/comments',
+    component: () => import('../views/admin/CommentManage.vue'),
+    meta: { title: '评论管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-
-  // 新增管理页面路由
-  { 
-    path: '/comments', 
-    component: () => import('../views/desktop/CommentManage.vue'),
-    meta: { 
-      requiresAuth: true, 
-      requiresAdmin: true,
-      title: '评论管理',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/user-actions',
+    component: () => import('../views/admin/UserActions.vue'),
+    meta: { title: '用户行为记录', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/user-actions', 
-    component: () => import('../views/desktop/UserActions.vue'),
-    meta: { 
-      requiresAuth: true, 
-      requiresAdmin: true,
-      title: '用户行为记录',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/resource-records',
+    component: () => import('../views/admin/ResourceRecord.vue'),
+    meta: { title: '资源记录', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/resource-records', 
-    component: () => import('../views/desktop/ResourceRecord.vue'),
-    meta: { 
-      requiresAuth: true, 
-      requiresAdmin: true,
-      title: '资源记录',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/backup',
+    component: () => import('../views/admin/BackupManage.vue'),
+    meta: { title: '备份管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/backup', 
-    component: () => import('../views/desktop/BackupManage.vue'),
-    meta: { 
-      requiresAuth: true, 
-      requiresAdmin: true,
-      title: '数据库备份',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/announcements',
+    component: () => import('../views/admin/AnnouncementManage.vue'),
+    meta: { title: '公告管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/announcements', 
-    component: () => import('../views/desktop/AnnouncementManage.vue'),
-    meta: { 
-      requiresAuth: true, 
-      requiresAdmin: true,
-      title: '公告管理',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  {
+    path: '/admin/user-action-log',
+    component: () => import('../views/admin/UserActionLog.vue'),
+    meta: { title: '用户操作日志', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
   },
-  { 
-    path: '/user-dashboard', 
-    component: () => import('../views/desktop/UserDashboard.vue'),
-    meta: { 
-      requiresAuth: true, 
-      title: '用户后台',
-      layout: 'desktop',
-      device: 'desktop'
-    }
+  // 用户后台
+  {
+    path: '/user',
+    component: () => import('../layouts/UserLayout.vue'),
+    meta: { title: '用户后台', requiresAuth: true, layout: 'desktop', device: 'all' },
+    children: [
+      {
+        path: 'resources',
+        component: () => import('../views/user/UserResources.vue'),
+        meta: { title: '我的资源' }
+      },
+      {
+        path: 'comments',
+        component: () => import('../views/user/UserComments.vue'),
+        meta: { title: '我的评论' }
+      },
+      {
+        path: 'profile',
+        component: () => import('../views/user/UserProfile.vue'),
+        meta: { title: '个人信息' }
+      },
+      {
+        path: '',
+        redirect: 'resources'
+      }
+    ]
   },
-
   // 404 页面
   { 
-    path: '/:pathMatch(.*)*', 
-    component: () => import('../views/desktop/Dashboard.vue'),
-    meta: { 
-      title: '页面未找到',
-      layout: 'desktop',
-      device: 'all'
-    }
+    path: '/:pathMatch(.*)*',
+    component: () => import('../views/admin/Dashboard.vue'),
+    meta: { title: '页面未找到' }
   }
 ]
 
@@ -266,7 +179,13 @@ router.beforeEach((to: any, from: any, next: any) => {
     next(redirectPath)
     return
   }
-  
+
+  // 登录校验：未登录不能访问后台页面（包括所有子路由）
+  const token = localStorage.getItem('loginToken')
+  if ((to.path.startsWith('/admin') || to.path.startsWith('/user')) && !token) {
+    return next({ path: '/login', replace: true })
+  }
+
   // 记录路由导航完成
   logRouteNavigation(to, from, 'complete')
   next()

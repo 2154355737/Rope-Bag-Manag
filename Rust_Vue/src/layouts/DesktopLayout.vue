@@ -9,22 +9,19 @@
     <!-- 主内容区域 -->
     <main class="desktop-main">
       <div class="content-wrapper">
-        <slot />
+        <router-view />
       </div>
     </main>
     
     <!-- 全局加载状态 -->
-    <div v-if="globalLoading" class="global-loading">
-      <el-loading-spinner />
-      <span class="loading-text">加载中...</span>
-    </div>
+    <el-loading v-if="globalLoading" :fullscreen="true" text="加载中..." />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, provide } from 'vue'
-import NavBar from '../components/desktop/NavBar.vue'
-import SideBar from '../components/desktop/SideBar.vue'
+import NavBar from '../components/layout/NavBar.vue'
+import SideBar from '../components/layout/SideBar.vue'
 
 // 全局加载状态
 const globalLoading = ref(false)
@@ -60,28 +57,7 @@ provide('setGlobalLoading', (loading: boolean) => {
   margin: 0 auto;
 }
 
-/* 全局加载状态 */
-.global-loading {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  backdrop-filter: blur(4px);
-}
 
-.loading-text {
-  margin-top: 12px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-}
 
 /* 响应式设计 */
 @media (max-width: 1200px) {

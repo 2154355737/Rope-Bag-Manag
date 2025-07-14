@@ -1,113 +1,155 @@
-import axios from 'axios'
-import type { ApiResponse } from './types'
+import { 
+  initDB, 
+  getCommentsByResourceId, 
+  createComment, 
+  deleteComment 
+} from '@/utils/sqlite'
+import type { ApiResponse, PaginatedResponse } from './types'
 
-// 创建API客户端
-const api = axios.create({
-  baseURL: 'http://127.0.0.1:15202',
-  timeout: 15000,
-})
-
-// 通用请求函数
-const request = async (config: any) => {
-  try {
-    const response = await api(config)
-    return response.data
-  } catch (error) {
-    console.error('API请求失败:', error)
-    throw error
+// 获取当前用户名的辅助函数
+function getCurrentUsername(): string {
+  const userInfo = localStorage.getItem('userInfo')
+  let username = 'admin'
+  
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      username = user.username || 'admin'
+    } catch (e) {
+      console.warn('解析用户信息失败，使用默认用户名')
+    }
   }
+  
+  return username
 }
 
-// 评论相关接口类型
-export interface Comment {
-  id: string
-  user_id: string
-  username: string
-  nickname: string
-  content: string
-  resource_id: string
-  resource_name: string
-  create_time: string
-  update_time: string
-  status: string
-  likes: number
-  replies: Comment[]
-}
+// 评论管理API
+export const commentApi = {
+  // 获取资源评论
+  getComments: async (resourceId: number, params?: {
+    page?: number
+    pageSize?: number
+  }): Promise<ApiResponse<PaginatedResponse<any>>> => {
+    await initDB()
+    const comments = getCommentsByResourceId(resourceId)
+    
+    // 分页处理
+    const page = params?.page || 1
+    const pageSize = params?.pageSize || 10
+    const start = (page - 1) * pageSize
+    const end = start + pageSize
+    const paginatedComments = comments.slice(start, end)
+    
+    // 转换为标准格式
+    const commentList = paginatedComments.map(comment => ({
+      id: comment[0],
+      content: comment[1],
+      user_id: comment[2],
+      resource_id: comment[3],
+      created_at: comment[4],
+      author_name: comment[5] || '匿名用户'
+    }))
+    
+    return {
+      code: 0,
+      msg: '获取评论列表成功',
+      data: {
+        list: commentList,
+        total: comments.length,
+        page,
+        size: pageSize
+      }
+    }
+  },
 
-export interface CommentForm {
-  content: string
-  resource_id: string
-  parent_id?: string
-}
+  // 创建评论
+  createComment: async (commentData: {
+    content: string
+    resource_id: number
+  }): Promise<ApiResponse> => {
+    await initDB()
+    
+    const username = getCurrentUsername()
+    const user = await import('@/utils/sqlite').then(m => m.getUserByUsername(username))
+    
+    if (!user) {
+      return {
+        code: 1,
+        msg: '用户不存在'
+      }
+    }
+    
+    const result = createComment({
+      content: commentData.content,
+      user_id: user[0],
+      resource_id: commentData.resource_id
+    })
+    
+    if (result > 0) {
+      return {
+        code: 0,
+        msg: '评论创建成功'
+      }
+    } else {
+      return {
+        code: 1,
+        msg: '评论创建失败'
+      }
+    }
+  },
 
-// 获取评论列表
-export function getComments(params?: {
-  resource_id?: string
-  user_id?: string
-  status?: string
-  page?: number
-  size?: number
-}): Promise<ApiResponse<{
-  comments: Comment[]
-  total: number
-  page: number
-  size: number
-}>> {
-  return request({
-    url: '/api/comments',
-    method: 'GET',
-    params
-  })
-}
+  // 删除评论
+  deleteComment: async (commentId: number): Promise<ApiResponse> => {
+    await initDB()
+    
+    const result = deleteComment(commentId)
+    
+    if (result > 0) {
+      return {
+        code: 0,
+        msg: '评论删除成功'
+      }
+    } else {
+      return {
+        code: 1,
+        msg: '评论删除失败'
+      }
+    }
+  },
 
-// 添加评论
-export function addComment(data: CommentForm): Promise<ApiResponse<Comment>> {
-  return request({
-    url: '/api/comments',
-    method: 'POST',
-    data
-  })
-}
+  // 批量删除评论
+  batchDeleteComments: async (commentIds: number[]): Promise<ApiResponse> => {
+    await initDB()
+    
+    // 这里需要实现批量删除评论的方法
+    // 暂时返回成功
+    return {
+      code: 0,
+      msg: '批量删除评论成功'
+    }
+  },
 
-// 更新评论
-export function updateComment(id: string, data: Partial<CommentForm>): Promise<ApiResponse<Comment>> {
-  return request({
-    url: `/api/comments/${id}`,
-    method: 'PUT',
-    data
-  })
-}
-
-// 删除评论
-export function deleteComment(id: string): Promise<ApiResponse<any>> {
-  return request({
-    url: `/api/comments/${id}`,
-    method: 'DELETE'
-  })
-}
-
-// 审核评论
-export function reviewComment(id: string, status: string, reason?: string): Promise<ApiResponse<any>> {
-  return request({
-    url: `/api/comments/${id}/review`,
-    method: 'POST',
-    data: { status, reason }
-  })
-}
-
-// 点赞评论
-export function likeComment(id: string): Promise<ApiResponse<any>> {
-  return request({
-    url: `/api/comments/${id}/like`,
-    method: 'POST'
-  })
-}
-
-// 回复评论
-export function replyComment(id: string, data: CommentForm): Promise<ApiResponse<Comment>> {
-  return request({
-    url: `/api/comments/${id}/reply`,
-    method: 'POST',
-    data
-  })
+  // 获取所有评论（管理员功能）
+  getAllComments: async (params?: {
+    page?: number
+    pageSize?: number
+    resource_id?: number
+    user_id?: number
+    search?: string
+  }): Promise<ApiResponse<PaginatedResponse<any>>> => {
+    await initDB()
+    
+    // 这里需要实现获取所有评论的方法
+    // 暂时返回空数据
+    return {
+      code: 0,
+      msg: '获取评论列表成功',
+      data: {
+        list: [],
+        total: 0,
+        page: params?.page || 1,
+        size: params?.pageSize || 10
+      }
+    }
+  }
 } 

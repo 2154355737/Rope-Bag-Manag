@@ -24,7 +24,7 @@ export function setLoginStatus(username: string, token?: string) {
   localStorage.setItem('isLoggedIn', 'true')
   localStorage.setItem('username', username)
   if (token) {
-    localStorage.setItem('token', token)
+    localStorage.setItem('loginToken', token)
   }
   localStorage.setItem('userInfo', JSON.stringify({
     username,

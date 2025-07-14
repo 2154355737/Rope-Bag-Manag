@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { initTheme } from './utils/theme'
 import { debugDeviceInfo } from './utils/device'
 import DesktopLayout from './layouts/DesktopLayout.vue'
+import UserLayout from './layouts/UserLayout.vue'
 
 // 初始化主题
 onMounted(() => {
@@ -27,6 +28,14 @@ const routeLayout = computed(() => {
 // 判断是否需要独立布局
 const needsIndependentLayout = computed(() => {
   return routeLayout.value === 'independent'
+})
+
+// 计算当前应该使用的布局组件
+const layoutComponent = computed(() => {
+  if (needsIndependentLayout.value) {
+    return 'div' // 独立布局不需要包装组件
+  }
+  return routeLayout.value === 'user' ? UserLayout : DesktopLayout
 })
 
 // 初始化布局
@@ -53,30 +62,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div id="app" class="theme-transition">
-    <!-- 加载状态 -->
-    <div v-if="!isLayoutReady" class="loading-container">
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-        <p>正在加载...</p>
-      </div>
+  <component :is="layoutComponent" v-if="isLayoutReady">
+    <router-view />
+  </component>
+  <div v-else class="loading-container">
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <p>正在加载布局...</p>
     </div>
-    
-    <!-- 布局内容 -->
-    <template v-else>
-      <!-- 独立布局：资源社区和登录页面 -->
-      <template v-if="needsIndependentLayout">
-        <router-view />
-      </template>
-      
-      <!-- 后台管理布局 -->
-      <template v-else>
-        <!-- 桌面端布局 -->
-        <DesktopLayout>
-          <router-view />
-        </DesktopLayout>
-      </template>
-    </template>
   </div>
 </template>
 
