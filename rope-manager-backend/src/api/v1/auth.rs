@@ -40,10 +40,10 @@ async fn register(
     auth_service: web::Data<AuthService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     match auth_service.register(&req).await {
-        Ok(user) => Ok(HttpResponse::Ok().json(json!({
+        Ok(response) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "注册成功",
-            "data": user
+            "data": response
         }))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({
             "code": 1,

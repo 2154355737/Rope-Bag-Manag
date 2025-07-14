@@ -265,7 +265,7 @@ import {
   Warning
 } from '@element-plus/icons-vue'
 import { getDeviceInfo, shouldUseMobileVersion } from '../../utils/device'
-import { userApi, statsApi } from '../../api'
+import { userApi, adminApi } from '../../api'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -344,7 +344,7 @@ async function loadDashboardData() {
     }
     
     // 加载统计数据
-    const statsRes = await statsApi.getStats()
+    const statsRes = await adminApi.getStats()
     if (statsRes.code === 0 && statsRes.data) {
       packageCount.value = statsRes.data.total_packages || 0
       availablePackages.value = statsRes.data.total_packages || 0

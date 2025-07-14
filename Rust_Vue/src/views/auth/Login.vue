@@ -108,39 +108,9 @@
             </el-button>
           </el-form>
 
-          <!-- 快速登录选项 -->
-          <div class="quick-login">
-            <div class="quick-login-title">
-              <span class="divider-line"></span>
-              <span class="divider-text">快速登录</span>
-              <span class="divider-line"></span>
-            </div>
-            
-            <div class="quick-login-buttons">
-              <el-button 
-                class="quick-btn admin-btn" 
-                @click="quickLogin('admin', 'admin123')"
-              >
-                <el-icon><User /></el-icon>
-                管理员
-              </el-button>
-              
-              <el-button 
-                class="quick-btn user-btn" 
-                @click="quickLogin('user', 'user123')"
-              >
-                <el-icon><User /></el-icon>
-                普通用户
-              </el-button>
-              
-              <el-button 
-                class="quick-btn moderator-btn" 
-                @click="quickLogin('moderator', 'mod123')"
-              >
-                <el-icon><User /></el-icon>
-                版主
-              </el-button>
-            </div>
+          <!-- 注册账号按钮 -->
+          <div class="register-link-container" style="text-align:center;margin-top:16px;">
+            <el-button type="success" link @click="goRegister">注册账号</el-button>
           </div>
 
           <!-- 底部信息 -->
@@ -160,7 +130,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Right, Box, DataAnalysis } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
-import { userApi } from '../../api'
+import { authApi, setToken } from '../../api'
 import { setLoginStatus } from '../../utils/auth'
 // import { getUsers, loadUsers } from '../../api/user' // 导入管理员相关API
 
@@ -200,20 +170,31 @@ async function handleLogin() {
     await loginFormRef.value.validate()
     loading.value = true
     
-    const response = await userApi.login(loginForm.username, loginForm.password)
+    const response = await authApi.login({
+      username: loginForm.username,
+      password: loginForm.password
+    })
     
     if (response.code === 0) {
       // 登录成功
-      const token = btoa(`${loginForm.username}:${Date.now()}`)
-      setLoginStatus(loginForm.username, token)
-      if (response.data.role === 'admin') {
+      setToken(response.data.token)
+      // 修正：写入loginTime字段
+      const userInfo = { ...response.data.user, loginTime: new Date().toISOString() }
+      localStorage.setItem('userInfo', JSON.stringify(userInfo))
+      localStorage.setItem('isLoggedIn', 'true')
+      localStorage.setItem('loginToken', response.data.token)
+      ElMessage.success('登录成功')
+      // 跳转
+      if (response.data.user.role === 'admin') {
         router.push('/admin')
+      } else if (response.data.user.role === 'elder') {
+        router.push('/elder')
       } else {
         router.push('/user')
       }
       return
     } else {
-      ElMessage.error(response.msg || '登录失败，请检查用户名和密码')
+      ElMessage.error(response.message || '登录失败，请检查用户名和密码')
     }
   } catch (error) {
     console.error('登录失败:', error)
@@ -294,6 +275,10 @@ function handleLogout() {
   localStorage.removeItem('loginToken')
   localStorage.removeItem('loginUser')
   router.replace('/login')
+}
+
+function goRegister() {
+  router.push('/register')
 }
 </script>
 

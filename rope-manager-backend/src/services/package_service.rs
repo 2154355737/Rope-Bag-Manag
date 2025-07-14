@@ -87,4 +87,15 @@ impl PackageService {
 
         Ok(package.file_url)
     }
+
+    pub async fn get_packages_advanced(
+        &self,
+        page: u32,
+        page_size: u32,
+        category: Option<i32>,
+        search: Option<String>,
+        status: Option<String>,
+    ) -> anyhow::Result<(Vec<Package>, i64)> {
+        self.package_repo.get_packages_advanced(page, page_size, category, search, status).await
+    }
 } 

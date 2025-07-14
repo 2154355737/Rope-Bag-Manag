@@ -44,7 +44,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { getMenuItems } from '../../api'
+import { getUserInfo } from '../../utils/auth'
 import {
   House,
   User,
@@ -63,9 +63,11 @@ import { databaseExport } from '../../utils/sqliteExport'
 
 const route = useRoute()
 
-// 组件挂载时加载菜单数据
+// 组件挂载时根据用户角色过滤菜单
 onMounted(() => {
-  loadMenuItems()
+  const user = getUserInfo()
+  const role = user?.role || 'user'
+  menuItems.value = allMenuItems.filter(item => !item.roles || item.roles.includes(role))
 })
 
 // 当前路径
@@ -77,49 +79,22 @@ interface MenuItem {
   title: string
   icon: string
   badge: number
+  roles?: string[] // 可见角色
 }
+const allMenuItems: MenuItem[] = [
+  { path: '/admin', title: '仪表盘', icon: 'House', badge: 0 },
+  { path: '/admin/users', title: '用户管理', icon: 'User', badge: 0, roles: ['admin'] },
+  { path: '/admin/packages', title: '资源管理', icon: 'Box', badge: 0, roles: ['admin', 'moderator'] },
+  { path: '/admin/comments', title: '评论管理', icon: 'ChatDotRound', badge: 0, roles: ['admin', 'moderator'] },
+  { path: '/admin/user-actions', title: '行为记录', icon: 'Monitor', badge: 0, roles: ['admin'] },
+  { path: '/admin/resource-records', title: '资源记录', icon: 'Files', badge: 0, roles: ['admin'] },
+  { path: '/admin/backup', title: '数据备份', icon: 'Download', badge: 0, roles: ['admin'] },
+  { path: '/admin/announcements', title: '公告管理', icon: 'Bell', badge: 0, roles: ['admin', 'moderator'] },
+  { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0, roles: ['admin'] },
+  { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
+  { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] }
+]
 const menuItems = ref<MenuItem[]>([])
-
-// 加载菜单数据
-async function loadMenuItems() {
-  try {
-    const menuRes = await getMenuItems()
-    if (menuRes.code === 0 && menuRes.data) {
-      menuItems.value = menuRes.data.menu_items || []
-    } else {
-      // 默认菜单项
-      menuItems.value = [
-        { path: '/admin', title: '仪表盘', icon: 'House', badge: 0 },
-        { path: '/admin/users', title: '用户管理', icon: 'User', badge: 0 },
-        { path: '/admin/packages', title: '资源管理', icon: 'Box', badge: 0 },
-        { path: '/admin/comments', title: '评论管理', icon: 'ChatDotRound', badge: 0 },
-        { path: '/admin/user-actions', title: '行为记录', icon: 'Monitor', badge: 0 },
-        { path: '/admin/resource-records', title: '资源记录', icon: 'Files', badge: 0 },
-        { path: '/admin/backup', title: '数据备份', icon: 'Download', badge: 0 },
-        { path: '/admin/announcements', title: '公告管理', icon: 'Bell', badge: 0 },
-        { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0 },
-        { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0 },
-        { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0 }
-      ]
-    }
-  } catch (error) {
-    console.error('加载菜单数据失败:', error)
-    // 使用默认菜单项
-    menuItems.value = [
-      { path: '/admin', title: '仪表盘', icon: 'House', badge: 0 },
-      { path: '/admin/users', title: '用户管理', icon: 'User', badge: 0 },
-      { path: '/admin/packages', title: '资源管理', icon: 'Box', badge: 0 },
-      { path: '/admin/comments', title: '评论管理', icon: 'ChatDotRound', badge: 0 },
-      { path: '/admin/user-actions', title: '行为记录', icon: 'Monitor', badge: 0 },
-      { path: '/admin/resource-records', title: '资源记录', icon: 'Files', badge: 0 },
-      { path: '/admin/backup', title: '数据备份', icon: 'Download', badge: 0 },
-      { path: '/admin/announcements', title: '公告管理', icon: 'Bell', badge: 0 },
-      { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0 },
-      { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0 },
-      { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0 }
-    ]
-  }
-}
 
 // 图标组件映射
 const iconComponents: Record<string, any> = {

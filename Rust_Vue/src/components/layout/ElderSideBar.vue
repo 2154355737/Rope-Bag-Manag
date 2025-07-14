@@ -2,15 +2,19 @@
   <aside class="desktop-sidebar">
     <div class="sidebar-content">
       <nav class="sidebar-nav">
-        <router-link to="/user/profile" class="nav-item" active-class="active" title="个人信息">
+        <router-link to="/elder/profile" class="nav-item" active-class="active" title="个人信息">
           <div class="nav-icon"><el-icon :size="20"><User /></el-icon></div>
           <span class="nav-text">个人信息</span>
         </router-link>
-        <router-link to="/user/comments" class="nav-item" active-class="active" title="我的评论">
+        <router-link to="/elder/comments" class="nav-item" active-class="active" title="我的评论">
           <div class="nav-icon"><el-icon :size="20"><ChatDotRound /></el-icon></div>
           <span class="nav-text">我的评论</span>
         </router-link>
-        <router-link to="/user/resources" class="nav-item" active-class="active" title="我的资源">
+        <router-link to="/elder/resources" class="nav-item" active-class="active" title="资源管理">
+          <div class="nav-icon"><el-icon :size="20"><Box /></el-icon></div>
+          <span class="nav-text">资源管理</span>
+        </router-link>
+        <router-link to="/elder/my-resources" class="nav-item" active-class="active" title="我的资源">
           <div class="nav-icon"><el-icon :size="20"><Files /></el-icon></div>
           <span class="nav-text">我的资源</span>
         </router-link>
@@ -32,7 +36,7 @@
   </aside>
 </template>
 <script setup lang="ts">
-import { User, ChatDotRound, Files } from '@element-plus/icons-vue'
+import { User, ChatDotRound, Box, Files } from '@element-plus/icons-vue'
 </script>
 <style scoped>
 .desktop-sidebar {

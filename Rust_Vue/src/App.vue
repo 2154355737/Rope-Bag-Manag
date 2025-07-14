@@ -1,76 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, nextTick } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { initTheme } from './utils/theme'
-import { debugDeviceInfo } from './utils/device'
 import DesktopLayout from './layouts/DesktopLayout.vue'
 import UserLayout from './layouts/UserLayout.vue'
-
-// 初始化主题
-onMounted(() => {
-  initTheme()
-})
+import ElderLayout from './layouts/ElderLayout.vue'
 
 const route = useRoute()
-const isLayoutReady = ref(false)
-
-// 调试信息
-const debugLayout = () => {
-  debugDeviceInfo()
-  console.log('🖥️ 当前布局: 桌面端')
-}
-
-// 判断当前路由的布局类型
-const routeLayout = computed(() => {
-  return route.meta?.layout || 'desktop'
-})
-
-// 判断是否需要独立布局
-const needsIndependentLayout = computed(() => {
-  return routeLayout.value === 'independent'
-})
-
-// 计算当前应该使用的布局组件
 const layoutComponent = computed(() => {
-  if (needsIndependentLayout.value) {
-    return 'div' // 独立布局不需要包装组件
-  }
-  return routeLayout.value === 'user' ? UserLayout : DesktopLayout
-})
-
-// 初始化布局
-const initLayout = async () => {
-  debugLayout()
-  
-  // 等待下一个tick确保路由信息已更新
-  await nextTick()
-  
-  // 设置布局就绪状态
-  isLayoutReady.value = true
-  
-  console.log('🎨 布局初始化完成:', {
-    route: route.path,
-    layout: routeLayout.value,
-    device: 'desktop',
-    isIndependent: needsIndependentLayout.value
-  })
-}
-
-onMounted(async () => {
-  await initLayout()
+  const layout = route.meta.layout
+  if (layout === 'independent') return null
+  if (layout === 'user') return UserLayout
+  if (layout === 'elder') return ElderLayout
+  return DesktopLayout
 })
 </script>
 
 <template>
-  <component :is="layoutComponent" v-if="isLayoutReady">
-    <router-view />
-  </component>
-  <div v-else class="loading-container">
-    <div class="loading-spinner">
-      <div class="spinner"></div>
-      <p>正在加载布局...</p>
-    </div>
-  </div>
+  <component v-if="layoutComponent" :is="layoutComponent" />
+  <router-view v-else />
 </template>
 
 <style scoped>

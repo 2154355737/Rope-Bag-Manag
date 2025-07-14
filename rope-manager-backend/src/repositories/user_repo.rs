@@ -31,9 +31,10 @@ impl UserRepository {
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: match row.get::<_, String>(4)?.as_str() {
+                role: match row.get::<_, String>(4)?.to_lowercase().as_str() {
                     "admin" => crate::models::UserRole::Admin,
                     "moderator" => crate::models::UserRole::Moderator,
+                    "elder" => crate::models::UserRole::Elder,
                     _ => crate::models::UserRole::User,
                 },
                 star: row.get(5)?,
@@ -69,9 +70,10 @@ impl UserRepository {
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: match row.get::<_, String>(4)?.as_str() {
+                role: match row.get::<_, String>(4)?.to_lowercase().as_str() {
                     "admin" => crate::models::UserRole::Admin,
                     "moderator" => crate::models::UserRole::Moderator,
+                    "elder" => crate::models::UserRole::Elder,
                     _ => crate::models::UserRole::User,
                 },
                 star: row.get(5)?,
@@ -94,21 +96,27 @@ impl UserRepository {
 
     pub async fn find_by_username(&self, username: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().await;
-        let mut stmt = conn.prepare(
-            "SELECT id, username, password_hash, nickname, role, star, ban_status, 
-                    ban_reason, qq_number, avatar_url, created_at, last_login, is_admin 
-             FROM users WHERE username = ?"
-        )?;
-
-        let user = stmt.query_row(params![username], |row| {
+        let sql = "SELECT id, username, password_hash, nickname, role, star, ban_status, \
+                    ban_reason, qq_number, avatar_url, created_at, last_login, is_admin \
+             FROM users WHERE username = ?";
+        println!("[SQL] find_by_username: {} | username={}", sql, username);
+        let mut stmt = match conn.prepare(sql) {
+            Ok(s) => s,
+            Err(e) => {
+                println!("[ERROR] prepare failed: {}", e);
+                return Err(e.into());
+            }
+        };
+        let user = match stmt.query_row(params![username], |row| {
             Ok(User {
                 id: row.get(0)?,
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: match row.get::<_, String>(4)?.as_str() {
+                role: match row.get::<_, String>(4)?.to_lowercase().as_str() {
                     "admin" => crate::models::UserRole::Admin,
                     "moderator" => crate::models::UserRole::Moderator,
+                    "elder" => crate::models::UserRole::Elder,
                     _ => crate::models::UserRole::User,
                 },
                 star: row.get(5)?,
@@ -124,8 +132,15 @@ impl UserRepository {
                 last_login: row.get(11)?,
                 is_admin: row.get(12)?,
             })
-        }).optional()?;
-
+        }) {
+            Ok(val) => Some(val),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => {
+                println!("[ERROR] query_row failed: {}", e);
+                return Err(e.into());
+            }
+        };
+        println!("[SQL] find_by_username result: {:?}", user);
         Ok(user)
     }
 
@@ -142,6 +157,7 @@ impl UserRepository {
                 match user.role {
                     crate::models::UserRole::Admin => "admin",
                     crate::models::UserRole::Moderator => "moderator",
+                    crate::models::UserRole::Elder => "elder",
                     crate::models::UserRole::User => "user",
                 },
                 user.star,
@@ -174,6 +190,7 @@ impl UserRepository {
                 match user.role {
                     crate::models::UserRole::Admin => "admin",
                     crate::models::UserRole::Moderator => "moderator",
+                    crate::models::UserRole::Elder => "elder",
                     crate::models::UserRole::User => "user",
                 },
                 user.star,

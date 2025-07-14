@@ -45,7 +45,7 @@ impl AuthService {
         Ok(LoginResponse { user, token })
     }
 
-    pub async fn register(&self, req: &CreateUserRequest) -> Result<User> {
+    pub async fn register(&self, req: &CreateUserRequest) -> Result<LoginResponse> {
         // 检查用户名是否已存在
         if let Some(_) = self.user_repo.find_by_username(&req.username).await? {
             return Err(anyhow::anyhow!("用户名已存在"));
@@ -72,7 +72,9 @@ impl AuthService {
         };
 
         self.user_repo.create_user(&user).await?;
-        Ok(user)
+        // 生成token
+        let token = self.jwt_utils.generate_token(&user)?;
+        Ok(LoginResponse { user, token })
     }
 
     pub async fn get_user_from_token(&self, token: &str) -> Result<User> {

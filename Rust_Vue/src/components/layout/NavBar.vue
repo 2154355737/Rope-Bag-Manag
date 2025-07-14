@@ -7,7 +7,7 @@
           <el-icon :size="24">
             <Box />
           </el-icon>
-          <span class="navbar-title">绳包管理系统</span>
+          <span class="navbar-title">{{ dynamicTitle }}</span>
         </div>
       </div>
       
@@ -66,14 +66,11 @@
                 <el-icon><User /></el-icon>
                 个人资料
               </el-dropdown-item>
-              <el-dropdown-item @click="handleSettings">
-                <el-icon><Setting /></el-icon>
-                系统设置
+              <!-- 系统设置菜单项已移除 -->
+              <el-dropdown-item divided @click="handleLogout">
+                <el-icon><Switch /></el-icon>
+                退出登录
               </el-dropdown-item>
-                              <el-dropdown-item divided @click="handleLogout">
-                  <el-icon><Switch /></el-icon>
-                  退出登录
-                </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -126,9 +123,26 @@ const availableThemes = computed(() => {
   return Object.values(configs)
 })
 
+const dynamicTitle = computed(() => {
+  const user = getUserInfo()
+  if (user?.role === 'admin') return '管理员后台'
+  if (user?.role === 'elder') return '元老后台'
+  if (user?.role === 'user') return '用户中心'
+  return '绳包管理系统'
+})
+
 // 事件处理
 const handleProfile = () => {
-  router.push('/profile')
+  const user = getUserInfo()
+  if (user?.role === 'elder') {
+    router.push('/elder/profile')
+  } else if (user?.role === 'user') {
+    router.push('/user/profile')
+  } else if (user?.role === 'admin') {
+    router.push('/admin/users')
+  } else {
+    router.push('/login')
+  }
 }
 
 const handleSettings = () => {

@@ -5,7 +5,7 @@
 <script setup lang="ts">
 </script>
 <style scoped>
-.user-profile {
+.elder-profile {
   font-size: 18px;
 }
 </style> 

@@ -284,6 +284,7 @@ import type { FormInstance, UploadFile } from 'element-plus'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { communityApi } from '@/api/community'
 import type { Resource, UploadForm } from '../../../types'
+import { getUserInfo } from '@/utils/auth'
 
 const router = useRouter()
 
@@ -459,7 +460,23 @@ const goToLogin = () => {
 }
 
 const goToAdmin = () => {
-  router.push('/dashboard')
+  // 调试输出localStorage登录状态
+  console.log('isLoggedIn:', localStorage.getItem('isLoggedIn'))
+  console.log('userInfo:', localStorage.getItem('userInfo'))
+  const user = getUserInfo && getUserInfo()
+  if (!user) {
+    router.push('/login')
+    return
+  }
+  if (user.role === 'admin' || user.role === 'moderator') {
+    router.push('/admin')
+  } else if (user.role === 'elder') {
+    router.push('/elder')
+  } else if (user.role === 'user') {
+    router.push('/user')
+  } else {
+    router.push('/403')
+  }
 }
 
 const getCategoryLabel = (category: string) => {

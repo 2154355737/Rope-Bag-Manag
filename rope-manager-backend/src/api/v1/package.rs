@@ -2,6 +2,17 @@ use actix_web::{web, HttpResponse};
 use serde_json::json;
 use crate::services::package_service::PackageService;
 use crate::models::{CreatePackageRequest, UpdatePackageRequest};
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+pub struct PackageQuery {
+    pub page: Option<u32>,
+    #[serde(rename = "pageSize")]
+    pub page_size: Option<u32>,
+    pub category: Option<String>,
+    pub search: Option<String>,
+    pub status: Option<String>,
+}
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -23,16 +34,26 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 
 async fn get_packages(
     package_service: web::Data<PackageService>,
+    query: web::Query<PackageQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    match package_service.get_packages().await {
-        Ok(packages) => Ok(HttpResponse::Ok().json(json!({
+    let page = query.page.unwrap_or(1);
+    let page_size = query.page_size.unwrap_or(12);
+    // category参数为all或空时不筛选，否则转为i32
+    let category = match &query.category {
+        Some(s) if s != "all" && !s.is_empty() => s.parse::<i32>().ok(),
+        _ => None,
+    };
+    let search = query.search.clone().filter(|s| !s.is_empty());
+    let status = query.status.clone();
+    match package_service.get_packages_advanced(page, page_size, category, search, status).await {
+        Ok((list, total)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
             "data": {
-                "list": packages,
-                "total": packages.len(),
-                "page": 1,
-                "size": packages.len()
+                "list": list,
+                "total": total,
+                "page": page,
+                "size": page_size
             }
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({

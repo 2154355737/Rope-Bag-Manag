@@ -1,8 +1,8 @@
 <template>
-  <div class="user-layout">
+  <div class="elder-layout">
     <NavBar />
     <SideBar />
-    <main class="user-main">
+    <main class="elder-main">
       <div class="content-wrapper">
         <router-view />
       </div>
@@ -12,18 +12,18 @@
 
 <script setup lang="ts">
 import NavBar from '@/components/layout/NavBar.vue'
-import SideBar from '@/components/layout/UserSideBar.vue'
+import SideBar from '@/components/layout/ElderSideBar.vue'
 </script>
 
 <style scoped>
-.user-layout {
+.elder-layout {
   height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-primary);
   overflow: hidden;
 }
-.user-main {
+.elder-main {
   margin-left: 240px;
   margin-top: 64px;
   flex: 1;
@@ -37,7 +37,7 @@ import SideBar from '@/components/layout/UserSideBar.vue'
   margin: 0 auto;
 }
 
-.user-profile-card {
+.elder-profile-card {
   background: var(--bg-card);
   border-radius: 12px;
   box-shadow: 0 2px 16px rgba(0,0,0,0.08);

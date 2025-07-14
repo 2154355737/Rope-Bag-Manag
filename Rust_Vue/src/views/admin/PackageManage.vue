@@ -452,7 +452,7 @@ import {
   User,
   Check
 } from '@element-plus/icons-vue'
-import { getPackages, adminAddPackage, adminUpdatePackage, adminDeletePackage, downloadPackage, getCategories, addCategory, updateCategory, deleteCategory } from '../../api'
+import { packageApi, categoryApi } from '../../api'
 import { apiCache } from '../../api/cache'
 
 // 响应式数据
@@ -549,7 +549,7 @@ async function loadPackages() {
     loading.value = true
     // 强制清除缓存
     apiCache.delete('getPackages')
-    const res = await getPackages()
+    const res = await packageApi.getPackages()
     if (res.code === 0 && res.data) {
       packages.value = res.data.绳包列表?.map((pkg: any) => ({
         id: pkg.id,
@@ -585,7 +585,7 @@ async function loadCategories() {
   try {
     // 强制清除缓存
     apiCache.delete('getCategories')
-    const res = await getCategories()
+    const res = await categoryApi.getCategories()
     if (res.code === 0 && res.data) {
       categories.value = res.data
     } else {
@@ -626,7 +626,7 @@ function viewPackage(pkg: any) {
 
 async function downloadPackage(pkg: any) {
   try {
-    const res = await downloadPackage(pkg.id)
+    const res = await packageApi.downloadPackage(pkg.id)
     if (res.code === 0) {
       ElMessage.success(`开始下载 ${pkg.name}`)
     } else {
@@ -689,7 +689,7 @@ async function updatePackage() {
       admin_password
     }
     
-    const res = await adminUpdatePackage(updateData)
+    const res = await packageApi.adminUpdatePackage(updateData)
     if (res.code === 0) {
       ElMessage.success('绳包更新成功')
       editDialogVisible.value = false
@@ -719,7 +719,7 @@ async function deletePackage(pkg: any) {
       }
     )
     
-    const res = await adminDeletePackage(pkg.id, 'muteduanxing', 'ahk12378dx')
+    const res = await packageApi.adminDeletePackage(pkg.id, 'muteduanxing', 'ahk12378dx')
     if (res.code === 0) {
       ElMessage.success('绳包已删除')
       // 延迟刷新数据，确保后端数据已更新
@@ -773,7 +773,7 @@ async function addPackage() {
       admin_password
     }
     
-    const res = await adminAddPackage(packageData)
+    const res = await packageApi.adminAddPackage(packageData)
     if (res.code === 0) {
       ElMessage.success('绳包添加成功')
       addDialogVisible.value = false
@@ -824,7 +824,7 @@ async function addCategoryItem() {
       admin_password
     }
     
-    const res = await addCategory(categoryData)
+    const res = await categoryApi.addCategory(categoryData)
     if (res.code === 0) {
       ElMessage.success('分类添加成功')
       showAddCategoryDialog.value = false
@@ -879,7 +879,7 @@ async function saveCategory() {
       admin_password
     }
     
-    const res = await updateCategory(categoryData)
+    const res = await categoryApi.updateCategory(categoryData)
     if (res.code === 0) {
       ElMessage.success('分类更新成功')
       showEditCategoryDialog.value = false
@@ -912,7 +912,7 @@ async function deleteCategoryItem(category: any) {
     const admin_username = 'muteduanxing'
     const admin_password = 'ahk12378dx'
     
-    const res = await deleteCategory(category.id, admin_username, admin_password)
+    const res = await categoryApi.deleteCategory(category.id, admin_username, admin_password)
     if (res.code === 0) {
       ElMessage.success('分类已删除')
       // 延迟刷新数据，确保后端数据已更新

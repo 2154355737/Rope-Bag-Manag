@@ -13,24 +13,22 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 绳包表
+-- 绳包表（兼容Rust端结构，无user_id）
 CREATE TABLE IF NOT EXISTS packages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title VARCHAR(200) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    author VARCHAR(100),
+    version VARCHAR(50),
     description TEXT,
-    category_id INTEGER,
-    file_path VARCHAR(500),
+    file_url VARCHAR(500),
     file_size INTEGER,
     download_count INTEGER DEFAULT 0,
-    rating DECIMAL(3,2) DEFAULT 0.0,
-    rating_count INTEGER DEFAULT 0,
-    user_id INTEGER NOT NULL,
-    is_public BOOLEAN DEFAULT 1,
-    is_approved BOOLEAN DEFAULT 0,
+    like_count INTEGER DEFAULT 0,
+    favorite_count INTEGER DEFAULT 0,
+    category_id INTEGER,
+    status VARCHAR(20) DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id)
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 分类表
@@ -81,7 +79,6 @@ CREATE TABLE IF NOT EXISTS system_settings (
 );
 
 -- 创建索引
-CREATE INDEX IF NOT EXISTS idx_packages_user_id ON packages(user_id);
 CREATE INDEX IF NOT EXISTS idx_packages_category_id ON packages(category_id);
 CREATE INDEX IF NOT EXISTS idx_packages_created_at ON packages(created_at);
 CREATE INDEX IF NOT EXISTS idx_comments_package_id ON comments(package_id);

@@ -1,5 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use chrono::{DateTime, Utc};
+use std::fmt;
+use serde::ser::SerializeStruct;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -18,10 +20,11 @@ pub struct User {
     pub is_admin: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum UserRole {
     Admin,
     Moderator,
+    Elder,
     User,
 }
 
@@ -41,6 +44,33 @@ impl Default for UserRole {
 impl Default for BanStatus {
     fn default() -> Self {
         BanStatus::Normal
+    }
+}
+
+impl fmt::Display for UserRole {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            UserRole::Admin => "admin",
+            UserRole::Moderator => "moderator",
+            UserRole::Elder => "elder",
+            UserRole::User => "user",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl serde::Serialize for UserRole {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = match self {
+            UserRole::Admin => "admin",
+            UserRole::Moderator => "moderator",
+            UserRole::Elder => "elder",
+            UserRole::User => "user",
+        };
+        serializer.serialize_str(s)
     }
 }
 

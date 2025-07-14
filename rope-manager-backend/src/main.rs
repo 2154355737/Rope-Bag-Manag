@@ -1,4 +1,4 @@
-use actix_web::{web, App, HttpServer, middleware::Logger};
+use actix_web::{web, App, HttpServer, middleware::Logger, http};
 use actix_cors::Cors;
 use log::info;
 
@@ -59,9 +59,16 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(
                 Cors::default()
-                    .allow_any_origin()
-                    .allow_any_method()
-                    .allow_any_header()
+                    .allowed_origin("http://localhost:5173")
+                    .allowed_origin("http://127.0.0.1:5173")
+                    .allowed_origin("http://localhost:3000")
+                    .allowed_origin("http://127.0.0.1:3000")
+                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+                    .allowed_headers(vec![
+                        http::header::AUTHORIZATION,
+                        http::header::CONTENT_TYPE,
+                        http::header::ACCEPT,
+                    ])
                     .max_age(3600)
             )
             .app_data(web::Data::new(auth_service.clone()))

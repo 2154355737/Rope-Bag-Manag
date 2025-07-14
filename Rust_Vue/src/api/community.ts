@@ -1,178 +1,61 @@
-import { getDB } from '../utils/sqlite'
+import { api, ApiResponse } from '../utils/apiClient'
 
-export function getAllResources() {
-  const db = getDB()
-  const res = db.exec('SELECT * FROM resource')
-  return res[0] ? res[0].values : []
-}
-// 其他增删改查同理
-
-// 获取当前用户名的辅助函数
-function getCurrentUsername() {
-  const userInfo = localStorage.getItem('userInfo')
-  let username = 'admin'
-  
-  if (userInfo) {
-    try {
-      const user = JSON.parse(userInfo)
-      username = user.username || 'admin'
-    } catch (e) {
-      console.warn('解析用户信息失败，使用默认用户名')
-    }
-  }
-  
-  return username
+export interface Resource {
+  id: number
+  title?: string // 兼容旧字段
+  name?: string  // 新字段
+  description?: string
+  author: string
+  version?: string
+  category?: string
+  tags?: string[]
+  status?: string
+  file_url?: string
+  cover_url?: string
+  created_at?: string
+  updated_at?: string
 }
 
-// 社区资源管理API
 export const communityApi = {
   // 获取资源列表
-  getResources: async (params: {
-    page?: number
-    pageSize?: number
-    category?: string
-    status?: string
-    search?: string
-  }) => {
-    const db = getDB()
-    let resources = []
-    let total = 0
-
-    if (params.search) {
-      const searchRes = await db.exec(`SELECT * FROM resource WHERE 绳包名称 LIKE '%${params.search}%' OR 简介 LIKE '%${params.search}%' OR 作者 LIKE '%${params.search}%'`)
-      resources = searchRes[0] ? searchRes[0].values : []
-      total = resources.length
-    } else {
-      const res = await db.exec('SELECT * FROM resource')
-      resources = res[0] ? res[0].values : []
-      total = resources.length
-    }
-    
-    // 分类过滤
-    if (params.category && params.category !== 'all') {
-      // 这里可以根据实际需求实现分类过滤
-      // 目前后端没有分类字段，可以基于作者或其他字段进行过滤
-    }
-    
-    // 分页处理
-    const page = params.page || 1
-    const pageSize = params.pageSize || 12
-    const start = (page - 1) * pageSize
-    const end = start + pageSize
-    const paginatedResources = resources.slice(start, end)
-    
-    return { code: 0, data: {
-      resources: paginatedResources,
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize)
-    } }
+  getResources: (params?: { page?: number; pageSize?: number; category?: string; status?: string; search?: string }): Promise<ApiResponse<{ list: Resource[]; total: number; page: number; pageSize: number; totalPages?: number }>> => {
+    return api.get('/api/v1/packages', { params })
   },
-
   // 获取资源详情
-  getResource: async (id: number) => {
-    const db = getDB()
-    const res = await db.exec(`SELECT * FROM resource WHERE id = ${id}`)
-    if (res[0] && res[0].values.length > 0) {
-      return { code: 0, data: res[0].values[0] }
-    }
-    return { code: 1, msg: '资源不存在' }
+  getResource: (id: number): Promise<ApiResponse<Resource>> => {
+    return api.get(`/api/v1/packages/${id}`)
   },
-
   // 下载资源
-  downloadResource: async (id: number) => {
-    const db = getDB()
-    const res = await db.exec(`SELECT url FROM resource WHERE id = ${id}`)
-    if (res[0] && res[0].values.length > 0) {
-      const url = res[0].values[0][0]
-      // 模拟下载
-      console.log(`模拟下载资源: ${id}`)
-      return { code: 0, data: { url } }
-    }
-    return { code: 1, msg: '资源不存在' }
+  downloadResource: (id: number): Promise<ApiResponse<{ url: string }>> => {
+    return api.get(`/api/v1/packages/${id}/download`)
   },
-
   // 创建资源
-  createResource: async (data: {
-    title: string
-    description: string
-    category: string
-    tags: string[]
-    status: string
-    file?: File
-    cover?: File
-  }) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    const res = await db.exec(`INSERT INTO resource (绳包名称, 简介, 作者, 版本, 分类, 标签, 状态, 文件名, 文件URL, 封面名, 封面URL, 上传时间, 更新时间) VALUES ('${data.title}', '${data.description}', '${username}', '1.0.0', '${data.category}', '${data.tags.join(',')}', '${data.status}', '${data.file?.name || ''}', '${data.file ? URL.createObjectURL(data.file) : ''}', '${data.cover?.name || ''}', '${data.cover ? URL.createObjectURL(data.cover) : ''}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`)
-    return { code: 0, msg: '资源创建成功' }
+  createResource: (data: any): Promise<ApiResponse> => {
+    return api.post('/api/v1/packages', data)
   },
-
   // 更新资源
-  updateResource: async (id: number, data: {
-    title?: string
-    description?: string
-    category?: string
-    tags?: string[]
-    status?: string
-    file?: File
-    cover?: File
-  }) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    let updateSql = `UPDATE resource SET 绳包名称 = '${data.title || ''}'`
-    if (data.description) updateSql += `, 简介 = '${data.description}'`
-    if (data.category) updateSql += `, 分类 = '${data.category}'`
-    if (data.tags) updateSql += `, 标签 = '${data.tags.join(',')}'`
-    if (data.status) updateSql += `, 状态 = '${data.status}'`
-    if (data.file) updateSql += `, 文件名 = '${data.file.name}', 文件URL = '${URL.createObjectURL(data.file)}'`
-    if (data.cover) updateSql += `, 封面名 = '${data.cover.name}', 封面URL = '${URL.createObjectURL(data.cover)}'`
-    updateSql += `, 更新时间 = CURRENT_TIMESTAMP WHERE id = ${id}`
-    const res = await db.exec(updateSql)
-    return res[0] && res[0].changes > 0 ? { code: 0, msg: '资源更新成功' } : { code: 1, msg: '资源不存在' }
+  updateResource: (id: number, data: any): Promise<ApiResponse> => {
+    return api.put(`/api/v1/packages/${id}`, data)
   },
-
   // 删除资源
-  deleteResource: async (id: number) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    const res = await db.exec(`DELETE FROM resource WHERE id = ${id} AND 作者 = '${username}'`)
-    return res[0] && res[0].changes > 0 ? { code: 0, msg: '资源删除成功' } : { code: 1, msg: '资源不存在或无权限' }
+  deleteResource: (id: number): Promise<ApiResponse> => {
+    return api.delete(`/api/v1/packages/${id}`)
   },
-
   // 批量删除资源
-  batchDeleteResources: async (ids: number[]) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    const placeholders = ids.map(() => '?').join(',')
-    const res = await db.exec(`DELETE FROM resource WHERE id IN (${placeholders}) AND 作者 = '${username}'`, ids)
-    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
+  batchDeleteResources: (ids: number[]): Promise<ApiResponse> => {
+    return api.post('/api/v1/packages/batch-delete', { ids })
   },
-
   // 更新资源状态
-  updateResourceStatus: async (id: number, status: string) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    const res = await db.exec(`UPDATE resource SET 状态 = '${status}' WHERE id = ${id} AND 作者 = '${username}'`)
-    return res[0] && res[0].changes > 0 ? { code: 0, msg: '状态更新成功' } : { code: 1, msg: '资源不存在或无权限' }
+  updateResourceStatus: (id: number, status: string): Promise<ApiResponse> => {
+    return api.put(`/api/v1/packages/${id}/status`, { status })
   },
-
   // 批量更新资源状态
-  batchUpdateResourceStatus: async (ids: number[], status: string) => {
-    const username = getCurrentUsername()
-    const db = getDB()
-    const placeholders = ids.map(() => '?').join(',')
-    const res = await db.exec(`UPDATE resource SET 状态 = '${status}' WHERE id IN (${placeholders}) AND 作者 = '${username}'`, ids)
-    return { code: 0, data: res.map(r => ({ id: r.changes, result: r.changes > 0 ? 'success' : 'failed' })) }
+  batchUpdateResourceStatus: (ids: number[], status: string): Promise<ApiResponse> => {
+    return api.post('/api/v1/packages/batch-update-status', { ids, status })
   },
-
   // 获取资源统计
-  getResourceStats: async () => {
-    const db = getDB()
-    const res = await db.exec('SELECT COUNT(*) FROM resource')
-    const total = res[0] ? res[0].values[0][0] : 0
-    return { code: 0, data: { total } }
+  getResourceStats: (): Promise<ApiResponse<{ total: number }>> => {
+    return api.get('/api/v1/packages/stats')
   }
 }
 

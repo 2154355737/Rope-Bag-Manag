@@ -222,7 +222,7 @@ import {
   Close,
   TrendCharts
 } from '@element-plus/icons-vue'
-import { getLogs } from '../../utils/sqlite'
+import { adminApi } from '../../api'
 
 const router = useRouter()
 
@@ -275,7 +275,7 @@ async function loadLogs(val = 1) {
     const { initDB } = await import('../../utils/sqlite')
     await initDB()
     
-    const logData = getLogs(level.value || undefined, pageSize.value)
+    const logData = await adminApi.getLogs(level.value || undefined, pageSize.value)
     
     // 过滤日志
     let filteredLogs = logData

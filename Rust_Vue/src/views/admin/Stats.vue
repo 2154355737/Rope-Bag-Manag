@@ -232,7 +232,7 @@ import {
   Delete,
   Star
 } from '@element-plus/icons-vue'
-import { statsApi, userApi } from '../../api'
+import { adminApi, userApi } from '../../api'
 
 // 响应式数据
 const currentTime = ref('')
@@ -267,7 +267,7 @@ async function loadStats() {
     }
     
     // 加载统计数据
-    const statsRes = await statsApi.getStats()
+    const statsRes = await adminApi.getStats()
     if (statsRes.code === 0 && statsRes.data) {
       // 更新统计信息
       totalViews.value = statsRes.data.total_views || 0
