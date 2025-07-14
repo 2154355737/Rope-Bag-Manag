@@ -180,10 +180,10 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '无权限', layout: 'independent', device: 'all' }
   },
   // 404 页面
-  { 
+  {
     path: '/:pathMatch(.*)*',
-    component: () => import('../views/admin/Dashboard.vue'),
-    meta: { title: '页面未找到' }
+    component: () => import('../views/NotFound.vue'),
+    meta: { title: '页面未找到', layout: 'independent', device: 'all' }
   }
 ]
 

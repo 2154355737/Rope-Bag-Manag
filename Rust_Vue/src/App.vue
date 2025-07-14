@@ -7,16 +7,19 @@ import ElderLayout from './layouts/ElderLayout.vue'
 
 const route = useRoute()
 const layoutComponent = computed(() => {
+  // 只在明确有 layout 字段时才渲染布局
   const layout = route.meta.layout
+  if (!layout) return null
   if (layout === 'independent') return null
   if (layout === 'user') return UserLayout
   if (layout === 'elder') return ElderLayout
-  return DesktopLayout
+  if (layout === 'desktop') return DesktopLayout
+  return null
 })
 </script>
 
 <template>
-  <component v-if="layoutComponent" :is="layoutComponent" />
+  <component v-if="layoutComponent" :is="layoutComponent" :key="route.fullPath" />
   <router-view v-else />
 </template>
 
