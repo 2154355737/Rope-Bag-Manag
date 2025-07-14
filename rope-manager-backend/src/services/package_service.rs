@@ -50,29 +50,28 @@ impl PackageService {
     }
 
     pub async fn update_package(&self, package_id: i32, req: &UpdatePackageRequest) -> Result<()> {
-        let mut package = self.package_repo.find_by_id(package_id).await?;
+        let package = self.package_repo.find_by_id(package_id).await?;
         let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
 
-        // 更新绳包信息
-        let mut updated_package = package.clone();
-        if let Some(name) = &req.name {
-            updated_package.name = name.clone();
-        }
-        if let Some(version) = &req.version {
-            updated_package.version = version.clone();
-        }
-        if let Some(description) = &req.description {
-            updated_package.description = description.clone();
-        }
-        if let Some(category_id) = req.category_id {
-            updated_package.category_id = Some(category_id);
-        }
-        if let Some(status) = &req.status {
-            updated_package.status = status.clone();
-        }
-        updated_package.updated_at = Utc::now();
+        let updated_package = Package {
+            id: package_id,
+            name: req.name.clone().unwrap_or(package.name),
+            author: package.author,
+            version: req.version.clone().or(package.version),
+            description: req.description.clone().or(package.description),
+            category_id: req.category_id.or(package.category_id),
+            status: req.status.clone().unwrap_or(package.status),
+            file_url: package.file_url,
+            file_size: package.file_size,
+            download_count: package.download_count,
+            like_count: package.like_count,
+            favorite_count: package.favorite_count,
+            created_at: package.created_at,
+            updated_at: chrono::Utc::now(),
+        };
 
-        self.package_repo.update_package(&updated_package).await
+        self.package_repo.update_package(&updated_package).await?;
+        Ok(())
     }
 
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {

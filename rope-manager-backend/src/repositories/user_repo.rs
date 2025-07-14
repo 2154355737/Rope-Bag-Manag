@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, OptionalExtension};
 use crate::models::User;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -31,9 +31,17 @@ impl UserRepository {
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: row.get(4)?,
+                role: match row.get::<_, String>(4)?.as_str() {
+                    "admin" => crate::models::UserRole::Admin,
+                    "moderator" => crate::models::UserRole::Moderator,
+                    _ => crate::models::UserRole::User,
+                },
                 star: row.get(5)?,
-                ban_status: row.get(6)?,
+                ban_status: match row.get::<_, String>(6)?.as_str() {
+                    "suspended" => crate::models::BanStatus::Suspended,
+                    "banned" => crate::models::BanStatus::Banned,
+                    _ => crate::models::BanStatus::Normal,
+                },
                 ban_reason: row.get(7)?,
                 qq_number: row.get(8)?,
                 avatar_url: row.get(9)?,
@@ -61,9 +69,17 @@ impl UserRepository {
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: row.get(4)?,
+                role: match row.get::<_, String>(4)?.as_str() {
+                    "admin" => crate::models::UserRole::Admin,
+                    "moderator" => crate::models::UserRole::Moderator,
+                    _ => crate::models::UserRole::User,
+                },
                 star: row.get(5)?,
-                ban_status: row.get(6)?,
+                ban_status: match row.get::<_, String>(6)?.as_str() {
+                    "suspended" => crate::models::BanStatus::Suspended,
+                    "banned" => crate::models::BanStatus::Banned,
+                    _ => crate::models::BanStatus::Normal,
+                },
                 ban_reason: row.get(7)?,
                 qq_number: row.get(8)?,
                 avatar_url: row.get(9)?,
@@ -90,9 +106,17 @@ impl UserRepository {
                 username: row.get(1)?,
                 password_hash: row.get(2)?,
                 nickname: row.get(3)?,
-                role: row.get(4)?,
+                role: match row.get::<_, String>(4)?.as_str() {
+                    "admin" => crate::models::UserRole::Admin,
+                    "moderator" => crate::models::UserRole::Moderator,
+                    _ => crate::models::UserRole::User,
+                },
                 star: row.get(5)?,
-                ban_status: row.get(6)?,
+                ban_status: match row.get::<_, String>(6)?.as_str() {
+                    "suspended" => crate::models::BanStatus::Suspended,
+                    "banned" => crate::models::BanStatus::Banned,
+                    _ => crate::models::BanStatus::Normal,
+                },
                 ban_reason: row.get(7)?,
                 qq_number: row.get(8)?,
                 avatar_url: row.get(9)?,
@@ -115,9 +139,17 @@ impl UserRepository {
                 user.username,
                 user.password_hash,
                 user.nickname,
-                user.role,
+                match user.role {
+                    crate::models::UserRole::Admin => "admin",
+                    crate::models::UserRole::Moderator => "moderator",
+                    crate::models::UserRole::User => "user",
+                },
                 user.star,
-                user.ban_status,
+                match user.ban_status {
+                    crate::models::BanStatus::Normal => "normal",
+                    crate::models::BanStatus::Suspended => "suspended",
+                    crate::models::BanStatus::Banned => "banned",
+                },
                 user.ban_reason,
                 user.qq_number,
                 user.avatar_url,
@@ -139,9 +171,17 @@ impl UserRepository {
                 user.username,
                 user.password_hash,
                 user.nickname,
-                user.role,
+                match user.role {
+                    crate::models::UserRole::Admin => "admin",
+                    crate::models::UserRole::Moderator => "moderator",
+                    crate::models::UserRole::User => "user",
+                },
                 user.star,
-                user.ban_status,
+                match user.ban_status {
+                    crate::models::BanStatus::Normal => "normal",
+                    crate::models::BanStatus::Suspended => "suspended",
+                    crate::models::BanStatus::Banned => "banned",
+                },
                 user.ban_reason,
                 user.qq_number,
                 user.avatar_url,
@@ -158,7 +198,7 @@ impl UserRepository {
         let conn = self.conn.lock().await;
         conn.execute(
             "UPDATE users SET last_login = ? WHERE id = ?",
-            params![chrono::Utc::now(), user_id]
+            params![chrono::Utc::now().to_rfc3339(), user_id]
         )?;
         Ok(())
     }

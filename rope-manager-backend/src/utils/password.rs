@@ -1,6 +1,7 @@
 use anyhow::Result;
 use bcrypt::{hash, verify, DEFAULT_COST};
 
+#[derive(Clone)]
 pub struct PasswordUtils;
 
 impl PasswordUtils {

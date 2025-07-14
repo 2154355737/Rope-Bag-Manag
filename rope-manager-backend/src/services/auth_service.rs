@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::models::{User, LoginRequest, CreateUserRequest, LoginResponse};
+use crate::models::{User, CreateUserRequest, LoginResponse};
 use crate::repositories::user_repo::UserRepository;
 use crate::utils::jwt::JwtUtils;
 use crate::utils::password::PasswordUtils;

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, OptionalExtension};
 use crate::models::Package;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -39,7 +39,11 @@ impl PackageRepository {
                 like_count: row.get(8)?,
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
-                status: row.get(11)?,
+                status: match row.get::<_, String>(11)?.as_str() {
+                    "inactive" => crate::models::PackageStatus::Inactive,
+                    "deleted" => crate::models::PackageStatus::Deleted,
+                    _ => crate::models::PackageStatus::Active,
+                },
                 created_at: row.get(12)?,
                 updated_at: row.get(13)?,
             })
@@ -71,7 +75,11 @@ impl PackageRepository {
                 like_count: row.get(8)?,
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
-                status: row.get(11)?,
+                status: match row.get::<_, String>(11)?.as_str() {
+                    "inactive" => crate::models::PackageStatus::Inactive,
+                    "deleted" => crate::models::PackageStatus::Deleted,
+                    _ => crate::models::PackageStatus::Active,
+                },
                 created_at: row.get(12)?,
                 updated_at: row.get(13)?,
             })
@@ -98,7 +106,11 @@ impl PackageRepository {
                 package.like_count,
                 package.favorite_count,
                 package.category_id,
-                package.status,
+                match package.status {
+                    crate::models::PackageStatus::Active => "active",
+                    crate::models::PackageStatus::Inactive => "inactive",
+                    crate::models::PackageStatus::Deleted => "deleted",
+                },
                 package.created_at,
                 package.updated_at,
             ]
@@ -124,7 +136,11 @@ impl PackageRepository {
                 package.like_count,
                 package.favorite_count,
                 package.category_id,
-                package.status,
+                match package.status {
+                    crate::models::PackageStatus::Active => "active",
+                    crate::models::PackageStatus::Inactive => "inactive",
+                    crate::models::PackageStatus::Deleted => "deleted",
+                },
                 package.created_at,
                 package.updated_at,
                 package.id,

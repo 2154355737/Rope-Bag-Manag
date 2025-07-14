@@ -18,14 +18,14 @@ pub struct User {
     pub is_admin: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum UserRole {
     Admin,
     Moderator,
     User,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum BanStatus {
     Normal,
     Suspended,

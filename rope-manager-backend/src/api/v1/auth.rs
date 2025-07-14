@@ -1,7 +1,7 @@
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse, Result, HttpRequest};
 use serde_json::json;
+use crate::models::{CreateUserRequest, LoginRequest};
 use crate::services::auth_service::AuthService;
-use crate::models::{LoginRequest, CreateUserRequest, LoginResponse};
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(

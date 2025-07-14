@@ -42,7 +42,7 @@ async fn get_user(
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id = path.into_inner();
-    match user_service.get_user(user_id).await {
+    match user_service.get_user_by_id(user_id).await {
         Ok(Some(user)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",

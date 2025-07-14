@@ -47,7 +47,7 @@ impl CommentRepository {
                 comment.user_id,
                 comment.package_id,
                 comment.content,
-                comment.created_at,
+                comment.created_at.to_rfc3339(),
             ]
         )?;
         Ok(())

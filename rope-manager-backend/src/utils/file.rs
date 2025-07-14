@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::path::Path;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct FileUtils {
     upload_path: String,
 }

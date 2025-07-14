@@ -9,18 +9,15 @@ pub use comment_repo::*;
 pub use system_repo::*;
 
 use rusqlite::{Connection, Result};
-use std::path::Path;
+use std::path::PathBuf;
 
-pub fn init_database(db_path: &str) -> Result<()> {
-    // 确保数据目录存在
-    if let Some(parent) = Path::new(db_path).parent() {
-        std::fs::create_dir_all(parent)?;
+pub fn get_connection() -> Result<Connection> {
+    let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "data.db".to_string());
+    
+    // 确保数据库目录存在
+    if let Some(parent) = PathBuf::from(&db_path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| rusqlite::Error::InvalidPath(e.to_string().into()))?;
     }
-
-    let conn = Connection::open(db_path)?;
     
-    // 创建表
-    conn.execute_batch(include_str!("../sql/init.sql"))?;
-    
-    Ok(())
+    Connection::open(&db_path)
 } 

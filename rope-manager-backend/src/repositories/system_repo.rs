@@ -1,5 +1,4 @@
-use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, Result};
 use crate::models::{Stats, Category, UserAction};
 use std::sync::Arc;
 use tokio::sync::Mutex;

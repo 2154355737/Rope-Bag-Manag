@@ -16,18 +16,18 @@ impl UserService {
         self.user_repo.get_all_users().await
     }
 
-    pub async fn get_user(&self, user_id: i32) -> Result<Option<User>> {
+    pub async fn get_user_by_id(&self, user_id: i32) -> Result<Option<User>> {
         self.user_repo.find_by_id(user_id).await
     }
 
     pub async fn update_user(&self, user_id: i32, req: &UpdateUserRequest) -> Result<()> {
-        let mut user = self.user_repo.find_by_id(user_id).await?;
+        let user = self.user_repo.find_by_id(user_id).await?;
         let user = user.ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
 
         // 更新用户信息
         let mut updated_user = user.clone();
         if let Some(nickname) = &req.nickname {
-            updated_user.nickname = nickname.clone();
+            updated_user.nickname = Some(nickname.clone());
         }
         if let Some(star) = req.star {
             updated_user.star = star;
@@ -39,10 +39,10 @@ impl UserService {
             updated_user.role = role.clone();
         }
         if let Some(qq_number) = &req.qq_number {
-            updated_user.qq_number = qq_number.clone();
+            updated_user.qq_number = Some(qq_number.clone());
         }
         if let Some(avatar_url) = &req.avatar_url {
-            updated_user.avatar_url = avatar_url.clone();
+            updated_user.avatar_url = Some(avatar_url.clone());
         }
 
         self.user_repo.update_user(&updated_user).await

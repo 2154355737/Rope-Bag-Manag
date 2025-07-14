@@ -1,197 +1,248 @@
-# 绳包管理器后端
+# 绳包管理器后端服务
 
-基于 Rust + Actix-web 的绳包资源管理系统后端服务。
+这是一个基于 Rust + Actix-web 的绳包管理器后端服务。
 
-## 🚀 功能特性
+## 功能特性
 
-- **用户认证**: JWT token 认证系统
-- **用户管理**: 用户注册、登录、权限管理
-- **绳包管理**: 绳包资源的上传、下载、管理
-- **社区功能**: 评论、点赞、收藏
-- **管理员后台**: 数据统计、用户管理、系统设置
-- **文件管理**: 安全的文件上传和下载
+- 🔐 用户认证和授权
+- 📦 绳包管理（上传、下载、分类）
+- 💬 社区评论系统
+- 👥 用户管理
+- 🛠️ 管理员后台
+- 📊 数据统计
 
-## 🛠️ 技术栈
+## 技术栈
 
-- **后端框架**: Rust + Actix-web
+- **框架**: Actix-web
 - **数据库**: SQLite
-- **认证**: JWT Token
+- **认证**: JWT
 - **密码加密**: bcrypt
-- **文件处理**: 本地文件系统
+- **序列化**: serde
+- **日志**: log + env_logger
 
-## 📁 项目结构
+## 快速开始
 
-```
-src/
-├── main.rs                 # 应用入口
-├── config.rs              # 配置管理
-├── models/                # 数据模型
-│   ├── mod.rs
-│   ├── user.rs           # 用户模型
-│   ├── package.rs        # 绳包模型
-│   ├── comment.rs        # 评论模型
-│   └── system.rs         # 系统模型
-├── api/                  # API路由
-│   ├── mod.rs
-│   └── v1/              # API版本
-│       ├── mod.rs
-│       ├── auth.rs      # 认证API
-│       ├── user.rs      # 用户API
-│       ├── package.rs   # 绳包API
-│       ├── admin.rs     # 管理API
-│       └── community.rs # 社区API
-├── services/            # 业务逻辑
-│   ├── mod.rs
-│   ├── auth_service.rs
-│   ├── user_service.rs
-│   ├── package_service.rs
-│   └── admin_service.rs
-├── repositories/        # 数据访问
-│   ├── mod.rs
-│   ├── user_repo.rs
-│   ├── package_repo.rs
-│   └── system_repo.rs
-├── middleware/          # 中间件
-│   ├── mod.rs
-│   ├── auth.rs         # 认证中间件
-│   ├── cors.rs         # CORS中间件
-│   └── logging.rs      # 日志中间件
-├── utils/              # 工具函数
-│   ├── mod.rs
-│   ├── jwt.rs          # JWT工具
-│   ├── password.rs     # 密码加密
-│   └── file.rs         # 文件处理
-└── sql/                # SQL文件
-    └── init.sql        # 数据库初始化
-```
-
-## 🚀 快速开始
-
-### 环境要求
+### 1. 环境要求
 
 - Rust 1.70+
-- Cargo
+- Windows/Linux/macOS
 
-### 安装和运行
+### 2. 安装依赖
 
-1. **克隆项目**
-```bash
-git clone <repository-url>
-cd rope-manager-backend
-```
-
-2. **安装依赖**
 ```bash
 cargo build
 ```
 
-3. **运行项目**
+### 3. 配置管理
+
+项目支持多种配置方式：
+
+#### 方式一：配置文件（推荐）
 ```bash
-cargo run
+# 创建默认配置文件
+powershell -ExecutionPolicy Bypass -File config_manager.ps1 new
+
+# 编辑配置文件
+powershell -ExecutionPolicy Bypass -File config_manager.ps1 edit
+
+# 查看当前配置
+powershell -ExecutionPolicy Bypass -File config_manager.ps1 show
 ```
 
-4. **访问API**
-- 服务地址: http://localhost:8080
-- API文档: http://localhost:8080/api/v1
+#### 方式二：环境变量
+```bash
+# 设置环境变量
+set HOST=127.0.0.1
+set PORT=8080
+set DATABASE_URL=data.db
+set JWT_SECRET=your-secret-key
+set UPLOAD_PATH=uploads
+```
 
-## 📋 API接口
+#### 方式三：混合模式
+配置文件优先级高于环境变量，环境变量优先级高于默认值。
+
+### 4. 启动服务
+
+#### 方法一：使用批处理脚本（推荐）
+```bash
+# Windows批处理
+start.bat
+
+# 或使用PowerShell脚本（支持中文显示）
+powershell -ExecutionPolicy Bypass -File start.ps1
+```
+
+#### 方法二：直接运行
+```bash
+# 开发模式
+cargo run
+
+# 发布模式
+cargo run --release
+```
+
+服务将在 `http://127.0.0.1:8080` 启动。
+
+### 5. 测试API
+
+运行测试脚本：
+
+```bash
+# 基础测试（批处理）
+test_api.bat
+
+# 基础测试（PowerShell，推荐）
+powershell -ExecutionPolicy Bypass -File test_api.ps1
+
+# 高级测试（PowerShell，包含详细报告）
+powershell -ExecutionPolicy Bypass -File test_api_advanced.ps1
+```
+
+测试脚本会自动从配置文件读取端口设置，支持中文显示和详细的测试报告。
+
+## API 端点
 
 ### 认证相关
 
-- `POST /api/v1/auth/login` - 用户登录
 - `POST /api/v1/auth/register` - 用户注册
+- `POST /api/v1/auth/login` - 用户登录
 - `GET /api/v1/auth/user-info` - 获取用户信息
-
-### 用户管理
-
-- `GET /api/v1/users` - 获取用户列表
-- `GET /api/v1/users/{id}` - 获取单个用户
-- `PUT /api/v1/users/{id}` - 更新用户信息
-- `DELETE /api/v1/users/{id}` - 删除用户
 
 ### 绳包管理
 
 - `GET /api/v1/packages` - 获取绳包列表
-- `GET /api/v1/packages/{id}` - 获取单个绳包
+- `GET /api/v1/packages/{id}` - 获取绳包详情
 - `POST /api/v1/packages` - 创建绳包
 - `PUT /api/v1/packages/{id}` - 更新绳包
 - `DELETE /api/v1/packages/{id}` - 删除绳包
-- `GET /api/v1/packages/{id}/download` - 下载绳包
 
-### 社区功能
+### 用户管理
 
-- `GET /api/v1/community/comments/{package_id}` - 获取评论
-- `POST /api/v1/community/comments/{package_id}` - 发表评论
+- `GET /api/v1/users` - 获取用户列表
+- `GET /api/v1/users/{id}` - 获取用户详情
+- `PUT /api/v1/users/{id}` - 更新用户信息
+- `DELETE /api/v1/users/{id}` - 删除用户
+
+### 评论系统
+
+- `GET /api/v1/comments` - 获取评论列表
+- `POST /api/v1/comments` - 创建评论
+- `PUT /api/v1/comments/{id}` - 更新评论
+- `DELETE /api/v1/comments/{id}` - 删除评论
 
 ### 管理员功能
 
 - `GET /api/v1/admin/stats` - 获取统计数据
-- `GET /api/v1/admin/categories` - 获取分类列表
-- `GET /api/v1/admin/user-actions` - 获取用户行为记录
+- `GET /api/v1/admin/logs` - 获取系统日志
+- `POST /api/v1/admin/backup` - 创建数据备份
 
-## 🔧 配置
+## 项目结构
 
-通过环境变量配置：
-
-```bash
-# 服务器配置
-HOST=127.0.0.1
-PORT=8080
-
-# 数据库配置
-DATABASE_URL=data/rope_manager.db
-
-# JWT配置
-JWT_SECRET=your-secret-key
-
-# 文件上传配置
-UPLOAD_PATH=uploads
-MAX_FILE_SIZE=10485760  # 10MB
+```
+src/
+├── main.rs              # 应用入口
+├── config.rs            # 配置管理
+├── models/              # 数据模型
+│   ├── user.rs         # 用户模型
+│   ├── package.rs      # 绳包模型
+│   └── comment.rs      # 评论模型
+├── api/                 # API路由
+│   └── v1/             # API版本1
+│       ├── auth.rs     # 认证API
+│       ├── packages.rs # 绳包API
+│       ├── users.rs    # 用户API
+│       └── admin.rs    # 管理员API
+├── services/            # 业务逻辑层
+│   ├── auth_service.rs # 认证服务
+│   ├── user_service.rs # 用户服务
+│   └── package_service.rs # 绳包服务
+├── repositories/        # 数据访问层
+│   ├── user_repo.rs    # 用户仓库
+│   ├── package_repo.rs # 绳包仓库
+│   └── comment_repo.rs # 评论仓库
+├── middleware/          # 中间件
+│   ├── auth.rs         # 认证中间件
+│   ├── cors.rs         # CORS中间件
+│   └── logging.rs      # 日志中间件
+└── utils/              # 工具函数
+    ├── jwt.rs          # JWT工具
+    ├── password.rs     # 密码工具
+    └── file.rs         # 文件工具
 ```
 
-## 🔐 默认账户
+## 数据库
 
-- **管理员账户**
-  - 用户名: `admin`
-  - 密码: `admin123`
+项目使用 SQLite 数据库，数据库文件位于 `data.db`。
 
-## 📊 数据库
+初始化SQL脚本位于 `sql/init.sql`，包含：
 
-项目使用 SQLite 数据库，数据库文件位于 `data/rope_manager.db`。
+- 用户表
+- 绳包表
+- 评论表
+- 分类表
+- 系统配置表
 
-### 主要表结构
+## 开发
 
-- `users` - 用户表
-- `packages` - 绳包表
-- `comments` - 评论表
-- `categories` - 分类表
-- `user_actions` - 用户行为日志表
+### 添加新功能
 
-## 🛡️ 安全特性
+1. 在 `models/` 中定义数据模型
+2. 在 `repositories/` 中实现数据访问
+3. 在 `services/` 中实现业务逻辑
+4. 在 `api/v1/` 中定义API端点
+5. 在 `main.rs` 中注册路由
 
-- JWT Token 认证
-- bcrypt 密码加密
-- CORS 跨域配置
-- 文件上传安全检查
-- SQL 注入防护
+### 运行测试
 
-## 📝 开发说明
+```bash
+cargo test
+```
 
-### 添加新的API
+### 代码格式化
 
-1. 在 `src/api/v1/` 下创建新的路由文件
-2. 在 `src/services/` 下创建对应的服务
-3. 在 `src/repositories/` 下创建数据访问层
-4. 在 `src/models/` 下定义数据模型
+```bash
+cargo fmt
+```
 
-### 数据库迁移
+### 代码检查
 
-修改 `src/sql/init.sql` 文件，然后重新运行应用。
+```bash
+cargo clippy
+```
 
-## 🤝 贡献
+## 部署
 
-欢迎提交 Issue 和 Pull Request！
+### 生产环境
 
-## �� 许可证
+1. 编译发布版本：
+   ```bash
+   cargo build --release
+   ```
 
-MIT License 
+2. 配置生产环境变量
+
+3. 使用进程管理器（如 systemd）运行服务
+
+### Docker 部署
+
+```dockerfile
+FROM rust:1.70 as builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bullseye-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/rope-manager-backend /usr/local/bin/
+EXPOSE 8080
+CMD ["rope-manager-backend"]
+```
+
+## 许可证
+
+MIT License
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！ 
