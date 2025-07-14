@@ -193,13 +193,11 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to: any, from: any, next: any) => {
+router.beforeEach((to, from, next) => {
   // 记录路由导航开始
   logRouteNavigation(to, from, 'start')
-  
-  // 调试路由信息
   debugRouteInfo(to, from)
-  
+
   // 设置页面标题
   if (to.meta?.title) {
     document.title = `${to.meta.title} - 绳包管理系统`
@@ -208,15 +206,13 @@ router.beforeEach((to: any, from: any, next: any) => {
   // 检查是否需要重定向
   const redirectPath = getRedirectPath(to, from)
   if (redirectPath) {
-    console.log('🔄 路由重定向:', { from: to.path, to: redirectPath })
     logRouteNavigation(to, from, 'redirect')
-    next(redirectPath)
-    return
+    return next(redirectPath)
   }
 
-  // 登录校验：未登录不能访问后台页面（包括所有子路由）
+  // 登录校验：所有 meta.requiresAuth 的页面都需要登录
   const token = localStorage.getItem('loginToken')
-  if ((to.path.startsWith('/admin') || to.path.startsWith('/user')) && !token) {
+  if (to.meta?.requiresAuth && !token) {
     return next({ path: '/login', replace: true })
   }
 
@@ -228,7 +224,6 @@ router.beforeEach((to: any, from: any, next: any) => {
     return next('/403')
   }
 
-  // 记录路由导航完成
   logRouteNavigation(to, from, 'complete')
   next()
 })
