@@ -1,23 +1,21 @@
 <template>
-  <div class="community-home">
+  <div class="home-container">
     <!-- 顶部导航栏 -->
-    <div class="community-header">
+    <header class="header">
       <div class="header-content">
-        <div class="logo-section">
-          <div class="logo-container">
-            <div class="logo-icon">📚</div>
-            <div class="logo-text">
-              <h1 class="site-title">资源社区</h1>
-              <p class="site-subtitle">分享、发现、学习</p>
-            </div>
+        <div class="logo">
+          <div class="logo-icon">📚</div>
+          <div class="logo-text">
+            <h1>资源社区</h1>
+            <p>分享、发现、学习</p>
           </div>
         </div>
         
-        <div class="search-section">
+        <div class="search">
           <el-input
             v-model="searchQuery"
             placeholder="搜索资源..."
-            class="search-input"
+            size="large"
             clearable
             @keyup.enter="handleSearch"
           >
@@ -25,61 +23,85 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-          <el-button type="primary" @click="handleSearch" class="search-btn">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
         </div>
         
-        <div class="user-section">
+        <div class="actions">
           <ThemeSwitcher />
-          <el-button v-if="!isLoggedIn" type="primary" @click="goToLogin" class="login-btn">
+          <el-button 
+            v-if="!isLoggedIn" 
+            type="primary" 
+            size="large"
+            @click="goToLogin"
+          >
             <el-icon><User /></el-icon>
             登录
           </el-button>
-          <el-button v-if="isLoggedIn" type="success" @click="goToAdmin" class="admin-btn">
+          <el-button 
+            v-if="isLoggedIn" 
+            type="success" 
+            size="large"
+            @click="goToAdmin"
+          >
             <el-icon><Setting /></el-icon>
             管理后台
           </el-button>
         </div>
       </div>
-    </div>
+    </header>
 
     <!-- 分类导航 -->
-    <div class="category-nav">
-      <div class="category-container">
-        <el-tabs v-model="activeCategory" @tab-click="handleCategoryChange" class="category-tabs">
-          <el-tab-pane label="全部" name="all"></el-tab-pane>
-          <el-tab-pane label="热门" name="hot"></el-tab-pane>
-          <el-tab-pane label="最新" name="latest"></el-tab-pane>
-          <el-tab-pane label="推荐" name="recommended"></el-tab-pane>
-          <el-tab-pane label="教程" name="tutorial"></el-tab-pane>
-          <el-tab-pane label="工具" name="tool"></el-tab-pane>
-          <el-tab-pane label="模板" name="template"></el-tab-pane>
+    <nav class="nav">
+      <div class="nav-content">
+        <el-tabs 
+          v-model="activeCategory" 
+          @tab-click="handleCategoryChange"
+          class="category-tabs"
+        >
+          <el-tab-pane label="全部" name="all" />
+          <el-tab-pane label="热门" name="hot" />
+          <el-tab-pane label="最新" name="latest" />
+          <el-tab-pane label="推荐" name="recommended" />
+          <el-tab-pane label="教程" name="tutorial" />
+          <el-tab-pane label="工具" name="tool" />
+          <el-tab-pane label="模板" name="template" />
         </el-tabs>
       </div>
-    </div>
+    </nav>
 
     <!-- 筛选工具栏 -->
-    <div class="filter-toolbar">
+    <div class="filter-bar">
       <div class="filter-content">
         <div class="filter-left">
-          <el-select v-model="sortBy" placeholder="排序方式" @change="handleSortChange" class="filter-select">
-            <el-option label="最新发布" value="latest"></el-option>
-            <el-option label="最多下载" value="downloads"></el-option>
-            <el-option label="最多点赞" value="likes"></el-option>
-            <el-option label="最多收藏" value="favorites"></el-option>
+          <el-select 
+            v-model="sortBy" 
+            placeholder="排序方式" 
+            @change="handleSortChange"
+            size="large"
+          >
+            <el-option label="最新发布" value="latest" />
+            <el-option label="最多下载" value="downloads" />
+            <el-option label="最多点赞" value="likes" />
+            <el-option label="最多收藏" value="favorites" />
           </el-select>
           
-          <el-select v-model="filterType" placeholder="资源类型" @change="handleFilterChange" class="filter-select">
-            <el-option label="全部类型" value="all"></el-option>
-            <el-option label="免费资源" value="free"></el-option>
-            <el-option label="付费资源" value="paid"></el-option>
+          <el-select 
+            v-model="filterType" 
+            placeholder="资源类型" 
+            @change="handleFilterChange"
+            size="large"
+          >
+            <el-option label="全部类型" value="all" />
+            <el-option label="免费资源" value="free" />
+            <el-option label="付费资源" value="paid" />
           </el-select>
         </div>
         
         <div class="filter-right">
-          <el-button type="primary" @click="showUploadDialog = true" class="upload-btn">
+          <el-button 
+            type="primary" 
+            size="large"
+            @click="showUploadDialog = true"
+          >
             <el-icon><Upload /></el-icon>
             上传资源
           </el-button>
@@ -87,86 +109,140 @@
       </div>
     </div>
 
-    <!-- 资源列表 -->
-    <div class="resources-container">
-      <div class="resources-grid">
-        <div 
-          v-for="resource in filteredResources" 
-          :key="resource.id" 
-          class="resource-card"
-          @click="viewResource(resource.id)"
-        >
-                      <div class="resource-image">
-              <img :src="resource.cover || '/placeholder.jpg'" :alt="resource.绳包名称">
-            <div class="resource-overlay">
-              <el-button type="primary" size="small" @click.stop="downloadResource(resource.id)" class="download-btn">
-                <el-icon><Download /></el-icon>
-                下载
+    <!-- 主内容区 -->
+    <main class="main">
+      <div class="main-content">
+        <!-- 公告区左侧 -->
+        <div class="content-right">
+          <div class="notice-card">
+            <h3 class="notice-title">社区公告</h3>
+            <ul class="notice-list">
+              <li v-for="item in notices" :key="item.id">
+                {{ item.text }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <!-- 主内容区右侧 -->
+        <div class="content-left">
+          <!-- 统计卡片 -->
+          <div class="stats">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-icon">
+                  <el-icon><Document /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ totalResources }}</div>
+                  <div class="stat-label">总资源数</div>
+                </div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-icon">
+                  <el-icon><Download /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ totalDownloads }}</div>
+                  <div class="stat-label">总下载量</div>
+                </div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-icon">
+                  <el-icon><User /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ totalUsers }}</div>
+                  <div class="stat-label">注册用户</div>
+                </div>
+              </div>
+              
+              <div class="stat-card">
+                <div class="stat-icon">
+                  <el-icon><Star /></el-icon>
+                </div>
+                <div class="stat-info">
+                  <div class="stat-number">{{ totalLikes }}</div>
+                  <div class="stat-label">总点赞数</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 资源列表 -->
+          <div class="resources">
+            <div v-if="filteredResources.length === 0" class="empty-state">
+              <div class="empty-icon">📦</div>
+              <h3>暂无资源</h3>
+              <p>还没有资源被上传，快来分享你的第一个资源吧！</p>
+              <el-button type="primary" @click="showUploadDialog = true">
+                <el-icon><Upload /></el-icon>
+                上传资源
               </el-button>
             </div>
-            <div class="resource-badge" v-if="resource.category">
-              {{ getCategoryLabel(resource.category) }}
+            
+            <div v-else class="resources-grid">
+              <div 
+                v-for="resource in filteredResources.slice((currentPage-1)*pageSize, currentPage*pageSize)" 
+                :key="resource.id"
+                class="resource-card"
+                @click="viewResource(resource.id)"
+              >
+                <div class="resource-icon">
+                  <el-icon size="28" :color="getCategoryColor(resource.category)">
+                    <Document />
+                  </el-icon>
+                </div>
+                <div class="resource-content">
+                  <div class="resource-header">
+                    <h3 class="resource-title">{{ resource.绳包名称 }}</h3>
+                    <span class="resource-badge">{{ getCategoryLabel(resource.category) }}</span>
+                  </div>
+                  <p class="resource-desc">{{ resource.简介 }}</p>
+                  <div class="resource-footer">
+                    <div class="resource-meta">
+                      <span class="meta-item">
+                        <el-icon><User /></el-icon>
+                        {{ resource.作者 }}
+                      </span>
+                      <span class="meta-item">
+                        <el-icon><Calendar /></el-icon>
+                        {{ formatDate(resource.上架时间) }}
+                      </span>
+                    </div>
+                    <div class="resource-actions">
+                      <el-button 
+                        type="primary" 
+                        size="small"
+                        @click.stop="downloadResource(resource.id)"
+                      >
+                        <el-icon><Download /></el-icon>
+                        下载
+                      </el-button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div class="resource-info">
-            <h3 class="resource-title">{{ resource.绳包名称 }}</h3>
-            <p class="resource-description">{{ resource.简介 }}</p>
-            
-            <div class="resource-meta">
-              <div class="meta-item">
-                <el-icon><User /></el-icon>
-                <span>{{ resource.作者 }}</span>
-              </div>
-              <div class="meta-item">
-                <el-icon><Calendar /></el-icon>
-                <span>{{ formatDate(resource.上架时间) }}</span>
-              </div>
-            </div>
-            
-            <div class="resource-stats">
-              <div class="stat-item">
-                <el-icon><Download /></el-icon>
-                <span>{{ formatNumber(resource.下载次数) }}</span>
-              </div>
-              <div class="stat-item">
-                <el-icon><Star /></el-icon>
-                <span>{{ formatNumber(resource.likes || 0) }}</span>
-              </div>
-              <div class="stat-item">
-                <el-icon><Star /></el-icon>
-                <span>{{ formatNumber(resource.favorites || 0) }}</span>
-              </div>
-            </div>
-            
-            <div class="resource-tags">
-              <el-tag 
-                v-for="tag in resource.标签" 
-                :key="tag" 
-                size="small" 
-                class="resource-tag"
-              >
-                {{ tag }}
-              </el-tag>
-            </div>
+          <!-- 分页 -->
+          <div v-if="filteredResources.length > 0" class="pagination">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :total="totalResources"
+              :page-sizes="[18, 36, 54]"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+              background
+            />
           </div>
         </div>
       </div>
-      
-      <!-- 分页 -->
-      <div class="pagination-container">
-        <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
-          :total="totalResources"
-          :page-sizes="[12, 24, 48, 96]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-          class="pagination"
-        />
-      </div>
-    </div>
+    </main>
 
     <!-- 上传对话框 -->
     <el-dialog
@@ -174,11 +250,21 @@
       title="上传资源"
       width="600px"
       :before-close="handleUploadClose"
-      class="upload-dialog"
+      destroy-on-close
     >
-      <el-form :model="uploadForm" :rules="uploadRules" ref="uploadFormRef" label-width="100px" class="upload-form">
+      <el-form 
+        :model="uploadForm" 
+        :rules="uploadRules" 
+        ref="uploadFormRef" 
+        label-width="100px"
+        size="large"
+      >
         <el-form-item label="资源标题" prop="title">
-          <el-input v-model="uploadForm.title" placeholder="请输入资源标题"></el-input>
+          <el-input 
+            v-model="uploadForm.title" 
+            placeholder="请输入资源标题"
+            clearable
+          />
         </el-form-item>
         
         <el-form-item label="资源描述" prop="description">
@@ -187,15 +273,17 @@
             type="textarea"
             :rows="4"
             placeholder="请输入资源描述"
-          ></el-input>
+            show-word-limit
+            maxlength="500"
+          />
         </el-form-item>
         
         <el-form-item label="资源分类" prop="category">
-          <el-select v-model="uploadForm.category" placeholder="选择分类">
-            <el-option label="教程" value="tutorial"></el-option>
-            <el-option label="工具" value="tool"></el-option>
-            <el-option label="模板" value="template"></el-option>
-            <el-option label="其他" value="other"></el-option>
+          <el-select v-model="uploadForm.category" placeholder="选择分类" style="width: 100%">
+            <el-option label="教程" value="tutorial" />
+            <el-option label="工具" value="tool" />
+            <el-option label="模板" value="template" />
+            <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
         
@@ -204,14 +292,15 @@
             v-model="uploadForm.tagsInput"
             placeholder="输入标签，用逗号分隔"
             @keyup.enter="addTag"
-          ></el-input>
+            clearable
+          />
           <div class="tags-container">
             <el-tag
               v-for="tag in uploadForm.tags"
               :key="tag"
               closable
               @close="removeTag(tag)"
-              class="upload-tag"
+              effect="light"
             >
               {{ tag }}
             </el-tag>
@@ -225,9 +314,12 @@
             :on-change="handleFileChange"
             :limit="1"
             accept=".zip,.rar,.7z,.pdf,.doc,.docx"
-            class="file-upload"
+            drag
           >
-            <el-button type="primary">选择文件</el-button>
+            <el-icon class="el-icon--upload"><Upload /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
             <template #tip>
               <div class="el-upload__tip">
                 支持 zip, rar, 7z, pdf, doc, docx 格式，文件大小不超过100MB
@@ -243,9 +335,12 @@
             :on-change="handleCoverChange"
             :limit="1"
             accept="image/*"
-            class="cover-upload"
+            drag
           >
-            <el-button type="primary">选择封面</el-button>
+            <el-icon class="el-icon--upload"><Picture /></el-icon>
+            <div class="el-upload__text">
+              将图片拖到此处，或<em>点击上传</em>
+            </div>
             <template #tip>
               <div class="el-upload__tip">
                 支持 jpg, png, gif 格式，建议尺寸 300x200
@@ -257,8 +352,13 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showUploadDialog = false">取消</el-button>
-          <el-button type="primary" @click="submitUpload" :loading="uploading">
+          <el-button @click="showUploadDialog = false" size="large">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="submitUpload" 
+            :loading="uploading"
+            size="large"
+          >
             上传资源
           </el-button>
         </span>
@@ -278,7 +378,10 @@ import {
   Download,
   Star,
   Calendar,
-  Upload
+  Upload,
+  Document,
+  Collection,
+  Picture
 } from '@element-plus/icons-vue'
 import type { FormInstance, UploadFile } from 'element-plus'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
@@ -299,6 +402,19 @@ const totalResources = ref(0)
 const showUploadDialog = ref(false)
 const uploading = ref(false)
 const loading = ref(false)
+
+// 统计数据
+const totalDownloads = ref(0)
+const totalUsers = ref(0)
+const totalLikes = ref(0)
+
+// 公告数据
+const notices = [
+  { id: 1, text: '欢迎来到资源社区！' },
+  { id: 2, text: '请遵守社区规范，文明发言。' },
+  { id: 3, text: '资源上传请确保无版权争议。' },
+  { id: 4, text: '如遇问题请联系管理员。' },
+]
 
 // 分类标签映射
 const categoryLabels = {
@@ -385,16 +501,100 @@ const filteredResources = computed(() => {
 const loadResources = async () => {
   try {
     loading.value = true
-    const res = await communityApi.getResources({
-      page: currentPage.value,
-      pageSize: pageSize.value,
-      category: activeCategory.value,
-      search: searchQuery.value
-    })
+    
+    // 模拟资源数据
+    const mockResources = [
+      {
+        id: 1,
+        绳包名称: 'Vue 3 开发模板',
+        简介: '基于 Vue 3 + TypeScript + Element Plus 的现代化开发模板，包含完整的项目结构和常用组件。',
+        作者: '张三',
+        上架时间: '2024-01-15',
+        下载次数: 1250,
+        likes: 89,
+        favorites: 45,
+        category: 'template',
+        标签: ['Vue3', 'TypeScript', 'Element Plus']
+      },
+      {
+        id: 2,
+        绳包名称: 'React 组件库',
+        简介: '一套完整的 React 组件库，包含表单、表格、弹窗等常用组件，支持 TypeScript。',
+        作者: '李四',
+        上架时间: '2024-01-10',
+        下载次数: 890,
+        likes: 67,
+        favorites: 32,
+        category: 'tool',
+        标签: ['React', '组件库', 'TypeScript']
+      },
+      {
+        id: 3,
+        绳包名称: 'Node.js 后端教程',
+        简介: '从零开始学习 Node.js 后端开发，包含 Express、MongoDB、JWT 认证等完整教程。',
+        作者: '王五',
+        上架时间: '2024-01-08',
+        下载次数: 2100,
+        likes: 156,
+        favorites: 78,
+        category: 'tutorial',
+        标签: ['Node.js', 'Express', 'MongoDB']
+      },
+      {
+        id: 4,
+        绳包名称: 'Python 数据分析工具',
+        简介: '基于 Python 的数据分析工具包，包含数据处理、可视化、机器学习等功能。',
+        作者: '赵六',
+        上架时间: '2024-01-05',
+        下载次数: 750,
+        likes: 43,
+        favorites: 21,
+        category: 'tool',
+        标签: ['Python', '数据分析', '机器学习']
+      },
+      {
+        id: 5,
+        绳包名称: 'Flutter 移动应用模板',
+        简介: '完整的 Flutter 移动应用开发模板，包含状态管理、路由、网络请求等常用功能。',
+        作者: '孙七',
+        上架时间: '2024-01-03',
+        下载次数: 680,
+        likes: 52,
+        favorites: 28,
+        category: 'template',
+        标签: ['Flutter', '移动开发', 'Dart']
+      },
+      {
+        id: 6,
+        绳包名称: 'Docker 部署指南',
+        简介: '详细的 Docker 容器化部署指南，包含 Dockerfile 编写、Docker Compose 配置等。',
+        作者: '周八',
+        上架时间: '2024-01-01',
+        下载次数: 950,
+        likes: 78,
+        favorites: 41,
+        category: 'tutorial',
+        标签: ['Docker', '容器化', '部署']
+      }
+    ]
+    
+    // 模拟API响应
+    const res = {
+      code: 0,
+      data: {
+        resources: mockResources,
+        total: mockResources.length
+      }
+    }
     
     if (res.code === 0 && res.data) {
       resources.value = res.data.resources || res.data.绳包列表 || []
       totalResources.value = res.data.total || resources.value.length
+      
+      // 计算统计数据
+      totalDownloads.value = resources.value.reduce((sum, resource) => sum + (resource.下载次数 || 0), 0)
+      totalLikes.value = resources.value.reduce((sum, resource) => sum + (resource.likes || 0), 0)
+      totalUsers.value = Math.floor(Math.random() * 1000) + 500 // 模拟数据
     } else {
       ElMessage.error(res.msg || '加载资源失败')
     }
@@ -444,7 +644,6 @@ const downloadResource = async (id: number) => {
     const res = await communityApi.downloadResource(id)
     if (res.code === 0) {
       ElMessage.success('下载统计成功')
-      // 重新加载资源以更新下载次数
       loadResources()
     } else {
       ElMessage.error(res.msg || '下载失败')
@@ -460,7 +659,6 @@ const goToLogin = () => {
 }
 
 const goToAdmin = () => {
-  // 调试输出localStorage登录状态
   console.log('isLoggedIn:', localStorage.getItem('isLoggedIn'))
   console.log('userInfo:', localStorage.getItem('userInfo'))
   const user = getUserInfo && getUserInfo()
@@ -481,6 +679,16 @@ const goToAdmin = () => {
 
 const getCategoryLabel = (category: string) => {
   return categoryLabels[category as keyof typeof categoryLabels] || category
+}
+
+const getCategoryColor = (category: string) => {
+  const colors = {
+    tutorial: '#67C23A',
+    tool: '#409EFF',
+    template: '#E6A23C',
+    other: '#909399'
+  }
+  return colors[category as keyof typeof colors] || '#909399'
 }
 
 const formatDate = (date: string) => {
@@ -535,7 +743,6 @@ const submitUpload = async () => {
     if (res.code === 0) {
       ElMessage.success('资源上传成功')
       showUploadDialog.value = false
-      // 重置表单
       Object.assign(uploadForm, {
         title: '',
         description: '',
@@ -545,7 +752,6 @@ const submitUpload = async () => {
         file: undefined,
         cover: undefined
       })
-      // 重新加载资源
       loadResources()
     } else {
       ElMessage.error(res.msg || '上传失败')
@@ -560,7 +766,6 @@ const submitUpload = async () => {
 
 const handleUploadClose = () => {
   showUploadDialog.value = false
-  // 重置表单
   Object.assign(uploadForm, {
     title: '',
     description: '',
@@ -572,133 +777,83 @@ const handleUploadClose = () => {
   })
 }
 
-// 生命周期
 onMounted(() => {
   loadResources()
 })
 </script>
 
 <style scoped>
-.community-home {
+.home-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--brand-color) 0%, var(--brand-color-dark) 100%);
-  color: var(--text-primary);
+  background: #f6f8fa;
 }
 
-.community-header {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding: var(--spacing-lg) 0;
+/* 顶部导航 */
+.header {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 0;
   position: sticky;
   top: 0;
-  z-index: var(--z-index-sticky);
-  box-shadow: var(--shadow-light);
+  z-index: 100;
 }
 
 .header-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 var(--spacing-lg);
+  padding: 0 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-lg);
+  gap: 32px;
 }
 
-.logo-section {
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
-}
-
-.logo-container {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
 }
 
 .logo-icon {
-  font-size: 2.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 32px;
 }
 
-.logo-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.site-title {
+.logo-text h1 {
   margin: 0;
-  font-size: var(--font-size-xxl);
-  font-weight: var(--font-weight-bold);
-  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  line-height: 1.2;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
 }
 
-.site-subtitle {
-  margin: var(--spacing-xs) 0 0 0;
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-normal);
+.logo-text p {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: #6b7280;
 }
 
-.search-section {
+.search {
   flex: 1;
-  max-width: 500px;
+  max-width: 400px;
+}
+
+.actions {
   display: flex;
-  gap: var(--spacing-md);
-}
-
-.search-input {
-  flex: 1;
-}
-
-.search-input :deep(.el-input__wrapper) {
-  border-radius: var(--border-radius-large);
-  box-shadow: var(--shadow-light);
-  transition: all var(--transition-base);
-}
-
-.search-input :deep(.el-input__wrapper:hover) {
-  box-shadow: var(--shadow-base);
-}
-
-.search-btn {
-  border-radius: var(--border-radius-large);
-  padding: 0 var(--spacing-lg);
-  font-weight: var(--font-weight-medium);
-}
-
-.user-section {
+  align-items: center;
+  gap: 12px;
   flex-shrink: 0;
-  display: flex;
-  gap: var(--spacing-md);
+  margin-left: auto;
 }
 
-.login-btn, .admin-btn {
-  border-radius: var(--border-radius-large);
-  padding: 0 var(--spacing-lg);
-  font-weight: var(--font-weight-medium);
-  transition: all var(--transition-base);
+/* 分类导航 */
+.nav {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.login-btn:hover, .admin-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-base);
-}
-
-.category-nav {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 0 var(--spacing-lg);
-}
-
-.category-container {
+.nav-content {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 24px;
 }
 
 .category-tabs :deep(.el-tabs__header) {
@@ -706,155 +861,217 @@ onMounted(() => {
 }
 
 .category-tabs :deep(.el-tabs__nav-wrap) {
-  padding: var(--spacing-md) 0;
+  padding: 8px 0;
 }
 
 .category-tabs :deep(.el-tabs__item) {
-  font-weight: var(--font-weight-medium);
-  transition: all var(--transition-base);
-}
-
-.category-tabs :deep(.el-tabs__item:hover) {
-  color: var(--brand-color);
+  font-weight: 500;
+  color: #6b7280;
 }
 
 .category-tabs :deep(.el-tabs__item.is-active) {
-  color: var(--brand-color);
-  font-weight: var(--font-weight-semibold);
+  color: #3b82f6;
+  font-weight: 600;
 }
 
-.filter-toolbar {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+/* 筛选栏 */
+.filter-bar {
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 0;
 }
 
 .filter-content {
   max-width: 1200px;
   margin: 0 auto;
+  padding: 0 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: 16px;
 }
 
 .filter-left {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 12px;
 }
 
-.filter-select {
-  min-width: 150px;
+.filter-left .el-select {
+  width: 160px;
 }
 
-.filter-select :deep(.el-input__wrapper) {
-  border-radius: var(--border-radius-base);
+/* 主内容区 */
+.main {
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  box-sizing: border-box;
+  padding: 32px 0;
 }
 
-.upload-btn {
-  border-radius: var(--border-radius-large);
-  padding: 0 var(--spacing-lg);
-  font-weight: var(--font-weight-medium);
-  transition: all var(--transition-base);
-}
-
-.upload-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-base);
-}
-
-.resources-container {
+.main-content {
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--spacing-xl) var(--spacing-lg);
+  padding: 0 24px;
+  display: flex;
+  gap: 32px;
 }
 
-.resources-grid {
+.content-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.content-right {
+  width: 280px;
+  flex-shrink: 0;
+}
+
+/* 统计卡片 */
+.stats {
+  margin-bottom: 32px;
+}
+
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: var(--spacing-lg);
-  margin-bottom: var(--spacing-xl);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
 }
 
-.resource-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: var(--border-radius-extra-large);
-  overflow: hidden;
-  box-shadow: var(--shadow-light);
-  transition: all var(--transition-base);
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
+.stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
-.resource-card:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--shadow-dark);
-  border-color: var(--brand-color-light);
+.stat-card:hover {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
-.resource-image {
-  position: relative;
-  height: 200px;
-  overflow: hidden;
-}
-
-.resource-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform var(--transition-base);
-}
-
-.resource-card:hover .resource-image img {
-  transform: scale(1.1);
-}
-
-.resource-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity var(--transition-base);
+  color: #fff;
+  font-size: 20px;
 }
 
-.resource-card:hover .resource-overlay {
-  opacity: 1;
+.stat-info {
+  flex: 1;
 }
 
-.download-btn {
-  border-radius: var(--border-radius-base);
-  font-weight: var(--font-weight-medium);
+.stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* 资源列表 */
+.resources {
+  margin-bottom: 32px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.empty-state h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.empty-state p {
+  margin: 0 0 24px 0;
+  color: #6b7280;
+}
+
+.resources-grid {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.resource-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.resource-card:hover {
+  box-shadow: 0 8px 25px 0 rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+}
+
+.resource-icon {
+  position: relative;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-radius: 8px 8px 0 0;
 }
 
 .resource-badge {
   position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
-  background: var(--brand-color);
-  color: white;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-base);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  top: 8px;
+  right: 8px;
+  font-size: 12px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 4px;
 }
 
-.resource-info {
-  padding: var(--spacing-lg);
+.resource-content {
+  padding: 16px;
+}
+
+.resource-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
 }
 
 .resource-title {
-  margin: 0 0 var(--spacing-md) 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -862,173 +1079,140 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.resource-description {
-  margin: 0 0 var(--spacing-md) 0;
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.resource-desc {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 0 0 2px 0;
+  line-height: 1.4;
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
 }
 
 .resource-meta {
   display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
+  gap: 4px;
+  font-size: 12px;
+  color: #9ca3af;
 }
 
 .resource-stats {
   display: flex;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
+  gap: 4px;
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .resource-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xs);
+  gap: 6px;
 }
 
-.resource-tag {
-  font-size: var(--font-size-xs);
-  border-radius: var(--border-radius-base);
-}
-
-.pagination-container {
+/* 分页 */
+.pagination {
   display: flex;
   justify-content: center;
-  padding: var(--spacing-lg) 0;
+  padding: 20px 0;
 }
 
-.pagination :deep(.el-pagination) {
-  --el-pagination-bg-color: rgba(255, 255, 255, 0.9);
-  --el-pagination-border-radius: var(--border-radius-base);
-  backdrop-filter: blur(10px);
+/* 公告区 */
+.notice-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 100px;
 }
 
+.notice-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.notice-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notice-list li {
+  padding: 8px 0;
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.5;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.notice-list li:last-child {
+  border-bottom: none;
+}
+
+/* 上传对话框 */
 .upload-dialog :deep(.el-dialog) {
-  border-radius: var(--border-radius-extra-large);
-  box-shadow: var(--shadow-dark);
+  border-radius: 12px;
 }
 
-.upload-dialog :deep(.el-dialog__header) {
-  border-bottom: 1px solid var(--border-color-light);
-  padding: var(--spacing-lg);
-}
-
-.upload-dialog :deep(.el-dialog__body) {
-  padding: var(--spacing-lg);
-}
-
-.upload-dialog :deep(.el-dialog__footer) {
-  border-top: 1px solid var(--border-color-light);
-  padding: var(--spacing-lg);
-}
-
-.upload-form :deep(.el-form-item__label) {
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.upload-form :deep(.el-input__wrapper) {
-  border-radius: var(--border-radius-base);
+/* 对话框头部背景透明 */
+:deep(.el-dialog__header) {
+  background-color: transparent !important;
 }
 
 .tags-container {
-  margin-top: var(--spacing-sm);
+  margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xs);
-}
-
-.upload-tag {
-  border-radius: var(--border-radius-base);
-}
-
-.file-upload, .cover-upload {
-  width: 100%;
-}
-
-.file-upload :deep(.el-upload), .cover-upload :deep(.el-upload) {
-  width: 100%;
-}
-
-.file-upload :deep(.el-upload-dragger), .cover-upload :deep(.el-upload-dragger) {
-  border-radius: var(--border-radius-base);
-  border: 2px dashed var(--border-color);
-  transition: all var(--transition-base);
-}
-
-.file-upload :deep(.el-upload-dragger:hover), .cover-upload :deep(.el-upload-dragger:hover) {
-  border-color: var(--brand-color);
-  background-color: var(--bg-secondary);
-}
-
-/* 深色模式适配 */
-.dark .community-home {
-  background: linear-gradient(135deg, var(--brand-color-dark) 0%, var(--brand-color) 100%);
-}
-
-.dark .community-header,
-.dark .category-nav,
-.dark .filter-toolbar {
-  background: rgba(44, 44, 44, 0.95);
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .resource-card {
-  background: rgba(44, 44, 44, 0.95);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.dark .resource-card:hover {
-  border-color: var(--brand-color-light);
+  gap: 6px;
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-  .header-content,
-  .category-container,
-  .filter-content,
-  .resources-container {
-    max-width: 100%;
-    padding-left: var(--spacing-md);
-    padding-right: var(--spacing-md);
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .content-right {
+    width: 100%;
+    margin-top: 24px;
+  }
+  
+  .notice-card {
+    position: static;
   }
 }
 
 @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: 16px;
   }
   
-  .search-section {
+  .search {
     max-width: 100%;
   }
   
   .filter-content {
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: 12px;
   }
   
   .filter-left {
@@ -1036,88 +1220,145 @@ onMounted(() => {
     justify-content: space-between;
   }
   
+  .filter-left .el-select {
+    width: 48%;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
   .resources-grid {
     grid-template-columns: 1fr;
-    gap: var(--spacing-md);
-  }
-  
-  .logo-container {
-    justify-content: center;
-  }
-  
-  .site-title {
-    font-size: var(--font-size-xl);
   }
 }
 
 @media (max-width: 480px) {
   .header-content,
-  .category-container,
+  .nav-content,
   .filter-content,
-  .resources-container {
-    padding-left: var(--spacing-sm);
-    padding-right: var(--spacing-sm);
+  .main-content {
+    padding-left: 16px;
+    padding-right: 16px;
   }
   
-  .site-title {
-    font-size: var(--font-size-lg);
+  .stats-grid {
+    grid-template-columns: 1fr;
   }
   
-  .logo-icon {
-    font-size: 2rem;
+  .stat-card {
+    padding: 16px;
   }
   
-  .resource-card {
-    border-radius: var(--border-radius-large);
-  }
-  
-  .resource-info {
-    padding: var(--spacing-md);
+  .resource-content {
+    padding: 16px;
   }
 }
 
-/* 动画效果 */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* 深色模式适配 */
+.dark .home-container {
+  background: #111827;
 }
 
-.resource-card {
-  animation: fadeInUp 0.6s ease-out;
+.dark .header,
+.dark .nav,
+.dark .filter-bar {
+  background: #1f2937;
+  border-bottom-color: #374151;
 }
 
-.resource-card:nth-child(1) { animation-delay: 0.1s; }
-.resource-card:nth-child(2) { animation-delay: 0.2s; }
-.resource-card:nth-child(3) { animation-delay: 0.3s; }
-.resource-card:nth-child(4) { animation-delay: 0.4s; }
-.resource-card:nth-child(5) { animation-delay: 0.5s; }
-.resource-card:nth-child(6) { animation-delay: 0.6s; }
-
-/* 无障碍支持 */
-@media (prefers-reduced-motion: reduce) {
-  .resource-card,
-  .resource-card:hover,
-  .resource-image img,
-  .resource-overlay {
-    animation: none;
-    transition: none;
-  }
+.dark .stat-card,
+.dark .resource-card,
+.dark .notice-card,
+.dark .empty-state {
+  background: #1f2937;
+  color: #f9fafb;
 }
 
-/* 高对比度模式 */
-@media (prefers-contrast: high) {
-  .resource-card {
-    border: 2px solid var(--border-color);
-  }
-  
-  .resource-card:hover {
-    border-color: var(--brand-color);
-  }
+.dark .logo-text h1,
+.dark .resource-title,
+.dark .notice-title {
+  color: #f9fafb;
+}
+
+.dark .logo-text p,
+.dark .stat-label,
+.dark .resource-desc,
+.dark .meta-item,
+.dark .notice-list li {
+  color: #9ca3af;
+}
+
+.dark .stat-number {
+  color: #f9fafb;
+}
+
+.dark .resource-stats .stat-item {
+  color: #9ca3af;
+}
+
+/* 让 el-input 输入框背景透明 */
+:deep(.el-input__wrapper) input {
+  background-color: transparent !important;
+}
+
+/* 主题切换按钮图标居中 */
+:deep(.theme-btn) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+:deep(.theme-icon) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 主题适配 - 统计图标 */
+.stat-icon {
+  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark));
+  color: #fff;
+}
+
+/* 主题适配 - 标签页 */
+.category-tabs :deep(.el-tabs__item) {
+  color: var(--text-secondary);
+  transition: color var(--transition-base);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.category-tabs :deep(.el-tabs__item.is-active) {
+  color: var(--brand-color);
+  font-weight: var(--font-weight-semibold);
+}
+
+.category-tabs :deep(.el-tabs__item:hover) {
+  color: var(--brand-color-light);
+}
+
+/* 主题适配 - 公告标题 */
+.notice-title {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* 深色模式特殊处理 */
+.dark .stat-icon {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+}
+
+.dark .category-tabs :deep(.el-tabs__item) {
+  color: #9ca3af;
+}
+
+.dark .category-tabs :deep(.el-tabs__item.is-active) {
+  color: #60a5fa;
+}
+
+.dark .notice-title {
+  color: #f9fafb;
 }
 </style> 
