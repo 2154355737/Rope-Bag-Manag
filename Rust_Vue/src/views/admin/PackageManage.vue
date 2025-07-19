@@ -444,7 +444,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Box, 
@@ -569,11 +569,26 @@ const refreshDownloadCount = async (pkgId: number) => {
       const index = packages.value.findIndex(p => p.id === pkgId)
       if (index !== -1) {
         packages.value[index].downloads = res.data.download_count
+        // 更新统计数据（虽然下载计数不影响统计卡片，但保持一致性）
+        updateStatistics()
       }
     }
   } catch (error) {
     console.error('刷新下载计数失败:', error)
   }
+}
+
+// 添加观察函数，当包数据变化时更新统计
+function setupWatchers() {
+  // 监听筛选条件变化
+  watch([statusFilter, typeFilter], () => {
+    // 当筛选条件变化时，不需要更新统计，因为我们统计的是总数
+  })
+  
+  // 监听包数据变化
+  watch(() => packages.value, () => {
+    updateStatistics()
+  }, { deep: true })
 }
 
 async function loadPackages() {
@@ -612,10 +627,7 @@ async function loadPackages() {
       console.log('处理后的绳包数据:', packages.value)
       
       // 更新统计数据
-      totalPackages.value = packages.value.length
-      availablePackages.value = packages.value.length
-      borrowedPackages.value = 0
-      maintenancePackages.value = 0
+      updateStatistics()
     } else {
       ElMessage.error('获取绳包数据失败')
     }
@@ -625,6 +637,33 @@ async function loadPackages() {
   } finally {
     loading.value = false
   }
+}
+
+// 更新统计数据
+function updateStatistics() {
+  // 总资源数
+  totalPackages.value = packages.value.length
+  
+  // 已发布资源数（正常或Active状态）
+  availablePackages.value = packages.value.filter(pkg => 
+    pkg.status === '正常' || pkg.status === 'Active' || pkg.status === '已发布'
+  ).length
+  
+  // 待审核资源数（待审核或Inactive状态）
+  borrowedPackages.value = packages.value.filter(pkg => 
+    pkg.status === '待审核' || pkg.status === 'Inactive'
+  ).length
+  
+  // 活跃用户数量（统计不同作者数量）
+  const uniqueAuthors = new Set(packages.value.map(pkg => pkg.author))
+  maintenancePackages.value = uniqueAuthors.size
+
+  console.log('统计数据更新:', {
+    总资源数: totalPackages.value,
+    已发布: availablePackages.value,
+    待审核: borrowedPackages.value,
+    活跃用户: maintenancePackages.value
+  })
 }
 
 async function loadCategories() {
@@ -776,6 +815,7 @@ async function updatePackage() {
       setTimeout(async () => {
         await loadCategories() // 先加载分类数据
         await loadPackages() // 再加载绳包数据
+        // 无需单独调用updateStatistics，因为loadPackages中已包含
       }, 500)
     } else {
       ElMessage.error(res.message || '更新失败')
@@ -814,6 +854,25 @@ async function deletePackage(pkg: any) {
       console.error('删除绳包错误:', error)
       ElMessage.error('删除失败')
     }
+  }
+}
+
+// 单个包状态更改时更新统计数据
+async function updateSinglePackageStatus(pkgId: number, newStatus: string) {
+  try {
+    // 查询单个包的最新信息
+    const res = await packageApi.getPackage(pkgId)
+    if (res.code === 0 && res.data) {
+      // 更新内存中的状态
+      const index = packages.value.findIndex(p => p.id === pkgId)
+      if (index !== -1) {
+        packages.value[index].status = newStatus
+        // 更新统计数据
+        updateStatistics()
+      }
+    }
+  } catch (error) {
+    console.error('更新包状态失败:', error)
   }
 }
 
@@ -1036,6 +1095,7 @@ function formatDate(date: string) {
 onMounted(async () => {
   await loadCategories() // 先加载分类数据
   await loadPackages() // 再加载绳包数据
+  setupWatchers() // 设置数据观察
 })
 </script>
 
