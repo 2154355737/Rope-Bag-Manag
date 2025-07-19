@@ -39,6 +39,7 @@ pub struct CreatePackageRequest {
     pub version: Option<String>,
     pub description: Option<String>,
     pub category_id: Option<i32>,
+    pub file_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -48,6 +49,7 @@ pub struct UpdatePackageRequest {
     pub description: Option<String>,
     pub category_id: Option<i32>,
     pub status: Option<PackageStatus>,
+    pub file_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

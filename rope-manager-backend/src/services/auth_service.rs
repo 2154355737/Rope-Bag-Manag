@@ -58,6 +58,7 @@ impl AuthService {
         let user = User {
             id: 0, // 数据库会自动生成
             username: req.username.clone(),
+            email: req.email.clone(),
             password_hash,
             nickname: req.nickname.clone(),
             role: crate::models::UserRole::User,
@@ -66,6 +67,9 @@ impl AuthService {
             ban_reason: None,
             qq_number: req.qq_number.clone(),
             avatar_url: None,
+            login_count: 0,
+            upload_count: 0,
+            download_count: 0,
             created_at: Utc::now(),
             last_login: None,
             is_admin: false,

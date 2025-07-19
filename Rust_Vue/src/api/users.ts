@@ -64,6 +64,16 @@ export const userApi = {
     return api.delete(`/api/v1/users/${id}`)
   },
 
+  // 批量删除用户
+  batchDeleteUsers: (usernames: string[]): Promise<ApiResponse<null>> => {
+    return api.delete('/api/v1/users/batch', { usernames })
+  },
+
+  // 创建用户
+  createUser: (userData: any): Promise<ApiResponse<User>> => {
+    return api.post('/api/v1/users', userData)
+  },
+
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
     return api.get('/api/v1/auth/user-info')

@@ -78,9 +78,9 @@
               </template>
             </el-table-column>
             <el-table-column prop="qq_number" label="QQ号" width="120" />
-            <el-table-column prop="register_time" label="注册时间" width="180">
+            <el-table-column prop="created_at" label="注册时间" width="180">
               <template #default="{ row }">
-                {{ formatTime(row.register_time) }}
+                {{ formatTime(row.created_at) }}
               </template>
             </el-table-column>
             <el-table-column prop="last_login" label="最后登录" width="180">
@@ -164,7 +164,7 @@
         </div>
         <div class="detail-item">
           <label>注册时间:</label>
-          <span>{{ formatTime(currentUser.register_time) }}</span>
+          <span>{{ formatTime(currentUser.created_at) }}</span>
         </div>
         <div class="detail-item">
           <label>最后登录:</label>
@@ -246,14 +246,18 @@
         <el-form-item label="用户名" prop="username">
           <el-input v-model="addUserForm.username" placeholder="请输入用户名" />
         </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="addUserForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input v-model="addUserForm.password" type="password" placeholder="请输入密码" />
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="addUserForm.role" placeholder="请选择角色">
-            <el-option label="普通用户" value="Normal" />
-            <el-option label="开发者" value="Developer" />
-            <el-option label="元老" value="Elder" />
+            <el-option label="普通用户" value="user" />
+            <el-option label="开发者" value="moderator" />
+            <el-option label="元老" value="elder" />
+            <el-option label="管理员" value="admin" />
           </el-select>
         </el-form-item>
         <el-form-item label="星级" prop="star">
@@ -278,6 +282,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
+import { userApi } from '../../api/users'
 
 // 响应式数据
 const loading = ref(false)
@@ -308,8 +313,9 @@ const editForm = reactive({
 // 添加用户表单
 const addUserForm = reactive({
   username: '',
+  email: '',
   password: '',
-  role: 'Normal',
+  role: 'user',
   star: 1,
   qq_number: '',
   avatar_url: ''
@@ -320,6 +326,10 @@ const addUserRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 2, max: 20, message: '用户名长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
@@ -349,14 +359,13 @@ async function loadUsers() {
       params.status = statusFilter.value
     }
     
-    const response = await fetch(`http://127.0.0.1:15202/api/users?${new URLSearchParams(params)}`)
-    const data = await response.json()
+    const response = await userApi.getUsers(params)
     
-    if (data.code === 0) {
-      userList.value = data.data.users || []
-      total.value = data.data.total || 0
+    if (response.code === 0) {
+      userList.value = response.data?.list || []
+      total.value = response.data?.total || 0
     } else {
-      ElMessage.error(data.msg || '加载用户列表失败')
+      ElMessage.error(response.msg || '加载用户列表失败')
     }
   } catch (error) {
     console.error('加载用户列表失败:', error)
@@ -417,22 +426,14 @@ function editUser(user: any) {
 
 async function saveUserEdit() {
   try {
-    const response = await fetch(`http://127.0.0.1:15202/api/users/${currentUser.value.username}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(editForm)
-    })
+    const response = await userApi.updateUser(currentUser.value.id, editForm)
     
-    const data = await response.json()
-    
-    if (data.code === 0) {
+    if (response.code === 0) {
       ElMessage.success('用户信息更新成功')
       editDialogVisible.value = false
       loadUsers()
     } else {
-      ElMessage.error(data.msg || '更新失败')
+      ElMessage.error(response.msg || '更新失败')
     }
   } catch (error) {
     ElMessage.error('更新失败')
@@ -443,17 +444,13 @@ async function deleteUser(user: any) {
   try {
     await ElMessageBox.confirm(`确定要删除用户 ${user.username} 吗？`, '确认删除')
     
-    const response = await fetch(`http://127.0.0.1:15202/api/users/${user.username}`, {
-      method: 'DELETE'
-    })
+    const response = await userApi.deleteUser(user.id)
     
-    const data = await response.json()
-    
-    if (data.code === 0) {
+    if (response.code === 0) {
       ElMessage.success('用户删除成功')
       loadUsers()
     } else {
-      ElMessage.error(data.msg || '删除失败')
+      ElMessage.error(response.msg || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -472,22 +469,14 @@ async function batchDelete() {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedUsers.value.length} 个用户吗？`, '确认删除')
     
     const usernames = selectedUsers.value.map(user => user.username)
-    const response = await fetch('http://127.0.0.1:15202/api/users/batch', {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ usernames })
-    })
+    const response = await userApi.batchDeleteUsers(usernames)
     
-    const data = await response.json()
-    
-    if (data.code === 0) {
+    if (response.code === 0) {
       ElMessage.success('批量删除成功')
       selectedUsers.value = []
       loadUsers()
     } else {
-      ElMessage.error(data.msg || '批量删除失败')
+      ElMessage.error(response.msg || '批量删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -514,37 +503,24 @@ async function handleAddUser() {
 
 async function addUser() {
   try {
-    // 获取认证信息
-    const token = localStorage.getItem('token') || ''
-    const username = localStorage.getItem('username') || ''
+    const response = await userApi.createUser(addUserForm)
     
-    const response = await fetch('http://127.0.0.1:15202/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Username': username
-      },
-      body: JSON.stringify(addUserForm)
-    })
-    
-    const data = await response.json()
-    
-    if (data.code === 0) {
+    if (response.code === 0) {
       ElMessage.success('用户添加成功')
       showAddUserDialog.value = false
       // 重置表单
       Object.assign(addUserForm, {
         username: '',
+        email: '',
         password: '',
-        role: 'Normal',
+        role: 'user',
         star: 1,
         qq_number: '',
         avatar_url: ''
       })
       loadUsers() // 刷新用户列表
     } else {
-      ElMessage.error(data.msg || '添加失败')
+      ElMessage.error(response.msg || '添加失败')
     }
   } catch (error) {
     console.error('添加用户失败:', error)

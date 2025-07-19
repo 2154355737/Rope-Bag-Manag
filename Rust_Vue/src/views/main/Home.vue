@@ -58,12 +58,12 @@
           class="category-tabs"
         >
           <el-tab-pane label="全部" name="all" />
-          <el-tab-pane label="热门" name="hot" />
-          <el-tab-pane label="最新" name="latest" />
-          <el-tab-pane label="推荐" name="recommended" />
-          <el-tab-pane label="教程" name="tutorial" />
-          <el-tab-pane label="工具" name="tool" />
-          <el-tab-pane label="模板" name="template" />
+          <el-tab-pane 
+            v-for="category in categories" 
+            :key="category.id" 
+            :label="category.name" 
+            :name="category.id.toString()" 
+          />
         </el-tabs>
       </div>
     </nav>
@@ -172,7 +172,7 @@
 
           <!-- 资源列表 -->
           <div class="resources">
-            <div v-if="filteredResources.length === 0" class="empty-state">
+            <div v-if="resources.length === 0" class="empty-state">
               <div class="empty-icon">📦</div>
               <h3>暂无资源</h3>
               <p>还没有资源被上传，快来分享你的第一个资源吧！</p>
@@ -184,31 +184,31 @@
             
             <div v-else class="resources-grid">
               <div 
-                v-for="resource in filteredResources.slice((currentPage-1)*pageSize, currentPage*pageSize)" 
+                v-for="resource in resources.slice((currentPage-1)*pageSize, currentPage*pageSize)" 
                 :key="resource.id"
                 class="resource-card"
                 @click="viewResource(resource.id)"
               >
                 <div class="resource-icon">
-                  <el-icon size="28" :color="getCategoryColor(resource.category)">
+                  <el-icon size="28" :color="getCategoryColor(resource.category_id)">
                     <Document />
                   </el-icon>
                 </div>
                 <div class="resource-content">
                   <div class="resource-header">
-                    <h3 class="resource-title">{{ resource.绳包名称 }}</h3>
-                    <span class="resource-badge">{{ getCategoryLabel(resource.category) }}</span>
+                    <h3 class="resource-title">{{ resource.name }}</h3>
+                    <span class="resource-badge">{{ getCategoryLabel(resource.category_id) }}</span>
                   </div>
-                  <p class="resource-desc">{{ resource.简介 }}</p>
+                  <p class="resource-desc">{{ resource.description }}</p>
                   <div class="resource-footer">
                     <div class="resource-meta">
                       <span class="meta-item">
                         <el-icon><User /></el-icon>
-                        {{ resource.作者 }}
+                        {{ resource.author }}
                       </span>
                       <span class="meta-item">
                         <el-icon><Calendar /></el-icon>
-                        {{ formatDate(resource.上架时间) }}
+                        {{ formatDate(resource.created_at) }}
                       </span>
                     </div>
                     <div class="resource-actions">
@@ -228,7 +228,7 @@
           </div>
           
           <!-- 分页 -->
-          <div v-if="filteredResources.length > 0" class="pagination">
+          <div v-if="resources.length > 0" class="pagination">
             <el-pagination
               v-model:current-page="currentPage"
               v-model:page-size="pageSize"
@@ -388,6 +388,9 @@ import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { communityApi } from '@/api/community'
 import type { Resource, UploadForm } from '../../../types'
 import { getUserInfo } from '@/utils/auth'
+import { formatDate, formatFileSize } from '@/utils/format'
+import { packageApi, type Package } from '@/api/packages'
+import { categoryApi, type Category } from '@/api/categories'
 
 const router = useRouter()
 
@@ -397,7 +400,7 @@ const activeCategory = ref('all')
 const sortBy = ref('latest')
 const filterType = ref('all')
 const currentPage = ref(1)
-const pageSize = ref(12)
+const pageSize = ref(18)
 const totalResources = ref(0)
 const showUploadDialog = ref(false)
 const uploading = ref(false)
@@ -409,12 +412,15 @@ const totalUsers = ref(0)
 const totalLikes = ref(0)
 
 // 公告数据
-const notices = [
+const notices = ref([
   { id: 1, text: '欢迎来到资源社区！' },
   { id: 2, text: '请遵守社区规范，文明发言。' },
   { id: 3, text: '资源上传请确保无版权争议。' },
   { id: 4, text: '如遇问题请联系管理员。' },
-]
+])
+
+// 分类数据
+const categories = ref<Category[]>([])
 
 // 分类标签映射
 const categoryLabels = {
@@ -425,7 +431,7 @@ const categoryLabels = {
 }
 
 // 资源数据
-const resources = ref<Resource[]>([])
+const resources = ref<Package[]>([])
 
 // 上传表单
 const uploadForm = reactive<UploadForm>({
@@ -465,32 +471,32 @@ const filteredResources = computed(() => {
 
   // 分类筛选
   if (activeCategory.value !== 'all') {
-    filtered = filtered.filter(resource => resource.category === activeCategory.value)
+    filtered = filtered.filter(resource => resource.category_id === parseInt(activeCategory.value))
   }
 
   // 搜索筛选
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(resource =>
-      resource.绳包名称.toLowerCase().includes(query) ||
-      resource.简介.toLowerCase().includes(query) ||
-      resource.作者.toLowerCase().includes(query)
+      resource.name.toLowerCase().includes(query) ||
+      resource.description.toLowerCase().includes(query) ||
+      resource.author.toLowerCase().includes(query)
     )
   }
 
   // 排序
   switch (sortBy.value) {
     case 'latest':
-      filtered.sort((a, b) => new Date(b.上架时间).getTime() - new Date(a.上架时间).getTime())
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       break
     case 'downloads':
-      filtered.sort((a, b) => b.下载次数 - a.下载次数)
+      filtered.sort((a, b) => b.download_count - a.download_count)
       break
     case 'likes':
-      filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0))
+      filtered.sort((a, b) => (b.like_count || 0) - (a.like_count || 0))
       break
     case 'favorites':
-      filtered.sort((a, b) => (b.favorites || 0) - (a.favorites || 0))
+      filtered.sort((a, b) => (b.favorite_count || 0) - (a.favorite_count || 0))
       break
   }
 
@@ -499,138 +505,79 @@ const filteredResources = computed(() => {
 
 // 方法
 const loadResources = async () => {
-  try {
     loading.value = true
+  try {
+    const params: any = {}
     
-    // 模拟资源数据
-    const mockResources = [
-      {
-        id: 1,
-        绳包名称: 'Vue 3 开发模板',
-        简介: '基于 Vue 3 + TypeScript + Element Plus 的现代化开发模板，包含完整的项目结构和常用组件。',
-        作者: '张三',
-        上架时间: '2024-01-15',
-        下载次数: 1250,
-        likes: 89,
-        favorites: 45,
-        category: 'template',
-        标签: ['Vue3', 'TypeScript', 'Element Plus']
-      },
-      {
-        id: 2,
-        绳包名称: 'React 组件库',
-        简介: '一套完整的 React 组件库，包含表单、表格、弹窗等常用组件，支持 TypeScript。',
-        作者: '李四',
-        上架时间: '2024-01-10',
-        下载次数: 890,
-        likes: 67,
-        favorites: 32,
-        category: 'tool',
-        标签: ['React', '组件库', 'TypeScript']
-      },
-      {
-        id: 3,
-        绳包名称: 'Node.js 后端教程',
-        简介: '从零开始学习 Node.js 后端开发，包含 Express、MongoDB、JWT 认证等完整教程。',
-        作者: '王五',
-        上架时间: '2024-01-08',
-        下载次数: 2100,
-        likes: 156,
-        favorites: 78,
-        category: 'tutorial',
-        标签: ['Node.js', 'Express', 'MongoDB']
-      },
-      {
-        id: 4,
-        绳包名称: 'Python 数据分析工具',
-        简介: '基于 Python 的数据分析工具包，包含数据处理、可视化、机器学习等功能。',
-        作者: '赵六',
-        上架时间: '2024-01-05',
-        下载次数: 750,
-        likes: 43,
-        favorites: 21,
-        category: 'tool',
-        标签: ['Python', '数据分析', '机器学习']
-      },
-      {
-        id: 5,
-        绳包名称: 'Flutter 移动应用模板',
-        简介: '完整的 Flutter 移动应用开发模板，包含状态管理、路由、网络请求等常用功能。',
-        作者: '孙七',
-        上架时间: '2024-01-03',
-        下载次数: 680,
-        likes: 52,
-        favorites: 28,
-        category: 'template',
-        标签: ['Flutter', '移动开发', 'Dart']
-      },
-      {
-        id: 6,
-        绳包名称: 'Docker 部署指南',
-        简介: '详细的 Docker 容器化部署指南，包含 Dockerfile 编写、Docker Compose 配置等。',
-        作者: '周八',
-        上架时间: '2024-01-01',
-        下载次数: 950,
-        likes: 78,
-        favorites: 41,
-        category: 'tutorial',
-        标签: ['Docker', '容器化', '部署']
-      }
-    ]
-    
-    // 模拟API响应
-    const res = {
-      code: 0,
-      data: {
-        resources: mockResources,
-        total: mockResources.length
-      }
+    // 添加分类过滤
+    if (activeCategory.value !== 'all') {
+      params.category_id = parseInt(activeCategory.value)
     }
+    
+    // 添加搜索过滤
+    if (searchQuery.value) {
+      params.search = searchQuery.value
+    }
+    
+    // 添加排序和类型过滤
+    params.sort = sortBy.value
+    if (filterType.value !== 'all') {
+      params.type = filterType.value
+    }
+    
+    console.log("请求参数:", params)
+    const res = await packageApi.getPackages(params)
     
     if (res.code === 0 && res.data) {
-      resources.value = res.data.resources || res.data.绳包列表 || []
-      totalResources.value = res.data.total || resources.value.length
+      resources.value = res.data.list
+      totalResources.value = res.data.total
       
       // 计算统计数据
-      totalDownloads.value = resources.value.reduce((sum, resource) => sum + (resource.下载次数 || 0), 0)
-      totalLikes.value = resources.value.reduce((sum, resource) => sum + (resource.likes || 0), 0)
-      totalUsers.value = Math.floor(Math.random() * 1000) + 500 // 模拟数据
+      totalDownloads.value = resources.value.reduce((sum, resource) => sum + resource.download_count, 0)
+      totalLikes.value = resources.value.reduce((sum, resource) => sum + resource.like_count, 0)
+      
+      // 统计数据可能通过API获取更准确
+      totalUsers.value = Math.floor(Math.random() * 1000) + 500
     } else {
-      ElMessage.error(res.msg || '加载资源失败')
+      ElMessage.error(res.message || '加载资源失败')
     }
   } catch (error) {
-    console.error('加载资源失败:', error)
-    ElMessage.error('加载资源失败')
+    console.error('加载资源出错:', error)
+    ElMessage.error('加载资源时发生错误')
   } finally {
     loading.value = false
   }
 }
 
 const handleSearch = () => {
-  currentPage.value = 1
-  loadResources()
+  currentPage.value = 1 // 重置页码
+  loadResources() // 重新加载资源
 }
 
-const handleCategoryChange = () => {
-  currentPage.value = 1
-  loadResources()
+// 处理分类切换
+const handleCategoryChange = (tab: any) => {
+  console.log("分类切换到:", tab.props.name)
+  activeCategory.value = tab.props.name
+  currentPage.value = 1 // 重置页码
+  loadResources() // 重新加载资源
 }
 
 const handleSortChange = () => {
-  loadResources()
+  // 客户端排序，无需重新请求
+  // 如果后端支持排序，可以在这里重新请求数据
 }
 
 const handleFilterChange = () => {
-  loadResources()
+  // 如果后端支持按资源类型筛选，可以在这里重新请求数据
 }
 
-const handleSizeChange = (size: number) => {
+const handleSizeChange = (size) => {
   pageSize.value = size
-  currentPage.value = 1
+  currentPage.value = 1 // 重置页码
   loadResources()
 }
 
-const handleCurrentChange = (page: number) => {
+const handleCurrentChange = (page) => {
   currentPage.value = page
   loadResources()
 }
@@ -677,18 +624,21 @@ const goToAdmin = () => {
   }
 }
 
-const getCategoryLabel = (category: string) => {
-  return categoryLabels[category as keyof typeof categoryLabels] || category
+const getCategoryLabel = (categoryId: number | null) => {
+  if (!categoryId) return '未分类'
+  const category = categories.value.find(c => c.id === categoryId)
+  return category ? category.name : '未分类'
 }
 
-const getCategoryColor = (category: string) => {
-  const colors = {
-    tutorial: '#67C23A',
-    tool: '#409EFF',
-    template: '#E6A23C',
-    other: '#909399'
+const getCategoryColor = (categoryId: number) => {
+  const colorMap = {
+    1: '#409EFF', // 蓝色
+    2: '#67C23A', // 绿色
+    3: '#E6A23C', // 黄色
+    4: '#F56C6C', // 红色
+    5: '#909399'  // 灰色
   }
-  return colors[category as keyof typeof colors] || '#909399'
+  return colorMap[categoryId] || '#409EFF'
 }
 
 const formatDate = (date: string) => {
@@ -777,8 +727,25 @@ const handleUploadClose = () => {
   })
 }
 
-onMounted(() => {
-  loadResources()
+// 加载分类数据
+const loadCategories = async () => {
+  try {
+    const res = await categoryApi.getCategories()
+    if (res.code === 0 && res.data) {
+      categories.value = res.data.list || []
+      console.log("获取到的分类:", categories.value)
+    } else {
+      console.error('获取分类失败:', res.message)
+    }
+  } catch (error) {
+    console.error('加载分类出错:', error)
+  }
+}
+
+// 初始化
+onMounted(async () => {
+  await loadCategories()
+  await loadResources()
 })
 </script>
 

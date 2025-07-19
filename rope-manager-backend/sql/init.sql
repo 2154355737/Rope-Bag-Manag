@@ -4,10 +4,19 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    nickname VARCHAR(100),
     role VARCHAR(20) DEFAULT 'user' NOT NULL,
+    star INTEGER DEFAULT 0,
+    ban_status VARCHAR(20) DEFAULT 'normal',
+    ban_reason TEXT,
+    qq_number VARCHAR(20),
     avatar_url VARCHAR(255),
     bio TEXT,
     is_active BOOLEAN DEFAULT 1,
+    is_admin BOOLEAN DEFAULT 0,
+    login_count INTEGER DEFAULT 0,
+    upload_count INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
     last_login DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -78,6 +87,25 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 系统日志表
+CREATE TABLE IF NOT EXISTS system_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    level VARCHAR(20) NOT NULL,
+    message TEXT NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    details TEXT
+);
+
+-- 公告表
+CREATE TABLE IF NOT EXISTS announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    priority INTEGER DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_packages_category_id ON packages(category_id);
 CREATE INDEX IF NOT EXISTS idx_packages_created_at ON packages(created_at);
@@ -86,14 +114,6 @@ CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_user_id ON user_actions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at);
 
--- 插入默认分类
-INSERT OR IGNORE INTO categories (id, name, description) VALUES 
-(1, '基础绳结', '基础绳结技巧'),
-(2, '高级绳结', '复杂绳结技巧'),
-(3, '装饰绳结', '装饰性绳结'),
-(4, '实用绳结', '日常实用绳结'),
-(5, '救援绳结', '救援和安全绳结');
-
 -- 插入默认系统设置
 INSERT OR IGNORE INTO system_settings (key, value, description) VALUES 
 ('site_name', '绳包管理器', '网站名称'),
@@ -101,4 +121,13 @@ INSERT OR IGNORE INTO system_settings (key, value, description) VALUES
 ('max_file_size', '10485760', '最大文件上传大小（字节）'),
 ('allowed_file_types', 'zip,rar,7z', '允许的文件类型'),
 ('registration_enabled', 'true', '是否允许用户注册'),
-('comment_approval_required', 'false', '评论是否需要审核'); 
+('comment_approval_required', 'false', '评论是否需要审核'),
+('primary_color', '#409EFF', '主题主色调'),
+('secondary_color', '#67C23A', '主题次色调'),
+('dark_mode', 'false', '深色模式'),
+('font_size', '14px', '字体大小'),
+('language', 'zh-CN', '语言设置');
+
+-- 插入默认管理员用户 (密码: admin123)
+INSERT OR IGNORE INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES 
+(1, 'admin', 'admin@example.com', '$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 1, CURRENT_TIMESTAMP); 

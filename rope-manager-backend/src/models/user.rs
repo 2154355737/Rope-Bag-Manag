@@ -7,6 +7,7 @@ use serde::ser::SerializeStruct;
 pub struct User {
     pub id: i32,
     pub username: String,
+    pub email: String,
     pub password_hash: String,
     pub nickname: Option<String>,
     pub role: UserRole,
@@ -15,6 +16,9 @@ pub struct User {
     pub ban_reason: Option<String>,
     pub qq_number: Option<String>,
     pub avatar_url: Option<String>,
+    pub login_count: i32,
+    pub upload_count: i32,
+    pub download_count: i32,
     pub created_at: DateTime<Utc>,
     pub last_login: Option<DateTime<Utc>>,
     pub is_admin: bool,
@@ -77,6 +81,7 @@ impl serde::Serialize for UserRole {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateUserRequest {
     pub username: String,
+    pub email: String,
     pub password: String,
     pub nickname: Option<String>,
     pub qq_number: Option<String>,

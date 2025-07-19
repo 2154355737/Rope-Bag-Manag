@@ -47,9 +47,9 @@ async fn main() -> std::io::Result<()> {
         .expect("创建系统仓库失败");
     
     let auth_service = services::AuthService::new(user_repo.clone(), config.jwt_secret().to_string());
-    let user_service = services::UserService::new(user_repo);
+    let user_service = services::UserService::new(user_repo.clone());
     let package_service = services::PackageService::new(package_repo, config.upload_path().to_string());
-    let admin_service = services::AdminService::new(system_repo);
+    let admin_service = services::AdminService::new(system_repo.clone(), user_service.clone());
     let community_service = services::CommunityService::new(comment_repo);
     
     info!("服务器启动在 http://{}", config.server_address());
@@ -76,6 +76,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(package_service.clone()))
             .app_data(web::Data::new(admin_service.clone()))
             .app_data(web::Data::new(community_service.clone()))
+            .app_data(web::Data::new(system_repo.clone()))  // 添加系统仓库作为独立服务
             .configure(api::configure_routes)
     })
     .workers(config.server.workers)

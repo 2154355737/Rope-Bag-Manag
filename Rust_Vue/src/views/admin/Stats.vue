@@ -273,11 +273,11 @@ async function loadStats() {
       totalViews.value = statsRes.data.total_views || 0
     }
     
-    // 加载最近活动数据
-    const activitiesRes = await getRecentActivities()
-    if (activitiesRes.code === 0 && activitiesRes.data) {
-      recentActivities.value = activitiesRes.data.activities || []
-    }
+    // 加载最近活动数据 - 暂时注释掉，等待后端实现
+    // const activitiesRes = await getRecentActivities()
+    // if (activitiesRes.code === 0 && activitiesRes.data) {
+    //   recentActivities.value = activitiesRes.data.activities || []
+    // }
   } catch (error) {
     console.error('加载统计数据失败:', error)
     ElMessage.error('加载统计数据失败')

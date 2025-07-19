@@ -1,15 +1,14 @@
 use actix_web::{web, HttpResponse};
 use serde_json::json;
+use serde::Deserialize;
 use crate::services::package_service::PackageService;
 use crate::models::{CreatePackageRequest, UpdatePackageRequest};
-use serde::Deserialize;
 
-#[derive(Deserialize)]
-pub struct PackageQuery {
+#[derive(Debug, Deserialize)]
+pub struct PackageQueryParams {
     pub page: Option<u32>,
-    #[serde(rename = "pageSize")]
     pub page_size: Option<u32>,
-    pub category: Option<String>,
+    pub category_id: Option<i32>,
     pub search: Option<String>,
     pub status: Option<String>,
 }
@@ -29,37 +28,51 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     .service(
         web::resource("/{id}/download")
             .route(web::get().to(download_package))
+    )
+    .service(
+        web::resource("/{id}/upload")
+            .route(web::post().to(upload_package_file))
+    )
+    .service(
+        web::resource("/categories")
+            .route(web::get().to(get_package_categories))
     );
 }
 
 async fn get_packages(
     package_service: web::Data<PackageService>,
-    query: web::Query<PackageQuery>,
+    query: web::Query<PackageQueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    println!("[DEBUG] get_packages called with query: {:?}", query);
     let page = query.page.unwrap_or(1);
-    let page_size = query.page_size.unwrap_or(12);
-    // category参数为all或空时不筛选，否则转为i32
-    let category = match &query.category {
-        Some(s) if s != "all" && !s.is_empty() => s.parse::<i32>().ok(),
-        _ => None,
-    };
-    let search = query.search.clone().filter(|s| !s.is_empty());
-    let status = query.status.clone();
-    match package_service.get_packages_advanced(page, page_size, category, search, status).await {
-        Ok((list, total)) => Ok(HttpResponse::Ok().json(json!({
+    let page_size = query.page_size.unwrap_or(20);
+    
+    // 使用高级搜索功能
+    match package_service.get_packages_advanced(
+        page,
+        page_size,
+        query.category_id,
+        query.search.clone(),
+        query.status.clone()
+    ).await {
+        Ok((packages, total)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
             "data": {
-                "list": list,
+                "list": packages,
                 "total": total,
                 "page": page,
-                "size": page_size
+                "pageSize": page_size,
+                "totalPages": (total as f64 / page_size as f64).ceil() as u32
             }
         }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+        Err(e) => {
+            println!("[ERROR] get_packages error: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": e.to_string()
         })))
+        }
     }
 }
 
@@ -68,7 +81,7 @@ async fn get_package(
     package_service: web::Data<PackageService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let package_id = path.into_inner();
-    match package_service.get_package(package_id).await {
+    match package_service.get_package_by_id(package_id).await {
         Ok(Some(package)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
@@ -92,7 +105,7 @@ async fn create_package(
     match package_service.create_package(&req).await {
         Ok(package) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "创建成功",
+            "message": "绳包创建成功",
             "data": package
         }))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({
@@ -109,12 +122,13 @@ async fn update_package(
 ) -> Result<HttpResponse, actix_web::Error> {
     let package_id = path.into_inner();
     match package_service.update_package(package_id, &req).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+        Ok(package) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "更新成功"
+            "message": "绳包更新成功",
+            "data": package
         }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
             "message": e.to_string()
         })))
     }
@@ -128,7 +142,7 @@ async fn delete_package(
     match package_service.delete_package(package_id).await {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "删除成功"
+            "message": "绳包删除成功"
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
@@ -143,18 +157,48 @@ async fn download_package(
 ) -> Result<HttpResponse, actix_web::Error> {
     let package_id = path.into_inner();
     match package_service.download_package(package_id).await {
-        Ok(file_path) => {
-            // 这里应该返回文件下载响应
-            Ok(HttpResponse::Ok().json(json!({
-                "code": 0,
-                "message": "下载成功",
-                "data": {
-                    "file_path": file_path
-                }
-            })))
-        },
+        Ok(file_path) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": file_path
+        }))),
         Err(e) => Ok(HttpResponse::NotFound().json(json!({
             "code": 404,
+            "message": e.to_string()
+        })))
+    }
+}
+
+async fn upload_package_file(
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let package_id = path.into_inner();
+    // TODO: 实现文件上传逻辑
+    match package_service.update_package_file(package_id).await {
+        Ok(package) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "文件上传成功",
+            "data": package
+        }))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": e.to_string()
+        })))
+    }
+}
+
+async fn get_package_categories(
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match package_service.get_categories().await {
+        Ok(categories) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": categories
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
             "message": e.to_string()
         })))
     }

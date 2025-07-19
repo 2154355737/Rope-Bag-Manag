@@ -25,6 +25,7 @@ export interface CreatePackageRequest {
   version?: string
   description?: string
   category_id?: number
+  file_url?: string
 }
 
 // 更新绳包请求
@@ -33,7 +34,8 @@ export interface UpdatePackageRequest {
   version?: string
   description?: string
   category_id?: number
-  status?: string
+  status?: string | 'Active' | 'Inactive' | 'Deleted'
+  file_url?: string
 }
 
 // 绳包列表查询参数
@@ -59,12 +61,24 @@ export const packageApi = {
   // 获取绳包列表
   getPackages: (params?: PackageQueryParams): Promise<ApiResponse<PackageListResponse>> => {
     const queryParams = new URLSearchParams()
+    
+    // 添加分页参数
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
-    if (params?.category_id) queryParams.append('category_id', params.category_id.toString())
+    
+    // 添加分类过滤
+    if (params?.category_id !== undefined) {
+      console.log("添加分类过滤:", params.category_id)
+      queryParams.append('category_id', params.category_id.toString())
+    }
+    
+    // 添加状态过滤
     if (params?.status) queryParams.append('status', params.status)
+    
+    // 添加搜索过滤
     if (params?.search) queryParams.append('search', params.search)
 
+    console.log("请求参数:", queryParams.toString())
     return api.get(`/api/v1/packages?${queryParams.toString()}`)
   },
 

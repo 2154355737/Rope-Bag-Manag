@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::models::{Package, CreatePackageRequest, UpdatePackageRequest};
+use crate::models::{Package, CreatePackageRequest, UpdatePackageRequest, Category};
 use crate::repositories::package_repo::PackageRepository;
 use crate::utils::file::FileUtils;
 use chrono::Utc;
@@ -26,6 +26,11 @@ impl PackageService {
         self.package_repo.find_by_id(package_id).await
     }
 
+    // 新增方法：根据ID获取包（别名方法）
+    pub async fn get_package_by_id(&self, package_id: i32) -> Result<Option<Package>> {
+        self.package_repo.find_by_id(package_id).await
+    }
+
     pub async fn create_package(&self, req: &CreatePackageRequest) -> Result<Package> {
         // 创建绳包记录
         let package = Package {
@@ -34,7 +39,7 @@ impl PackageService {
             author: req.author.clone(),
             version: req.version.clone(),
             description: req.description.clone(),
-            file_url: String::new(), // 暂时为空，上传文件后会更新
+            file_url: req.file_url.clone().unwrap_or_else(String::new), // 使用请求中的file_url
             file_size: None,
             download_count: 0,
             like_count: 0,
@@ -49,7 +54,7 @@ impl PackageService {
         Ok(package)
     }
 
-    pub async fn update_package(&self, package_id: i32, req: &UpdatePackageRequest) -> Result<()> {
+    pub async fn update_package(&self, package_id: i32, req: &UpdatePackageRequest) -> Result<Package> {
         let package = self.package_repo.find_by_id(package_id).await?;
         let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
 
@@ -61,7 +66,7 @@ impl PackageService {
             description: req.description.clone().or(package.description),
             category_id: req.category_id.or(package.category_id),
             status: req.status.clone().unwrap_or(package.status),
-            file_url: package.file_url,
+            file_url: req.file_url.clone().unwrap_or(package.file_url), // 使用请求中的file_url，如果没有则保持原值
             file_size: package.file_size,
             download_count: package.download_count,
             like_count: package.like_count,
@@ -71,7 +76,7 @@ impl PackageService {
         };
 
         self.package_repo.update_package(&updated_package).await?;
-        Ok(())
+        Ok(updated_package)
     }
 
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {
@@ -86,6 +91,22 @@ impl PackageService {
         self.package_repo.increment_download_count(package_id).await?;
 
         Ok(package.file_url)
+    }
+
+    // 新增方法：更新包文件
+    pub async fn update_package_file(&self, package_id: i32) -> Result<Package> {
+        let package = self.package_repo.find_by_id(package_id).await?;
+        let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
+
+        // TODO: 实现文件上传逻辑
+        // 这里应该处理文件上传并更新包信息
+
+        Ok(package)
+    }
+
+    // 新增方法：获取分类
+    pub async fn get_categories(&self) -> Result<Vec<Category>> {
+        self.package_repo.get_categories().await
     }
 
     pub async fn get_packages_advanced(

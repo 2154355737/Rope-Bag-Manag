@@ -201,26 +201,34 @@
           <el-descriptions-item label="作者">{{ selectedPackage.author }}</el-descriptions-item>
           <el-descriptions-item label="版本">{{ selectedPackage.version }}</el-descriptions-item>
           <el-descriptions-item label="类型">
-            <el-tag :type="selectedPackage.type === 'rope' ? 'primary' : 'success'">
-              {{ selectedPackage.type === 'rope' ? '绳索' : '装备' }}
+            <el-tag :type="getCategoryType(selectedPackage.type)">
+              {{ selectedPackage.type }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="下载次数">{{ selectedPackage.downloads }}</el-descriptions-item>
           <el-descriptions-item label="上传时间">{{ formatDate(selectedPackage.uploadTime) }}</el-descriptions-item>
           <el-descriptions-item label="最后更新">{{ formatDate(selectedPackage.lastUpdate) }}</el-descriptions-item>
           <el-descriptions-item label="描述" :span="2">{{ selectedPackage.description }}</el-descriptions-item>
+          <el-descriptions-item label="项目链接" :span="2">
+            <a :href="selectedPackage.url" target="_blank">{{ selectedPackage.url }}</a>
+          </el-descriptions-item>
         </el-descriptions>
         
         <div class="detail-actions">
-          <el-button type="primary" @click="downloadPackage(selectedPackage)">
+          <el-button 
+            type="primary" 
+            @click="downloadPackage(selectedPackage); detailDialogVisible = false"
+            :disabled="selectedPackage.status !== '正常' && selectedPackage.status !== 'Active'"
+          >
             <el-icon><Download /></el-icon>
             下载绳包
           </el-button>
+          <el-button @click="detailDialogVisible = false">
+            <el-icon><Close /></el-icon>
+            关闭
+          </el-button>
         </div>
       </div>
-      <template #footer>
-        <el-button @click="detailDialogVisible = false">关闭</el-button>
-      </template>
     </el-dialog>
 
     <!-- 添加绳包对话框 -->
@@ -241,12 +249,12 @@
           <el-input v-model="newPackage.version" placeholder="请输入版本号" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="newPackage.category" placeholder="选择分类">
+          <el-select v-model="newPackage.category_id" placeholder="选择分类">
             <el-option 
               v-for="cat in categories" 
               :key="cat.id" 
               :label="cat.name" 
-              :value="cat.name"
+              :value="cat.id"
               :disabled="!cat.enabled"
             />
           </el-select>
@@ -296,12 +304,12 @@
           <el-input v-model="editingPackage.version" placeholder="请输入版本号" />
         </el-form-item>
         <el-form-item label="分类">
-          <el-select v-model="editingPackage.category" placeholder="选择分类">
+          <el-select v-model="editingPackage.category_id" placeholder="选择分类">
             <el-option 
               v-for="cat in categories" 
               :key="cat.id" 
               :label="cat.name" 
-              :value="cat.name"
+              :value="cat.id"
               :disabled="!cat.enabled"
             />
           </el-select>
@@ -450,10 +458,18 @@ import {
   Folder,
   Clock,
   User,
-  Check
+  Check,
+  Close
 } from '@element-plus/icons-vue'
 import { packageApi, categoryApi } from '../../api'
 import { apiCache } from '../../api/cache'
+import { 
+  Package, 
+  CreatePackageRequest, 
+  UpdatePackageRequest, 
+  PackageListResponse 
+} from '../../api/packages'
+import { Category, CreateCategoryRequest, UpdateCategoryRequest } from '../../api/categories'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -485,7 +501,7 @@ const newPackage = ref({
   name: '',
   author: '',
   version: '1.0.0',
-  category: '未分类',
+  category_id: undefined as number | undefined,
   status: '正常',
   description: '',
   url: ''
@@ -504,7 +520,7 @@ const editingPackage = ref({
   name: '',
   author: '',
   version: '',
-  category: '',
+  category_id: undefined as number | undefined,
   status: '',
   description: '',
   url: ''
@@ -544,6 +560,22 @@ const filteredPackages = computed(() => {
 })
 
 // 方法
+const refreshDownloadCount = async (pkgId: number) => {
+  try {
+    // 查询单个包的最新信息
+    const res = await packageApi.getPackage(pkgId)
+    if (res.code === 0 && res.data) {
+      // 更新内存中的下载计数
+      const index = packages.value.findIndex(p => p.id === pkgId)
+      if (index !== -1) {
+        packages.value[index].downloads = res.data.download_count
+      }
+    }
+  } catch (error) {
+    console.error('刷新下载计数失败:', error)
+  }
+}
+
 async function loadPackages() {
   try {
     loading.value = true
@@ -551,19 +583,33 @@ async function loadPackages() {
     apiCache.delete('getPackages')
     const res = await packageApi.getPackages()
     if (res.code === 0 && res.data) {
-      packages.value = res.data.绳包列表?.map((pkg: any) => ({
-        id: pkg.id,
-        name: pkg.绳包名称,
-        author: pkg.作者,
-        version: pkg.版本,
-        type: pkg.分类 || '未分类',
-        status: pkg.状态 || '正常',
-        description: pkg.简介,
-        downloads: pkg.下载次数,
-        uploadTime: pkg.上架时间,
-        lastUpdate: pkg.上架时间,
-        url: pkg.项目直链
-      })) || []
+      packages.value = res.data.list?.map((pkg) => {
+        // 根据分类ID查找分类名称
+        let categoryName = '未分类';
+        if (pkg.category_id) {
+          const category = categories.value.find(c => c.id === pkg.category_id);
+          if (category) {
+            categoryName = category.name;
+          }
+        }
+        
+        return {
+          id: pkg.id,
+          name: pkg.name,
+          author: pkg.author,
+          version: pkg.version || '',
+          category_id: pkg.category_id,
+          type: categoryName,
+          status: pkg.status || 'Active',
+          description: pkg.description || '',
+          downloads: pkg.download_count,
+          uploadTime: pkg.created_at,
+          lastUpdate: pkg.updated_at,
+          url: pkg.file_url || '' // 确保url字段正确映射
+        };
+      }) || []
+      
+      console.log('处理后的绳包数据:', packages.value)
       
       // 更新统计数据
       totalPackages.value = packages.value.length
@@ -587,7 +633,9 @@ async function loadCategories() {
     apiCache.delete('getCategories')
     const res = await categoryApi.getCategories()
     if (res.code === 0 && res.data) {
-      categories.value = res.data
+      // 确保data.list存在且是数组
+      categories.value = res.data.list || []
+      console.log('获取到的分类数据:', categories.value)
     } else {
       ElMessage.error('获取分类数据失败')
     }
@@ -626,12 +674,33 @@ function viewPackage(pkg: any) {
 
 async function downloadPackage(pkg: any) {
   try {
-    const res = await packageApi.downloadPackage(pkg.id)
-    if (res.code === 0) {
-      ElMessage.success(`开始下载 ${pkg.name}`)
-    } else {
-      ElMessage.error(res.msg || '下载失败')
+    // 检查资源状态是否为正常
+    if (pkg.status !== '正常' && pkg.status !== 'Active') {
+      ElMessage.warning(`资源 ${pkg.name} 状态不为正常，无法下载`)
+      return
     }
+    
+    // 检查资源是否有项目链接
+    if (!pkg.url || pkg.url.trim() === '') {
+      ElMessage.warning(`资源 ${pkg.name} 没有项目链接，无法下载`)
+      return
+    }
+    
+    // 先增加下载计数
+    const res = await packageApi.downloadPackage(pkg.id)
+    if (res.code !== 0) {
+      console.warn('增加下载计数失败:', res.message)
+      // 继续下载，但记录警告
+    }
+    
+    // 打开下载链接
+    window.open(pkg.url, '_blank')
+    ElMessage.success(`开始下载 ${pkg.name}`)
+    
+    // 延迟刷新当前包的下载计数
+    setTimeout(() => {
+      refreshDownloadCount(pkg.id)
+    }, 500)
   } catch (error) {
     console.error('下载错误:', error)
     ElMessage.error('下载失败')
@@ -645,8 +714,8 @@ function editPackage(pkg: any) {
     name: pkg.name,
     author: pkg.author,
     version: pkg.version,
-    category: pkg.type || 'tutorial',
-    status: pkg.status || 'published',
+    category_id: pkg.category_id ? Number(pkg.category_id) : undefined,
+    status: pkg.status || 'Active',
     description: pkg.description,
     url: pkg.url
   }
@@ -655,9 +724,6 @@ function editPackage(pkg: any) {
 
 async function updatePackage() {
   try {
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
     // 验证表单数据
     if (!editingPackage.value.name.trim()) {
       ElMessage.error('请输入绳包名称')
@@ -676,30 +742,43 @@ async function updatePackage() {
       return
     }
     
-    const updateData = {
-      id: editingPackage.value.id,
-      name: editingPackage.value.name,
-      author: editingPackage.value.author,
-      version: editingPackage.value.version,
-      desc: editingPackage.value.description,
-      url: editingPackage.value.url,
-      category: editingPackage.value.category,
-      status: editingPackage.value.status,
-      admin_username,
-      admin_password
+    // 将状态字符串转换为后端需要的枚举
+    let statusEnum: string = 'Active'
+    switch (editingPackage.value.status) {
+      case '正常':
+      case '已发布':
+        statusEnum = 'Active'
+        break
+      case '待审核':
+      case '维护中':
+        statusEnum = 'Inactive'
+        break
+      case '已拒绝':
+        statusEnum = 'Deleted'
+        break
     }
     
-    const res = await packageApi.adminUpdatePackage(updateData)
+    const updateData: UpdatePackageRequest = {
+      name: editingPackage.value.name,
+      version: editingPackage.value.version,
+      description: editingPackage.value.description,
+      category_id: editingPackage.value.category_id,
+      status: statusEnum,
+      file_url: editingPackage.value.url // 添加file_url字段
+    }
+    
+    console.log('更新绳包数据:', updateData)
+    const res = await packageApi.updatePackage(editingPackage.value.id, updateData)
     if (res.code === 0) {
       ElMessage.success('绳包更新成功')
       editDialogVisible.value = false
       // 延迟刷新数据，确保后端数据已更新
       setTimeout(async () => {
-        await loadPackages() // 重新加载数据
-        await loadCategories() // 重新加载分类数据
+        await loadCategories() // 先加载分类数据
+        await loadPackages() // 再加载绳包数据
       }, 500)
     } else {
-      ElMessage.error(res.msg || '更新失败')
+      ElMessage.error(res.message || '更新失败')
     }
   } catch (error) {
     console.error('编辑绳包错误:', error)
@@ -719,7 +798,7 @@ async function deletePackage(pkg: any) {
       }
     )
     
-    const res = await packageApi.adminDeletePackage(pkg.id, 'muteduanxing', 'ahk12378dx')
+    const res = await packageApi.deletePackage(pkg.id)
     if (res.code === 0) {
       ElMessage.success('绳包已删除')
       // 延迟刷新数据，确保后端数据已更新
@@ -728,7 +807,7 @@ async function deletePackage(pkg: any) {
         await loadCategories() // 重新加载分类数据
       }, 500)
     } else {
-      ElMessage.error(res.msg || '删除失败')
+      ElMessage.error(res.message || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -740,9 +819,6 @@ async function deletePackage(pkg: any) {
 
 async function addPackage() {
   try {
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
     // 验证表单数据
     if (!newPackage.value.name.trim()) {
       ElMessage.error('请输入绳包名称')
@@ -761,39 +837,36 @@ async function addPackage() {
       return
     }
     
-    const packageData = {
+    const packageData: CreatePackageRequest = {
       name: newPackage.value.name,
       author: newPackage.value.author,
       version: newPackage.value.version,
-      desc: newPackage.value.description,
-      url: newPackage.value.url,
-      category: newPackage.value.category,
-      status: newPackage.value.status,
-      admin_username,
-      admin_password
+      description: newPackage.value.description,
+      category_id: newPackage.value.category_id,
+      file_url: newPackage.value.url // 添加file_url字段
     }
     
-    const res = await packageApi.adminAddPackage(packageData)
+    const res = await packageApi.createPackage(packageData)
     if (res.code === 0) {
       ElMessage.success('绳包添加成功')
       addDialogVisible.value = false
-      // 重置表单
+      // 清空表单
       newPackage.value = {
         name: '',
         author: '',
         version: '1.0.0',
-        category: '未分类',
+        category_id: undefined,
         status: '正常',
         description: '',
         url: ''
       }
       // 延迟刷新数据，确保后端数据已更新
       setTimeout(async () => {
-        await loadPackages() // 重新加载数据
-        await loadCategories() // 重新加载分类数据
+        await loadCategories() // 先加载分类数据
+        await loadPackages() // 再加载绳包数据
       }, 500)
     } else {
-      ElMessage.error(res.msg || '添加失败')
+      ElMessage.error(res.message || '添加失败')
     }
   } catch (error) {
     console.error('添加绳包错误:', error)
@@ -803,44 +876,34 @@ async function addPackage() {
 
 async function addCategoryItem() {
   try {
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    // 验证表单数据
     if (!newCategory.value.name.trim()) {
       ElMessage.error('请输入分类名称')
       return
     }
-    if (!newCategory.value.description.trim()) {
-      ElMessage.error('请输入分类描述')
-      return
-    }
     
-    const categoryData = {
+    const res = await categoryApi.addCategory({
       name: newCategory.value.name,
       description: newCategory.value.description,
-      enabled: newCategory.value.enabled,
-      admin_username,
-      admin_password
-    }
+      enabled: newCategory.value.enabled
+    })
     
-    const res = await categoryApi.addCategory(categoryData)
     if (res.code === 0) {
       ElMessage.success('分类添加成功')
       showAddCategoryDialog.value = false
-      // 重置表单
-      newCategory.value = { name: '', description: '', enabled: true }
-      // 延迟刷新数据，确保后端数据已更新
-      setTimeout(async () => {
-        await loadCategories() // 重新加载分类数据
-        await loadPackages() // 重新加载资源数据
-      }, 500)
+      // 清空表单
+      newCategory.value = {
+        name: '',
+        description: '',
+        enabled: true
+      }
+      // 重新加载分类
+      await loadCategories()
     } else {
-      ElMessage.error(res.msg || '添加失败')
+      ElMessage.error(res.message || '添加分类失败')
     }
   } catch (error) {
-    console.error('添加分类错误:', error)
-    ElMessage.error('添加失败')
+    console.error('添加分类出错:', error)
+    ElMessage.error('添加分类失败')
   }
 }
 
@@ -857,43 +920,31 @@ function editCategory(category: any) {
 
 async function saveCategory() {
   try {
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    // 验证表单数据
     if (!editingCategory.value.name.trim()) {
       ElMessage.error('请输入分类名称')
       return
     }
-    if (!editingCategory.value.description.trim()) {
-      ElMessage.error('请输入分类描述')
-      return
-    }
     
-    const categoryData = {
-      id: editingCategory.value.id,
+    const res = await categoryApi.updateCategory(
+      editingCategory.value.id,
+      {
       name: editingCategory.value.name,
       description: editingCategory.value.description,
-      enabled: editingCategory.value.enabled,
-      admin_username,
-      admin_password
+        enabled: editingCategory.value.enabled
     }
+    )
     
-    const res = await categoryApi.updateCategory(categoryData)
     if (res.code === 0) {
       ElMessage.success('分类更新成功')
       showEditCategoryDialog.value = false
-      // 延迟刷新数据，确保后端数据已更新
-      setTimeout(async () => {
-        await loadCategories() // 重新加载分类数据
-        await loadPackages() // 重新加载资源数据
-      }, 500)
+      // 重新加载分类
+      await loadCategories()
     } else {
-      ElMessage.error(res.msg || '更新失败')
+      ElMessage.error(res.message || '更新分类失败')
     }
   } catch (error) {
-    console.error('编辑分类错误:', error)
-    ElMessage.error('更新失败')
+    console.error('更新分类出错:', error)
+    ElMessage.error('更新分类失败')
   }
 }
 
@@ -909,35 +960,34 @@ async function deleteCategoryItem(category: any) {
       }
     )
     
-    const admin_username = 'muteduanxing'
-    const admin_password = 'ahk12378dx'
-    
-    const res = await categoryApi.deleteCategory(category.id, admin_username, admin_password)
+    const res = await categoryApi.deleteCategory(category.id)
     if (res.code === 0) {
       ElMessage.success('分类已删除')
-      // 延迟刷新数据，确保后端数据已更新
-      setTimeout(async () => {
-        await loadCategories() // 重新加载分类数据
-        await loadPackages() // 重新加载资源数据
-      }, 500)
+      // 重新加载分类
+      await loadCategories()
     } else {
-      ElMessage.error(res.msg || '删除失败')
+      ElMessage.error(res.message || '删除分类失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除分类错误:', error)
-      ElMessage.error('删除失败')
+      console.error('删除分类出错:', error)
+      ElMessage.error('删除分类失败')
     }
   }
 }
 
 function getStatusText(status: string) {
   const statusMap: Record<string, string> = {
+    // 中文状态名
     '正常': '正常',
     '已发布': '已发布',
     '待审核': '待审核',
     '已拒绝': '已拒绝',
-    '维护中': '维护中'
+    '维护中': '维护中',
+    // 英文枚举值
+    'Active': '正常',
+    'Inactive': '待审核',
+    'Deleted': '已拒绝'
   }
   return statusMap[status] || status
 }
@@ -954,6 +1004,7 @@ function getStatusType(status: string) {
 }
 
 function getCategoryText(category: string) {
+  // 因为在loadPackages中已经转换为分类名称，这里直接返回
   return category
 }
 
@@ -982,9 +1033,9 @@ function formatDate(date: string) {
 }
 
 // 初始化数据
-onMounted(() => {
-  loadPackages()
-  loadCategories()
+onMounted(async () => {
+  await loadCategories() // 先加载分类数据
+  await loadPackages() // 再加载绳包数据
 })
 </script>
 

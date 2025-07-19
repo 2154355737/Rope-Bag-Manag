@@ -6,6 +6,7 @@ export { adminApi } from './admin'
 export { categoryApi } from './categories'
 export { commentApi } from './comments'
 export { settingsApi } from './settings'
+export { apiCache } from './cache'
 
 // 重新导出类型
 export type { LoginRequest, RegisterRequest, UserInfo, LoginResponse } from './auth'
@@ -15,6 +16,7 @@ export type { Stats, SystemLog, UserAction } from './admin'
 export type { Category } from './categories'
 export type { Comment } from './comments'
 export type { SystemSettings } from './settings'
+export type { CacheData } from './cache'
 
 // 导出API客户端工具
 export { api, healthCheck, setToken, getToken, clearToken, isLoggedIn } from '../utils/apiClient'
