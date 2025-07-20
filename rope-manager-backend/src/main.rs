@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer, middleware::Logger, http};
 use actix_cors::Cors;
 use log::info;
+use std::sync::Arc;
 
 mod config;
 mod models;
@@ -33,28 +34,60 @@ async fn main() -> std::io::Result<()> {
     let conn = repositories::get_connection().expect("数据库连接失败");
     
     // 执行数据库初始化SQL
-    conn.execute_batch(include_str!("../sql/init.sql"))
-        .expect("数据库初始化失败");
+    match conn.execute_batch(include_str!("../sql/init.sql")) {
+        Ok(_) => info!("数据库初始化成功"),
+        Err(e) => {
+            // 分析错误信息，尝试确定是否是已经存在的表/索引问题
+            if e.to_string().contains("already exists") {
+                info!("数据库表已存在，跳过初始化");
+            } else {
+                eprintln!("数据库初始化失败: {}", e);
+                // 不要panic，让服务继续启动
+            }
+        }
+    }
     
-    // 创建服务实例
-    let user_repo = repositories::UserRepository::new(config.database_url())
-        .expect("创建用户仓库失败");
-    let package_repo = repositories::PackageRepository::new(config.database_url())
-        .expect("创建绳包仓库失败");
-    let comment_repo = repositories::CommentRepository::new(config.database_url())
-        .expect("创建评论仓库失败");
-    let system_repo = repositories::SystemRepository::new(config.database_url())
-        .expect("创建系统仓库失败");
+    // 数据库URL和配置
+    let db_url = config.database_url().to_string();
+    let upload_path = config.upload_path().to_string();
+    let jwt_secret = config.jwt_secret().to_string();
+    let server_address = config.server_address().to_string();
+    let workers = config.server.workers;
     
-    let auth_service = services::AuthService::new(user_repo.clone(), config.jwt_secret().to_string());
-    let user_service = services::UserService::new(user_repo.clone());
-    let package_service = services::PackageService::new(package_repo, config.upload_path().to_string());
-    let admin_service = services::AdminService::new(system_repo.clone(), user_service.clone());
-    let community_service = services::CommunityService::new(comment_repo);
-    
-    info!("服务器启动在 http://{}", config.server_address());
+    // 启动服务器
+    info!("服务器启动在 http://{}", server_address);
     
     HttpServer::new(move || {
+        // 为每个工作线程创建仓库实例
+        let user_repo = repositories::UserRepository::new(&db_url)
+            .expect("创建用户仓库失败");
+        let package_repo = repositories::PackageRepository::new(&db_url)
+            .expect("创建绳包仓库失败");
+        let comment_repo = repositories::CommentRepository::new(&db_url)
+            .expect("创建评论仓库失败");
+        let system_repo = repositories::SystemRepository::new(&db_url)
+            .expect("创建系统仓库失败");
+        
+        // 创建服务实例
+        let auth_service = services::auth_service::AuthService::new(
+            user_repo.clone(), jwt_secret.clone()
+        );
+        let user_service = services::user_service::UserService::new(
+            user_repo.clone()
+        );
+        let package_service = services::package_service::PackageService::new(
+            package_repo.clone(), upload_path.clone()
+        ).with_system_repo(system_repo.clone());
+        let admin_service = services::admin_service::AdminService::new(
+            system_repo.clone(), user_service.clone()
+        );
+        let comment_service = services::comment_service::CommentService::new(
+            comment_repo.clone(), user_repo.clone()
+        );
+        let community_service = services::community_service::CommunityService::new(
+            comment_repo.clone()
+        );
+
         App::new()
             .wrap(Logger::default())
             .wrap(
@@ -71,16 +104,17 @@ async fn main() -> std::io::Result<()> {
                     ])
                     .max_age(3600)
             )
-            .app_data(web::Data::new(auth_service.clone()))
-            .app_data(web::Data::new(user_service.clone()))
-            .app_data(web::Data::new(package_service.clone()))
-            .app_data(web::Data::new(admin_service.clone()))
-            .app_data(web::Data::new(community_service.clone()))
-            .app_data(web::Data::new(system_repo.clone()))  // 添加系统仓库作为独立服务
+            .app_data(web::Data::new(auth_service))
+            .app_data(web::Data::new(user_service))
+            .app_data(web::Data::new(package_service))
+            .app_data(web::Data::new(admin_service))
+            .app_data(web::Data::new(comment_service))
+            .app_data(web::Data::new(community_service))
+            .app_data(web::Data::new(system_repo))
             .configure(api::configure_routes)
     })
-    .workers(config.server.workers)
-    .bind(config.server_address())?
+    .workers(workers)
+    .bind(server_address)?
     .run()
     .await
 }

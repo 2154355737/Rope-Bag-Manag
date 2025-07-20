@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{Connection, params};
+use rusqlite::{Connection, params, OptionalExtension};
 use crate::models::{Package, Category};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -116,7 +116,7 @@ impl PackageRepository {
         Ok(package)
     }
 
-    pub async fn create_package(&self, package: &Package) -> Result<()> {
+    pub async fn create_package(&self, package: &Package) -> Result<Package> {
         let conn = self.conn.lock().await;
         let sql = "INSERT INTO packages (name, author, version, description, file_url, file_size, \
                                   download_count, like_count, favorite_count, category_id, status, \
@@ -149,7 +149,15 @@ impl PackageRepository {
                 return Err(e.into());
             }
         }
-        Ok(())
+        
+        // 获取最后插入的ID
+        let last_id = conn.last_insert_rowid() as i32;
+        
+        // 创建包含ID的新包对象
+        let mut created_package = package.clone();
+        created_package.id = last_id;
+        
+        Ok(created_package)
     }
 
     pub async fn update_package(&self, package: &Package) -> Result<()> {
@@ -349,5 +357,33 @@ impl PackageRepository {
         };
         println!("[SQL] get_categories result count: {}", categories.len());
         Ok(categories)
+    }
+
+    pub async fn check_package_exists(&self, package_id: i32) -> Result<bool> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT 1 FROM packages WHERE id = ?";
+        println!("[SQL] check_package_exists: {} | id={}", sql, package_id);
+        
+        let exists = conn.query_row(
+            sql,
+            params![package_id],
+            |_| Ok(true)
+        ).optional()?;
+        
+        Ok(exists.is_some())
+    }
+    
+    pub async fn get_package_file_url(&self, package_id: i32) -> Result<String> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT file_url FROM packages WHERE id = ?";
+        println!("[SQL] get_package_file_url: {} | id={}", sql, package_id);
+        
+        let file_url: String = conn.query_row(
+            sql,
+            params![package_id],
+            |row| row.get(0)
+        )?;
+        
+        Ok(file_url)
     }
 } 

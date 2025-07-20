@@ -52,16 +52,40 @@ CREATE TABLE IF NOT EXISTS categories (
 -- 评论表
 CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    content TEXT NOT NULL,
     user_id INTEGER NOT NULL,
-    package_id INTEGER,
+    target_type VARCHAR(20) NOT NULL DEFAULT 'Package',
+    target_id INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    status VARCHAR(20) DEFAULT 'Active' NOT NULL,
     parent_id INTEGER,
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
+    likes INTEGER DEFAULT 0,
+    dislikes INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE,
     FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE
+);
+
+-- 点赞表
+CREATE TABLE IF NOT EXISTS comment_likes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(comment_id, user_id)
+);
+
+-- 点踩表
+CREATE TABLE IF NOT EXISTS comment_dislikes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(comment_id, user_id)
 );
 
 -- 用户行为日志表
@@ -109,10 +133,37 @@ CREATE TABLE IF NOT EXISTS announcements (
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_packages_category_id ON packages(category_id);
 CREATE INDEX IF NOT EXISTS idx_packages_created_at ON packages(created_at);
-CREATE INDEX IF NOT EXISTS idx_comments_package_id ON comments(package_id);
+CREATE INDEX IF NOT EXISTS idx_comments_target_type_target_id ON comments(target_type, target_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments(parent_id);
+CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status);
+CREATE INDEX IF NOT EXISTS idx_comment_likes_comment_id ON comment_likes(comment_id);
+CREATE INDEX IF NOT EXISTS idx_comment_likes_user_id ON comment_likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_comment_dislikes_comment_id ON comment_dislikes(comment_id);
+CREATE INDEX IF NOT EXISTS idx_comment_dislikes_user_id ON comment_dislikes(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_user_id ON user_actions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at);
+
+-- 创建资源记录表
+CREATE TABLE IF NOT EXISTS resource_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resource_id INTEGER NOT NULL,
+    resource_type TEXT NOT NULL,
+    user_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    ip_address TEXT,
+    old_data TEXT,
+    new_data TEXT,
+    timestamp INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT
+);
+
+-- 为资源记录表创建索引
+CREATE INDEX IF NOT EXISTS idx_resource_records_resource ON resource_records(resource_id, resource_type);
+CREATE INDEX IF NOT EXISTS idx_resource_records_user ON resource_records(user_id);
+CREATE INDEX IF NOT EXISTS idx_resource_records_action ON resource_records(action);
+CREATE INDEX IF NOT EXISTS idx_resource_records_timestamp ON resource_records(timestamp);
 
 -- 插入默认系统设置
 INSERT OR IGNORE INTO system_settings (key, value, description) VALUES 

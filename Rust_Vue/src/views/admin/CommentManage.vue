@@ -11,10 +11,9 @@
       <div class="manage-content">
         <!-- 筛选条件 -->
         <div class="filter-section">
-          <el-form :inline="true" :model="filterForm" class="filter-form">
+          <el-form :inline="true" :model="filterForm">
             <el-form-item label="评论状态">
               <el-select v-model="filterForm.status" placeholder="选择状态" clearable>
-                <el-option label="全部" value="" />
                 <el-option label="正常" value="Active" />
                 <el-option label="隐藏" value="Hidden" />
                 <el-option label="已删除" value="Deleted" />
@@ -22,7 +21,6 @@
             </el-form-item>
             <el-form-item label="目标类型">
               <el-select v-model="filterForm.target_type" placeholder="选择类型" clearable>
-                <el-option label="全部" value="" />
                 <el-option label="绳包" value="Package" />
                 <el-option label="用户" value="User" />
                 <el-option label="系统" value="System" />
@@ -38,13 +36,16 @@
                 range-separator="至"
                 start-placeholder="开始日期"
                 end-placeholder="结束日期"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
+                clearable
               />
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="handleFilter">筛选</el-button>
               <el-button @click="resetFilter">重置</el-button>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="success" @click="addComment">添加评论</el-button>
+              <el-button type="danger" @click="batchDelete">删除评论</el-button>
             </el-form-item>
           </el-form>
         </div>
@@ -170,11 +171,11 @@
         </div>
         <div class="detail-item">
           <label>创建时间:</label>
-          <span>{{ formatTime(currentComment.create_time) }}</span>
+          <span>{{ formatTime(currentComment.created_at) }}</span>
         </div>
         <div class="detail-item">
           <label>更新时间:</label>
-          <span>{{ formatTime(currentComment.update_time) }}</span>
+          <span>{{ formatTime(currentComment.updated_at) }}</span>
         </div>
         <div class="detail-item">
           <label>点赞数:</label>
@@ -195,42 +196,137 @@
         <el-button @click="commentDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 添加评论对话框 -->
+    <el-dialog 
+      v-model="addCommentDialogVisible" 
+      title="添加评论" 
+      width="600px"
+    >
+      <el-form :model="newComment" label-width="100px">
+        <el-form-item label="评论内容">
+          <el-input type="textarea" v-model="newComment.content" rows="4" />
+        </el-form-item>
+        <el-form-item label="评论身份">
+          <el-select v-model="newComment.target_type" placeholder="选择身份">
+            <el-option label="管理员" value="Admin" />
+            <el-option label="元老" value="Elder" />
+            <el-option label="普通用户" value="User" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="选择资源">
+          <el-select v-model="newComment.resource_id" filterable placeholder="选择资源" @visible-change="loadResourcesIfNeeded">
+            <el-option
+              v-for="item in resources"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="父评论ID">
+          <el-input-number v-model="newComment.parent_id" placeholder="输入父评论ID" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="addCommentDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitAddComment">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+// 导入所需依赖
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { commentApi } from '../../api/comments'
+import { commentApi, Comment } from '../../api/comments'
+import { resourceRecordApi } from '../../api/resourceRecords'
+import { packageApi } from '../../api/packages'
 
-// 响应式数据
+// 评论列表数据
+const commentList = ref<Comment[]>([])
 const loading = ref(false)
-const commentList = ref([])
-const selectedComments = ref([])
-const currentPage = ref(1)
-const pageSize = ref(20)
 const total = ref(0)
-const commentDialogVisible = ref(false)
-const currentComment = ref(null)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const selectedComments = ref<Comment[]>([])
 
+// 筛选表单
 const filterForm = reactive({
   status: '',
   target_type: '',
   user_id: '',
-  date_range: []
+  date_range: [] as Date[]
 })
 
-// 方法
+// 当前选中的评论
+const currentComment = ref<Comment | null>(null)
+const commentDialogVisible = ref(false)
+
+// 添加评论相关
+const addCommentDialogVisible = ref(false)
+const newComment = reactive({
+  content: '',
+  resource_id: null as number | null,
+  parent_id: null as number | null,
+  target_type: 'Package' as string
+})
+const resources = ref<any[]>([])
+const resourcesLoaded = ref(false)
+
+// 加载资源选项
+async function loadResourcesIfNeeded(force = false) {
+  if (resourcesLoaded.value && !force) return
+  
+  try {
+    // 这里调用绳包API获取资源列表
+    const response = await packageApi.getPackages({ pageSize: 100 })
+    if (response.code === 0 && response.data) {
+      resources.value = response.data.list || []
+      resourcesLoaded.value = true
+    }
+  } catch (error) {
+    console.error('加载资源列表失败:', error)
+  }
+}
+
+// 资源操作记录服务
+const resourceLogger = {
+  logResourceOperation(resourceType: string, action: string, resourceId: number, targetId?: number, targetType?: string): void {
+    try {
+      resourceRecordApi.logResourceAction(resourceId, action)
+        .catch(err => console.warn('记录操作失败:', err));
+    } catch (error) {
+      console.error('记录操作失败:', error);
+    }
+  }
+};
+
+// 加载评论数据
 async function loadComments() {
   loading.value = true
   try {
-    const params = {
+    const params: any = {
       page: currentPage.value,
-      size: pageSize.value,
-      ...filterForm
+      size: pageSize.value
     }
+    
+    // 将非空的filterForm字段添加到params
+    Object.keys(filterForm).forEach(key => {
+      if (filterForm[key] !== null && filterForm[key] !== undefined && filterForm[key] !== '') {
+        params[key] = filterForm[key]
+      }
+    })
+    
+    // 处理日期范围
+    if (filterForm.date_range && filterForm.date_range.length === 2) {
+      params.start_date = filterForm.date_range[0]
+      params.end_date = filterForm.date_range[1]
+    }
+    
     const response = await commentApi.getAllComments(params)
-    if (response.code === 0) {
+    if (response.code === 0 && response.data) {
       commentList.value = response.data.list || []
       total.value = response.data.total || 0
     }
@@ -257,7 +353,7 @@ function resetFilter() {
   handleFilter()
 }
 
-function handleSelectionChange(selection: any[]) {
+function handleSelectionChange(selection: Comment[]) {
   selectedComments.value = selection
 }
 
@@ -271,18 +367,19 @@ function handleCurrentChange(page: number) {
   loadComments()
 }
 
-function viewComment(comment: any) {
+function viewComment(comment: Comment) {
   currentComment.value = comment
   commentDialogVisible.value = true
 }
 
-async function hideComment(comment: any) {
+async function hideComment(comment: Comment) {
   try {
     await ElMessageBox.confirm('确定要隐藏这条评论吗？', '确认操作')
     const response = await commentApi.updateComment(comment.id, { status: 'Hidden' })
     if (response.code === 0) {
       ElMessage.success('评论已隐藏')
       loadComments()
+      resourceLogger.logResourceOperation('Comment', 'hide', comment.id, comment.target_id, comment.target_type);
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -291,13 +388,14 @@ async function hideComment(comment: any) {
   }
 }
 
-async function showComment(comment: any) {
+async function showComment(comment: Comment) {
   try {
     await ElMessageBox.confirm('确定要显示这条评论吗？', '确认操作')
     const response = await commentApi.updateComment(comment.id, { status: 'Active' })
     if (response.code === 0) {
       ElMessage.success('评论已显示')
       loadComments()
+      resourceLogger.logResourceOperation('Comment', 'show', comment.id, comment.target_id, comment.target_type);
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -306,7 +404,7 @@ async function showComment(comment: any) {
   }
 }
 
-async function deleteComment(comment: any) {
+async function deleteComment(comment: Comment) {
   try {
     await ElMessageBox.confirm('确定要删除这条评论吗？此操作不可恢复！', '确认删除', {
       type: 'warning'
@@ -315,6 +413,7 @@ async function deleteComment(comment: any) {
     if (response.code === 0) {
       ElMessage.success('评论已删除')
       loadComments()
+      resourceLogger.logResourceOperation('Comment', 'delete', comment.id, comment.target_id, comment.target_type);
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -376,6 +475,51 @@ async function batchDelete() {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
     }
+  }
+}
+
+// 添加评论
+function addComment() {
+  // 重置表单
+  Object.assign(newComment, {
+    content: '',
+    resource_id: null,
+    parent_id: null
+  })
+  // 显示对话框
+  addCommentDialogVisible.value = true
+  // 加载资源选项
+  loadResourcesIfNeeded(true)
+}
+
+// 提交添加评论
+async function submitAddComment() {
+  if (!newComment.content || !newComment.resource_id) {
+    ElMessage.warning('请填写完整的评论信息')
+    return
+  }
+  
+  try {
+    // 这里使用正确的数据结构传递
+    const response = await commentApi.createComment({
+      content: newComment.content,
+      target_id: newComment.resource_id,
+      target_type: 'Package'
+    })
+    
+    if (response.code === 0) {
+      ElMessage.success('评论添加成功')
+      addCommentDialogVisible.value = false
+      loadComments()
+      // 如果response.data存在才使用它
+      const commentId = response.data?.id || 0
+      resourceLogger.logResourceOperation('Comment', 'add', commentId, newComment.resource_id, 'Package');
+    } else {
+      ElMessage.error(`添加失败: ${response.message}`)
+    }
+  } catch (error) {
+    console.error('添加评论失败:', error)
+    ElMessage.error('添加评论失败')
   }
 }
 

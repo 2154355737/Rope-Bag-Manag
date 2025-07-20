@@ -1,12 +1,14 @@
 use anyhow::Result;
-use crate::models::{Package, CreatePackageRequest, UpdatePackageRequest, Category};
+use crate::models::{Package, CreatePackageRequest, UpdatePackageRequest, Category, CreateResourceRecordRequest};
 use crate::repositories::package_repo::PackageRepository;
+use crate::repositories::system_repo::SystemRepository;
 use crate::utils::file::FileUtils;
 use chrono::Utc;
 
 #[derive(Clone)]
 pub struct PackageService {
     package_repo: PackageRepository,
+    system_repo: Option<SystemRepository>,
     file_utils: FileUtils,
 }
 
@@ -14,8 +16,15 @@ impl PackageService {
     pub fn new(package_repo: PackageRepository, upload_path: String) -> Self {
         Self {
             package_repo,
+            system_repo: None,
             file_utils: FileUtils::new(upload_path),
         }
+    }
+
+    // 设置系统仓库，用于记录资源操作
+    pub fn with_system_repo(mut self, system_repo: SystemRepository) -> Self {
+        self.system_repo = Some(system_repo);
+        self
     }
 
     pub async fn get_packages(&self) -> Result<Vec<Package>> {
@@ -50,14 +59,39 @@ impl PackageService {
             updated_at: Utc::now(),
         };
 
-        self.package_repo.create_package(&package).await?;
-        Ok(package)
+        // 创建包
+        let created_package = self.package_repo.create_package(&package).await?;
+        
+        // 记录资源操作
+        if let Some(system_repo) = &self.system_repo {
+            // 创建资源记录请求
+            let record = CreateResourceRecordRequest {
+                resource_id: created_package.id,
+                resource_type: "Package".to_string(),
+                action: "Create".to_string(),
+                old_data: None,
+                new_data: Some(serde_json::to_string(&created_package).unwrap_or_default()),
+            };
+            
+            // 使用系统仓库记录操作，默认用户ID为1（可以根据实际情况修改）
+            if let Err(e) = system_repo.log_resource_action(&record, 1).await {
+                // 仅记录错误，不影响主要功能
+                log::error!("记录资源创建操作失败: {}", e);
+            } else {
+                log::info!("成功记录资源创建操作: Package ID={}", created_package.id);
+            }
+        }
+        
+        Ok(created_package)
     }
 
     pub async fn update_package(&self, package_id: i32, req: &UpdatePackageRequest) -> Result<Package> {
         let package = self.package_repo.find_by_id(package_id).await?;
         let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
 
+        // 克隆package用于记录旧数据
+        let old_package = package.clone();
+        
         let updated_package = Package {
             id: package_id,
             name: req.name.clone().unwrap_or(package.name),
@@ -76,21 +110,93 @@ impl PackageService {
         };
 
         self.package_repo.update_package(&updated_package).await?;
+        
+        // 记录资源更新操作
+        if let Some(system_repo) = &self.system_repo {
+            // 创建资源记录请求
+            let record = CreateResourceRecordRequest {
+                resource_id: package_id,
+                resource_type: "Package".to_string(),
+                action: "Update".to_string(),
+                old_data: Some(serde_json::to_string(&old_package).unwrap_or_default()),
+                new_data: Some(serde_json::to_string(&updated_package).unwrap_or_default()),
+            };
+            
+            // 使用系统仓库记录操作
+            if let Err(e) = system_repo.log_resource_action(&record, 1).await {
+                log::error!("记录资源更新操作失败: {}", e);
+            } else {
+                log::info!("成功记录资源更新操作: Package ID={}", package_id);
+            }
+        }
+        
         Ok(updated_package)
     }
 
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {
-        self.package_repo.delete_package(package_id).await
+        // 先获取包信息，用于记录
+        let package = self.package_repo.find_by_id(package_id).await?;
+        
+        // 删除包
+        self.package_repo.delete_package(package_id).await?;
+        
+        // 记录资源删除操作
+        if let Some(system_repo) = &self.system_repo {
+            if let Some(package) = package {
+                // 创建资源记录请求
+                let record = CreateResourceRecordRequest {
+                    resource_id: package_id,
+                    resource_type: "Package".to_string(),
+                    action: "Delete".to_string(),
+                    old_data: Some(serde_json::to_string(&package).unwrap_or_default()),
+                    new_data: None,
+                };
+                
+                // 使用系统仓库记录操作
+                if let Err(e) = system_repo.log_resource_action(&record, 1).await {
+                    log::error!("记录资源删除操作失败: {}", e);
+                } else {
+                    log::info!("成功记录资源删除操作: Package ID={}", package_id);
+                }
+            }
+        }
+        
+        Ok(())
     }
 
     pub async fn download_package(&self, package_id: i32) -> Result<String> {
-        let package = self.package_repo.find_by_id(package_id).await?;
-        let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
-
+        // 首先检查包是否存在
+        let exists = self.package_repo.check_package_exists(package_id).await?;
+        if !exists {
+            return Err(anyhow::anyhow!("绳包不存在"));
+        }
+        
+        // 获取文件URL
+        let file_url = self.package_repo.get_package_file_url(package_id).await?;
+        
         // 增加下载次数
         self.package_repo.increment_download_count(package_id).await?;
+        
+        // 记录资源下载操作
+        if let Some(system_repo) = &self.system_repo {
+            // 创建资源记录请求
+            let record = CreateResourceRecordRequest {
+                resource_id: package_id,
+                resource_type: "Package".to_string(),
+                action: "Download".to_string(),
+                old_data: None,
+                new_data: None,
+            };
+            
+            // 使用系统仓库记录操作
+            if let Err(e) = system_repo.log_resource_action(&record, 1).await {
+                log::error!("记录资源下载操作失败: {}", e);
+            } else {
+                log::info!("成功记录资源下载操作: Package ID={}", package_id);
+            }
+        }
 
-        Ok(package.file_url)
+        Ok(file_url)
     }
 
     // 新增方法：更新包文件

@@ -4,6 +4,9 @@ import 'element-plus/dist/index.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
+// 导入字体
+import './assets/fonts.css'
+
 // 导入主题样式
 import './assets/base.css'
 import './assets/global.css'
@@ -19,6 +22,9 @@ import router from './router'
 // 导入工具函数
 import { initTheme } from './utils/theme'
 
+// 导入资源记录服务
+import { resourceLogger } from './utils/loggerService'
+
 // 创建应用
 const app = createApp(App)
 
@@ -33,6 +39,11 @@ app.use(router)
 
 // 初始化主题系统
 const cleanupTheme = initTheme()
+
+// 将资源记录服务添加到全局属性中
+app.config.globalProperties.$resourceLogger = resourceLogger
+// 也可以通过provide/inject使用
+app.provide('resourceLogger', resourceLogger)
 
 // 挂载应用
 app.mount('#app')

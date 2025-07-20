@@ -9,6 +9,20 @@
       </template>
 
       <div class="record-content">
+        <!-- 添加自动刷新功能 -->
+        <div class="auto-refresh">
+          <el-switch
+            v-model="autoRefresh"
+            active-text="自动刷新"
+            inactive-text="手动刷新"
+          />
+          <span v-if="autoRefresh" class="refresh-info">每 {{ refreshInterval }}s 刷新</span>
+          <el-button type="primary" @click="handleRefresh" :loading="loading">
+            <el-icon><Refresh /></el-icon>
+            立即刷新
+          </el-button>
+        </div>
+
         <!-- 筛选条件 -->
         <div class="filter-section">
           <el-form :inline="true" :model="filterForm" class="filter-form">
@@ -244,23 +258,34 @@
         <el-button @click="recordDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 删除图表容器 -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+// 导入所需依赖
+import { ref, reactive, onMounted, watch, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { resourceRecordApi } from '../../api/resourceRecords'
+import { resourceRecordApi, ResourceRecord } from '../../api/resourceRecords'
+// 删除echarts相关导入
+// import * as echarts from 'echarts'
+// import type { EChartsType } from 'echarts'
+// import { saveAs } from 'file-saver'
+// import { utils, writeFile } from 'xlsx'
+
+// 定义Timeout类型
+type Timeout = ReturnType<typeof setTimeout>
 
 // 响应式数据
 const loading = ref(false)
-const recordList = ref([])
-const selectedRecords = ref([])
+const recordList = ref<ResourceRecord[]>([])
+const selectedRecords = ref<ResourceRecord[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const recordDialogVisible = ref(false)
-const currentRecord = ref(null)
+const currentRecord = ref<ResourceRecord | null>(null)
 
 const stats = reactive({
   total_records: 0,
@@ -273,23 +298,54 @@ const filterForm = reactive({
   resource_type: '',
   action: '',
   user_id: '',
-  date_range: []
+  date_range: [] as Date[]
 })
+
+// 添加图表相关的响应式数据
+// const chartContainer = ref<HTMLElement | null>(null)
+// const chartInstance = ref<EChartsType | null>(null)
+// const chartData = reactive({
+//   dates: [] as string[],
+//   counts: [] as number[],
+//   byType: {} as Record<string, number>
+// })
+
+const autoRefresh = ref(false)
+const refreshInterval = ref(30)
+let refreshTimer: Timeout | null = null
 
 // 方法
 async function loadRecords() {
   loading.value = true
   try {
-    const params = {
+    // 构建参数
+    const params: any = {
       page: currentPage.value,
-      size: pageSize.value,
-      ...filterForm
+      pageSize: pageSize.value,
+      resource_type: filterForm.resource_type || undefined,
+      action: filterForm.action || undefined,
+      user_id: filterForm.user_id ? parseInt(filterForm.user_id) : undefined
     }
+    
+    // 添加日期范围
+    if (filterForm.date_range && filterForm.date_range.length === 2) {
+      params.start_date = formatDateForApi(filterForm.date_range[0])
+      params.end_date = formatDateForApi(filterForm.date_range[1])
+    }
+    
+    console.log('加载资源记录，参数:', params)
     const response = await resourceRecordApi.getResourceRecords(params)
-    if (response.code === 0) {
+    if (response.code === 0 && response.data) {
       recordList.value = response.data.list || []
       total.value = response.data.total || 0
+      stats.total_records = total.value
+      
+      // 更新统计数据
       updateStats()
+      console.log('加载到资源记录:', recordList.value.length)
+    } else {
+      console.error('加载资源记录返回错误:', response.message)
+      ElMessage.error(response.message || '加载资源记录失败')
     }
   } catch (error) {
     console.error('加载资源记录失败:', error)
@@ -299,11 +355,93 @@ async function loadRecords() {
   }
 }
 
+// 格式化日期为API所需的格式
+function formatDateForApi(date: Date): string {
+  if (!date) return ''
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
+// 更新统计数据
 function updateStats() {
-  stats.total_records = total.value
-  stats.create_count = recordList.value.filter(r => r.action === 'Create').length
-  stats.update_count = recordList.value.filter(r => r.action === 'Update').length
-  stats.delete_count = recordList.value.filter(r => r.action === 'Delete').length
+  if (recordList.value && recordList.value.length > 0) {
+    // 直接从列表中计算统计数据
+    stats.create_count = recordList.value.filter(r => r.action === 'Create').length
+    stats.update_count = recordList.value.filter(r => r.action === 'Update').length
+    stats.delete_count = recordList.value.filter(r => r.action === 'Delete').length
+    
+    // 加载完整的统计数据
+    loadActionStats()
+  }
+}
+
+// 加载操作统计数据
+async function loadActionStats() {
+  try {
+    // 构建统计查询参数
+    const params: any = {}
+    
+    // 添加日期范围
+    if (filterForm.date_range && filterForm.date_range.length === 2) {
+      params.start_date = formatDateForApi(filterForm.date_range[0])
+      params.end_date = formatDateForApi(filterForm.date_range[1])
+    }
+    
+    // 添加资源类型
+    if (filterForm.resource_type) {
+      params.resource_type = filterForm.resource_type
+    }
+    
+    // 添加用户ID
+    if (filterForm.user_id) {
+      params.user_id = parseInt(filterForm.user_id)
+    }
+    
+    console.log('加载资源操作统计，参数:', params)
+    const response = await resourceRecordApi.getResourceActionStats(params)
+    if (response.code === 0 && response.data) {
+      // 更新图表数据
+      // chartData.dates = response.data.by_day.map((item: any) => item.date)
+      // chartData.counts = response.data.by_day.map((item: any) => item.count)
+      
+      // 更新统计数据
+      stats.create_count = response.data.create_count || 0
+      stats.update_count = response.data.update_count || 0
+      stats.delete_count = response.data.delete_count || 0
+      
+      // 渲染图表
+      // renderChart()
+    } else {
+      console.error('加载统计数据返回错误:', response.message)
+    }
+  } catch (error) {
+    console.error('加载统计数据失败:', error)
+  }
+}
+
+// 格式化JSON数据以便显示
+function formatJson(jsonStr: string | null | undefined): string {
+  if (!jsonStr) return ''
+  try {
+    // 如果已经是对象，先转为字符串
+    const jsonObj = typeof jsonStr === 'object' ? jsonStr : JSON.parse(jsonStr)
+    return JSON.stringify(jsonObj, null, 2)
+  } catch (e) {
+    return String(jsonStr)
+  }
+}
+
+// 格式化时间戳
+function formatTime(timestamp: string | number): string {
+  if (!timestamp) return ''
+  
+  // 如果是数字时间戳，转换为日期
+  if (typeof timestamp === 'number') {
+    const date = new Date(timestamp * 1000) // 秒转毫秒
+    return date.toLocaleString()
+  }
+  
+  // 如果是字符串日期，直接返回
+  return timestamp
 }
 
 function handleFilter() {
@@ -321,7 +459,7 @@ function resetFilter() {
   handleFilter()
 }
 
-function handleSelectionChange(selection: any[]) {
+function handleSelectionChange(selection: ResourceRecord[]) {
   selectedRecords.value = selection
 }
 
@@ -335,12 +473,12 @@ function handleCurrentChange(page: number) {
   loadRecords()
 }
 
-function viewRecord(record: any) {
+function viewRecord(record: ResourceRecord) {
   currentRecord.value = record
   recordDialogVisible.value = true
 }
 
-async function deleteRecord(record: any) {
+async function deleteRecord(record: ResourceRecord) {
   try {
     await ElMessageBox.confirm('确定要删除这条记录吗？', '确认删除')
     const response = await resourceRecordApi.deleteResourceRecord(record.id)
@@ -363,9 +501,16 @@ async function batchDelete() {
   
   try {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedRecords.value.length} 条记录吗？`, '确认删除')
-    // 批量删除逻辑
-    ElMessage.success('批量删除成功')
-    loadRecords()
+    // 调用API批量删除
+    const recordIds = selectedRecords.value.map(record => record.id)
+    const response = await resourceRecordApi.batchDeleteResourceRecords(recordIds)
+    
+    if (response.code === 0) {
+      ElMessage.success('批量删除成功')
+      loadRecords()
+    } else {
+      ElMessage.error(`删除失败: ${response.message}`)
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
@@ -373,19 +518,57 @@ async function batchDelete() {
   }
 }
 
+// 导出记录为Excel文件
 function exportRecords() {
-  ElMessage.info('导出功能开发中...')
+  try {
+    // 检查是否有记录可导出
+    if (recordList.value.length === 0) {
+      ElMessage.warning('没有记录可导出')
+      return
+    }
+    
+    // 由于当前环境不支持文件导出库，提示用户手动导出
+    ElMessage.info('当前版本不支持自动导出，请使用浏览器保存功能手动导出数据')
+
+    // 备注：如果需要支持导出功能，需要安装相关依赖
+    // npm install file-saver xlsx
+    
+    // 以下代码在安装相关依赖后可以取消注释使用
+    /*
+    // 准备导出数据
+    const exportData = recordList.value.map(record => ({
+      ID: record.id,
+      资源类型: getResourceTypeLabel(record.resource_type),
+      资源ID: record.resource_id,
+      资源名称: record.resource_name || '',
+      操作用户: record.user_name || record.user_id,
+      操作类型: getActionLabel(record.action),
+      操作时间: formatTime(record.timestamp),
+      IP地址: record.ip_address || ''
+    }))
+    
+    // 创建工作表
+    const worksheet = utils.json_to_sheet(exportData)
+    
+    // 创建工作簿
+    const workbook = utils.book_new()
+    utils.book_append_sheet(workbook, worksheet, '资源操作记录')
+    
+    // 生成Excel文件
+    const now = new Date()
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    writeFile(workbook, `资源操作记录_${dateStr}.xlsx`)
+    
+    ElMessage.success('导出成功')
+    */
+  } catch (error) {
+    console.error('导出记录失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
-function getResourceTypeTag(type: string): string {
-  const tags = {
-    Package: 'primary',
-    User: 'success',
-    Category: 'warning',
-    Comment: 'info',
-    Settings: 'danger'
-  }
-  return tags[type] || 'info'
+function handleRefresh() {
+  loadRecords()
 }
 
 function getResourceTypeLabel(type: string): string {
@@ -394,22 +577,44 @@ function getResourceTypeLabel(type: string): string {
     User: '用户',
     Category: '分类',
     Comment: '评论',
-    Settings: '设置'
+    Settings: '设置',
+    Backup: '备份',
+    Announcement: '公告',
+    Resource: '资源',
+    Log: '日志',
+    Role: '角色',
+    Permission: '权限',
+    File: '文件',
+    Tag: '标签',
+    Image: '图片',
+    Video: '视频',
+    Audio: '音频',
+    Document: '文档'
   }
   return labels[type] || type
 }
 
-function getActionTag(action: string): string {
+function getResourceTypeTag(type: string): string {
   const tags = {
-    Create: 'success',
-    Update: 'warning',
-    Delete: 'danger',
-    Download: 'info',
-    Upload: 'primary',
-    Star: 'warning',
-    Ban: 'danger'
+    Package: 'primary',
+    User: 'success',
+    Category: 'warning',
+    Comment: 'info',
+    Settings: 'danger',
+    Backup: 'info',
+    Announcement: 'warning',
+    Resource: 'primary',
+    Log: 'info',
+    Role: 'success',
+    Permission: 'danger',
+    File: 'primary',
+    Tag: 'warning',
+    Image: 'primary',
+    Video: 'success',
+    Audio: 'warning',
+    Document: 'info'
   }
-  return tags[action] || 'info'
+  return tags[type] || 'info'
 }
 
 function getActionLabel(action: string): string {
@@ -420,28 +625,162 @@ function getActionLabel(action: string): string {
     Download: '下载',
     Upload: '上传',
     Star: '标星',
-    Ban: '封禁'
+    Ban: '封禁',
+    StatusChange: '状态变更',
+    Import: '导入',
+    Export: '导出',
+    Approve: '审核通过',
+    Reject: '拒绝',
+    Restore: '恢复',
+    Move: '移动',
+    Copy: '复制',
+    Share: '分享',
+    Like: '点赞',
+    Dislike: '点踩',
+    Comment: '评论',
+    Reply: '回复'
   }
   return labels[action] || action
 }
 
-function formatTime(timestamp: number): string {
-  if (!timestamp) return '-'
-  return new Date(timestamp * 1000).toLocaleString()
-}
-
-function formatJson(jsonString: string): string {
-  try {
-    const obj = JSON.parse(jsonString)
-    return JSON.stringify(obj, null, 2)
-  } catch {
-    return jsonString
+function getActionTag(action: string): string {
+  const tags = {
+    Create: 'success',
+    Update: 'warning',
+    Delete: 'danger',
+    Download: 'info',
+    Upload: 'primary',
+    Star: 'warning',
+    Ban: 'danger',
+    StatusChange: 'warning',
+    Import: 'primary',
+    Export: 'info',
+    Approve: 'success',
+    Reject: 'danger',
+    Restore: 'success',
+    Move: 'warning',
+    Copy: 'info',
+    Share: 'primary',
+    Like: 'success',
+    Dislike: 'danger',
+    Comment: 'info',
+    Reply: 'info'
   }
+  return tags[action] || 'info'
 }
 
+// 监听筛选条件变化
+watch([() => filterForm.resource_type, () => filterForm.action, () => filterForm.user_id, () => filterForm.date_range], () => {
+  // 当筛选条件变化时，自动更新筛选
+  handleFilter()
+}, { deep: true })
+
+// 组件挂载完成后执行
 onMounted(() => {
   loadRecords()
 })
+
+// 设置自动刷新
+watch(autoRefresh, (newVal) => {
+  if (newVal) {
+    // 启动定时器
+    refreshTimer = window.setInterval(() => {
+      loadRecords()
+    }, refreshInterval.value * 1000)
+  } else {
+    // 清除定时器
+    if (refreshTimer !== null) {
+      clearInterval(refreshTimer)
+      refreshTimer = null
+    }
+  }
+})
+
+// 在组件销毁时清除定时器
+onUnmounted(() => {
+  if (refreshTimer !== null) {
+    clearInterval(refreshTimer)
+  }
+  // 销毁图表实例
+  // if (chartInstance.value) {
+  //   chartInstance.value.dispose()
+  // }
+})
+
+// 渲染图表
+// function renderChart() {
+//   if (!chartContainer.value) return
+  
+//   // 如果已存在图表实例，销毁它
+//   if (chartInstance.value) {
+//     chartInstance.value.dispose()
+//   }
+  
+//   // 创建新的图表实例
+//   chartInstance.value = echarts.init(chartContainer.value)
+  
+//   // 图表配置
+//   const option = {
+//     title: {
+//       text: '资源操作统计',
+//       textStyle: {
+//         color: '#333'
+//       }
+//     },
+//     tooltip: {
+//       trigger: 'axis'
+//     },
+//     legend: {
+//       data: ['操作次数']
+//     },
+//     xAxis: {
+//       type: 'category',
+//       data: chartData.dates
+//     },
+//     yAxis: {
+//       type: 'value',
+//       name: '次数'
+//     },
+//     series: [
+//       {
+//         name: '操作次数',
+//         type: 'line',
+//         data: chartData.counts,
+//         smooth: true,
+//         itemStyle: {
+//           color: '#409EFF'
+//         },
+//         areaStyle: {
+//           color: {
+//             type: 'linear',
+//             x: 0,
+//             y: 0,
+//             x2: 0,
+//             y2: 1,
+//             colorStops: [
+//               {
+//                 offset: 0,
+//                 color: 'rgba(64, 158, 255, 0.5)'
+//               },
+//               {
+//                 offset: 1,
+//                 color: 'rgba(64, 158, 255, 0.1)'
+//               }
+//             ]
+//           }
+//         }
+//       }
+//     ]
+//   }
+  
+//   // 设置图表选项
+//   chartInstance.value.setOption(option)
+  
+//   // 窗口大小变化时调整图表大小
+//   window.addEventListener('resize', () => {
+//     chartInstance.value && chartInstance.value.resize()
+//   })
+// }
 </script>
 
 <style scoped>
@@ -470,6 +809,21 @@ onMounted(() => {
 
 .record-content {
   padding: 20px 0;
+}
+
+.auto-refresh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 10px 20px;
+  background: var(--el-bg-color-page);
+  border-radius: 8px;
+}
+
+.refresh-info {
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
 }
 
 .filter-section {

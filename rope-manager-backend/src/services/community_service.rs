@@ -20,13 +20,20 @@ impl CommunityService {
     pub async fn create_comment(&self, package_id: i32, content: &str) -> Result<Comment> {
         // 这里应该从JWT token中获取用户ID，暂时使用默认值
         let user_id = 1; // TODO: 从认证中获取
+        let now = Utc::now();
 
         let comment = Comment {
             id: 0, // 数据库会自动生成
             user_id,
-            package_id,
+            target_type: "Package".to_string(),
+            target_id: package_id,
             content: content.to_string(),
-            created_at: Utc::now(),
+            status: "Active".to_string(),
+            parent_id: None,
+            likes: 0,
+            dislikes: 0,
+            created_at: now,
+            updated_at: now,
         };
 
         self.comment_repo.create_comment(&comment).await?;

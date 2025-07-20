@@ -4,11 +4,14 @@ use crate::models::system::{Category, CreateCategoryRequest, UpdateCategoryReque
 use crate::repositories::system_repo::SystemRepository;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.route("", web::get().to(get_categories))
-       .route("", web::post().to(create_category))
-       .route("/{id}", web::get().to(get_category))
-       .route("/{id}", web::put().to(update_category))
-       .route("/{id}", web::delete().to(delete_category));
+    cfg.service(
+        web::scope("/categories")
+            .route("", web::get().to(get_categories))
+            .route("", web::post().to(create_category))
+            .route("/{id}", web::get().to(get_category))
+            .route("/{id}", web::put().to(update_category))
+            .route("/{id}", web::delete().to(delete_category))
+    );
 }
 
 // 获取所有分类

@@ -5,16 +5,10 @@ use crate::services::auth_service::AuthService;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::resource("/login")
-            .route(web::post().to(login))
-    )
-    .service(
-        web::resource("/register")
-            .route(web::post().to(register))
-    )
-    .service(
-        web::resource("/user-info")
-            .route(web::get().to(get_user_info))
+        web::scope("/auth")
+            .service(web::resource("/login").route(web::post().to(login)))
+            .service(web::resource("/register").route(web::post().to(register)))
+            .service(web::resource("/user-info").route(web::get().to(get_user_info)))
     );
 }
 

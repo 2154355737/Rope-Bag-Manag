@@ -12,7 +12,22 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:15202'
+      '/api': 'http://127.0.0.1:15202',
+      // 添加对外部资源的代理
+      '/fonts': {
+        target: 'https://rsms.me/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/fonts/, '')
+      },
+      '/esm': {
+        target: 'https://esm.sh/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/esm/, '')
+      }
+    },
+    // 防止网络问题
+    hmr: {
+      overlay: false
     }
   },
   resolve: {

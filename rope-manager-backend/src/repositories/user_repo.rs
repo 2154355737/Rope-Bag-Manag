@@ -307,7 +307,8 @@ impl UserRepository {
     pub async fn get_user_comments(&self, user_id: i32) -> Result<Vec<Comment>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(
-            "SELECT id, user_id, package_id, content, created_at, updated_at 
+            "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
+                    likes, dislikes, created_at, updated_at 
              FROM comments WHERE user_id = ? ORDER BY created_at DESC"
         )?;
 
@@ -315,9 +316,15 @@ impl UserRepository {
             Ok(Comment {
                 id: row.get(0)?,
                 user_id: row.get(1)?,
-                package_id: row.get(2)?,
-                content: row.get(3)?,
-                created_at: row.get(4)?,
+                target_type: row.get(2)?,
+                target_id: row.get(3)?,
+                content: row.get(4)?,
+                status: row.get(5)?,
+                parent_id: row.get(6)?,
+                likes: row.get(7)?,
+                dislikes: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

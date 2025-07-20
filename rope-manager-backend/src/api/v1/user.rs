@@ -5,36 +5,39 @@ use crate::models::UpdateUserRequest;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::resource("")
-            .route(web::get().to(get_users))
-            .route(web::post().to(create_user))
-    )
-    .service(
-        web::resource("/batch")
-            .route(web::delete().to(batch_delete_users))
-    )
-    .service(
-        web::resource("/{id}")
-            .route(web::get().to(get_user))
-            .route(web::put().to(update_user))
-            .route(web::delete().to(delete_user))
-    )
-    .service(
-        web::resource("/profile")
-            .route(web::get().to(get_current_user_profile))
-            .route(web::put().to(update_current_user_profile))
-    )
-    .service(
-        web::resource("/my-resources")
-            .route(web::get().to(get_my_resources))
-    )
-    .service(
-        web::resource("/my-comments")
-            .route(web::get().to(get_my_comments))
-    )
-    .service(
-        web::resource("/change-password")
-            .route(web::post().to(change_password))
+        web::scope("/users")
+            .service(
+                web::resource("")
+                    .route(web::get().to(get_users))
+                    .route(web::post().to(create_user))
+            )
+            .service(
+                web::resource("/batch")
+                    .route(web::delete().to(batch_delete_users))
+            )
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_user))
+                    .route(web::put().to(update_user))
+                    .route(web::delete().to(delete_user))
+            )
+            .service(
+                web::resource("/profile")
+                    .route(web::get().to(get_current_user_profile))
+                    .route(web::put().to(update_current_user_profile))
+            )
+            .service(
+                web::resource("/my-resources")
+                    .route(web::get().to(get_my_resources))
+            )
+            .service(
+                web::resource("/my-comments")
+                    .route(web::get().to(get_my_comments))
+            )
+            .service(
+                web::resource("/change-password")
+                    .route(web::post().to(change_password))
+            )
     );
 }
 

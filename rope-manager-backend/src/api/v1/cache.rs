@@ -10,11 +10,14 @@ pub struct CacheItem {
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.route("/{cache_key}", web::delete().to(clear_cache))
-       .route("/{cache_key}", web::get().to(get_cache))
-       .route("", web::post().to(set_cache))
-       .route("", web::delete().to(clear_all_cache))
-       .route("/stats", web::get().to(get_cache_stats));
+    cfg.service(
+        web::scope("/cache")
+            .route("/{cache_key}", web::delete().to(clear_cache))
+            .route("/{cache_key}", web::get().to(get_cache))
+            .route("", web::post().to(set_cache))
+            .route("", web::delete().to(clear_all_cache))
+            .route("/stats", web::get().to(get_cache_stats))
+    );
 }
 
 // 清除缓存的处理函数

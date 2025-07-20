@@ -1,12 +1,43 @@
-// 导出所有API模块
-export { authApi } from './auth'
-export { userApi } from './users'
-export { packageApi } from './packages'
-export { adminApi } from './admin'
-export { categoryApi } from './categories'
-export { commentApi } from './comments'
-export { settingsApi } from './settings'
-export { apiCache } from './cache'
+// 统一导出各模块的API
+import { commentApi } from './comments'
+import { userApi } from './users'
+import { packageApi } from './packages'
+import { categoryApi } from './categories'
+import { apiCache } from './cache'
+import { adminApi } from './admin'
+import { authApi } from './auth'
+import { settingsApi } from './settings'
+import { resourceRecordApi } from './resourceRecords'
+import { communityApi } from './community'
+
+export {
+  commentApi,
+  userApi,
+  packageApi,
+  categoryApi,
+  apiCache,
+  adminApi,
+  authApi,
+  settingsApi,
+  resourceRecordApi,
+  communityApi
+}
+
+// 导出一个默认包含所有API的对象
+const api = {
+  comment: commentApi,
+  user: userApi,
+  package: packageApi,
+  category: categoryApi,
+  cache: apiCache,
+  admin: adminApi,
+  auth: authApi,
+  settings: settingsApi,
+  resourceRecord: resourceRecordApi,
+  community: communityApi
+}
+
+export default api
 
 // 重新导出类型
 export type { LoginRequest, RegisterRequest, UserInfo, LoginResponse } from './auth'

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crate::repositories::system_repo::SystemRepository;
 use crate::services::user_service::UserService;
-use crate::models::{Stats, Category, UserAction};
+use crate::models::{Stats, Category, UserAction, ResourceRecord, ResourceActionStats, CreateResourceRecordRequest};
 use serde::Serialize;
 use serde_json::Value;
 use chrono::Utc;
@@ -120,6 +120,26 @@ impl AdminService {
         self.system_repo.get_resource_records().await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
+    // 新增方法：记录资源操作
+    pub async fn log_resource_action(&self, record: &CreateResourceRecordRequest, user_id: i32) -> Result<i64> {
+        self.system_repo.log_resource_action(record, user_id).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：删除资源记录
+    pub async fn delete_resource_record(&self, record_id: i32) -> Result<()> {
+        self.system_repo.delete_resource_record(record_id).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：批量删除资源记录
+    pub async fn batch_delete_resource_records(&self, record_ids: &[i32]) -> Result<usize> {
+        self.system_repo.batch_delete_resource_records(record_ids).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：获取资源操作统计
+    pub async fn get_resource_action_stats(&self) -> Result<ResourceActionStats> {
+        self.system_repo.get_resource_action_stats().await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
     // 新增方法：获取用户统计
     pub async fn get_user_stats(&self) -> Result<(i32, i32, i32)> {
         self.user_service.get_user_stats().await
@@ -171,17 +191,6 @@ pub struct ThemeSettings {
     pub dark_mode: bool,
     pub font_size: String,
     pub language: String,
-}
-
-#[derive(Serialize)]
-pub struct ResourceRecord {
-    pub id: i32,
-    pub resource_name: String,
-    pub resource_type: String,
-    pub file_size: u64,
-    pub download_count: i32,
-    pub created_at: String,
-    pub updated_at: String,
 }
 
 pub async fn get_dashboard_stats() -> DashboardStats {

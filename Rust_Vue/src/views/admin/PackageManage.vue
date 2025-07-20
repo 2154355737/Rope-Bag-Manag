@@ -463,6 +463,8 @@ import {
 } from '@element-plus/icons-vue'
 import { packageApi, categoryApi } from '../../api'
 import { apiCache } from '../../api/cache'
+import { resourceRecordApi } from '../../api/resourceRecords'
+import { resourceLogger } from '../../utils/loggerService'
 import { 
   Package, 
   CreatePackageRequest, 
@@ -470,6 +472,7 @@ import {
   PackageListResponse 
 } from '../../api/packages'
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from '../../api/categories'
+import axios from 'axios' // 导入axios
 
 // 响应式数据
 const searchQuery = ref('')
@@ -609,7 +612,7 @@ async function loadPackages() {
         }
         
         return {
-          id: pkg.id,
+        id: pkg.id,
           name: pkg.name,
           author: pkg.author,
           version: pkg.version || '',
@@ -732,9 +735,12 @@ async function downloadPackage(pkg: any) {
       // 继续下载，但记录警告
     }
     
+    // 记录资源下载操作
+    await resourceLogger.logDownload(pkg.id)
+    
     // 打开下载链接
     window.open(pkg.url, '_blank')
-    ElMessage.success(`开始下载 ${pkg.name}`)
+      ElMessage.success(`开始下载 ${pkg.name}`)
     
     // 延迟刷新当前包的下载计数
     setTimeout(() => {
@@ -810,6 +816,9 @@ async function updatePackage() {
     const res = await packageApi.updatePackage(editingPackage.value.id, updateData)
     if (res.code === 0) {
       ElMessage.success('绳包更新成功')
+      
+      // 注意：资源操作记录已在API层自动处理，不需要在这里重复记录
+      
       editDialogVisible.value = false
       // 延迟刷新数据，确保后端数据已更新
       setTimeout(async () => {
@@ -821,7 +830,7 @@ async function updatePackage() {
       ElMessage.error(res.message || '更新失败')
     }
   } catch (error) {
-    console.error('编辑绳包错误:', error)
+    console.error('更新绳包错误:', error)
     ElMessage.error('更新失败')
   }
 }
@@ -838,9 +847,21 @@ async function deletePackage(pkg: any) {
       }
     )
     
+    // 删除前记录资源的信息，用于日志
+    const packageInfo = {
+      id: pkg.id,
+      name: pkg.name,
+      author: pkg.author
+    }
+    
     const res = await packageApi.deletePackage(pkg.id)
     if (res.code === 0) {
       ElMessage.success('绳包已删除')
+      
+      // 手动记录删除操作（因为API拦截器可能无法正确获取被删除资源的信息）
+      // 注释掉这行，避免重复记录，让API拦截器自动记录
+      // await resourceLogger.logDelete(pkg.id)
+      
       // 延迟刷新数据，确保后端数据已更新
       setTimeout(async () => {
         await loadPackages() // 重新加载数据
@@ -869,6 +890,8 @@ async function updateSinglePackageStatus(pkgId: number, newStatus: string) {
         packages.value[index].status = newStatus
         // 更新统计数据
         updateStatistics()
+        
+        // 注意：资源状态变更操作已在API层自动处理，不需要在这里重复记录
       }
     }
   } catch (error) {
@@ -905,9 +928,13 @@ async function addPackage() {
       file_url: newPackage.value.url // 添加file_url字段
     }
     
+    console.log('创建绳包数据:', packageData)
     const res = await packageApi.createPackage(packageData)
     if (res.code === 0) {
       ElMessage.success('绳包添加成功')
+      
+      // 注意：资源操作记录已在API层自动处理，不需要在这里重复记录
+      
       addDialogVisible.value = false
       // 清空表单
       newPackage.value = {
@@ -948,6 +975,12 @@ async function addCategoryItem() {
     
     if (res.code === 0) {
       ElMessage.success('分类添加成功')
+      
+      // 记录分类创建操作
+      if (res.data && res.data.id) {
+        await resourceLogger.logCreate(res.data.id, 'Category')
+      }
+      
       showAddCategoryDialog.value = false
       // 清空表单
       newCategory.value = {
@@ -995,6 +1028,10 @@ async function saveCategory() {
     
     if (res.code === 0) {
       ElMessage.success('分类更新成功')
+      
+      // 记录分类更新操作
+      await resourceLogger.logUpdate(editingCategory.value.id, 'Category')
+      
       showEditCategoryDialog.value = false
       // 重新加载分类
       await loadCategories()
@@ -1018,6 +1055,9 @@ async function deleteCategoryItem(category: any) {
         type: 'warning'
       }
     )
+    
+    // 先记录删除操作
+    await resourceLogger.logDelete(category.id, 'Category')
     
     const res = await categoryApi.deleteCategory(category.id)
     if (res.code === 0) {

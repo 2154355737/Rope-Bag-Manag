@@ -325,28 +325,157 @@ impl SystemRepository {
         Ok(())
     }
 
-    // 新增方法：获取资源记录
-    pub async fn get_resource_records(&self) -> Result<Vec<crate::services::admin_service::ResourceRecord>> {
+    // 获取资源记录列表
+    pub async fn get_resource_records(&self) -> Result<Vec<crate::models::ResourceRecord>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(
-            "SELECT id, name, type, file_size, download_count, created_at, updated_at 
-             FROM packages ORDER BY created_at DESC"
+            "SELECT r.id, r.resource_id, r.resource_type, p.name as resource_name, 
+                r.user_id, u.username as user_name, r.action, r.ip_address,
+                r.old_data, r.new_data, r.timestamp, r.created_at, r.updated_at,
+                COALESCE(p.file_size, 0) as file_size,
+                COALESCE(p.download_count, 0) as download_count
+         FROM resource_records r
+         LEFT JOIN packages p ON r.resource_id = p.id AND r.resource_type = 'Package'
+         LEFT JOIN users u ON r.user_id = u.id
+         ORDER BY r.timestamp DESC"
         )?;
 
         let records = stmt.query_map([], |row| {
-            Ok(crate::services::admin_service::ResourceRecord {
+            Ok(crate::models::ResourceRecord {
                 id: row.get(0)?,
-                resource_name: row.get(1)?,
+                resource_id: row.get(1)?,
                 resource_type: row.get(2)?,
-                file_size: row.get(3)?,
-                download_count: row.get(4)?,
-                created_at: row.get(5)?,
-                updated_at: row.get(6)?,
+                resource_name: row.get(3)?,
+                user_id: row.get(4)?,
+                user_name: row.get(5)?,
+                action: row.get(6)?,
+                ip_address: row.get(7)?,
+                old_data: row.get(8)?,
+                new_data: row.get(9)?,
+                timestamp: row.get(10)?,
+                file_size: row.get(13).ok(),
+                download_count: row.get(14).ok(),
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
 
         Ok(records)
+    }
+
+    // 添加记录资源操作的方法
+    pub async fn log_resource_action(&self, record: &crate::models::CreateResourceRecordRequest, user_id: i32) -> Result<i64> {
+        let conn = self.conn.lock().await;
+        
+        let timestamp = chrono::Utc::now().timestamp();
+        
+        // 尝试获取客户端IP地址，这里简化处理
+        let ip_address = "127.0.0.1"; // 实际应用中应从请求中获取
+        
+        conn.execute(
+            "INSERT INTO resource_records (resource_id, resource_type, user_id, action, ip_address, old_data, new_data, timestamp, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+            params![
+                record.resource_id,
+                record.resource_type,
+                user_id,
+                record.action,
+                ip_address,
+                record.old_data.as_deref().unwrap_or(""),
+                record.new_data.as_deref().unwrap_or(""),
+                timestamp
+            ]
+        )?;
+        
+        Ok(conn.last_insert_rowid())
+    }
+
+    // 添加删除资源记录方法
+    pub async fn delete_resource_record(&self, record_id: i32) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        conn.execute(
+            "DELETE FROM resource_records WHERE id = ?",
+            [record_id]
+        )?;
+        
+        Ok(())
+    }
+
+    // 添加批量删除资源记录方法
+    pub async fn batch_delete_resource_records(&self, record_ids: &[i32]) -> Result<usize> {
+        let conn = self.conn.lock().await;
+        
+        let placeholders = record_ids
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
+            
+        let query = format!("DELETE FROM resource_records WHERE id IN ({})", placeholders);
+        
+        let mut stmt = conn.prepare(&query)?;
+        
+        let params: Vec<&dyn rusqlite::ToSql> = record_ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::ToSql)
+            .collect();
+        
+        let count = stmt.execute(&params[..])?;
+        
+        Ok(count)
+    }
+
+    // 获取资源操作统计
+    pub async fn get_resource_action_stats(&self) -> Result<crate::models::ResourceActionStats> {
+        let conn = self.conn.lock().await;
+        
+        // 获取各种操作计数
+        let mut stmt = conn.prepare(
+            "SELECT 
+                COUNT(CASE WHEN action = 'Create' THEN 1 END) as create_count,
+                COUNT(CASE WHEN action = 'Update' THEN 1 END) as update_count,
+                COUNT(CASE WHEN action = 'Delete' THEN 1 END) as delete_count,
+                COUNT(CASE WHEN action = 'Download' THEN 1 END) as download_count
+             FROM resource_records"
+        )?;
+        
+        let counts = stmt.query_row([], |row| {
+            Ok((
+                row.get::<_, i32>(0)?,
+                row.get::<_, i32>(1)?,
+                row.get::<_, i32>(2)?,
+                row.get::<_, i32>(3)?
+            ))
+        })?;
+        
+        // 获取每日统计
+        let mut daily_stmt = conn.prepare(
+            "SELECT 
+                date(created_at) as day,
+                COUNT(*) as count
+             FROM resource_records
+             GROUP BY date(created_at)
+             ORDER BY day DESC
+             LIMIT 30"
+        )?;
+        
+        let daily_stats = daily_stmt.query_map([], |row| {
+            Ok(crate::models::DailyStats {
+                date: row.get(0)?,
+                count: row.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
+        Ok(crate::models::ResourceActionStats {
+            create_count: counts.0,
+            update_count: counts.1,
+            delete_count: counts.2,
+            download_count: counts.3,
+            by_day: daily_stats,
+        })
     }
 
     // 获取单个分类

@@ -8,6 +8,7 @@ import {
   debugRouteInfo
 } from '../utils/router'
 import { getUserInfo } from '../utils/auth'
+import { resourceLogger } from '../utils/loggerService'
 
 // 路由类型定义
 export interface RouteMeta {
@@ -187,54 +188,65 @@ const routes: RouteRecordRaw[] = [
   }
 ]
 
+// 创建路由实例
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 })
 
-// 路由守卫
+// 全局前置守卫
 router.beforeEach((to, from, next) => {
-  // 记录路由导航开始
-  logRouteNavigation(to, from, 'start')
-  debugRouteInfo(to, from)
-
-  // 设置页面标题
-  if (to.meta?.title) {
-    document.title = `${to.meta.title} - 绳包管理系统`
+  // 页面标题
+  if (to.meta.title) {
+    document.title = `${to.meta.title} - 绳包管理器`
+  } else {
+    document.title = '绳包管理器'
   }
-
-  // 检查是否需要重定向
-  const redirectPath = getRedirectPath(to, from)
-  if (redirectPath) {
-    logRouteNavigation(to, from, 'redirect')
-    return next(redirectPath)
+  
+  // 页面权限检查
+  const requiredRole = to.meta.requiresRole
+  const userRole = localStorage.getItem('userRole') || 'guest'
+  
+  if (requiredRole && requiredRole !== userRole) {
+    next({ path: '/forbidden', replace: true })
+    return
   }
-
-  // 登录校验：所有 meta.requiresAuth 的页面都需要登录
-  const token = localStorage.getItem('loginToken')
-  if (to.meta?.requiresAuth && !token) {
-    return next({ path: '/login', replace: true })
+  
+  // 检查登录状态
+  const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+  const isLoggedIn = localStorage.getItem('token')
+  
+  if (requiresAuth && !isLoggedIn) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
   }
-
-  // 路由守卫：角色权限控制
-  const user = getUserInfo()
-  const userRole = user?.role || 'guest'
-  const routeRoles = to.meta.roles as string[] | undefined
-  if (routeRoles && !routeRoles.includes(userRole)) {
-    return next('/403')
-  }
-
-  logRouteNavigation(to, from, 'complete')
+  
   next()
 })
 
-// 路由后置守卫，用于预加载
-router.afterEach((to) => {
-  // 在路由切换后预加载其他重要页面
-  if (to.meta?.preload) {
-    setTimeout(() => {
-      preloadImportantPages()
-    }, 1000) // 延迟1秒预加载
+// 全局后置钩子
+router.afterEach((to, from) => {
+  // 记录页面访问
+  try {
+    if (to.params.id && typeof to.params.id === 'string' && !isNaN(parseInt(to.params.id))) {
+      const resourceId = parseInt(to.params.id)
+      // 对特定资源页面进行访问记录
+      if (to.path.includes('/packages/') || to.path.includes('/resources/')) {
+        console.log(`[路由记录] 访问资源页面: ${to.path}, 资源ID: ${resourceId}`)
+        resourceLogger.logAction(resourceId, 'View', 'Package')
+          .catch(err => console.error('记录页面访问失败:', err))
+      } else if (to.path.includes('/users/')) {
+        console.log(`[路由记录] 访问用户页面: ${to.path}, 用户ID: ${resourceId}`)
+        resourceLogger.logAction(resourceId, 'View', 'User')
+          .catch(err => console.error('记录页面访问失败:', err))
+      } else if (to.path.includes('/comments/')) {
+        console.log(`[路由记录] 访问评论页面: ${to.path}, 评论ID: ${resourceId}`)
+        resourceLogger.logAction(resourceId, 'View', 'Comment')
+          .catch(err => console.error('记录页面访问失败:', err))
+      }
+    }
+  } catch (error) {
+    console.warn('页面访问记录失败:', error)
   }
 })
 

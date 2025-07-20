@@ -1,4 +1,5 @@
 import { api, ApiResponse } from '../utils/apiClient'
+import { resourceLogger } from '../utils/loggerService'
 
 // 绳包信息类型
 export interface Package {
@@ -89,28 +90,68 @@ export const packageApi = {
 
   // 创建绳包
   createPackage: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.post('/api/v1/packages', data)
+    return api.post('/api/v1/packages', data).then(response => {
+      // 如果创建成功，记录资源操作
+      if (response.code === 0 && response.data && response.data.id) {
+        console.log('自动记录创建绳包操作:', response.data.id)
+        resourceLogger.logCreate(response.data.id, 'Package', response.data)
+          .catch(err => console.error('记录创建操作失败:', err))
+      }
+      return response
+    })
   },
 
   // 更新绳包
   updatePackage: (id: number, data: UpdatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.put(`/api/v1/packages/${id}`, data)
+    return api.put(`/api/v1/packages/${id}`, data).then(response => {
+      // 如果更新成功，记录资源操作
+      if (response.code === 0) {
+        console.log('自动记录更新绳包操作:', id)
+        resourceLogger.logUpdate(id, 'Package', null, response.data)
+          .catch(err => console.error('记录更新操作失败:', err))
+      }
+      return response
+    })
   },
 
   // 删除绳包
   deletePackage: (id: number): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/packages/${id}`)
+    return api.delete(`/api/v1/packages/${id}`).then(response => {
+      // 如果删除成功，记录资源操作
+      if (response.code === 0) {
+        console.log('自动记录删除绳包操作:', id)
+        resourceLogger.logDelete(id, 'Package')
+          .catch(err => console.error('记录删除操作失败:', err))
+      }
+      return response
+    })
   },
 
   // 下载绳包
   downloadPackage: (id: number): Promise<ApiResponse<string>> => {
-    return api.get(`/api/v1/packages/${id}/download`)
+    return api.get(`/api/v1/packages/${id}/download`).then(response => {
+      // 如果下载成功，记录资源操作
+      if (response.code === 0) {
+        console.log('自动记录下载绳包操作:', id)
+        resourceLogger.logDownload(id, 'Package')
+          .catch(err => console.error('记录下载操作失败:', err))
+      }
+      return response
+    })
   },
 
   // 上传绳包文件
   uploadPackageFile: (id: number, file: File): Promise<ApiResponse<Package>> => {
     const formData = new FormData()
     formData.append('file', file)
-    return api.upload(`/api/v1/packages/${id}/upload`, formData)
+    return api.upload(`/api/v1/packages/${id}/upload`, formData).then(response => {
+      // 如果上传成功，记录资源操作
+      if (response.code === 0) {
+        console.log('自动记录上传绳包操作:', id)
+        resourceLogger.logUpload(id, 'Package', { filename: file.name, size: file.size })
+          .catch(err => console.error('记录上传操作失败:', err))
+      }
+      return response
+    })
   },
 } 

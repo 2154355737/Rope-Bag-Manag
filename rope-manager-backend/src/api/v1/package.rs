@@ -15,27 +15,30 @@ pub struct PackageQueryParams {
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
-        web::resource("")
-            .route(web::get().to(get_packages))
-            .route(web::post().to(create_package))
-    )
-    .service(
-        web::resource("/{id}")
-            .route(web::get().to(get_package))
-            .route(web::put().to(update_package))
-            .route(web::delete().to(delete_package))
-    )
-    .service(
-        web::resource("/{id}/download")
-            .route(web::get().to(download_package))
-    )
-    .service(
-        web::resource("/{id}/upload")
-            .route(web::post().to(upload_package_file))
-    )
-    .service(
-        web::resource("/categories")
-            .route(web::get().to(get_package_categories))
+        web::scope("/packages")
+            .service(
+                web::resource("")
+                    .route(web::get().to(get_packages))
+                    .route(web::post().to(create_package))
+            )
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_package))
+                    .route(web::put().to(update_package))
+                    .route(web::delete().to(delete_package))
+            )
+            .service(
+                web::resource("/{id}/download")
+                    .route(web::get().to(download_package))
+            )
+            .service(
+                web::resource("/{id}/upload")
+                    .route(web::post().to(upload_package_file))
+            )
+            .service(
+                web::resource("/categories")
+                    .route(web::get().to(get_package_categories))
+            )
     );
 }
 
