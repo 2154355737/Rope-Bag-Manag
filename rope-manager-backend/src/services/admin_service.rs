@@ -1,7 +1,9 @@
 use anyhow::Result;
 use crate::repositories::system_repo::SystemRepository;
 use crate::services::user_service::UserService;
-use crate::models::{Stats, Category, UserAction, ResourceRecord, ResourceActionStats, CreateResourceRecordRequest};
+use crate::models::{Stats, ResourceRecord, ResourceActionStats, CreateResourceRecordRequest};
+use crate::models::user_action::UserAction;
+use crate::models::system::{Category, BackupInfo, BackupStats};
 use serde::Serialize;
 use serde_json::Value;
 use chrono::Utc;
@@ -35,38 +37,51 @@ impl AdminService {
         self.system_repo.get_logs().await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    // 新增方法：创建备份
-    pub async fn create_backup(&self) -> Result<BackupInfo> {
-        let backup_id = Uuid::new_v4().to_string();
-        let timestamp = Utc::now();
-        let file_path = format!("backups/backup_{}.db", backup_id);
+    // 更新创建备份方法
+    pub async fn create_backup(&self, backup_type: &str, description: Option<&str>, user_id: Option<i32>) -> Result<BackupInfo> {
+        self.system_repo.create_backup(backup_type, description, user_id).await
+    }
+
+    // 更新获取备份列表方法
+    pub async fn get_backups(&self, page: Option<u32>, page_size: Option<u32>) -> Result<(Vec<BackupInfo>, i64)> {
+        let limit = page_size;
+        let offset = if let (Some(p), Some(ps)) = (page, page_size) {
+            Some((p - 1) * ps)
+        } else {
+            None
+        };
         
-        // TODO: 实现实际的数据库备份逻辑
-        self.system_repo.create_backup(&file_path).await?;
-        
-        Ok(BackupInfo {
-            backup_id: backup_id.clone(),
-            file_path,
-            size: 1024 * 1024, // 示例大小
-            created_at: timestamp.to_rfc3339(),
-        })
+        self.system_repo.get_backups(limit, offset).await
     }
 
-    // 新增方法：获取备份列表
-    pub async fn get_backups(&self) -> Result<Vec<BackupInfo>> {
-        self.system_repo.get_backups().await.map_err(|e| anyhow::anyhow!("{}", e))
+    // 获取备份详情方法
+    pub async fn get_backup_details(&self, backup_id: &str) -> Result<BackupInfo> {
+        self.system_repo.get_backup_details(backup_id).await
     }
 
-    // 新增方法：下载备份
-    pub async fn download_backup(&self, backup_id: &str) -> Result<String> {
-        self.system_repo.get_backup_path(backup_id).await
-            .map_err(|e| anyhow::anyhow!("{}", e))
-    }
-
-    // 新增方法：删除备份
+    // 更新删除备份方法
     pub async fn delete_backup(&self, backup_id: &str) -> Result<()> {
         self.system_repo.delete_backup(backup_id).await
-            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 批量删除备份方法
+    pub async fn batch_delete_backups(&self, backup_ids: &[String]) -> Result<usize> {
+        self.system_repo.batch_delete_backups(backup_ids).await
+    }
+
+    // 恢复备份方法
+    pub async fn restore_backup(&self, backup_id: &str) -> Result<()> {
+        self.system_repo.restore_backup(backup_id).await
+    }
+
+    // 获取备份统计方法
+    pub async fn get_backup_stats(&self) -> Result<BackupStats> {
+        self.system_repo.get_backup_stats().await
+    }
+
+    // 获取备份下载路径方法
+    pub async fn get_backup_download_path(&self, backup_id: &str) -> Result<String> {
+        self.system_repo.get_backup_path(backup_id).await
     }
 
     // 新增方法：获取公告
@@ -164,14 +179,6 @@ pub struct SystemLog {
     pub message: String,
     pub timestamp: String,
     pub details: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct BackupInfo {
-    pub backup_id: String,
-    pub file_path: String,
-    pub size: u64,
-    pub created_at: String,
 }
 
 #[derive(Serialize)]

@@ -1,11 +1,14 @@
+use std::{fs, path::Path, sync::Arc};
 use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
-use crate::models::system::{Category, Stats, UserAction, CreateCategoryRequest, UpdateCategoryRequest};
-use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::fs;
-use std::path::Path;
-use chrono::Utc;
 use anyhow::Result;
+use chrono::Utc;
+use uuid::Uuid;
+
+// 导入所需模型
+use crate::models::Stats;
+use crate::models::user_action::UserAction;
+use crate::models::system::{Category, CreateCategoryRequest, UpdateCategoryRequest, BackupInfo, BackupStats};
 
 #[derive(Clone)]
 pub struct SystemRepository {
@@ -20,63 +23,76 @@ impl SystemRepository {
         })
     }
 
-    pub async fn get_stats(&self) -> Result<Stats> {
+    pub async fn get_stats(&self) -> Result<crate::models::Stats> {
         let conn = self.conn.lock().await;
         
-        // 获取用户统计
+        // 获取总用户数
         let total_users: i64 = conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
-        let active_users: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM users WHERE last_login > datetime('now', '-7 days')", 
-            [], 
-            |row| row.get(0)
-        )?;
-        let new_users_today: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', 'start of day')", 
-            [], 
-            |row| row.get(0)
-        )?;
-
-        // 获取绳包统计
+        
+        // 获取总包数
         let total_packages: i64 = conn.query_row("SELECT COUNT(*) FROM packages", [], |row| row.get(0))?;
-        let new_packages_today: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM packages WHERE created_at > datetime('now', 'start of day')", 
-            [], 
+        
+        // 获取总评论数
+        let total_comments: i64 = conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0))?;
+        
+        // 获取活跃用户数（30天内登录过的）
+        let active_users: i64 = conn.query_row(
+            "SELECT COUNT(DISTINCT user_id) FROM user_actions WHERE action_type = 'Login' AND timestamp > datetime('now', '-30 day')",
+            [],
             |row| row.get(0)
         )?;
-
-        // 获取评论统计
-        let total_comments: i64 = conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0))?;
-
-        Ok(Stats {
-            total_users,
-            total_packages,
-            total_comments,
-            active_users,
-            new_users_today,
-            new_packages_today,
-            system_status: "normal".to_string(),
-            uptime: 86400, // 24小时，单位秒
-        })
+        
+        // 获取今日新增用户数
+        let new_users_today: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', 'start of day')",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 获取今日新增包数
+        let new_packages_today: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM packages WHERE created_at > datetime('now', 'start of day')",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 创建Stats对象
+        let stats = crate::models::Stats {
+            total_users: total_users.try_into().unwrap(),
+            total_packages: total_packages.try_into().unwrap(),
+            total_comments: total_comments.try_into().unwrap(),
+            active_users: active_users.try_into().unwrap(),
+            new_users_today: new_users_today.try_into().unwrap(),
+            new_packages_today: new_packages_today.try_into().unwrap(),
+            system_status: "Running".to_string(),
+            uptime: 0, // 暂时不计算运行时间
+        };
+        
+        Ok(stats)
     }
 
+    // 修复get_categories方法
     pub async fn get_categories(&self) -> Result<Vec<Category>> {
         let conn = self.conn.lock().await;
-        let mut stmt = conn.prepare(
-            "SELECT id, name, description, enabled, created_at 
-             FROM categories ORDER BY created_at ASC"
-        )?;
-
-        let categories = stmt.query_map([], |row| {
+        
+        let mut stmt = conn.prepare("SELECT id, name, description, enabled, created_at, updated_at FROM categories")?;
+        
+        let rows = stmt.query_map([], |row| {
             Ok(Category {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 description: row.get(2)?,
                 enabled: row.get(3)?,
                 created_at: row.get(4)?,
+                updated_at: row.get(5)?,
             })
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-
+        })?;
+        
+        let mut categories = Vec::new();
+        for category_result in rows {
+            categories.push(category_result?);
+        }
+        
         Ok(categories)
     }
 
@@ -128,67 +144,461 @@ impl SystemRepository {
         Ok(logs)
     }
 
-    // 新增方法：创建备份
-    pub async fn create_backup(&self, file_path: &str) -> Result<()> {
+    // 完善创建备份方法
+    pub async fn create_backup(&self, backup_type: &str, description: Option<&str>, user_id: Option<i32>) -> Result<crate::models::system::BackupInfo> {
+        // 生成唯一备份ID
+        let backup_id = Uuid::new_v4().to_string();
+        let timestamp = Utc::now();
+        let timestamp_str = timestamp.format("%Y%m%d_%H%M%S").to_string();
+        
+        // 创建备份文件名
+        let filename = format!("backup_{}_{}.db", backup_type.to_lowercase(), timestamp_str);
+        let file_path = format!("backups/{}", filename);
+        
         // 确保备份目录存在
-        if let Some(parent) = Path::new(file_path).parent() {
+        if let Some(parent) = Path::new(&file_path).parent() {
             fs::create_dir_all(parent)?;
         }
 
-        // 简单复制数据库文件作为备份
+        // 获取当前数据库路径
         let db_path = "data.db";
+        let mut status = "Success";
+        let mut file_size = 0;
+        
+        // 执行数据库备份
         if Path::new(db_path).exists() {
-            fs::copy(db_path, file_path).map_err(|e| anyhow::anyhow!("{}", e))?;
+            // 为防止备份过程中数据库变化，先创建临时连接并在事务中执行备份
+            let conn = self.conn.lock().await;
+            conn.execute("BEGIN IMMEDIATE", [])?;
+            
+            // 执行备份
+            let result = fs::copy(db_path, &file_path);
+            
+            // 结束事务
+            conn.execute("END", [])?;
+            
+            match result {
+                Ok(size) => {
+                    file_size = size;
+                },
+                Err(e) => {
+                    status = "Failed";
+                    eprintln!("Backup failed: {}", e);
+                }
+            }
+        } else {
+            status = "Failed";
+            eprintln!("Database file not found");
         }
+        
+        // 记录备份信息到数据库
+        let backup_info = self.record_backup_info(
+            &backup_id, 
+            &filename, 
+            &file_path, 
+            file_size, 
+            backup_type, 
+            status, 
+            description, 
+            &timestamp.to_rfc3339(), 
+            user_id
+        ).await?;
+        
+        Ok(backup_info)
+    }
+
+    // 记录备份信息到数据库
+    async fn record_backup_info(
+        &self,
+        id: &str,
+        filename: &str,
+        file_path: &str,
+        file_size: u64,
+        backup_type: &str,
+        status: &str,
+        description: Option<&str>,
+        backup_time: &str,
+        created_by: Option<i32>
+    ) -> Result<crate::models::system::BackupInfo> {
+        let conn = self.conn.lock().await;
+        
+        // 确保备份表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS backups (
+                id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                backup_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                description TEXT,
+                backup_time TEXT NOT NULL,
+                created_by INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            []
+        )?;
+        
+        // 插入备份记录
+        conn.execute(
+            "INSERT INTO backups (id, filename, file_path, file_size, backup_type, status, description, backup_time, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            params![
+                id,
+                filename,
+                file_path,
+                file_size as i64,
+                backup_type,
+                status,
+                description,
+                backup_time,
+                created_by
+            ]
+        )?;
+        
+        // 获取用户名（如果有用户ID）
+        let created_by_name = if let Some(user_id) = created_by {
+            conn.query_row(
+                "SELECT username FROM users WHERE id = ?",
+                [user_id],
+                |row| row.get(0)
+            ).ok()
+        } else {
+            None
+        };
+        
+        // 构建并返回备份信息
+        Ok(crate::models::system::BackupInfo {
+            id: id.to_string(),
+            filename: filename.to_string(),
+            file_path: file_path.to_string(),
+            file_size,
+            backup_type: backup_type.to_string(),
+            status: status.to_string(),
+            description: description.map(|s| s.to_string()),
+            backup_time: backup_time.to_string(),
+            created_by,
+            created_by_name,
+        })
+    }
+
+    // 完善获取备份列表方法
+    pub async fn get_backups(&self, limit: Option<u32>, offset: Option<u32>) -> Result<(Vec<crate::models::system::BackupInfo>, i64)> {
+        let conn = self.conn.lock().await;
+        
+        // 确保备份表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS backups (
+                id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                backup_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                description TEXT,
+                backup_time TEXT NOT NULL,
+                created_by INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            []
+        )?;
+        
+        // 获取总记录数
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM backups",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 构建查询语句
+        let mut sql = "SELECT b.id, b.filename, b.file_path, b.file_size, b.backup_type, 
+                     b.status, b.description, b.backup_time, b.created_by, u.username
+                  FROM backups b
+                  LEFT JOIN users u ON b.created_by = u.id
+                  ORDER BY b.backup_time DESC".to_string();
+        
+        // 添加分页
+        if let (Some(limit), Some(offset)) = (limit, offset) {
+            sql.push_str(&format!(" LIMIT {} OFFSET {}", limit, offset));
+        } else if let Some(limit) = limit {
+            sql.push_str(&format!(" LIMIT {}", limit));
+        }
+        
+        // 执行查询
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::models::system::BackupInfo {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                file_path: row.get(2)?,
+                file_size: row.get::<_, i64>(3)? as u64,
+                backup_type: row.get(4)?,
+                status: row.get(5)?,
+                description: row.get(6)?,
+                backup_time: row.get(7)?,
+                created_by: row.get(8)?,
+                created_by_name: row.get(9)?,
+            })
+        })?;
+        
+        // 收集结果
+        let mut backups = Vec::new();
+        for row in rows {
+            backups.push(row?);
+        }
+        
+        Ok((backups, total))
+    }
+
+    // 获取备份详情
+    pub async fn get_backup_details(&self, backup_id: &str) -> Result<crate::models::system::BackupInfo> {
+        let conn = self.conn.lock().await;
+        
+        let mut stmt = conn.prepare(
+            "SELECT b.id, b.filename, b.file_path, b.file_size, b.backup_type, 
+                    b.status, b.description, b.backup_time, b.created_by, u.username
+             FROM backups b
+             LEFT JOIN users u ON b.created_by = u.id
+             WHERE b.id = ?"
+        )?;
+        
+        let backup = stmt.query_row([backup_id], |row| {
+            Ok(crate::models::system::BackupInfo {
+                id: row.get(0)?,
+                filename: row.get(1)?,
+                file_path: row.get(2)?,
+                file_size: row.get::<_, i64>(3)? as u64,
+                backup_type: row.get(4)?,
+                status: row.get(5)?,
+                description: row.get(6)?,
+                backup_time: row.get(7)?,
+                created_by: row.get(8)?,
+                created_by_name: row.get(9)?,
+            })
+        })?;
+        
+        Ok(backup)
+    }
+
+    // 完善删除备份方法
+    pub async fn delete_backup(&self, backup_id: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        // 先获取备份文件路径
+        let file_path: String = conn.query_row(
+            "SELECT file_path FROM backups WHERE id = ?",
+            [backup_id],
+            |row| row.get(0)
+        )?;
+        
+        // 删除文件
+        if Path::new(&file_path).exists() {
+            fs::remove_file(&file_path)?;
+        }
+        
+        // 删除数据库记录
+        conn.execute("DELETE FROM backups WHERE id = ?", [backup_id])?;
         
         Ok(())
     }
 
-    // 新增方法：获取备份列表
-    pub async fn get_backups(&self) -> Result<Vec<crate::services::admin_service::BackupInfo>> {
-        let backup_dir = "backups";
-        if !Path::new(backup_dir).exists() {
-            return Ok(vec![]);
+    // 批量删除备份
+    pub async fn batch_delete_backups(&self, backup_ids: &[String]) -> Result<usize> {
+        if backup_ids.is_empty() {
+            return Ok(0);
         }
-
-        let mut backups = Vec::new();
-        for entry in fs::read_dir(backup_dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() && path.extension().map_or(false, |ext| ext == "db") {
-                let metadata = fs::metadata(&path)?;
-                let file_name = path.file_name().unwrap().to_str().unwrap();
-                let backup_id = file_name.replace("backup_", "").replace(".db", "");
-                
-                backups.push(crate::services::admin_service::BackupInfo {
-                    backup_id,
-                    file_path: path.to_str().unwrap().to_string(),
-                    size: metadata.len(),
-                    created_at: Utc::now().to_rfc3339(),
-                });
+        
+        let conn = self.conn.lock().await;
+        
+        // 获取所有要删除的文件路径
+        let placeholder = backup_ids.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let query = format!("SELECT file_path FROM backups WHERE id IN ({})", placeholder);
+        
+        let mut stmt = conn.prepare(&query)?;
+        let file_paths = stmt.query_map(
+            rusqlite::params_from_iter(backup_ids.iter()),
+            |row| row.get::<_, String>(0)
+        )?;
+        
+        // 删除文件
+        for file_path_result in file_paths {
+            let file_path = file_path_result?;
+            if Path::new(&file_path).exists() {
+                fs::remove_file(&file_path).ok(); // 忽略错误，继续删除其他文件
             }
         }
-
-        Ok(backups)
+        
+        // 从数据库中删除记录
+        let delete_query = format!("DELETE FROM backups WHERE id IN ({})", placeholder);
+        let deleted = conn.execute(
+            &delete_query,
+            rusqlite::params_from_iter(backup_ids.iter())
+        )?;
+        
+        Ok(deleted as usize)
     }
 
-    // 新增方法：获取备份文件路径
-    pub async fn get_backup_path(&self, backup_id: &str) -> Result<String> {
-        let backup_path = format!("backups/backup_{}.db", backup_id);
-        if Path::new(&backup_path).exists() {
-            Ok(backup_path)
-        } else {
-            Err(anyhow::anyhow!("Backup not found"))
+    // 添加恢复备份方法
+    pub async fn restore_backup(&self, backup_id: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        // 获取备份文件路径和状态
+        let (file_path, status): (String, String) = conn.query_row(
+            "SELECT file_path, status FROM backups WHERE id = ?",
+            [backup_id],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        )?;
+        
+        // 检查备份状态
+        if status != "Success" {
+            return Err(anyhow::anyhow!("Cannot restore from a failed backup"));
         }
-    }
-
-    // 新增方法：删除备份
-    pub async fn delete_backup(&self, backup_id: &str) -> Result<()> {
-        let backup_path = format!("backups/backup_{}.db", backup_id);
-        if Path::new(&backup_path).exists() {
-            fs::remove_file(backup_path)?;
+        
+        // 检查备份文件是否存在
+        if !Path::new(&file_path).exists() {
+            return Err(anyhow::anyhow!("Backup file not found"));
         }
+        
+        // 备份当前数据库（恢复前备份）
+        let pre_restore_backup_id = Uuid::new_v4().to_string();
+        let timestamp = Utc::now().format("%Y%m%d_%H%M%S").to_string();
+        let pre_restore_filename = format!("pre_restore_backup_{}.db", timestamp);
+        let pre_restore_path = format!("backups/{}", pre_restore_filename);
+        
+        // 确保备份目录存在
+        if let Some(parent) = Path::new(&pre_restore_path).parent() {
+            fs::create_dir_all(parent)?;
+        }
+        
+        // 备份当前数据库
+        let db_path = "data.db";
+        if Path::new(db_path).exists() {
+            fs::copy(db_path, &pre_restore_path)?;
+            
+            // 记录这次恢复前的备份
+            self.record_backup_info(
+                &pre_restore_backup_id,
+                &pre_restore_filename,
+                &pre_restore_path,
+                fs::metadata(&pre_restore_path)?.len(),
+                "PreRestore",
+                "Success",
+                Some("Automatic backup before restore operation"),
+                &Utc::now().to_rfc3339(),
+                None
+            ).await?;
+        }
+        
+        // 执行恢复操作（关闭当前连接并复制备份文件）
+        drop(conn); // 释放锁，关闭连接
+        
+        // 复制备份文件到数据库位置
+        fs::copy(&file_path, db_path)?;
+        
+        // 重新建立数据库连接并记录恢复操作
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "INSERT INTO system_logs (level, message, details, timestamp) 
+             VALUES (?, ?, ?, datetime('now'))",
+            params![
+                "INFO",
+                format!("数据库已从备份 {} 恢复", backup_id),
+                format!("Restored from backup file: {}", file_path),
+            ]
+        )?;
+        
         Ok(())
+    }
+
+    // 获取备份统计信息
+    pub async fn get_backup_stats(&self) -> Result<crate::models::system::BackupStats> {
+        let conn = self.conn.lock().await;
+        
+        // 确保备份表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS backups (
+                id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                backup_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                description TEXT,
+                backup_time TEXT NOT NULL,
+                created_by INTEGER,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            []
+        )?;
+        
+        // 总备份数
+        let total_backups: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM backups",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 成功备份数
+        let success_backups: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM backups WHERE status = 'Success'",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 失败备份数
+        let failed_backups: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM backups WHERE status != 'Success'",
+            [],
+            |row| row.get(0)
+        )?;
+        
+        // 总大小
+        let total_size: i64 = conn.query_row(
+            "SELECT SUM(file_size) FROM backups",
+            [],
+            |row| row.get(0)
+        ).unwrap_or(0);
+        
+        // 最后一次备份时间
+        let last_backup_time: Option<String> = conn.query_row(
+            "SELECT backup_time FROM backups WHERE status = 'Success' ORDER BY backup_time DESC LIMIT 1",
+            [],
+            |row| row.get(0)
+        ).ok();
+        
+        // 下一次计划备份时间（如果有备份调度配置的话）
+        let next_scheduled_backup: Option<String> = None; // 这需要备份调度功能，可以在后续实现
+        
+        Ok(crate::models::system::BackupStats {
+            total_backups,
+            success_backups,
+            failed_backups,
+            total_size: total_size as u64,
+            last_backup_time,
+            next_scheduled_backup,
+        })
+    }
+
+    // 添加获取备份文件下载路径方法
+    pub async fn get_backup_path(&self, backup_id: &str) -> Result<String> {
+        let conn = self.conn.lock().await;
+        
+        let (file_path, status): (String, String) = conn.query_row(
+            "SELECT file_path, status FROM backups WHERE id = ?",
+            [backup_id],
+            |row| Ok((row.get(0)?, row.get(1)?))
+        )?;
+        
+        // 检查备份状态和文件存在性
+        if status != "Success" {
+            return Err(anyhow::anyhow!("Cannot download a failed backup"));
+        }
+        
+        if !Path::new(&file_path).exists() {
+            return Err(anyhow::anyhow!("Backup file not found"));
+        }
+        
+        Ok(file_path)
     }
 
     // 新增方法：获取公告
@@ -478,10 +888,10 @@ impl SystemRepository {
         })
     }
 
-    // 获取单个分类
+    // 修复get_category_by_id方法
     pub async fn get_category_by_id(&self, id: i32) -> Result<Option<Category>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, name, description, enabled, created_at FROM categories WHERE id = ?";
+        let sql = "SELECT id, name, description, enabled, created_at, updated_at FROM categories WHERE id = ?";
         println!("[SQL] get_category_by_id: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
@@ -493,6 +903,7 @@ impl SystemRepository {
                 description: row.get(2)?,
                 enabled: row.get(3)?,
                 created_at: row.get(4)?,
+                updated_at: row.get(5)?,
             })
         }) {
             Ok(c) => Some(c),
@@ -506,42 +917,44 @@ impl SystemRepository {
         Ok(category)
     }
 
-    // 创建分类
+    // 修复create_category方法
     pub async fn create_category(&self, req: &CreateCategoryRequest) -> Result<Category> {
         let conn = self.conn.lock().await;
-        let sql = "INSERT INTO categories (name, description, enabled) VALUES (?, ?, ?)";
+        let sql = "INSERT INTO categories (name, description, enabled, created_at) VALUES (?, ?, ?, datetime('now'))";
         println!("[SQL] create_category: {}", sql);
         
-        let now = chrono::Utc::now();
+        let enabled = req.enabled.unwrap_or(true);
         
         let mut stmt = conn.prepare(sql)?;
         stmt.execute(rusqlite::params![
             req.name,
             req.description,
-            req.enabled
+            enabled
         ])?;
         
         let id = conn.last_insert_rowid() as i32;
+        let now = chrono::Utc::now().to_rfc3339();
         
         let category = Category {
             id,
             name: req.name.clone(),
             description: req.description.clone(),
-            enabled: req.enabled,
+            enabled,
             created_at: now,
+            updated_at: None,
         };
         
         Ok(category)
     }
 
-    // 更新分类
+    // 修复update_category方法
     pub async fn update_category(&self, id: i32, req: &UpdateCategoryRequest) -> Result<Category> {
         // 先检查分类是否存在
         let category = self.get_category_by_id(id).await?
             .ok_or_else(|| anyhow::anyhow!("分类不存在"))?;
         
         let conn = self.conn.lock().await;
-        let sql = "UPDATE categories SET name = ?, description = ?, enabled = ? WHERE id = ?";
+        let sql = "UPDATE categories SET name = ?, description = ?, enabled = ?, updated_at = datetime('now') WHERE id = ?";
         println!("[SQL] update_category: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
@@ -553,12 +966,14 @@ impl SystemRepository {
         ])?;
         
         // 获取更新后的分类
+        let now = chrono::Utc::now().to_rfc3339();
         let updated_category = Category {
             id,
             name: req.name.clone().unwrap_or(category.name),
             description: req.description.clone().or(category.description),
             enabled: req.enabled.unwrap_or(category.enabled),
             created_at: category.created_at,
+            updated_at: Some(now),
         };
         
         Ok(updated_category)

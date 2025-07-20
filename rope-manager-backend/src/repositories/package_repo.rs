@@ -324,38 +324,21 @@ impl PackageRepository {
 
     pub async fn get_categories(&self) -> Result<Vec<Category>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, name, description, enabled, created_at 
-                   FROM categories ORDER BY created_at ASC";
-        println!("[SQL] get_categories: {}", sql);
-        let mut stmt = match conn.prepare(sql) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("[ERROR] prepare failed: {}", e);
-                return Err(e.into());
-            }
-        };
-        let categories = match stmt.query_map([], |row| {
+        
+        let mut stmt = conn.prepare("SELECT id, name, description, enabled, created_at, updated_at FROM categories")?;
+        
+        let categories = stmt.query_map([], |row| {
             Ok(Category {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 description: row.get(2)?,
                 enabled: row.get(3)?,
                 created_at: row.get(4)?,
+                updated_at: row.get(5)?,
             })
-        }) {
-            Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
-                Ok(list) => list,
-                Err(e) => {
-                    println!("[ERROR] collect failed: {}", e);
-                    return Err(e.into());
-                }
-            },
-            Err(e) => {
-                println!("[ERROR] query_map failed: {}", e);
-                return Err(e.into());
-            }
-        };
-        println!("[SQL] get_categories result count: {}", categories.len());
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        
         Ok(categories)
     }
 

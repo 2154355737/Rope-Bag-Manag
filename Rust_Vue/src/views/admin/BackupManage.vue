@@ -308,20 +308,22 @@ import {
   deleteBackupRecord,
   downloadBackup as downloadBackupApi,
   batchDeleteBackupRecords,
-  restoreBackup as restoreBackupApi
+  restoreBackup as restoreBackupApi,
+  getBackupDownloadUrl,
+  BackupRecord
 } from '../../api/backupRecords'
 
 // 响应式数据
 const loading = ref(false)
 const backupLoading = ref(false)
-const backupList = ref([])
-const selectedBackups = ref([])
+const backupList = ref<BackupRecord[]>([])
+const selectedBackups = ref<BackupRecord[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const backupDialogVisible = ref(false)
 const autoBackupDialogVisible = ref(false)
-const currentBackup = ref(null)
+const currentBackup = ref<BackupRecord | null>(null)
 
 const status = reactive({
   total_backups: 0,
@@ -378,7 +380,7 @@ async function createBackup() {
       ElMessage.success('备份创建成功')
       loadBackups()
     } else {
-      ElMessage.error(response.msg || '备份创建失败')
+      ElMessage.error(response.message || '备份创建失败')
     }
   } catch (error) {
     console.error('创建备份失败:', error)
@@ -404,7 +406,7 @@ function exportBackupList() {
   ElMessage.info('导出功能开发中...')
 }
 
-function handleSelectionChange(selection: any[]) {
+function handleSelectionChange(selection: BackupRecord[]) {
   selectedBackups.value = selection
 }
 
@@ -418,16 +420,16 @@ function handleCurrentChange(page: number) {
   loadBackups()
 }
 
-function viewBackup(backup: any) {
+function viewBackup(backup: BackupRecord) {
   currentBackup.value = backup
   backupDialogVisible.value = true
 }
 
-async function downloadBackup(backup: any) {
+async function downloadBackup(backup: BackupRecord) {
   try {
     // 创建一个隐藏的下载链接
     const link = document.createElement('a')
-    link.href = `http://127.0.0.1:15202/api/backup-records/${backup.id}/download`
+    link.href = `http://127.0.0.1:15201${getBackupDownloadUrl(backup.id)}`
     link.download = backup.filename
     link.style.display = 'none'
     document.body.appendChild(link)
@@ -440,7 +442,7 @@ async function downloadBackup(backup: any) {
   }
 }
 
-async function restoreBackup(backup: any) {
+async function restoreBackup(backup: BackupRecord) {
   try {
     await ElMessageBox.confirm(
       '确定要恢复这个备份吗？这将覆盖当前数据库！',
@@ -453,7 +455,7 @@ async function restoreBackup(backup: any) {
       ElMessage.success('备份恢复成功')
       loadBackups()
     } else {
-      ElMessage.error(response.msg || '恢复失败')
+      ElMessage.error(response.message || '恢复失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -462,7 +464,7 @@ async function restoreBackup(backup: any) {
   }
 }
 
-async function deleteBackup(backup: any) {
+async function deleteBackup(backup: BackupRecord) {
   try {
     await ElMessageBox.confirm('确定要删除这个备份吗？', '确认删除')
     const response = await deleteBackupRecord(backup.id)
@@ -486,7 +488,7 @@ async function batchDelete() {
   try {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedBackups.value.length} 个备份吗？`, '确认删除')
     
-    const ids = selectedBackups.value.map(backup => parseInt(backup.id))
+    const ids = selectedBackups.value.map(backup => backup.id)
     const response = await batchDeleteBackupRecords(ids)
     
     if (response.code === 0) {
@@ -494,7 +496,7 @@ async function batchDelete() {
       selectedBackups.value = []
       loadBackups()
     } else {
-      ElMessage.error(response.msg || '批量删除失败')
+      ElMessage.error(response.message || '批量删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {

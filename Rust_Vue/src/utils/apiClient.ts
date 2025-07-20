@@ -330,11 +330,11 @@ apiClient.interceptors.response.use(
               'Package', 
               packageId
             ).catch(err => console.error('记录包更新行为失败:', err))
-          }
-        }
+              }
+            }
         else if (method === 'DELETE' && url.includes('/api/v1/packages')) {
           // 记录包删除行为
-          const packageMatch = url.match(/\/packages\/(\d+)/)
+            const packageMatch = url.match(/\/packages\/(\d+)/)
           if (packageMatch && packageMatch[1]) {
             const packageId = parseInt(packageMatch[1])
             userActionService.logAction(
@@ -393,9 +393,9 @@ apiClient.interceptors.response.use(
               'User', 
               userId
             ).catch(err => console.error('记录用户更新行为失败:', err))
+            }
           }
-        }
-        
+          
         // 5. 搜索相关
         else if (method === 'GET' && url.includes('/api/v1/packages') && config.params?.keyword) {
           // 记录搜索行为
@@ -406,8 +406,8 @@ apiClient.interceptors.response.use(
             category,
             `搜索关键词: ${keyword} (${category})`
           ).catch(err => console.error('记录搜索行为失败:', err))
-        }
-        
+            }
+            
         // 6. 管理员操作
         else if (method !== 'GET' && url.includes('/api/v1/admin')) {
           let actionType = '未知操作'
@@ -420,10 +420,10 @@ apiClient.interceptors.response.use(
             actionType,
             `管理员${actionType}: ${url}`
           ).catch(err => console.error('记录管理员操作失败:', err))
-        }
+            }
       } catch (err) {
         console.error('记录用户行为失败:', err)
-      }
+        }
     }
     
     return response
