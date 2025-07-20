@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { resourceRecordApi } from '../api/resourceRecords'
+import userActionService from './userActionService'
 
 // 为Vite环境变量声明类型
 /// <reference types="vite/client" />
@@ -287,118 +288,46 @@ window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
 
 // 响应拦截器
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
+  (response) => {
     // 提取请求信息
-    const { method, url, data } = response.config
+    const { config, data } = response
+    const method = config.method?.toUpperCase() || 'GET'
+    const url = config.url || ''
     
-    // 尝试自动记录资源操作
-    if (response.data?.code === 0 && method && url) {
-      // 使用setTimeout确保异步执行，不阻塞主流程
-      setTimeout(() => {
-        try {
-          // 从URL中提取资源ID和类型
-          let resourceId: number | null = null
-          let resourceType = 'Unknown'
-          let action = 'Unknown'
-          
-          // 确定操作类型
-          if (method === 'post') action = 'Create'
-          else if (method === 'put') action = 'Update'
-          else if (method === 'delete') action = 'Delete'
-          else if (method === 'get' && url.includes('/download')) action = 'Download'
-          
-          // 对于创建操作，需要从响应中获取新创建的资源ID
-          if (action === 'Create' && response.data?.data?.id) {
-            resourceId = response.data.data.id
-            
-            // 从URL推断资源类型
-            if (url.includes('/packages')) resourceType = 'Package'
-            else if (url.includes('/users')) resourceType = 'User'
-            else if (url.includes('/comments')) resourceType = 'Comment'
-            else if (url.includes('/categories')) resourceType = 'Category'
-            else if (url.includes('/resource-records')) resourceType = 'ResourceRecord'
-            // 检查请求体数据来确定资源类型
-            else if (data) {
-              try {
-                const requestData = typeof data === 'string' ? JSON.parse(data) : data;
-                // 根据请求数据的字段推断资源类型
-                if (requestData.name && requestData.author && (requestData.version || requestData.file_url)) {
-                  resourceType = 'Package';
-                } else if (requestData.name && requestData.description && 'enabled' in requestData) {
-                  resourceType = 'Category';
-                } else if (requestData.username || requestData.email) {
-                  resourceType = 'User';
-                } else if (requestData.content && (requestData.resource_id || requestData.target_id)) {
-                  resourceType = 'Comment';
-                }
-              } catch (e) {
-                console.warn('解析请求数据失败:', e);
-              }
-            }
-          } else {
-            // 对于非创建操作，从URL中提取资源ID
-            const packageMatch = url.match(/\/packages\/(\d+)/)
-            const userMatch = url.match(/\/users\/(\d+)/)
-            const commentMatch = url.match(/\/comments\/(\d+)/)
-            const categoryMatch = url.match(/\/categories\/(\d+)/)
-            
-            if (packageMatch) {
-              resourceId = parseInt(packageMatch[1])
-              resourceType = 'Package'
-            } else if (userMatch) {
-              resourceId = parseInt(userMatch[1])
-              resourceType = 'User'
-            } else if (commentMatch) {
-              resourceId = parseInt(commentMatch[1])
-              resourceType = 'Comment'
-            } else if (categoryMatch) {
-              resourceId = parseInt(categoryMatch[1])
-              resourceType = 'Category'
-            } else {
-              // 尝试从URL末尾提取ID
-              const urlParts = url.split('/')
-              const lastPart = urlParts[urlParts.length - 1]
-              if (/^\d+$/.test(lastPart)) {
-                resourceId = parseInt(lastPart)
-                
-                // 从URL推断资源类型
-                if (url.includes('/packages')) resourceType = 'Package'
-                else if (url.includes('/users')) resourceType = 'User'
-                else if (url.includes('/comments')) resourceType = 'Comment'
-                else if (url.includes('/categories')) resourceType = 'Category'
-              }
-            }
-          }
-          
-          // 如果找不到资源ID或操作类型未知，则不记录
-          if (resourceId && action !== 'Unknown' && resourceType !== 'Unknown') {
-            console.log(`[自动记录] ${resourceType} ${action}操作：ID=${resourceId}`)
-            
-            // 准备记录数据
-            const recordData: any = {
-              resource_type: resourceType
-            }
-            
-            // 如果有响应数据，添加为新数据
-            if (response.data?.data && action !== 'Delete') {
-              recordData.new_data = typeof response.data.data === 'string' 
-                ? response.data.data 
-                : JSON.stringify(response.data.data)
-            }
-            
-            // 如果是创建操作，避免重复记录资源操作记录本身
-            if (!(resourceType === 'ResourceRecord' && action === 'Create')) {
-              resourceRecordApi.logResourceAction(resourceId, action, recordData)
-                .catch(err => console.warn('记录操作失败:', err))
-            }
-          } else {
-            // 调试输出
-            console.log(`[未记录操作] 无法确定资源信息: method=${method}, url=${url}, resourceId=${resourceId}, resourceType=${resourceType}, action=${action}`);
-          }
-        } catch (err) {
-          console.warn('自动记录资源操作失败:', err)
+    // 特定API操作记录为用户行为
+    if (data && data.code === 0) {
+      // 关键API操作记录
+      if (method === 'POST' && url.includes('/api/v1/auth/login')) {
+        // 登录成功在组件中已记录，此处不重复记录
+      } 
+      else if (method === 'POST' && url.includes('/api/v1/packages')) {
+        // 记录包上传行为
+        const packageId = data.data?.id
+        if (packageId) {
+          userActionService.logUpload('Package', packageId, '上传新绳包')
+            .catch(err => console.error('记录上传行为失败:', err))
         }
-      }, 0)
+      }
+      else if (method === 'GET' && url.includes('/download')) {
+        // 下载操作在组件中应该记录，此处可以作为备份记录点
+        const packageMatch = url.match(/\/packages\/(\d+)\/download/)
+        if (packageMatch && packageMatch[1]) {
+          const packageId = parseInt(packageMatch[1])
+          userActionService.logDownload('Package', packageId)
+            .catch(err => console.error('记录下载行为失败:', err))
+        }
+      }
+      else if ((method === 'POST' || method === 'PUT') && url.includes('/api/v1/comments')) {
+        // 记录评论行为
+        const commentData = data.data
+        if (commentData?.target_id && commentData?.target_type) {
+          userActionService.logComment(
+            commentData.target_type,
+            commentData.target_id,
+            `${method === 'POST' ? '发表' : '编辑'}评论`
+          ).catch(err => console.error('记录评论行为失败:', err))
+        }
+      }
     }
     
     return response

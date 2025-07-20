@@ -9,6 +9,7 @@ import { authApi } from './auth'
 import { settingsApi } from './settings'
 import { resourceRecordApi } from './resourceRecords'
 import { communityApi } from './community'
+import { userActionApi } from './userActions'
 
 export {
   commentApi,
@@ -20,7 +21,8 @@ export {
   authApi,
   settingsApi,
   resourceRecordApi,
-  communityApi
+  communityApi,
+  userActionApi
 }
 
 // 导出一个默认包含所有API的对象
@@ -34,7 +36,8 @@ const api = {
   auth: authApi,
   settings: settingsApi,
   resourceRecord: resourceRecordApi,
-  community: communityApi
+  community: communityApi,
+  userAction: userActionApi
 }
 
 export default api
@@ -43,11 +46,12 @@ export default api
 export type { LoginRequest, RegisterRequest, UserInfo, LoginResponse } from './auth'
 export type { User, UserQueryParams, UserListResponse, UpdateUserRequest } from './users'
 export type { Package, CreatePackageRequest, UpdatePackageRequest, PackageQueryParams, PackageListResponse } from './packages'
-export type { Stats, SystemLog, UserAction } from './admin'
+export type { Stats, SystemLog, UserAction as AdminUserAction } from './admin'
 export type { Category } from './categories'
 export type { Comment } from './comments'
 export type { SystemSettings } from './settings'
 export type { CacheData } from './cache'
+export type { UserAction, UserActionStats } from './userActions'
 
 // 导出API客户端工具
 export { api, healthCheck, setToken, getToken, clearToken, isLoggedIn } from '../utils/apiClient'

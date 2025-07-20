@@ -1,8 +1,9 @@
 pub mod user;
 pub mod package;
 pub mod comment;
-pub mod system;
 pub mod resource_record;
+pub mod system;
+pub mod user_action; // 添加用户行为记录模型
 
 use serde::{Serialize, Deserialize};
 

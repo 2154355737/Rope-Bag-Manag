@@ -46,6 +46,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { authApi } from '../../api'
+import userActionService from '../../utils/userActionService'
 
 const router = useRouter()
 const registerFormRef = ref()
@@ -103,10 +104,19 @@ async function handleRegister() {
       localStorage.setItem('userInfo', JSON.stringify(response.data.user))
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('loginToken', response.data.token)
+      
+      // 记录用户注册成功行为
+      userActionService.logRegister(registerForm.username, true)
+        .catch(err => console.error('记录注册行为失败:', err))
+        
       ElMessage.success('注册成功，已自动登录')
       router.push('/user')
       return
     } else {
+      // 记录用户注册失败行为
+      userActionService.logRegister(registerForm.username, false, response.message)
+        .catch(err => console.error('记录注册失败行为失败:', err))
+        
       ElMessage.error(response.message || '注册失败')
     }
   } catch (error) {

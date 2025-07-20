@@ -1,5 +1,7 @@
 import { getDeviceType } from './device'
-import { isLoggedIn, isLoginExpired } from './auth'
+import { isLoggedIn, isLoginExpired, getUserInfo } from './auth'
+import { RouteLocationNormalized } from 'vue-router'
+import userActionService from './userActionService'
 
 // 路由工具函数（简化版，仅支持桌面端）
 
@@ -130,24 +132,25 @@ export function getRedirectPath(to: any, from: any): string | null {
 }
 
 /**
- * 路由导航日志
- * @param to 目标路由
- * @param from 来源路由
- * @param action 操作类型
+ * 记录路由导航
  */
-export function logRouteNavigation(to: any, from: any, action: 'start' | 'complete' | 'redirect') {
-  const authStatus = checkAuthStatus()
+export const logRouteNavigation = (to: RouteLocationNormalized) => {
+  const toPath = to.path
+  const toName = to.meta.title || toPath
   
-  const logData = {
-    from: from.path,
-    to: to.path,
-    device: 'desktop',
-    isAuthenticated: authStatus.isAuthenticated,
-    action,
-    timestamp: new Date().toISOString()
+  try {
+    const userInfo = getUserInfo()
+    console.log(`路由导航: ${toPath}, 页面: ${toName}`)
+    
+    // 记录用户页面访问
+    if (userInfo && userInfo.id) {
+      userActionService.logPageView(toPath)
+        .catch(err => console.error('记录页面访问失败:', err))
+    }
+    
+  } catch (error) {
+    console.error('记录路由导航失败:', error)
   }
-  
-  console.log(`🚀 路由${action === 'start' ? '开始' : action === 'complete' ? '完成' : '重定向'}:`, logData)
 }
 
 /**

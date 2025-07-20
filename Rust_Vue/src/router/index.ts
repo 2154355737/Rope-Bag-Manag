@@ -198,10 +198,19 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // 页面标题
   if (to.meta.title) {
-    document.title = `${to.meta.title} - 绳包管理器`
+    document.title = `${to.meta.title} - 绳包管理系统`
   } else {
-    document.title = '绳包管理器'
+    document.title = '绳包管理系统'
   }
+  
+  // 记录导航开始
+  // logRouteNavigation(to, from, 'start')
+  
+  // 检查页面权限
+  const authStatus = checkAuthStatus()
+  
+  // 先记录访问日志
+  logRouteNavigation(to)
   
   // 页面权限检查
   const requiredRole = to.meta.requiresRole

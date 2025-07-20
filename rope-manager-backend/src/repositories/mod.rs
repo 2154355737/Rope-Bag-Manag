@@ -1,7 +1,8 @@
 pub mod user_repo;
 pub mod package_repo;
-pub mod comment_repo;
 pub mod system_repo;
+pub mod comment_repo;
+pub mod user_action_repo; // 添加用户行为记录仓库
 
 pub use user_repo::*;
 pub use package_repo::*;

@@ -47,6 +47,7 @@ async fn main() -> std::io::Result<()> {
         }
     }
     
+
     // 数据库URL和配置
     let db_url = config.database_url().to_string();
     let upload_path = config.upload_path().to_string();
@@ -67,6 +68,11 @@ async fn main() -> std::io::Result<()> {
             .expect("创建评论仓库失败");
         let system_repo = repositories::SystemRepository::new(&db_url)
             .expect("创建系统仓库失败");
+        let user_action_repo = repositories::user_action_repo::UserActionRepository::new(
+            Arc::new(tokio::sync::Mutex::new(
+                rusqlite::Connection::open(&db_url).expect("打开数据库连接失败")
+            ))
+        );
         
         // 创建服务实例
         let auth_service = services::auth_service::AuthService::new(
@@ -86,6 +92,9 @@ async fn main() -> std::io::Result<()> {
         );
         let community_service = services::community_service::CommunityService::new(
             comment_repo.clone()
+        );
+        let user_action_service = services::user_action_service::UserActionService::new(
+            user_action_repo.clone()
         );
 
         App::new()
@@ -111,6 +120,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(comment_service))
             .app_data(web::Data::new(community_service))
             .app_data(web::Data::new(system_repo))
+            .app_data(web::Data::new(user_action_service))
             .configure(api::configure_routes)
     })
     .workers(workers)

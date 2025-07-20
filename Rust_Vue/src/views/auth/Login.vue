@@ -132,6 +132,7 @@ import { User, Lock, Right, Box, DataAnalysis } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { authApi, setToken } from '../../api'
 import { setLoginStatus } from '../../utils/auth'
+import userActionService from '../../utils/userActionService'
 // import { getUsers, loadUsers } from '../../api/user' // 导入管理员相关API
 
 const router = useRouter()
@@ -183,6 +184,11 @@ async function handleLogin() {
       localStorage.setItem('userInfo', JSON.stringify(userInfo))
       localStorage.setItem('isLoggedIn', 'true')
       localStorage.setItem('loginToken', response.data.token)
+      
+      // 记录用户登录行为
+      userActionService.logLogin(loginForm.username, true)
+        .catch(err => console.error('记录登录行为失败:', err))
+      
       ElMessage.success('登录成功')
       // 跳转
       if (response.data.user.role === 'admin') {
@@ -194,6 +200,10 @@ async function handleLogin() {
       }
       return
     } else {
+      // 记录登录失败行为
+      userActionService.logLogin(loginForm.username, false, response.message)
+        .catch(err => console.error('记录登录失败行为失败:', err))
+        
       ElMessage.error(response.message || '登录失败，请检查用户名和密码')
     }
   } catch (error) {

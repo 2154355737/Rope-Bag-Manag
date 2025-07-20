@@ -71,7 +71,7 @@
         <!-- 统计信息 -->
         <div class="stats-section">
           <el-row :gutter="20">
-            <el-col :span="6">
+            <el-col :span="12">
               <el-card class="stat-card">
                 <div class="stat-content">
                   <div class="stat-icon">📊</div>
@@ -82,29 +82,7 @@
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-content">
-                  <div class="stat-icon">✅</div>
-                  <div class="stat-info">
-                    <div class="stat-value">{{ stats.success_actions }}</div>
-                    <div class="stat-label">成功操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stat-card">
-                <div class="stat-content">
-                  <div class="stat-icon">❌</div>
-                  <div class="stat-info">
-                    <div class="stat-value">{{ stats.failed_actions }}</div>
-                    <div class="stat-label">失败操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
+            <el-col :span="12">
               <el-card class="stat-card">
                 <div class="stat-content">
                   <div class="stat-icon">👥</div>
@@ -138,18 +116,10 @@
             </el-table-column>
             <el-table-column prop="target_type" label="目标类型" width="120" />
             <el-table-column prop="target_id" label="目标ID" width="120" />
-            <el-table-column prop="description" label="行为描述" min-width="200" />
-            <el-table-column prop="success" label="结果" width="100">
+            <el-table-column prop="details" label="行为描述" min-width="200" />
+            <el-table-column prop="created_at" label="时间" width="180">
               <template #default="{ row }">
-                <el-tag :type="row.success ? 'success' : 'danger'">
-                  {{ row.success ? '成功' : '失败' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="error_message" label="错误信息" min-width="200" />
-            <el-table-column prop="timestamp" label="时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.timestamp) }}
+                {{ formatTime(row.created_at) }}
               </template>
             </el-table-column>
             <el-table-column label="操作" width="120" fixed="right">
@@ -213,7 +183,7 @@
         </div>
         <div class="detail-item">
           <label>行为描述:</label>
-          <span>{{ currentAction.description }}</span>
+          <span>{{ currentAction.details }}</span>
         </div>
         <div class="detail-item">
           <label>IP地址:</label>
@@ -235,7 +205,7 @@
         </div>
         <div class="detail-item">
           <label>时间:</label>
-          <span>{{ formatTime(currentAction.timestamp) }}</span>
+          <span>{{ formatTime(currentAction.created_at) }}</span>
         </div>
       </div>
       <template #footer>
@@ -246,9 +216,11 @@
 </template>
 
 <script setup lang="ts">
+// 导入所需依赖
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
+import { userActionApi, UserAction, UserActionStats } from '../../api'
 
 // 响应式数据
 const loading = ref(false)
@@ -269,8 +241,6 @@ const searchQuery = reactive({
 
 const stats = reactive({
   total_actions: 0,
-  success_actions: 0,
-  failed_actions: 0,
   active_users: 0
 })
 
@@ -280,7 +250,7 @@ async function loadActions() {
   try {
     const params: Record<string, string> = {
       page: currentPage.value.toString(),
-      size: pageSize.value.toString()
+      page_size: pageSize.value.toString()
     }
     
     if (searchQuery.user_id) {
@@ -296,15 +266,15 @@ async function loadActions() {
       params.end_time = searchQuery.end_time
     }
     
-    const response = await fetch(`http://127.0.0.1:15202/api/user-actions?${new URLSearchParams(params)}`)
-    const data = await response.json()
+    const response = await userActionApi.getUserActions(params)
+    const data = response
     
-    if (data.code === 200) {
+    if (data.code === 0) {
       actionsList.value = data.data.actions || []
       total.value = data.data.total || 0
       updateStats()
     } else {
-      ElMessage.error(data.msg || '加载行为记录失败')
+      ElMessage.error(data.message || '加载行为记录失败')
     }
   } catch (error) {
     console.error('加载行为记录失败:', error)
@@ -317,8 +287,6 @@ async function loadActions() {
 function updateStats() {
   const actions = actionsList.value
   stats.total_actions = actions.length
-  stats.success_actions = actions.filter(a => a.success).length
-  stats.failed_actions = actions.filter(a => !a.success).length
   
   // 计算活跃用户数（去重）
   const uniqueUsers = new Set(actions.map(a => a.user_id))
@@ -361,17 +329,13 @@ async function deleteAction(action: any) {
   try {
     await ElMessageBox.confirm(`确定要删除这条行为记录吗？`, '确认删除')
     
-    const response = await fetch(`http://127.0.0.1:15202/api/user-actions/${action.id}`, {
-      method: 'DELETE'
-    })
+    const response = await userActionApi.deleteUserAction(action.id)
     
-    const data = await response.json()
-    
-    if (data.code === 200) {
+    if (response.code === 0) {
       ElMessage.success('行为记录删除成功')
       loadActions()
     } else {
-      ElMessage.error(data.msg || '删除失败')
+      ElMessage.error(response.message || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -390,22 +354,14 @@ async function batchDelete() {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedActions.value.length} 条行为记录吗？`, '确认删除')
     
     const actionIds = selectedActions.value.map(action => action.id)
-    const response = await fetch('http://127.0.0.1:15202/api/user-actions/batch', {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ action_ids: actionIds })
-    })
+    const response = await userActionApi.batchDeleteUserActions(actionIds)
     
-    const data = await response.json()
-    
-    if (data.code === 200) {
+    if (response.code === 0) {
       ElMessage.success('批量删除成功')
       selectedActions.value = []
       loadActions()
     } else {
-      ElMessage.error(data.msg || '批量删除失败')
+      ElMessage.error(response.message || '批量删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -446,9 +402,13 @@ function getActionTypeLabel(actionType: string): string {
   return labels[actionType] || actionType
 }
 
-function formatTime(timestamp: number): string {
+function formatTime(timestamp: string): string {
   if (!timestamp) return '-'
-  return new Date(timestamp * 1000).toLocaleString()
+  try {
+    return new Date(timestamp).toLocaleString()
+  } catch (e) {
+    return timestamp
+  }
 }
 
 onMounted(() => {

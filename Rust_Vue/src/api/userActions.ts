@@ -3,20 +3,30 @@ import { api, ApiResponse } from '../utils/apiClient'
 export interface UserAction {
   id: number
   user_id: number
-  action: string
-  detail: string
+  action_type: string
+  target_type?: string
+  target_id?: number
+  details?: string
+  ip_address?: string
+  user_agent?: string
   created_at: string
-  user_name: string
+}
+
+export interface UserActionStats {
+  total_actions: number
+  active_users: number
+  by_day: Array<{date: string, count: number}>
+  by_type: Array<{action_type: string, count: number}>
 }
 
 export const userActionApi = {
   // 获取用户行为记录
-  getUserActions: (params?: { page?: number; pageSize?: number; user_id?: number; action?: string; start_date?: string; end_date?: string; search?: string }): Promise<ApiResponse<{ list: UserAction[]; total: number; page: number; size: number }>> => {
+  getUserActions: (params?: { page?: number; page_size?: number; user_id?: number; action_type?: string; start_time?: string; end_time?: string }): Promise<ApiResponse<{ actions: UserAction[]; total: number; page: number; pageSize: number }>> => {
     return api.get('/api/v1/user-actions', { params })
   },
   // 记录用户行为
-  logUserAction: (action: string, detail?: string): Promise<ApiResponse> => {
-    return api.post('/api/v1/user-actions', { action, detail })
+  logUserAction: (action_type: string, details?: string, target_type?: string, target_id?: number): Promise<ApiResponse<UserAction>> => {
+    return api.post('/api/v1/user-actions', { action_type, details, target_type, target_id })
   },
   // 删除用户行为记录
   deleteUserAction: (actionId: number): Promise<ApiResponse> => {
@@ -24,14 +34,10 @@ export const userActionApi = {
   },
   // 批量删除用户行为记录
   batchDeleteUserActions: (actionIds: number[]): Promise<ApiResponse> => {
-    return api.post('/api/v1/user-actions/batch-delete', { ids: actionIds })
-  },
-  // 清空用户行为记录
-  clearUserActions: (params?: { user_id?: number; before_date?: string }): Promise<ApiResponse> => {
-    return api.post('/api/v1/user-actions/clear', params)
+    return api.delete('/api/v1/user-actions/batch', { data: { action_ids: actionIds } })
   },
   // 获取行为统计
-  getActionStats: (params?: { user_id?: number; start_date?: string; end_date?: string }): Promise<ApiResponse<any>> => {
+  getActionStats: (params?: { user_id?: number; start_time?: string; end_time?: string }): Promise<ApiResponse<UserActionStats>> => {
     return api.get('/api/v1/user-actions/stats', { params })
   }
 } 
