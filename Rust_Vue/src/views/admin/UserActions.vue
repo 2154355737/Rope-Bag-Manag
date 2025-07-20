@@ -397,7 +397,24 @@ function getActionTypeLabel(actionType: string): string {
     Like: '点赞',
     Share: '分享',
     Settings: '设置',
-    Admin: '管理操作'
+    Admin: '管理操作',
+    PageView: '页面访问',
+    View: '查看',
+    Navigation: '页面导航',
+    Search: '搜索',
+    EditPackage: '编辑资源',
+    DeletePackage: '删除资源',
+    CreatePackage: '创建资源',
+    UpdatePackage: '更新资源',
+    UpdateProfile: '更新资料',
+    DeleteComment: '删除评论',
+    SessionStart: '会话开始',
+    SessionEnd: '会话结束',
+    TabHidden: '离开页面',
+    TabVisible: '回到页面',
+    UserIdle: '用户闲置',
+    UserActive: '用户活跃',
+    BrowseCategory: '浏览分类'
   }
   return labels[actionType] || actionType
 }

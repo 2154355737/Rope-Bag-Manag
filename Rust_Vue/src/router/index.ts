@@ -203,9 +203,6 @@ router.beforeEach((to, from, next) => {
     document.title = '绳包管理系统'
   }
   
-  // 记录导航开始
-  // logRouteNavigation(to, from, 'start')
-  
   // 检查页面权限
   const authStatus = checkAuthStatus()
   
@@ -233,29 +230,51 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
-// 全局后置钩子
+// 全局后置钩子 - 添加详细访问记录
 router.afterEach((to, from) => {
-  // 记录页面访问
-  try {
-    if (to.params.id && typeof to.params.id === 'string' && !isNaN(parseInt(to.params.id))) {
-      const resourceId = parseInt(to.params.id)
-      // 对特定资源页面进行访问记录
-      if (to.path.includes('/packages/') || to.path.includes('/resources/')) {
-        console.log(`[路由记录] 访问资源页面: ${to.path}, 资源ID: ${resourceId}`)
-        resourceLogger.logAction(resourceId, 'View', 'Package')
-          .catch(err => console.error('记录页面访问失败:', err))
-      } else if (to.path.includes('/users/')) {
-        console.log(`[路由记录] 访问用户页面: ${to.path}, 用户ID: ${resourceId}`)
-        resourceLogger.logAction(resourceId, 'View', 'User')
-          .catch(err => console.error('记录页面访问失败:', err))
-      } else if (to.path.includes('/comments/')) {
-        console.log(`[路由记录] 访问评论页面: ${to.path}, 评论ID: ${resourceId}`)
-        resourceLogger.logAction(resourceId, 'View', 'Comment')
-          .catch(err => console.error('记录页面访问失败:', err))
+  // 如果用户已登录，记录更详细的页面访问信息
+  if (isLoggedIn()) {
+    const userInfo = getUserInfo();
+    const username = userInfo?.username || '未知用户';
+    const fromPath = from.path;
+    const toPath = to.path;
+    const toName = to.meta.title || toPath;
+    
+    // 记录更详细的导航信息，包括来源页面
+    import('../utils/userActionService').then(({ default: userActionService }) => {
+      userActionService.logAction(
+        'Navigation', 
+        `从"${fromPath}"导航到"${toName}"`, 
+        'Page', 
+        undefined
+      ).catch(err => console.error('记录导航行为失败:', err));
+    }).catch(err => console.error('导入服务失败:', err));
+    
+    // 记录特定页面访问
+    if (to.path.includes('/resource/')) {
+      const resourceId = parseInt(to.params.id as string);
+      if (!isNaN(resourceId)) {
+        import('../utils/userActionService').then(({ default: userActionService }) => {
+          userActionService.logView('Package', resourceId, `查看资源详情`)
+            .catch(err => console.error('记录资源查看行为失败:', err));
+        }).catch(err => console.error('导入服务失败:', err));
       }
     }
-  } catch (error) {
-    console.warn('页面访问记录失败:', error)
+    
+    // 记录分类页面访问
+    if (to.path.includes('/category/')) {
+      const category = to.params.category as string;
+      if (category) {
+        import('../utils/userActionService').then(({ default: userActionService }) => {
+          userActionService.logAction(
+            'BrowseCategory', 
+            `浏览"${category}"分类`, 
+            'Category', 
+            undefined
+          ).catch(err => console.error('记录分类浏览行为失败:', err));
+        }).catch(err => console.error('导入服务失败:', err));
+      }
+    }
   }
 })
 

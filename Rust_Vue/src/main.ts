@@ -25,6 +25,9 @@ import { initTheme } from './utils/theme'
 // 导入资源记录服务
 import { resourceLogger } from './utils/loggerService'
 
+// 导入会话追踪器
+import sessionTracker from './utils/sessionTracker'
+
 // 创建应用
 const app = createApp(App)
 
@@ -44,6 +47,9 @@ const cleanupTheme = initTheme()
 app.config.globalProperties.$resourceLogger = resourceLogger
 // 也可以通过provide/inject使用
 app.provide('resourceLogger', resourceLogger)
+
+// 初始化会话追踪器
+sessionTracker.init()
 
 // 挂载应用
 app.mount('#app')

@@ -473,6 +473,7 @@ import {
 } from '../../api/packages'
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from '../../api/categories'
 import axios from 'axios' // 导入axios
+import userActionService from '../../utils/userActionService'
 
 // 响应式数据
 const searchQuery = ref('')
@@ -709,42 +710,48 @@ function showAddPackageDialog() {
   addDialogVisible.value = true
 }
 
-function viewPackage(pkg: any) {
-  selectedPackage.value = pkg
+// 查看绳包详情
+const viewPackage = (row) => {
+  selectedPackage.value = row
   detailDialogVisible.value = true
+  
+  // 记录查看详情的行为
+  userActionService.logView('Package', row.id, `管理员查看绳包详情: ${row.name}`)
+    .catch(err => console.error('记录查看行为失败:', err))
 }
 
-async function downloadPackage(pkg: any) {
+// 下载绳包
+const downloadPackage = async (row) => {
   try {
     // 检查资源状态是否为正常
-    if (pkg.status !== '正常' && pkg.status !== 'Active') {
-      ElMessage.warning(`资源 ${pkg.name} 状态不为正常，无法下载`)
+    if (row.status !== '正常' && row.status !== 'Active') {
+      ElMessage.warning(`资源 ${row.name} 状态不为正常，无法下载`)
       return
     }
     
     // 检查资源是否有项目链接
-    if (!pkg.url || pkg.url.trim() === '') {
-      ElMessage.warning(`资源 ${pkg.name} 没有项目链接，无法下载`)
+    if (!row.url || row.url.trim() === '') {
+      ElMessage.warning(`资源 ${row.name} 没有项目链接，无法下载`)
       return
     }
     
     // 先增加下载计数
-    const res = await packageApi.downloadPackage(pkg.id)
+    const res = await packageApi.downloadPackage(row.id)
     if (res.code !== 0) {
       console.warn('增加下载计数失败:', res.message)
       // 继续下载，但记录警告
     }
     
     // 记录资源下载操作
-    await resourceLogger.logDownload(pkg.id)
+    await resourceLogger.logDownload(row.id)
     
     // 打开下载链接
-    window.open(pkg.url, '_blank')
-      ElMessage.success(`开始下载 ${pkg.name}`)
+    window.open(row.url, '_blank')
+      ElMessage.success(`开始下载 ${row.name}`)
     
     // 延迟刷新当前包的下载计数
     setTimeout(() => {
-      refreshDownloadCount(pkg.id)
+      refreshDownloadCount(row.id)
     }, 500)
   } catch (error) {
     console.error('下载错误:', error)
@@ -765,6 +772,10 @@ function editPackage(pkg: any) {
     url: pkg.url
   }
   editDialogVisible.value = true
+  
+  // 记录编辑操作
+  userActionService.logAction('EditPackage', `管理员打开编辑绳包: ${pkg.name}`, 'Package', pkg.id)
+    .catch(err => console.error('记录编辑行为失败:', err))
 }
 
 async function updatePackage() {
