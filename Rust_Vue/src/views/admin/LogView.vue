@@ -222,7 +222,7 @@ import {
   Close,
   TrendCharts
 } from '@element-plus/icons-vue'
-import { adminApi } from '../../api'
+import { adminApi, logsApi } from '../../api'
 
 const router = useRouter()
 
@@ -271,41 +271,31 @@ async function loadLogs(val = 1) {
   page.value = val
   loading.value = true
   try {
-    // 使用SQL.js数据库获取日志
-    const { initDB } = await import('../../utils/sqlite')
-    await initDB()
+    // 使用后端API获取日志
+    const response = await adminApi.getLogs({
+      page: page.value,
+      pageSize: pageSize.value,
+      level: level.value || undefined,
+      search: search.value || undefined
+    })
     
-    const logData = await adminApi.getLogs(level.value || undefined, pageSize.value)
-    
-    // 过滤日志
-    let filteredLogs = logData
-    if (search.value) {
-      filteredLogs = filteredLogs.filter(log => 
-        log[2]?.toLowerCase().includes(search.value.toLowerCase())
-      )
+    if (response.code === 0 && response.data) {
+      // 设置日志数据
+      logs.value = response.data.list || []
+      total.value = response.data.total || 0
+      
+      // 更新统计数据
+      infoCount.value = logs.value.filter(log => log.level === 'INFO').length
+      warnCount.value = logs.value.filter(log => log.level === 'WARN').length
+      errorCount.value = logs.value.filter(log => log.level === 'ERROR').length
+    } else {
+      ElMessage.warning(response.message || '获取日志数据失败')
     }
-    
-    // 分页处理
-    const start = (page.value - 1) * pageSize.value
-    const end = start + pageSize.value
-    logs.value = filteredLogs.slice(start, end).map(log => ({
-      id: log[0],
-      level: log[1],
-      message: log[2],
-      source: log[3],
-      details: log[4],
-      timestamp: log[5]
-    }))
-    
-    total.value = filteredLogs.length
-    
-    // 更新统计数据
-    infoCount.value = filteredLogs.filter(log => log[1] === 'INFO').length
-    warnCount.value = filteredLogs.filter(log => log[1] === 'WARN').length
-    errorCount.value = filteredLogs.filter(log => log[1] === 'ERROR').length
   } catch (error) {
     console.error('加载日志失败:', error)
     ElMessage.error('日志加载失败，请稍后重试')
+    logs.value = [] // 清空日志，避免显示错误数据
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -321,52 +311,52 @@ function onSearch() {
 
 async function exportLogs() {
   try {
-    const username = getUsername()
-    const params: any = {
-      page: 1,
-      page_size: total.value || 1000,
-      username
-    }
+    const params: any = {}
     if (search.value) params.search = search.value
     if (level.value) params.level = level.value
-    if (dateRange.value) {
-      params.start_time = dateRange.value[0]
-      params.end_time = dateRange.value[1]
+    if (dateRange.value && dateRange.value[0] && dateRange.value[1]) {
+      params.start_date = dateRange.value[0]
+      params.end_date = dateRange.value[1]
     }
-    if (module.value) params.module = module.value
     
-    const res = await fetch(`http://127.0.0.1:15202/api/logs/entries?${new URLSearchParams(params)}`)
-    const data = await res.json()
-    if (data.code === 0 && data.data) {
-      const logText = (data.data.entries || []).map((l: any) => `[${l.timestamp}] [${l.level}] ${l.message}`).join('\n')
-      const blob = new Blob([logText], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'logs.txt'
-      a.click()
-      URL.revokeObjectURL(url)
-      ElMessage.success('日志导出成功')
-    }
+    const response = await logsApi.exportLogs(params)
+    
+    // 创建下载链接
+    const blob = new Blob([response], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `system_logs_${new Date().toISOString().split('T')[0]}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('日志导出成功')
   } catch (e) {
-    ElMessage.error('导出失败')
+    console.error('导出日志失败:', e)
+    ElMessage.error('导出失败，请稍后重试')
   }
 }
 
 async function clearLogs() {
   try {
     await ElMessageBox.confirm('确定要清空所有日志吗？此操作不可恢复！', '清空日志', { type: 'warning' })
-    const username = getUsername()
-    const res = await fetch(`http://127.0.0.1:15202/api/logs/clear?username=${username}`)
-    const data = await res.json()
-    if (data.code === 0) {
-      ElMessage.success('日志已清空')
-      loadLogs(1)
+    
+    const params: any = {}
+    if (level.value) params.level = level.value
+    
+    const response = await logsApi.clearLogs(params)
+    
+    if (response.code === 0) {
+      ElMessage.success(`成功清除${response.data.deleted_count || 0}条日志`)
+      loadLogs(1) // 刷新日志列表
     } else {
-      ElMessage.error(data.msg || '清空失败')
+      ElMessage.error(response.message || '清空失败')
     }
   } catch (e) {
-    // 用户取消
+    // 用户取消操作或发生错误
+    if (e !== 'cancel') {
+      console.error('清空日志失败:', e)
+      ElMessage.error('清空日志失败')
+    }
   }
 }
 

@@ -11,6 +11,7 @@ import { resourceRecordApi } from './resourceRecords'
 import { communityApi } from './community'
 import { userActionApi } from './userActions'
 import * as announcementApi from './announcements'
+import { logsApi } from './logs'
 
 export {
   commentApi,
@@ -24,7 +25,8 @@ export {
   resourceRecordApi,
   communityApi,
   userActionApi,
-  announcementApi
+  announcementApi,
+  logsApi
 }
 
 // 导出一个默认包含所有API的对象
@@ -40,7 +42,8 @@ const api = {
   resourceRecord: resourceRecordApi,
   community: communityApi,
   userAction: userActionApi,
-  announcement: announcementApi
+  announcement: announcementApi,
+  logs: logsApi
 }
 
 export default api

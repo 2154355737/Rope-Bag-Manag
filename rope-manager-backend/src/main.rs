@@ -48,6 +48,18 @@ async fn main() -> std::io::Result<()> {
             }
         }
     }
+
+    // 执行系统表初始化SQL
+    match conn.execute_batch(include_str!("../sql/init_system_tables.sql")) {
+        Ok(_) => info!("系统表初始化成功"),
+        Err(e) => {
+            if e.to_string().contains("already exists") {
+                info!("系统表已存在，跳过初始化");
+            } else {
+                eprintln!("系统表初始化失败: {}", e);
+            }
+        }
+    }
     
 
     // 数据库URL和配置

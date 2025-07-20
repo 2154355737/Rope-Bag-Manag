@@ -76,7 +76,21 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/theme-settings")
                     .route(web::get().to(get_theme_settings))
-                    .route(web::put().to(update_theme_settings))
+                    .route(web::post().to(update_theme_settings))
+            )
+            .service(
+                web::resource("/settings")
+                    .route(web::get().to(get_settings))
+                    .route(web::post().to(update_settings)) // 添加POST方法
+            )
+            .service(
+                web::resource("/settings/reset")
+                    .route(web::post().to(reset_settings))
+            )
+            .service(
+                web::resource("/settings/{key}")
+                    .route(web::get().to(get_setting))
+                    .route(web::post().to(update_setting)) // 修改为POST方法
             )
             .service(
                 web::resource("/resource-records")
@@ -165,23 +179,42 @@ async fn get_user_actions(
 }
 
 async fn get_logs(
+    web::Query(params): web::Query<serde_json::Map<String, serde_json::Value>>,
     admin_service: web::Data<AdminService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    match admin_service.get_logs().await {
-        Ok(logs) => Ok(HttpResponse::Ok().json(json!({
+    // 解析查询参数
+    let page = params.get("page")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32);
+    
+    let page_size = params.get("page_size")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as u32);
+    
+    let level = params.get("level")
+        .and_then(|v| v.as_str());
+    
+    let search = params.get("search")
+        .and_then(|v| v.as_str());
+    
+    match admin_service.get_logs(page, page_size, level, search).await {
+        Ok((logs, total)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
             "data": {
                 "list": logs,
-                "total": logs.len(),
-                "page": 1,
-                "pageSize": logs.len()
+                "total": total,
+                "page": page.unwrap_or(1),
+                "page_size": page_size.unwrap_or(20)
             }
         }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
-        })))
+        Err(e) => {
+            eprintln!("获取系统日志失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("获取系统日志失败: {}", e)
+            })))
+        }
     }
 }
 
@@ -631,5 +664,178 @@ async fn get_active_announcements(
         "data": {
             "list": []
         }
+    })))
+} 
+
+// 获取所有设置
+async fn get_settings(
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.get_all_settings().await {
+        Ok(settings) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": settings
+        }))),
+        Err(e) => {
+            eprintln!("获取系统设置失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("获取系统设置失败: {}", e)
+            })))
+        }
+    }
+}
+
+// 更新多个设置
+async fn update_settings(
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 获取所有需要更新的设置
+    let settings = req.as_object();
+    
+    if let Some(settings_map) = settings {
+        let mut success_count = 0;
+        let mut error_count = 0;
+        
+        // 逐个更新设置
+        for (key, value) in settings_map {
+            // 将值转换为字符串
+            let value_str = match value {
+                serde_json::Value::String(s) => s.clone(),
+                _ => value.to_string(),
+            };
+            
+            match admin_service.update_setting(key, &value_str).await {
+                Ok(_) => {
+                    success_count += 1;
+                },
+                Err(_) => {
+                    error_count += 1;
+                }
+            }
+        }
+        
+        Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": format!("已成功更新 {} 个设置，失败 {} 个", success_count, error_count),
+            "data": {
+                "success_count": success_count,
+                "error_count": error_count
+            }
+        })))
+    } else {
+        Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "无效的设置数据格式"
+        })))
+    }
+}
+
+// 获取单个设置
+async fn get_setting(
+    path: web::Path<String>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let key = path.into_inner();
+    
+    match admin_service.get_setting(&key).await {
+        Ok(Some(value)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": {
+                "key": key,
+                "value": value
+            }
+        }))),
+        Ok(None) => Ok(HttpResponse::NotFound().json(json!({
+            "code": 404,
+            "message": format!("设置项 {} 不存在", key)
+        }))),
+        Err(e) => {
+            eprintln!("获取设置项失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("获取设置项失败: {}", e)
+            })))
+        }
+    }
+}
+
+// 更新单个设置
+async fn update_setting(
+    path: web::Path<String>,
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let key = path.into_inner();
+    
+    if let Some(value) = req.get("value") {
+        let value_str = match value {
+            serde_json::Value::String(s) => s.clone(),
+            _ => value.to_string(),
+        };
+        
+        match admin_service.update_setting(&key, &value_str).await {
+            Ok(_) => Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "设置更新成功"
+            }))),
+            Err(e) => {
+                eprintln!("更新设置失败: {}", e);
+                Ok(HttpResponse::InternalServerError().json(json!({
+                    "code": 500,
+                    "message": format!("更新设置失败: {}", e)
+                })))
+            }
+        }
+    } else {
+        Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "缺少value字段"
+        })))
+    }
+}
+
+// 重置所有设置
+async fn reset_settings(
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 重置主题设置
+    if let Err(e) = admin_service.update_theme_settings(&json!({
+        "primary_color": "#409EFF",
+        "secondary_color": "#67C23A",
+        "dark_mode": false,
+        "font_size": "14px",
+        "language": "zh-CN"
+    })).await {
+        eprintln!("重置主题设置失败: {}", e);
+        return Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("重置主题设置失败: {}", e)
+        })));
+    }
+    
+    // 重置功能开关
+    if let Err(e) = admin_service.update_setting("enable_registration", "true").await {
+        eprintln!("重置功能开关失败: {}", e);
+        return Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("重置功能开关失败: {}", e)
+        })));
+    }
+    
+    if let Err(e) = admin_service.update_setting("system_mode", "Normal").await {
+        eprintln!("重置系统模式失败: {}", e);
+        return Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("重置系统模式失败: {}", e)
+        })));
+    }
+    
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "设置已重置"
     })))
 } 

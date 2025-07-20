@@ -4,6 +4,7 @@ use tokio::sync::Mutex;
 use anyhow::Result;
 use chrono::Utc;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 // 导入所需模型
 use crate::models::Stats;
@@ -202,14 +203,78 @@ impl SystemRepository {
     }
 
     // 新增方法：获取系统日志
-    pub async fn get_logs(&self) -> Result<Vec<crate::services::admin_service::SystemLog>> {
+    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>) -> Result<(Vec<crate::services::admin_service::SystemLog>, i64)> {
         let conn = self.conn.lock().await;
-        let mut stmt = conn.prepare(
-            "SELECT id, level, message, timestamp, details 
-             FROM system_logs ORDER BY timestamp DESC LIMIT 100"
+        
+        // 创建日志表（如果不存在）
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS system_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                details TEXT
+            )",
+            [],
         )?;
-
-        let logs = stmt.query_map([], |row| {
+        
+        // 构建查询条件
+        let mut conditions = Vec::new();
+        let mut params_vec: Vec<String> = Vec::new();
+        let mut params_ref: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        
+        if let Some(l) = level {
+            conditions.push("level = ?");
+            params_vec.push(l.to_string());
+        }
+        
+        if let Some(s) = search {
+            conditions.push("(message LIKE ? OR details LIKE ?)");
+            let search_pattern = format!("%{}%", s);
+            params_vec.push(search_pattern.clone());
+            params_vec.push(search_pattern);
+        }
+        
+        // 更新参数引用
+        for param in &params_vec {
+            params_ref.push(param as &dyn rusqlite::ToSql);
+        }
+        
+        // 构建查询语句
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+        
+        // 获取总记录数
+        let count_query = format!("SELECT COUNT(*) FROM system_logs {}", where_clause);
+        let total: i64 = conn.query_row(&count_query, &params_ref[..], |row| row.get(0))?;
+        
+        // 构建分页查询
+        let limit_offset = match (page_size, page) {
+            (Some(limit), Some(page_num)) => {
+                let offset = (page_num - 1) * limit;
+                format!("LIMIT {} OFFSET {}", limit, offset)
+            }
+            (Some(limit), None) => format!("LIMIT {}", limit),
+            _ => String::new(),
+        };
+        
+        // 构建完整查询
+        let query = format!(
+            "SELECT id, level, message, timestamp, details 
+             FROM system_logs 
+             {} 
+             ORDER BY timestamp DESC 
+             {}",
+            where_clause, limit_offset
+        );
+        
+        // 执行查询
+        let mut stmt = conn.prepare(&query)?;
+        
+        let logs = stmt.query_map(&params_ref[..], |row| {
             Ok(crate::services::admin_service::SystemLog {
                 id: row.get(0)?,
                 level: row.get(1)?,
@@ -218,9 +283,35 @@ impl SystemRepository {
                 details: row.get(4)?,
             })
         })?
-        .collect::<Result<Vec<_>, _>>()?;
+        .filter_map(|result| result.ok())
+        .collect::<Vec<_>>();
+        
+        Ok((logs, total))
+    }
 
-        Ok(logs)
+    // 添加记录日志的方法
+    pub async fn add_log(&self, level: &str, message: &str, details: Option<&str>) -> Result<i64> {
+        let conn = self.conn.lock().await;
+        
+        // 创建日志表（如果不存在）
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS system_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT NOT NULL,
+                message TEXT NOT NULL,
+                timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                details TEXT
+            )",
+            [],
+        )?;
+        
+        // 插入日志
+        let result = conn.execute(
+            "INSERT INTO system_logs (level, message, details) VALUES (?, ?, ?)",
+            params![level, message, details],
+        )?;
+        
+        Ok(conn.last_insert_rowid())
     }
 
     // 完善创建备份方法
@@ -1128,40 +1219,90 @@ impl SystemRepository {
         Ok(announcements)
     }
 
-    // 新增方法：获取主题设置
-    pub async fn get_theme_settings(&self) -> Result<crate::services::admin_service::ThemeSettings> {
+    // 获取所有系统设置
+    pub async fn get_all_settings(&self) -> Result<HashMap<String, String>> {
         let conn = self.conn.lock().await;
         
-        // 从系统设置表获取主题配置
-        let primary_color: String = conn.query_row(
-            "SELECT value FROM system_settings WHERE key = 'primary_color'", 
-            [], 
-            |row| row.get(0)
-        ).unwrap_or("#409EFF".to_string());
+        // 确保设置表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )?;
         
-        let secondary_color: String = conn.query_row(
-            "SELECT value FROM system_settings WHERE key = 'secondary_color'", 
-            [], 
-            |row| row.get(0)
-        ).unwrap_or("#67C23A".to_string());
+        // 查询所有设置
+        let mut stmt = conn.prepare("SELECT key, value FROM system_settings")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
         
-        let dark_mode: bool = conn.query_row(
-            "SELECT value FROM system_settings WHERE key = 'dark_mode'", 
-            [], 
-            |row| row.get(0)
-        ).unwrap_or(false);
+        let mut settings = HashMap::new();
+        for row_result in rows {
+            if let Ok((key, value)) = row_result {
+                settings.insert(key, value);
+            }
+        }
         
-        let font_size: String = conn.query_row(
-            "SELECT value FROM system_settings WHERE key = 'font_size'", 
-            [], 
-            |row| row.get(0)
-        ).unwrap_or("14px".to_string());
+        // 设置默认值
+        if !settings.contains_key("primary_color") {
+            settings.insert("primary_color".to_string(), "#409EFF".to_string());
+            // 保存默认值到数据库
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                params!["primary_color", "#409EFF"],
+            )?;
+        }
         
-        let language: String = conn.query_row(
-            "SELECT value FROM system_settings WHERE key = 'language'", 
-            [], 
-            |row| row.get(0)
-        ).unwrap_or("zh-CN".to_string());
+        if !settings.contains_key("secondary_color") {
+            settings.insert("secondary_color".to_string(), "#67C23A".to_string());
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                params!["secondary_color", "#67C23A"],
+            )?;
+        }
+        
+        if !settings.contains_key("dark_mode") {
+            settings.insert("dark_mode".to_string(), "false".to_string());
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                params!["dark_mode", "false"],
+            )?;
+        }
+        
+        if !settings.contains_key("font_size") {
+            settings.insert("font_size".to_string(), "14px".to_string());
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                params!["font_size", "14px"],
+            )?;
+        }
+        
+        if !settings.contains_key("language") {
+            settings.insert("language".to_string(), "zh-CN".to_string());
+            conn.execute(
+                "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
+                params!["language", "zh-CN"],
+            )?;
+        }
+        
+        Ok(settings)
+    }
+
+    // 新增方法：获取主题设置
+    pub async fn get_theme_settings(&self) -> Result<crate::services::admin_service::ThemeSettings> {
+        let settings = self.get_all_settings().await?;
+        
+        let primary_color = settings.get("primary_color").cloned().unwrap_or_else(|| "#409EFF".to_string());
+        let secondary_color = settings.get("secondary_color").cloned().unwrap_or_else(|| "#67C23A".to_string());
+        let dark_mode = settings.get("dark_mode")
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(false);
+        let font_size = settings.get("font_size").cloned().unwrap_or_else(|| "14px".to_string());
+        let language = settings.get("language").cloned().unwrap_or_else(|| "zh-CN".to_string());
 
         Ok(crate::services::admin_service::ThemeSettings {
             primary_color,
@@ -1173,25 +1314,71 @@ impl SystemRepository {
     }
 
     // 新增方法：更新主题设置
-    pub async fn update_theme_settings(&self, primary_color: &str, secondary_color: &str, dark_mode: bool) -> Result<()> {
+    pub async fn update_theme_settings(&self, primary_color: &str, secondary_color: &str, dark_mode: bool, font_size: &str, language: &str) -> Result<()> {
         let conn = self.conn.lock().await;
+        
+        // 确保设置表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS system_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )?;
         
         // 更新或插入主题设置
         conn.execute(
-            "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
-            ["primary_color", primary_color]
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params!["primary_color", primary_color],
         )?;
         
         conn.execute(
-            "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
-            ["secondary_color", secondary_color]
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params!["secondary_color", secondary_color],
         )?;
         
         conn.execute(
-            "INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)",
-            ["dark_mode", &dark_mode.to_string()]
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params!["dark_mode", &dark_mode.to_string()],
+        )?;
+        
+        conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params!["font_size", font_size],
+        )?;
+        
+        conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params!["language", language],
         )?;
 
+        Ok(())
+    }
+
+    // 获取设置值
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().await;
+        
+        let value = conn.query_row(
+            "SELECT value FROM system_settings WHERE key = ?",
+            params![key],
+            |row| row.get::<_, String>(0)
+        ).optional()?;
+        
+        Ok(value)
+    }
+
+    // 更新设置值
+    pub async fn update_setting(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            params![key, value],
+        )?;
+        
         Ok(())
     }
 

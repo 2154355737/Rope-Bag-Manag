@@ -263,10 +263,42 @@ const settings = reactive({
 // 方法
 async function loadSettings() {
   try {
-    const response = await settingsApi.getSettings()
-    if (response.code === 0 && response.data) {
-      Object.assign(settings, response.data)
+    // 加载主题设置
+    const themeResponse = await settingsApi.getThemeSettings()
+    if (themeResponse.code === 0 && themeResponse.data) {
+      const themeData = themeResponse.data
+      settings.theme.primary_color = themeData.primary_color
+      settings.theme.secondary_color = themeData.secondary_color
+      settings.theme.dark_mode = themeData.dark_mode
+      settings.theme.font_size = themeData.font_size
+      settings.theme.language = themeData.language
     }
+    
+    // 加载系统模式
+    const modeResponse = await settingsApi.getSetting('system_mode')
+    if (modeResponse.code === 0 && modeResponse.data) {
+      settings.system_mode = modeResponse.data.value
+    }
+    
+    // 加载功能开关
+    const featurePromises = [
+      settingsApi.getSetting('enable_registration'),
+      settingsApi.getSetting('enable_community'),
+      settingsApi.getSetting('enable_upload'),
+      settingsApi.getSetting('enable_comments')
+    ]
+    
+    const featureResults = await Promise.all(featurePromises)
+    
+    featureResults.forEach(result => {
+      if (result.code === 0 && result.data) {
+        const key = result.data.key
+        const value = result.data.value === 'true'
+        if (key in settings.feature_flags) {
+          settings.feature_flags[key] = value
+        }
+      }
+    })
   } catch (error) {
     console.error('加载设置失败:', error)
     ElMessage.error('加载设置失败')
@@ -276,11 +308,29 @@ async function loadSettings() {
 async function saveSettings() {
   saving.value = true
   try {
-    const response = await settingsApi.updateSettings(settings)
-    if (response.code === 0) {
+    // 先保存主题设置
+    const themeResponse = await settingsApi.updateThemeSettings({
+      primary_color: settings.theme.primary_color || '#409EFF',
+      secondary_color: settings.theme.secondary_color || '#67C23A',
+      dark_mode: settings.theme.dark_mode || false,
+      font_size: settings.theme.font_size || '14px',
+      language: settings.theme.language || 'zh-CN'
+    })
+    
+    if (themeResponse.code === 0) {
+      // 逐个保存其他设置
+      const promises = [
+        settingsApi.updateSetting('system_mode', settings.system_mode),
+        settingsApi.updateSetting('enable_registration', settings.feature_flags.enable_registration),
+        settingsApi.updateSetting('enable_community', settings.feature_flags.enable_community),
+        settingsApi.updateSetting('enable_upload', settings.feature_flags.enable_upload),
+        settingsApi.updateSetting('enable_comments', settings.feature_flags.enable_comments)
+      ]
+      
+      await Promise.all(promises)
       ElMessage.success('设置保存成功')
     } else {
-      ElMessage.error(response.msg || '保存失败')
+      ElMessage.error(themeResponse.message || '保存失败')
     }
   } catch (error) {
     console.error('保存设置失败:', error)
@@ -299,43 +349,22 @@ function resetSettings() {
       cancelButtonText: '取消',
       type: 'warning'
     }
-  ).then(() => {
-    // 重置为默认值
-    Object.assign(settings, {
-      theme: {
-        community_theme: 'light',
-        admin_theme: 'light'
-      },
-      system_mode: 'Normal',
-      feature_flags: {
-        enable_registration: true,
-        enable_community: true,
-        enable_upload: true,
-        enable_comments: true,
-        enable_qq_binding: true
-      },
-      backend_config: {
-        proxy_address: '',
-        api_timeout: 30,
-        max_upload_size: 100
-      },
-      backup_settings: {
-        enable_auto_backup: false,
-        backup_interval_hours: 24,
-        backup_location: './backups',
-        max_backup_files: 10
-      },
-      global_announcement: {
-        enabled: false,
-        title: '',
-        content: '',
-        type_: 'Info',
-        start_time: '',
-        end_time: '',
-        priority: 5
+  ).then(async () => {
+    try {
+      const response = await settingsApi.resetSettings()
+      if (response.code === 0) {
+        ElMessage.success('设置已重置')
+        // 重新加载设置
+        loadSettings()
+      } else {
+        ElMessage.error(response.message || '重置失败')
       }
-    })
-    ElMessage.success('设置已重置')
+    } catch (error) {
+      console.error('重置设置失败:', error)
+      ElMessage.error('重置设置失败')
+    }
+  }).catch(() => {
+    // 用户取消操作
   })
 }
 

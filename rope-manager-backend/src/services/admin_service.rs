@@ -8,6 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use chrono::Utc;
 use uuid::Uuid;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct AdminService {
@@ -33,8 +34,15 @@ impl AdminService {
     }
 
     // 新增方法：获取系统日志
-    pub async fn get_logs(&self) -> Result<Vec<SystemLog>> {
-        self.system_repo.get_logs().await.map_err(|e| anyhow::anyhow!("{}", e))
+    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>) -> Result<(Vec<SystemLog>, i64)> {
+        self.system_repo.get_logs(page, page_size, level, search).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 添加日志
+    pub async fn add_log(&self, level: &str, message: &str, details: Option<&str>) -> Result<i64> {
+        self.system_repo.add_log(level, message, details).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     // 更新创建备份方法
@@ -125,9 +133,26 @@ impl AdminService {
         let primary_color = data["primary_color"].as_str().unwrap_or("#409EFF").to_string();
         let secondary_color = data["secondary_color"].as_str().unwrap_or("#67C23A").to_string();
         let dark_mode = data["dark_mode"].as_bool().unwrap_or(false);
+        let font_size = data["font_size"].as_str().unwrap_or("14px").to_string();
+        let language = data["language"].as_str().unwrap_or("zh-CN").to_string();
         
-        self.system_repo.update_theme_settings(&primary_color, &secondary_color, dark_mode).await
+        self.system_repo.update_theme_settings(&primary_color, &secondary_color, dark_mode, &font_size, &language).await
             .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 获取所有设置
+    pub async fn get_all_settings(&self) -> Result<HashMap<String, String>> {
+        self.system_repo.get_all_settings().await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 获取单个设置值
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        self.system_repo.get_setting(key).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 更新单个设置值
+    pub async fn update_setting(&self, key: &str, value: &str) -> Result<()> {
+        self.system_repo.update_setting(key, value).await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     // 新增方法：获取资源记录
