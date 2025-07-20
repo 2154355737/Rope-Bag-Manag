@@ -13,15 +13,19 @@ use actix_web::web;
 use crate::middleware::role_guard::RoleGuard;
 use crate::models::user::UserRole;
 
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    auth::configure_routes(cfg);
-    user::configure_routes(cfg);
-    package::configure_routes(cfg);
-    category::configure_routes(cfg);
-    comment::configure_routes(cfg);
-    admin::configure_routes(cfg);
-    cache::configure_routes(cfg);
-    community::configure_routes(cfg);
-    resource_records::configure_routes(cfg);
-    user_actions::configure_routes(cfg); // 配置用户行为记录路由
+pub fn configure_api(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/api/v1")
+            .configure(auth::configure_routes)
+            .configure(user::configure_routes)
+            .configure(package::configure_routes)
+            .configure(category::configure_routes)
+            .configure(comment::configure_routes)
+            .configure(admin::configure_routes)
+            .configure(admin::configure_user_routes) // 公告用户端路由
+            .configure(cache::configure_routes)
+            .configure(community::configure_routes)
+            .configure(resource_records::configure_routes)
+            .configure(user_actions::configure_routes)
+    );
 } 

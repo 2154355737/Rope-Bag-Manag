@@ -1,15 +1,17 @@
-use actix_web::{web, App, HttpServer, middleware::Logger, http};
+use actix_web::{App, HttpServer, web};
+use actix_web::middleware::Logger;
 use actix_cors::Cors;
+use actix_files::Files;
 use log::info;
 use std::sync::Arc;
 
 mod config;
-mod models;
-mod api;
-mod services;
-mod repositories;
-mod middleware;
+mod middleware; // 我们自己的middleware模块
 mod utils;
+mod models;
+mod repositories;
+mod services;
+mod api;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -97,6 +99,8 @@ async fn main() -> std::io::Result<()> {
             user_action_repo.clone()
         );
 
+        let uploads_dir = &config.file.upload_path;
+
         App::new()
             .wrap(Logger::default())
             .wrap(
@@ -107,9 +111,9 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("http://127.0.0.1:3000")
                     .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
                     .allowed_headers(vec![
-                        http::header::AUTHORIZATION,
-                        http::header::CONTENT_TYPE,
-                        http::header::ACCEPT,
+                        actix_web::http::header::AUTHORIZATION,
+                        actix_web::http::header::CONTENT_TYPE,
+                        actix_web::http::header::ACCEPT,
                     ])
                     .max_age(3600)
             )
@@ -121,7 +125,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(community_service))
             .app_data(web::Data::new(system_repo))
             .app_data(web::Data::new(user_action_service))
-            .configure(api::configure_routes)
+            .configure(api::v1::configure_api)
+            .service(
+                web::scope("/uploads")
+                    .service(Files::new("/", uploads_dir).show_files_listing())
+            )
     })
     .workers(workers)
     .bind(server_address)?

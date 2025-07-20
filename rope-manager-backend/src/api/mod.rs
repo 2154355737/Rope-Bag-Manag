@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse, Result};
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
-            .configure(v1::configure_routes)
+            .configure(v1::configure_api)
     )
     .service(
         web::resource("/health")

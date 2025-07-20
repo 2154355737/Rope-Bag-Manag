@@ -27,43 +27,61 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 获取总用户数
-        let total_users: i64 = conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
+        let total_users: i64 = match conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0)) {
+            Ok(count) => count,
+            Err(_) => 0, // 表可能不存在或其他错误
+        };
         
         // 获取总包数
-        let total_packages: i64 = conn.query_row("SELECT COUNT(*) FROM packages", [], |row| row.get(0))?;
+        let total_packages: i64 = match conn.query_row("SELECT COUNT(*) FROM packages", [], |row| row.get(0)) {
+            Ok(count) => count,
+            Err(_) => 0,
+        };
         
         // 获取总评论数
-        let total_comments: i64 = conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0))?;
+        let total_comments: i64 = match conn.query_row("SELECT COUNT(*) FROM comments", [], |row| row.get(0)) {
+            Ok(count) => count,
+            Err(_) => 0,
+        };
         
         // 获取活跃用户数（30天内登录过的）
-        let active_users: i64 = conn.query_row(
+        let active_users: i64 = match conn.query_row(
             "SELECT COUNT(DISTINCT user_id) FROM user_actions WHERE action_type = 'Login' AND timestamp > datetime('now', '-30 day')",
             [],
             |row| row.get(0)
-        )?;
+        ) {
+            Ok(count) => count,
+            Err(_) => 0,
+        };
         
         // 获取今日新增用户数
-        let new_users_today: i64 = conn.query_row(
+        let new_users_today: i64 = match conn.query_row(
             "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', 'start of day')",
             [],
             |row| row.get(0)
-        )?;
+        ) {
+            Ok(count) => count,
+            Err(_) => 0,
+        };
         
         // 获取今日新增包数
-        let new_packages_today: i64 = conn.query_row(
+        let new_packages_today: i64 = match conn.query_row(
             "SELECT COUNT(*) FROM packages WHERE created_at > datetime('now', 'start of day')",
             [],
             |row| row.get(0)
-        )?;
+        ) {
+            Ok(count) => count,
+            Err(_) => 0,
+        };
         
         // 创建Stats对象
         let stats = crate::models::Stats {
-            total_users: total_users.try_into().unwrap(),
-            total_packages: total_packages.try_into().unwrap(),
-            total_comments: total_comments.try_into().unwrap(),
-            active_users: active_users.try_into().unwrap(),
-            new_users_today: new_users_today.try_into().unwrap(),
-            new_packages_today: new_packages_today.try_into().unwrap(),
+            total_users: total_users as i32,
+            total_packages: total_packages as i32,
+            total_comments: total_comments as i32,
+            active_users: active_users as i32,
+            new_users_today: new_users_today as i32,
+            new_packages_today: new_packages_today as i32,
             system_status: "Running".to_string(),
             uptime: 0, // 暂时不计算运行时间
         };
@@ -75,22 +93,83 @@ impl SystemRepository {
     pub async fn get_categories(&self) -> Result<Vec<Category>> {
         let conn = self.conn.lock().await;
         
-        let mut stmt = conn.prepare("SELECT id, name, description, enabled, created_at, updated_at FROM categories")?;
+        // 检查表是否存在，不存在则创建
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT
+            )",
+            []
+        )?;
+        
+        // 检查表中是否有数据，没有则插入默认分类
+        let count: i64 = conn.query_row("SELECT COUNT(*) FROM categories", [], |row| row.get(0))?;
+        if count == 0 {
+            conn.execute(
+                "INSERT INTO categories (name, description, enabled, created_at)
+                VALUES ('默认分类', '系统默认分类', 1, datetime('now'))",
+                []
+            )?;
+        }
+        
+        // 获取表结构信息
+        let mut has_description = false;
+        let mut has_enabled = false;
+        let mut has_updated_at = false;
+        
+        let mut stmt = conn.prepare("PRAGMA table_info(categories)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "description" {
+                    has_description = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "updated_at" {
+                    has_updated_at = true;
+                }
+            }
+        }
+        
+        // 构建查询
+        let sql = format!(
+            "SELECT id, name, {} {} created_at {} FROM categories",
+            if has_description { "description," } else { "NULL as description," },
+            if has_enabled { "enabled," } else { "1 as enabled," },
+            if has_updated_at { ", updated_at" } else { ", NULL as updated_at" }
+        );
+        
+        let mut stmt = conn.prepare(&sql)?;
         
         let rows = stmt.query_map([], |row| {
             Ok(Category {
                 id: row.get(0)?,
                 name: row.get(1)?,
                 description: row.get(2)?,
-                enabled: row.get(3)?,
+                enabled: row.get(3).unwrap_or(true),
                 created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                updated_at: row.get(5).ok(),
             })
         })?;
         
         let mut categories = Vec::new();
         for category_result in rows {
-            categories.push(category_result?);
+            match category_result {
+                Ok(category) => categories.push(category),
+                Err(e) => {
+                    eprintln!("Error fetching category: {}", e);
+                    // 跳过错误的记录但不中断整个查询
+                    continue;
+                }
+            }
         }
         
         Ok(categories)
@@ -604,44 +683,169 @@ impl SystemRepository {
     // 新增方法：获取公告
     pub async fn get_announcements(&self) -> Result<Vec<crate::services::admin_service::Announcement>> {
         let conn = self.conn.lock().await;
-        let mut stmt = conn.prepare(
-            "SELECT id, title, content, priority, created_at, updated_at 
-             FROM announcements ORDER BY priority DESC, created_at DESC"
-        )?;
-
+        
+        // 首先检查表结构
+        let mut has_type = false;
+        let mut has_enabled = false;
+        let mut has_start_time = false;
+        let mut has_end_time = false;
+        
+        let pragma_result = conn.query_row("PRAGMA table_info(announcements)", [], |_| Ok(()))?;
+        
+        // 获取表的列信息
+        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        // 检查列是否存在
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "type" {
+                    has_type = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "start_time" {
+                    has_start_time = true;
+                } else if col_name == "end_time" {
+                    has_end_time = true;
+                }
+            }
+        }
+        
+        // 使用动态SQL，根据实际存在的列构建查询
+        let sql = format!(
+            "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at FROM announcements ORDER BY priority DESC, created_at DESC",
+            if has_type { "type," } else { "'' as type," },
+            if has_enabled { "enabled," } else { "1 as enabled," },
+            if has_start_time { "start_time," } else { "created_at as start_time," },
+            if has_end_time { "end_time," } else { "NULL as end_time," }
+        );
+        
+        let mut stmt = conn.prepare(&sql)?;
+        
         let announcements = stmt.query_map([], |row| {
+            let id: i32 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let content: String = row.get(2)?;
+            let type_: String = row.get(3).unwrap_or_else(|_| "Info".to_string());
+            let priority: i32 = row.get(4)?;
+            let enabled: bool = row.get(5).unwrap_or(true);
+            let start_time: String = row.get(6).unwrap_or_else(|_| chrono::Utc::now().to_rfc3339());
+            let end_time: Option<String> = row.get(7).ok();
+            let created_at: String = row.get(8)?;
+            let updated_at: String = row.get(9)?;
+            
             Ok(crate::services::admin_service::Announcement {
-                id: row.get(0)?,
-                title: row.get(1)?,
-                content: row.get(2)?,
-                priority: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                id,
+                title,
+                content,
+                type_,
+                priority,
+                enabled,
+                start_time,
+                end_time,
+                created_at,
+                updated_at
             })
         })?
-        .collect::<Result<Vec<_>, _>>()?;
-
+        .filter_map(|result| result.ok())
+        .collect::<Vec<_>>();
+        
         Ok(announcements)
     }
 
     // 新增方法：创建公告
     pub async fn create_announcement(&self, title: &str, content: &str, priority: i32) -> Result<crate::services::admin_service::Announcement> {
         let conn = self.conn.lock().await;
-        let now = Utc::now().to_rfc3339();
         
-        conn.execute(
-            "INSERT INTO announcements (title, content, priority, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?)",
-            [title, content, &priority.to_string(), &now, &now]
-        )?;
-
+        // 首先检查表结构
+        let mut has_type = false;
+        let mut has_enabled = false;
+        let mut has_start_time = false;
+        let mut has_end_time = false;
+        
+        // 获取表的列信息
+        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        // 检查列是否存在
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "type" {
+                    has_type = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "start_time" {
+                    has_start_time = true;
+                } else if col_name == "end_time" {
+                    has_end_time = true;
+                }
+            }
+        }
+        
+        // 默认值设置
+        let type_ = "Info";
+        let enabled = true;
+        let now = chrono::Utc::now().to_rfc3339();
+        let start_time = now.clone();
+        let end_time: Option<String> = None;
+        
+        // 构建适合当前表结构的INSERT语句
+        let mut sql = String::from("INSERT INTO announcements (title, content");
+        let mut values = String::from("?, ?");
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content];
+        
+        if has_type {
+            sql.push_str(", type");
+            values.push_str(", ?");
+            params.push(&type_);
+        }
+        
+        sql.push_str(", priority");
+        values.push_str(", ?");
+        params.push(&priority);
+        
+        if has_enabled {
+            sql.push_str(", enabled");
+            values.push_str(", ?");
+            params.push(&enabled);
+        }
+        
+        if has_start_time {
+            sql.push_str(", start_time");
+            values.push_str(", ?");
+            params.push(&start_time);
+        }
+        
+        if has_end_time {
+            sql.push_str(", end_time");
+            values.push_str(", ?");
+            params.push(&None::<String>);
+        }
+        
+        sql.push_str(", created_at, updated_at) VALUES (");
+        values.push_str(", datetime('now'), datetime('now'))");
+        
+        sql.push_str(&values);
+        
+        conn.execute(&sql, params.as_slice())?;
+        
         let id = conn.last_insert_rowid() as i32;
         
         Ok(crate::services::admin_service::Announcement {
             id,
             title: title.to_string(),
             content: content.to_string(),
+            type_: type_.to_string(),
             priority,
+            enabled,
+            start_time,
+            end_time,
             created_at: now.clone(),
             updated_at: now,
         })
@@ -650,22 +854,278 @@ impl SystemRepository {
     // 新增方法：更新公告
     pub async fn update_announcement(&self, id: i32, title: &str, content: &str, priority: i32) -> Result<()> {
         let conn = self.conn.lock().await;
-        let now = Utc::now().to_rfc3339();
         
-        conn.execute(
-            "UPDATE announcements SET title = ?, content = ?, priority = ?, updated_at = ? 
-             WHERE id = ?",
-            [title, content, &priority.to_string(), &now, &id.to_string()]
-        )?;
-
+        // 首先检查表结构
+        let mut has_type = false;
+        let mut has_enabled = false;
+        let mut has_start_time = false;
+        let mut has_end_time = false;
+        
+        // 获取表的列信息
+        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        // 检查列是否存在
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "type" {
+                    has_type = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "start_time" {
+                    has_start_time = true;
+                } else if col_name == "end_time" {
+                    has_end_time = true;
+                }
+            }
+        }
+        
+        // 构建UPDATE语句
+        let mut sql = String::from("UPDATE announcements SET title = ?, content = ?, priority = ?");
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority];
+        
+        sql.push_str(", updated_at = datetime('now') WHERE id = ?");
+        params.push(&id);
+        
+        conn.execute(&sql, params.as_slice())?;
+        
         Ok(())
     }
 
     // 新增方法：删除公告
     pub async fn delete_announcement(&self, id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
-        conn.execute("DELETE FROM announcements WHERE id = ?", [id])?;
+        
+        let sql = "DELETE FROM announcements WHERE id = ?";
+        
+        conn.execute(sql, params![id])?;
+        
         Ok(())
+    }
+
+    // 获取单个公告
+    pub async fn get_announcement_by_id(&self, id: i32) -> Result<Option<crate::services::admin_service::Announcement>> {
+        let conn = self.conn.lock().await;
+        
+        // 首先检查表结构
+        let mut has_type = false;
+        let mut has_enabled = false;
+        let mut has_start_time = false;
+        let mut has_end_time = false;
+        
+        // 获取表的列信息
+        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        // 检查列是否存在
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "type" {
+                    has_type = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "start_time" {
+                    has_start_time = true;
+                } else if col_name == "end_time" {
+                    has_end_time = true;
+                }
+            }
+        }
+        
+        // 使用动态SQL，根据实际存在的列构建查询
+        let sql = format!(
+            "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at 
+             FROM announcements 
+             WHERE id = ?",
+            if has_type { "type," } else { "'' as type," },
+            if has_enabled { "enabled," } else { "1 as enabled," },
+            if has_start_time { "start_time," } else { "created_at as start_time," },
+            if has_end_time { "end_time," } else { "NULL as end_time," }
+        );
+        
+        let announcement = match conn.query_row(&sql, [id], |row| {
+            let id: i32 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let content: String = row.get(2)?;
+            let type_: String = row.get(3).unwrap_or_else(|_| "Info".to_string());
+            let priority: i32 = row.get(4)?;
+            let enabled: bool = row.get(5).unwrap_or(true);
+            let start_time: String = row.get(6).unwrap_or_else(|_| chrono::Utc::now().to_rfc3339());
+            let end_time: Option<String> = row.get(7).ok();
+            let created_at: String = row.get(8)?;
+            let updated_at: String = row.get(9)?;
+            
+            Ok(crate::services::admin_service::Announcement {
+                id,
+                title,
+                content,
+                type_,
+                priority,
+                enabled,
+                start_time,
+                end_time,
+                created_at,
+                updated_at
+            })
+        }) {
+            Ok(a) => Some(a),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(e) => return Err(e.into()),
+        };
+        
+        Ok(announcement)
+    }
+
+    // 批量更新公告状态
+    pub async fn batch_update_announcement_status(&self, ids: &[i32], enabled: bool) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        
+        let conn = self.conn.lock().await;
+        
+        // 创建占位符
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("UPDATE announcements SET enabled = ?, updated_at = datetime('now') WHERE id IN ({})", placeholders);
+        
+        // 准备参数
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&enabled];
+        for id in ids {
+            params.push(id);
+        }
+        
+        let updated = conn.execute(&sql, params.as_slice())?;
+        
+        Ok(updated as usize)
+    }
+
+    // 批量删除公告
+    pub async fn batch_delete_announcements(&self, ids: &[i32]) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        
+        let conn = self.conn.lock().await;
+        
+        // 创建占位符
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM announcements WHERE id IN ({})", placeholders);
+        
+        // 准备参数
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        for id in ids {
+            params.push(id);
+        }
+        
+        let deleted = conn.execute(&sql, params.as_slice())?;
+        
+        Ok(deleted as usize)
+    }
+
+    // 获取当前有效的公告
+    pub async fn get_active_announcements(&self) -> Result<Vec<crate::services::admin_service::Announcement>> {
+        let conn = self.conn.lock().await;
+        
+        // 首先检查表结构
+        let mut has_type = false;
+        let mut has_enabled = false;
+        let mut has_start_time = false;
+        let mut has_end_time = false;
+        
+        // 获取表的列信息
+        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
+        let cols = stmt.query_map([], |row| {
+            let name: String = row.get(1)?;
+            Ok(name)
+        })?;
+        
+        // 检查列是否存在
+        for col_result in cols {
+            if let Ok(col_name) = col_result {
+                if col_name == "type" {
+                    has_type = true;
+                } else if col_name == "enabled" {
+                    has_enabled = true;
+                } else if col_name == "start_time" {
+                    has_start_time = true;
+                } else if col_name == "end_time" {
+                    has_end_time = true;
+                }
+            }
+        }
+        
+        let now = chrono::Utc::now().to_rfc3339();
+        
+        // 使用动态SQL，根据实际存在的列构建查询
+        let mut conditions = Vec::new();
+        
+        if has_enabled {
+            conditions.push("enabled = 1".to_string());
+        }
+        
+        if has_start_time {
+            conditions.push(format!("start_time <= '{}'", now));
+        }
+        
+        if has_end_time {
+            conditions.push(format!("(end_time IS NULL OR end_time > '{}')", now));
+        }
+        
+        let where_clause = if !conditions.is_empty() {
+            format!("WHERE {}", conditions.join(" AND "))
+        } else {
+            String::new()
+        };
+        
+        let sql = format!(
+            "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at 
+             FROM announcements 
+             {} 
+             ORDER BY priority DESC",
+            if has_type { "type," } else { "'' as type," },
+            if has_enabled { "enabled," } else { "1 as enabled," },
+            if has_start_time { "start_time," } else { "created_at as start_time," },
+            if has_end_time { "end_time," } else { "NULL as end_time," },
+            where_clause
+        );
+        
+        let mut stmt = conn.prepare(&sql)?;
+        
+        let announcements = stmt.query_map([], |row| {
+            let id: i32 = row.get(0)?;
+            let title: String = row.get(1)?;
+            let content: String = row.get(2)?;
+            let type_: String = row.get(3).unwrap_or_else(|_| "Info".to_string());
+            let priority: i32 = row.get(4)?;
+            let enabled: bool = row.get(5).unwrap_or(true);
+            let start_time: String = row.get(6).unwrap_or_else(|_| chrono::Utc::now().to_rfc3339());
+            let end_time: Option<String> = row.get(7).ok();
+            let created_at: String = row.get(8)?;
+            let updated_at: String = row.get(9)?;
+            
+            Ok(crate::services::admin_service::Announcement {
+                id,
+                title,
+                content,
+                type_,
+                priority,
+                enabled,
+                start_time,
+                end_time,
+                created_at,
+                updated_at
+            })
+        })?
+        .filter_map(|result| result.ok())
+        .collect::<Vec<_>>();
+        
+        Ok(announcements)
     }
 
     // 新增方法：获取主题设置

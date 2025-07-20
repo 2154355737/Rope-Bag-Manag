@@ -159,6 +159,26 @@ impl AdminService {
     pub async fn get_user_stats(&self) -> Result<(i32, i32, i32)> {
         self.user_service.get_user_stats().await
     }
+
+    // 新增方法：根据ID获取公告
+    pub async fn get_announcement_by_id(&self, id: i32) -> Result<Option<Announcement>> {
+        self.system_repo.get_announcement_by_id(id).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：批量更新公告状态
+    pub async fn batch_update_announcement_status(&self, ids: &[i32], enabled: bool) -> Result<usize> {
+        self.system_repo.batch_update_announcement_status(ids, enabled).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：批量删除公告
+    pub async fn batch_delete_announcements(&self, ids: &[i32]) -> Result<usize> {
+        self.system_repo.batch_delete_announcements(ids).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 新增方法：获取当前有效公告
+    pub async fn get_active_announcements(&self) -> Result<Vec<Announcement>> {
+        self.system_repo.get_active_announcements().await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
 }
 
 #[derive(Serialize)]
@@ -186,7 +206,11 @@ pub struct Announcement {
     pub id: i32,
     pub title: String,
     pub content: String,
+    pub type_: String, // 'Info', 'Warning', 'Error', 'Success'
     pub priority: i32,
+    pub enabled: bool,
+    pub start_time: String,
+    pub end_time: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

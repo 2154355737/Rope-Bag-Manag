@@ -243,20 +243,23 @@ import {
   getAnnouncements, 
   createAnnouncement as createAnnouncementApi,
   updateAnnouncement,
-  deleteAnnouncement as deleteAnnouncementApi
+  deleteAnnouncement as deleteAnnouncementApi,
+  batchUpdateAnnouncementStatus,
+  batchDeleteAnnouncements,
+  Announcement
 } from '../../api/announcements'
 
 // 响应式数据
 const loading = ref(false)
 const saving = ref(false)
-const announcementList = ref([])
-const selectedAnnouncements = ref([])
+const announcementList = ref<Announcement[]>([])
+const selectedAnnouncements = ref<Announcement[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const announcementDialogVisible = ref(false)
 const detailDialogVisible = ref(false)
-const currentAnnouncement = ref(null)
+const currentAnnouncement = ref<Announcement | null>(null)
 const isEdit = ref(false)
 const formRef = ref()
 
@@ -344,7 +347,7 @@ async function saveAnnouncement() {
       announcementDialogVisible.value = false
       loadAnnouncements()
     } else {
-      ElMessage.error(response.msg || '操作失败')
+      ElMessage.error(response.message || '操作失败')
     }
   } catch (error) {
     console.error('保存公告失败:', error)
@@ -398,9 +401,15 @@ async function batchEnable() {
   
   try {
     await ElMessageBox.confirm(`确定要启用选中的 ${selectedAnnouncements.value.length} 条公告吗？`, '确认操作')
-    // 批量启用逻辑
-    ElMessage.success('批量启用成功')
-    loadAnnouncements()
+    const ids = selectedAnnouncements.value.map(item => item.id)
+    const response = await batchUpdateAnnouncementStatus(ids, true)
+    
+    if (response.code === 0) {
+      ElMessage.success('批量启用成功')
+      loadAnnouncements()
+    } else {
+      ElMessage.error(response.message || '操作失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('操作失败')
@@ -416,9 +425,15 @@ async function batchDisable() {
   
   try {
     await ElMessageBox.confirm(`确定要禁用选中的 ${selectedAnnouncements.value.length} 条公告吗？`, '确认操作')
-    // 批量禁用逻辑
-    ElMessage.success('批量禁用成功')
-    loadAnnouncements()
+    const ids = selectedAnnouncements.value.map(item => item.id)
+    const response = await batchUpdateAnnouncementStatus(ids, false)
+    
+    if (response.code === 0) {
+      ElMessage.success('批量禁用成功')
+      loadAnnouncements()
+    } else {
+      ElMessage.error(response.message || '操作失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('操作失败')
@@ -434,9 +449,15 @@ async function batchDelete() {
   
   try {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedAnnouncements.value.length} 条公告吗？`, '确认删除')
-    // 批量删除逻辑
-    ElMessage.success('批量删除成功')
-    loadAnnouncements()
+    const ids = selectedAnnouncements.value.map(item => item.id)
+    const response = await batchDeleteAnnouncements(ids)
+    
+    if (response.code === 0) {
+      ElMessage.success('批量删除成功')
+      loadAnnouncements()
+    } else {
+      ElMessage.error(response.message || '删除失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')

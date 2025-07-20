@@ -60,7 +60,16 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(create_announcement))
             )
             .service(
+                web::resource("/announcements/batch-status")
+                    .route(web::put().to(batch_update_announcement_status))
+            )
+            .service(
+                web::resource("/announcements/batch-delete")
+                    .route(web::post().to(batch_delete_announcements))
+            )
+            .service(
                 web::resource("/announcements/{id}")
+                    .route(web::get().to(get_announcement))
                     .route(web::put().to(update_announcement))
                     .route(web::delete().to(delete_announcement))
             )
@@ -72,6 +81,17 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/resource-records")
                     .route(web::get().to(get_resource_records))
+            )
+    );
+}
+
+// 用户端查看有效公告的API
+pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/announcements")
+            .service(
+                web::resource("/active")
+                    .route(web::get().to(get_active_announcements))
             )
     );
 }
@@ -486,4 +506,130 @@ async fn get_resource_records(
             "message": e.to_string()
         })))
     }
+} 
+
+// 获取单个公告
+async fn get_announcement(
+    path: web::Path<i32>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let announcement_id = path.into_inner();
+    
+    match admin_service.get_announcement_by_id(announcement_id).await {
+        Ok(Some(announcement)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": announcement
+        }))),
+        Ok(None) => Ok(HttpResponse::NotFound().json(json!({
+            "code": 404,
+            "message": "公告不存在"
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("获取公告失败: {}", e)
+        })))
+    }
+}
+
+// 批量更新公告状态
+async fn batch_update_announcement_status(
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 提取参数
+    let ids = match req.get("ids") {
+        Some(val) => match val.as_array() {
+            Some(arr) => arr.iter()
+                .filter_map(|v| v.as_i64().map(|id| id as i32))
+                .collect::<Vec<i32>>(),
+            None => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的ID数组"
+            })))
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "未提供ID数组"
+        })))
+    };
+    
+    let enabled = match req.get("enabled") {
+        Some(val) => match val.as_bool() {
+            Some(b) => b,
+            None => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的enabled值"
+            })))
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "未提供enabled参数"
+        })))
+    };
+    
+    match admin_service.batch_update_announcement_status(&ids, enabled).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": format!("成功更新 {} 条公告状态", count),
+            "data": {
+                "updated_count": count
+            }
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("更新公告状态失败: {}", e)
+        })))
+    }
+}
+
+// 批量删除公告
+async fn batch_delete_announcements(
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 提取ID数组
+    let ids = match req.get("ids") {
+        Some(val) => match val.as_array() {
+            Some(arr) => arr.iter()
+                .filter_map(|v| v.as_i64().map(|id| id as i32))
+                .collect::<Vec<i32>>(),
+            None => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的ID数组"
+            })))
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "未提供ID数组"
+        })))
+    };
+    
+    match admin_service.batch_delete_announcements(&ids).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": format!("成功删除 {} 条公告", count),
+            "data": {
+                "deleted_count": count
+            }
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("批量删除公告失败: {}", e)
+        })))
+    }
+}
+
+// 获取当前有效的公告
+async fn get_active_announcements(
+) -> Result<HttpResponse, actix_web::Error> {
+    // 这里应该直接调用系统仓库获取有效公告
+    // 暂时返回空数组作为示例
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": {
+            "list": []
+        }
+    })))
 } 
