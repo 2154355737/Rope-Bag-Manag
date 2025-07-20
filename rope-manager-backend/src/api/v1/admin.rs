@@ -211,9 +211,9 @@ async fn get_logs(
         Err(e) => {
             eprintln!("获取系统日志失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
-                "code": 500,
+            "code": 500,
                 "message": format!("获取系统日志失败: {}", e)
-            })))
+        })))
         }
     }
 }

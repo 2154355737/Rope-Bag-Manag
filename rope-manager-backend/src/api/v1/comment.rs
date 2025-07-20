@@ -1,6 +1,5 @@
 use actix_web::{web, HttpResponse, Responder, get, post, put, delete};
-use crate::models::{ApiResponse, ApiError};
-use crate::models::Comment;
+use crate::models::ApiResponse;
 use crate::models::{CreateCommentRequest, CommentListResponse};
 use crate::services::comment_service::CommentService;
 use crate::middleware::auth::AuthenticatedUser;

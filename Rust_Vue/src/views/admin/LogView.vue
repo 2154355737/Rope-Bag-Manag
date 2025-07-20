@@ -283,8 +283,8 @@ async function loadLogs(val = 1) {
       // 设置日志数据
       logs.value = response.data.list || []
       total.value = response.data.total || 0
-      
-      // 更新统计数据
+    
+    // 更新统计数据
       infoCount.value = logs.value.filter(log => log.level === 'INFO').length
       warnCount.value = logs.value.filter(log => log.level === 'WARN').length
       errorCount.value = logs.value.filter(log => log.level === 'ERROR').length
@@ -323,13 +323,13 @@ async function exportLogs() {
     
     // 创建下载链接
     const blob = new Blob([response], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
     a.download = `system_logs_${new Date().toISOString().split('T')[0]}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('日志导出成功')
+      a.click()
+      URL.revokeObjectURL(url)
+      ElMessage.success('日志导出成功')
   } catch (e) {
     console.error('导出日志失败:', e)
     ElMessage.error('导出失败，请稍后重试')

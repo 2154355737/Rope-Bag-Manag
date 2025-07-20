@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse};
 use serde_json::json;
-use crate::models::system::{Category, CreateCategoryRequest, UpdateCategoryRequest};
+use crate::models::system::{CreateCategoryRequest, UpdateCategoryRequest};
 use crate::repositories::system_repo::SystemRepository;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {

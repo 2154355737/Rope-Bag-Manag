@@ -1,7 +1,6 @@
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::fmt;
-use serde::ser::SerializeStruct;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {

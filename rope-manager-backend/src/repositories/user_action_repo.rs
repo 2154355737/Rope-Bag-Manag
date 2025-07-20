@@ -21,12 +21,50 @@ impl UserActionRepository {
 
     // 创建用户行为记录
     pub async fn create_user_action(&self, req: &CreateUserActionRequest) -> Result<UserAction> {
+        println!("开始创建用户行为记录，用户ID: {}", req.user_id);
         let conn = self.conn.lock().await;
         
+        // 确保表存在
+        println!("确保user_actions表存在");
+        match conn.execute(
+            "CREATE TABLE IF NOT EXISTS user_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                action_type TEXT NOT NULL,
+                target_type TEXT,
+                target_id INTEGER,
+                details TEXT,
+                ip_address TEXT,
+                user_agent TEXT,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        ) {
+            Ok(_) => println!("表检查成功"),
+            Err(e) => println!("表创建错误: {}", e),
+        }
+
         let timestamp = Utc::now();
         let created_at_str = timestamp.to_rfc3339();
         
-        conn.execute(
+        println!("准备执行SQL插入，用户ID: {}, 行为类型: {}", req.user_id, req.action_type);
+        
+        // 先检查用户是否存在
+        let mut user_exists = false;
+        match conn.query_row("SELECT 1 FROM users WHERE id = ?", [req.user_id], |_| Ok(())) {
+            Ok(_) => {
+                println!("用户ID {} 在users表中存在", req.user_id);
+                user_exists = true;
+            },
+            Err(e) => println!("查询用户出错: {}", e),
+        }
+        
+        if !user_exists {
+            println!("警告: 用户ID {} 在users表中不存在，这可能导致外键约束错误", req.user_id);
+        }
+        
+        // 执行插入
+        match conn.execute(
             "INSERT INTO user_actions (
                 user_id, action_type, target_type, target_id, details, 
                 ip_address, user_agent, created_at
@@ -41,9 +79,16 @@ impl UserActionRepository {
                 req.user_agent,
                 created_at_str
             ],
-        )?;
+        ) {
+            Ok(rows) => println!("插入成功，影响行数: {}", rows),
+            Err(e) => {
+                println!("插入失败: {}", e);
+                return Err(anyhow::anyhow!("插入用户行为记录失败: {}", e));
+            }
+        }
         
         let id = conn.last_insert_rowid() as i32;
+        println!("新记录ID: {}", id);
         
         Ok(UserAction {
             id,

@@ -72,11 +72,23 @@ async fn log_user_action(
     action_req: web::Json<serde_json::Value>,
     user_action_service: web::Data<UserActionService>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 打印详细日志
+    println!("开始记录用户行为");
+    
     // 从JWT中提取用户ID
-    let user_id = extract_user_id(&req).unwrap_or(0);
+    let user_id_result = extract_user_id(&req);
+    println!("提取用户ID结果: {:?}", user_id_result);
+    
+    let user_id = user_id_result.unwrap_or(0);
+    println!("使用的用户ID: {}", user_id);
+    
+    // 打印请求内容
+    println!("请求内容: {:?}", action_req);
     
     // 从请求中提取数据
     let action_type = action_req.get("action_type").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+    println!("行为类型: {}", action_type);
+    
     let target_type = action_req.get("target_type").and_then(|v| v.as_str()).map(|s| s.to_string());
     let target_id = action_req.get("target_id").and_then(|v| v.as_i64()).map(|id| id as i32);
     let details = action_req.get("details").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -84,6 +96,8 @@ async fn log_user_action(
     // 获取IP地址和User-Agent
     let ip_address = req.connection_info().realip_remote_addr().map(|s| s.to_string());
     let user_agent = req.headers().get("User-Agent").and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+    
+    println!("IP地址: {:?}, User-Agent: {:?}", ip_address, user_agent);
     
     // 创建用户行为记录请求
     let create_req = CreateUserActionRequest {
@@ -96,17 +110,25 @@ async fn log_user_action(
         user_agent,
     };
     
+    println!("准备创建用户行为记录: user_id={}, action_type={}", create_req.user_id, create_req.action_type);
+    
     // 记录用户行为
     match user_action_service.log_user_action(&create_req).await {
-        Ok(action) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "操作记录成功",
-            "data": action
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
-        })))
+        Ok(action) => {
+            println!("记录成功: ID={}", action.id);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "操作记录成功",
+                "data": action
+            })))
+        },
+        Err(e) => {
+            println!("记录失败: {}", e.to_string());
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": e.to_string()
+            })))
+        }
     }
 }
 

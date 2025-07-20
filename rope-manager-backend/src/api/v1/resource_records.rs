@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use serde_json::json;
 use log::{info, debug, error};
 use crate::services::admin_service::AdminService;
-use crate::models::{ResourceRecord, ResourceRecordQuery, CreateResourceRecordRequest, BatchDeleteResourceRecordsRequest, ClearResourceRecordsRequest};
+use crate::models::{ResourceRecordQuery, CreateResourceRecordRequest, BatchDeleteResourceRecordsRequest, ClearResourceRecordsRequest};
 use crate::middleware::auth::extract_user_id;
 
 /// 配置资源记录模块路由
@@ -153,10 +153,10 @@ async fn batch_delete_records(
 
 /// 清空记录
 async fn clear_records(
-    req: web::Json<ClearResourceRecordsRequest>,
-    admin_service: web::Data<AdminService>,
+    _req: web::Json<ClearResourceRecordsRequest>,
+    _admin_service: web::Data<AdminService>,
 ) -> HttpResponse {
-    debug!("清空记录请求: {:?}", req);
+    debug!("清空记录请求: {:?}", _req);
     // TODO: 实现清空记录功能
     HttpResponse::Ok().json(json!({
         "code": 0,

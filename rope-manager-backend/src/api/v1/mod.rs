@@ -10,8 +10,6 @@ pub mod resource_records;
 pub mod user_actions; // 添加用户行为记录API模块
 
 use actix_web::web;
-use crate::middleware::role_guard::RoleGuard;
-use crate::models::user::UserRole;
 
 pub fn configure_api(cfg: &mut web::ServiceConfig) {
     cfg.service(

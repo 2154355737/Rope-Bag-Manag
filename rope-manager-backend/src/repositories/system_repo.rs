@@ -7,9 +7,8 @@ use uuid::Uuid;
 use std::collections::HashMap;
 
 // 导入所需模型
-use crate::models::Stats;
 use crate::models::user_action::UserAction;
-use crate::models::system::{Category, CreateCategoryRequest, UpdateCategoryRequest, BackupInfo, BackupStats};
+use crate::models::system::{Category, CreateCategoryRequest, UpdateCategoryRequest};
 
 #[derive(Clone)]
 pub struct SystemRepository {
@@ -48,7 +47,7 @@ impl SystemRepository {
         // 获取活跃用户数（30天内登录过的）
         let active_users: i64 = match conn.query_row(
             "SELECT COUNT(DISTINCT user_id) FROM user_actions WHERE action_type = 'Login' AND timestamp > datetime('now', '-30 day')",
-            [],
+            [], 
             |row| row.get(0)
         ) {
             Ok(count) => count,
@@ -57,18 +56,18 @@ impl SystemRepository {
         
         // 获取今日新增用户数
         let new_users_today: i64 = match conn.query_row(
-            "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', 'start of day')",
-            [],
+            "SELECT COUNT(*) FROM users WHERE created_at > datetime('now', 'start of day')", 
+            [], 
             |row| row.get(0)
         ) {
             Ok(count) => count,
             Err(_) => 0,
         };
-        
+
         // 获取今日新增包数
         let new_packages_today: i64 = match conn.query_row(
-            "SELECT COUNT(*) FROM packages WHERE created_at > datetime('now', 'start of day')",
-            [],
+            "SELECT COUNT(*) FROM packages WHERE created_at > datetime('now', 'start of day')", 
+            [], 
             |row| row.get(0)
         ) {
             Ok(count) => count,
@@ -172,7 +171,7 @@ impl SystemRepository {
                 }
             }
         }
-        
+
         Ok(categories)
     }
 
@@ -306,7 +305,7 @@ impl SystemRepository {
         )?;
         
         // 插入日志
-        let result = conn.execute(
+        conn.execute(
             "INSERT INTO system_logs (level, message, details) VALUES (?, ?, ?)",
             params![level, message, details],
         )?;
@@ -776,12 +775,12 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
-        let mut has_type = false;
-        let mut has_enabled = false;
-        let mut has_start_time = false;
-        let mut has_end_time = false;
+        let mut _has_type = false;
+        let mut _has_enabled = false;
+        let mut _has_start_time = false;
+        let mut _has_end_time = false;
         
-        let pragma_result = conn.query_row("PRAGMA table_info(announcements)", [], |_| Ok(()))?;
+        let _ = conn.query_row("PRAGMA table_info(announcements)", [], |_| Ok(()))?;
         
         // 获取表的列信息
         let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
@@ -794,13 +793,13 @@ impl SystemRepository {
         for col_result in cols {
             if let Ok(col_name) = col_result {
                 if col_name == "type" {
-                    has_type = true;
+                    _has_type = true;
                 } else if col_name == "enabled" {
-                    has_enabled = true;
+                    _has_enabled = true;
                 } else if col_name == "start_time" {
-                    has_start_time = true;
+                    _has_start_time = true;
                 } else if col_name == "end_time" {
-                    has_end_time = true;
+                    _has_end_time = true;
                 }
             }
         }
@@ -808,14 +807,14 @@ impl SystemRepository {
         // 使用动态SQL，根据实际存在的列构建查询
         let sql = format!(
             "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at FROM announcements ORDER BY priority DESC, created_at DESC",
-            if has_type { "type," } else { "'' as type," },
-            if has_enabled { "enabled," } else { "1 as enabled," },
-            if has_start_time { "start_time," } else { "created_at as start_time," },
-            if has_end_time { "end_time," } else { "NULL as end_time," }
+            if _has_type { "type," } else { "'' as type," },
+            if _has_enabled { "enabled," } else { "1 as enabled," },
+            if _has_start_time { "start_time," } else { "created_at as start_time," },
+            if _has_end_time { "end_time," } else { "NULL as end_time," }
         );
         
         let mut stmt = conn.prepare(&sql)?;
-        
+
         let announcements = stmt.query_map([], |row| {
             let id: i32 = row.get(0)?;
             let title: String = row.get(1)?;
@@ -843,7 +842,7 @@ impl SystemRepository {
         })?
         .filter_map(|result| result.ok())
         .collect::<Vec<_>>();
-        
+
         Ok(announcements)
     }
 
@@ -852,10 +851,10 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
-        let mut has_type = false;
-        let mut has_enabled = false;
-        let mut has_start_time = false;
-        let mut has_end_time = false;
+        let mut _has_type = false;
+        let mut _has_enabled = false;
+        let mut _has_start_time = false;
+        let mut _has_end_time = false;
         
         // 获取表的列信息
         let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
@@ -868,13 +867,13 @@ impl SystemRepository {
         for col_result in cols {
             if let Ok(col_name) = col_result {
                 if col_name == "type" {
-                    has_type = true;
+                    _has_type = true;
                 } else if col_name == "enabled" {
-                    has_enabled = true;
+                    _has_enabled = true;
                 } else if col_name == "start_time" {
-                    has_start_time = true;
+                    _has_start_time = true;
                 } else if col_name == "end_time" {
-                    has_end_time = true;
+                    _has_end_time = true;
                 }
             }
         }
@@ -891,7 +890,7 @@ impl SystemRepository {
         let mut values = String::from("?, ?");
         let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content];
         
-        if has_type {
+        if _has_type {
             sql.push_str(", type");
             values.push_str(", ?");
             params.push(&type_);
@@ -901,19 +900,19 @@ impl SystemRepository {
         values.push_str(", ?");
         params.push(&priority);
         
-        if has_enabled {
+        if _has_enabled {
             sql.push_str(", enabled");
             values.push_str(", ?");
             params.push(&enabled);
         }
         
-        if has_start_time {
+        if _has_start_time {
             sql.push_str(", start_time");
             values.push_str(", ?");
             params.push(&start_time);
         }
         
-        if has_end_time {
+        if _has_end_time {
             sql.push_str(", end_time");
             values.push_str(", ?");
             params.push(&None::<String>);
@@ -925,7 +924,7 @@ impl SystemRepository {
         sql.push_str(&values);
         
         conn.execute(&sql, params.as_slice())?;
-        
+
         let id = conn.last_insert_rowid() as i32;
         
         Ok(crate::services::admin_service::Announcement {
@@ -947,10 +946,10 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
-        let mut has_type = false;
-        let mut has_enabled = false;
-        let mut has_start_time = false;
-        let mut has_end_time = false;
+        let mut _has_type = false;
+        let mut _has_enabled = false;
+        let mut _has_start_time = false;
+        let mut _has_end_time = false;
         
         // 获取表的列信息
         let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
@@ -963,13 +962,13 @@ impl SystemRepository {
         for col_result in cols {
             if let Ok(col_name) = col_result {
                 if col_name == "type" {
-                    has_type = true;
+                    _has_type = true;
                 } else if col_name == "enabled" {
-                    has_enabled = true;
+                    _has_enabled = true;
                 } else if col_name == "start_time" {
-                    has_start_time = true;
+                    _has_start_time = true;
                 } else if col_name == "end_time" {
-                    has_end_time = true;
+                    _has_end_time = true;
                 }
             }
         }
@@ -982,7 +981,7 @@ impl SystemRepository {
         params.push(&id);
         
         conn.execute(&sql, params.as_slice())?;
-        
+
         Ok(())
     }
 
@@ -1002,10 +1001,10 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
-        let mut has_type = false;
-        let mut has_enabled = false;
-        let mut has_start_time = false;
-        let mut has_end_time = false;
+        let mut _has_type = false;
+        let mut _has_enabled = false;
+        let mut _has_start_time = false;
+        let mut _has_end_time = false;
         
         // 获取表的列信息
         let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
@@ -1018,13 +1017,13 @@ impl SystemRepository {
         for col_result in cols {
             if let Ok(col_name) = col_result {
                 if col_name == "type" {
-                    has_type = true;
+                    _has_type = true;
                 } else if col_name == "enabled" {
-                    has_enabled = true;
+                    _has_enabled = true;
                 } else if col_name == "start_time" {
-                    has_start_time = true;
+                    _has_start_time = true;
                 } else if col_name == "end_time" {
-                    has_end_time = true;
+                    _has_end_time = true;
                 }
             }
         }
@@ -1034,10 +1033,10 @@ impl SystemRepository {
             "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at 
              FROM announcements 
              WHERE id = ?",
-            if has_type { "type," } else { "'' as type," },
-            if has_enabled { "enabled," } else { "1 as enabled," },
-            if has_start_time { "start_time," } else { "created_at as start_time," },
-            if has_end_time { "end_time," } else { "NULL as end_time," }
+            if _has_type { "type," } else { "'' as type," },
+            if _has_enabled { "enabled," } else { "1 as enabled," },
+            if _has_start_time { "start_time," } else { "created_at as start_time," },
+            if _has_end_time { "end_time," } else { "NULL as end_time," }
         );
         
         let announcement = match conn.query_row(&sql, [id], |row| {
@@ -1124,10 +1123,10 @@ impl SystemRepository {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
-        let mut has_type = false;
-        let mut has_enabled = false;
-        let mut has_start_time = false;
-        let mut has_end_time = false;
+        let mut _has_type = false;
+        let mut _has_enabled = false;
+        let mut _has_start_time = false;
+        let mut _has_end_time = false;
         
         // 获取表的列信息
         let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
@@ -1140,13 +1139,13 @@ impl SystemRepository {
         for col_result in cols {
             if let Ok(col_name) = col_result {
                 if col_name == "type" {
-                    has_type = true;
+                    _has_type = true;
                 } else if col_name == "enabled" {
-                    has_enabled = true;
+                    _has_enabled = true;
                 } else if col_name == "start_time" {
-                    has_start_time = true;
+                    _has_start_time = true;
                 } else if col_name == "end_time" {
-                    has_end_time = true;
+                    _has_end_time = true;
                 }
             }
         }
@@ -1156,15 +1155,15 @@ impl SystemRepository {
         // 使用动态SQL，根据实际存在的列构建查询
         let mut conditions = Vec::new();
         
-        if has_enabled {
+        if _has_enabled {
             conditions.push("enabled = 1".to_string());
         }
         
-        if has_start_time {
+        if _has_start_time {
             conditions.push(format!("start_time <= '{}'", now));
         }
         
-        if has_end_time {
+        if _has_end_time {
             conditions.push(format!("(end_time IS NULL OR end_time > '{}')", now));
         }
         
@@ -1179,10 +1178,10 @@ impl SystemRepository {
              FROM announcements 
              {} 
              ORDER BY priority DESC",
-            if has_type { "type," } else { "'' as type," },
-            if has_enabled { "enabled," } else { "1 as enabled," },
-            if has_start_time { "start_time," } else { "created_at as start_time," },
-            if has_end_time { "end_time," } else { "NULL as end_time," },
+            if _has_type { "type," } else { "'' as type," },
+            if _has_enabled { "enabled," } else { "1 as enabled," },
+            if _has_start_time { "start_time," } else { "created_at as start_time," },
+            if _has_end_time { "end_time," } else { "NULL as end_time," },
             where_clause
         );
         
@@ -1378,7 +1377,7 @@ impl SystemRepository {
             "INSERT OR REPLACE INTO system_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
             params![key, value],
         )?;
-        
+
         Ok(())
     }
 

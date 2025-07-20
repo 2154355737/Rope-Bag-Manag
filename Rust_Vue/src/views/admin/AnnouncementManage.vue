@@ -405,8 +405,8 @@ async function batchEnable() {
     const response = await batchUpdateAnnouncementStatus(ids, true)
     
     if (response.code === 0) {
-      ElMessage.success('批量启用成功')
-      loadAnnouncements()
+    ElMessage.success('批量启用成功')
+    loadAnnouncements()
     } else {
       ElMessage.error(response.message || '操作失败')
     }
@@ -429,8 +429,8 @@ async function batchDisable() {
     const response = await batchUpdateAnnouncementStatus(ids, false)
     
     if (response.code === 0) {
-      ElMessage.success('批量禁用成功')
-      loadAnnouncements()
+    ElMessage.success('批量禁用成功')
+    loadAnnouncements()
     } else {
       ElMessage.error(response.message || '操作失败')
     }
@@ -453,8 +453,8 @@ async function batchDelete() {
     const response = await batchDeleteAnnouncements(ids)
     
     if (response.code === 0) {
-      ElMessage.success('批量删除成功')
-      loadAnnouncements()
+    ElMessage.success('批量删除成功')
+    loadAnnouncements()
     } else {
       ElMessage.error(response.message || '删除失败')
     }
