@@ -1,146 +1,216 @@
 <template>
-  <div class="comment-manage">
-    <el-card class="manage-card">
-      <template #header>
-        <div class="manage-header">
-          <h2>评论管理</h2>
-          <p>管理系统中的用户评论，包括审核、删除、回复等功能</p>
-        </div>
-      </template>
-
-      <div class="manage-content">
-        <!-- 筛选条件 -->
-        <div class="filter-section">
-          <el-form :inline="true" :model="filterForm">
-            <el-form-item label="评论状态">
-              <el-select v-model="filterForm.status" placeholder="选择状态" clearable>
-                <el-option label="正常" value="Active" />
-                <el-option label="隐藏" value="Hidden" />
-                <el-option label="已删除" value="Deleted" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="目标类型">
-              <el-select v-model="filterForm.target_type" placeholder="选择类型" clearable>
-                <el-option label="绳包" value="Package" />
-                <el-option label="用户" value="User" />
-                <el-option label="系统" value="System" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="用户ID">
-              <el-input v-model="filterForm.user_id" placeholder="输入用户ID" clearable />
-            </el-form-item>
-            <el-form-item label="时间范围">
-              <el-date-picker
-                v-model="filterForm.date_range"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-                clearable
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="handleFilter">筛选</el-button>
-              <el-button @click="resetFilter">重置</el-button>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="success" @click="addComment">添加评论</el-button>
-              <el-button type="danger" @click="batchDelete">删除评论</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- 评论列表 -->
-        <div class="comment-list">
-          <el-table 
-            :data="commentList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="user_id" label="用户" width="120" />
-            <el-table-column prop="target_type" label="目标类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getTargetTypeTag(row.target_type)">
-                  {{ getTargetTypeLabel(row.target_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="target_id" label="目标ID" width="100" />
-            <el-table-column prop="content" label="评论内容" min-width="200">
-              <template #default="{ row }">
-                <div class="comment-content">
-                  <p class="content-text">{{ row.content }}</p>
-                  <div class="content-meta">
-                    <span class="time">{{ formatTime(row.create_time) }}</span>
-                    <span class="likes">👍 {{ row.likes }}</span>
-                    <span class="dislikes">👎 {{ row.dislikes }}</span>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusTag(row.status)">
-                  {{ getStatusLabel(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewComment(row)">查看</el-button>
-                <el-button 
-                  size="small" 
-                  type="warning" 
-                  @click="hideComment(row)"
-                  v-if="row.status === 'Active'"
-                >
-                  隐藏
-                </el-button>
-                <el-button 
-                  size="small" 
-                  type="success" 
-                  @click="showComment(row)"
-                  v-if="row.status === 'Hidden'"
-                >
-                  显示
-                </el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteComment(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+  <div class="admin-page comment-manage">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><ChatDotSquare /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">评论管理</h1>
+            <p class="page-subtitle">管理系统中的用户评论，包括审核、删除、回复等功能</p>
           </div>
         </div>
-
-        <!-- 批量操作 -->
-        <div class="batch-actions" v-if="selectedComments.length > 0">
-          <el-button type="warning" @click="batchHide">批量隐藏</el-button>
-          <el-button type="success" @click="batchShow">批量显示</el-button>
-          <el-button type="danger" @click="batchDelete">批量删除</el-button>
-          <span class="selected-count">已选择 {{ selectedComments.length }} 条评论</span>
+        <div class="header-actions">
+          <el-button type="primary" @click="addComment">
+            <el-icon><Plus /></el-icon>
+            添加评论
+          </el-button>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><ChatLineSquare /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ totalComments }}</div>
+            <div class="stat-label">总评论数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><ChatDotRound /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ activeComments }}</div>
+            <div class="stat-label">正常评论</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><ChatSquare /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ hiddenComments }}</div>
+            <div class="stat-label">隐藏评论</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Timer /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ todayComments }}</div>
+            <div class="stat-label">今日新增</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选条件 -->
+    <div class="search-section">
+      <div class="search-left">
+        <el-select v-model="filterForm.status" placeholder="评论状态" clearable style="width: 150px">
+          <el-option label="正常" value="Active" />
+          <el-option label="隐藏" value="Hidden" />
+          <el-option label="已删除" value="Deleted" />
+        </el-select>
+        
+        <el-select v-model="filterForm.target_type" placeholder="目标类型" clearable style="width: 150px">
+          <el-option label="绳包" value="Package" />
+          <el-option label="用户" value="User" />
+          <el-option label="系统" value="System" />
+        </el-select>
+        
+        <el-input 
+          v-model="filterForm.user_id" 
+          placeholder="输入用户ID" 
+          clearable 
+          style="width: 150px"
+        />
+        
+        <el-date-picker
+          v-model="filterForm.date_range"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始日期"
+          end-placeholder="结束日期"
+          clearable
+          style="width: 350px"
+        />
+      </div>
+      
+      <div class="search-right">
+        <el-button type="primary" @click="handleFilter">
+          <el-icon><Search /></el-icon>
+          筛选
+        </el-button>
+        <el-button @click="resetFilter">
+          <el-icon><RefreshRight /></el-icon>
+          重置
+        </el-button>
+        <el-button type="danger" @click="batchDelete" :disabled="selectedComments.length === 0">
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 评论列表 -->
+    <div class="table-section">
+      <el-table 
+        :data="commentList" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="user_id" label="用户" width="120" />
+        <el-table-column prop="target_type" label="目标类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getTargetTypeTag(row.target_type)">
+              {{ getTargetTypeLabel(row.target_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="target_id" label="目标ID" width="100" />
+        <el-table-column prop="content" label="评论内容" min-width="200">
+          <template #default="{ row }">
+            <div class="comment-content">
+              <p class="content-text">{{ row.content }}</p>
+              <div class="content-meta">
+                <span class="time">{{ formatTime(row.create_time) }}</span>
+                <span class="likes">👍 {{ row.likes }}</span>
+                <span class="dislikes">👎 {{ row.dislikes }}</span>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTag(row.status)">
+              {{ getStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewComment(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
+            <el-button 
+              size="small" 
+              type="warning" 
+              @click="hideComment(row)"
+              v-if="row.status === 'Active'"
+            >
+              <el-icon><Hide /></el-icon>
+              隐藏
+            </el-button>
+            <el-button 
+              size="small" 
+              type="success" 
+              @click="showComment(row)"
+              v-else-if="row.status === 'Hidden'"
+            >
+              <el-icon><View /></el-icon>
+              显示
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deleteComment(row)"
+            >
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination-section">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
+
+    <!-- 批量操作 -->
+    <div class="batch-actions" v-if="selectedComments.length > 0">
+      <el-button type="warning" @click="batchHide">批量隐藏</el-button>
+      <el-button type="success" @click="batchShow">批量显示</el-button>
+      <el-button type="danger" @click="batchDelete">批量删除</el-button>
+      <span class="selected-count">已选择 {{ selectedComments.length }} 条评论</span>
+    </div>
 
     <!-- 评论详情对话框 -->
     <el-dialog 
@@ -238,8 +308,21 @@
 
 <script setup lang="ts">
 // 导入所需依赖
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ChatDotSquare,
+  ChatLineSquare,
+  ChatDotRound,
+  ChatSquare,
+  Delete,
+  View,
+  Hide,
+  Plus,
+  Search,
+  RefreshRight,
+  Timer
+} from '@element-plus/icons-vue'
 import { commentApi, Comment } from '../../api/comments'
 import { resourceRecordApi } from '../../api/resourceRecords'
 import { packageApi } from '../../api/packages'
@@ -274,6 +357,29 @@ const newComment = reactive({
 })
 const resources = ref<any[]>([])
 const resourcesLoaded = ref(false)
+
+// 评论统计数据
+const totalComments = computed(() => {
+  return total.value || 0
+})
+
+const activeComments = computed(() => {
+  return commentList.value.filter(comment => comment.status === 'Active').length
+})
+
+const hiddenComments = computed(() => {
+  return commentList.value.filter(comment => comment.status === 'Hidden').length
+})
+
+const todayComments = computed(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  return commentList.value.filter(comment => {
+    const createTime = new Date(comment.created_at)
+    return createTime >= today
+  }).length
+})
 
 // 加载资源选项
 async function loadResourcesIfNeeded(force = false) {
@@ -570,116 +676,29 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.comment-manage {
-  padding: 20px;
-}
-
-.manage-card {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.manage-header {
-  text-align: center;
-}
-
-.manage-header h2 {
-  margin: 0 0 10px 0;
-  color: var(--el-text-color-primary);
-}
-
-.manage-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.manage-content {
-  padding: 20px 0;
-}
-
-.filter-section {
-  margin-bottom: 20px;
-  padding: 20px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-}
-
-.filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.comment-list {
-  margin-bottom: 20px;
-}
-
-.comment-content {
-  max-width: 300px;
-}
-
+/* 评论管理页面特定样式 */
 .content-text {
   margin: 0 0 8px 0;
-  word-break: break-all;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: var(--text-primary);
 }
 
 .content-meta {
   display: flex;
-  gap: 15px;
+  gap: 16px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: var(--text-secondary);
 }
 
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
+.time {
+  color: var(--text-secondary);
 }
 
-.batch-actions {
+.likes, .dislikes {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 15px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-  margin-top: 20px;
+  gap: 4px;
 }
 
-.selected-count {
-  margin-left: auto;
-  color: var(--el-text-color-secondary);
-}
-
-.comment-detail {
-  padding: 20px;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 15px;
-  align-items: flex-start;
-}
-
-.detail-item label {
-  width: 100px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.detail-item span {
-  flex: 1;
-  color: var(--el-text-color-regular);
-}
-
-.content-box {
-  flex: 1;
-  padding: 10px;
-  background: var(--el-bg-color-page);
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.5;
-}
+/* 其余特定样式保持不变 */
 </style> 

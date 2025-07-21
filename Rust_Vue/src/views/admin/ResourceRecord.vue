@@ -1,207 +1,204 @@
 <template>
-  <div class="resource-record">
-    <el-card class="record-card">
-      <template #header>
-        <div class="record-header">
-          <h2>资源记录</h2>
-          <p>记录系统中所有资源的创建、修改、删除等操作历史</p>
-        </div>
-      </template>
-
-      <div class="record-content">
-        <!-- 添加自动刷新功能 -->
-        <div class="auto-refresh">
-          <el-switch
-            v-model="autoRefresh"
-            active-text="自动刷新"
-            inactive-text="手动刷新"
-          />
-          <span v-if="autoRefresh" class="refresh-info">每 {{ refreshInterval }}s 刷新</span>
-          <el-button type="primary" @click="handleRefresh" :loading="loading">
-            <el-icon><Refresh /></el-icon>
-            立即刷新
-          </el-button>
-        </div>
-
-        <!-- 筛选条件 -->
-        <div class="filter-section">
-          <el-form :inline="true" :model="filterForm" class="filter-form">
-            <el-form-item label="资源类型">
-              <el-select v-model="filterForm.resource_type" placeholder="选择资源类型" clearable>
-                <el-option label="全部" value="" />
-                <el-option label="绳包" value="Package" />
-                <el-option label="用户" value="User" />
-                <el-option label="分类" value="Category" />
-                <el-option label="评论" value="Comment" />
-                <el-option label="设置" value="Settings" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="操作类型">
-              <el-select v-model="filterForm.action" placeholder="选择操作类型" clearable>
-                <el-option label="全部" value="" />
-                <el-option label="创建" value="Create" />
-                <el-option label="更新" value="Update" />
-                <el-option label="删除" value="Delete" />
-                <el-option label="下载" value="Download" />
-                <el-option label="上传" value="Upload" />
-                <el-option label="标星" value="Star" />
-                <el-option label="封禁" value="Ban" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="操作用户">
-              <el-input v-model="filterForm.user_id" placeholder="输入用户ID" clearable />
-            </el-form-item>
-            <el-form-item label="时间范围">
-              <el-date-picker
-                v-model="filterForm.date_range"
-                type="datetimerange"
-                range-separator="至"
-                start-placeholder="开始时间"
-                end-placeholder="结束时间"
-                format="YYYY-MM-DD HH:mm:ss"
-                value-format="YYYY-MM-DD HH:mm:ss"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="handleFilter">筛选</el-button>
-              <el-button @click="resetFilter">重置</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- 统计信息 -->
-        <div class="stats-section">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">📝</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.total_records }}</div>
-                    <div class="stats-label">总记录数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">➕</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.create_count }}</div>
-                    <div class="stats-label">创建操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">✏️</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.update_count }}</div>
-                    <div class="stats-label">更新操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">🗑️</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.delete_count }}</div>
-                    <div class="stats-label">删除操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-
-        <!-- 资源记录列表 -->
-        <div class="record-list">
-          <el-table 
-            :data="recordList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="resource_type" label="资源类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getResourceTypeTag(row.resource_type)">
-                  {{ getResourceTypeLabel(row.resource_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="resource_id" label="资源ID" width="100" />
-            <el-table-column prop="user_id" label="操作用户" width="120" />
-            <el-table-column prop="action" label="操作类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getActionTag(row.action)">
-                  {{ getActionLabel(row.action) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="timestamp" label="操作时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.timestamp) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="ip_address" label="IP地址" width="120" />
-            <el-table-column label="数据对比" min-width="200">
-              <template #default="{ row }">
-                <div class="data-comparison">
-                  <div v-if="row.old_data" class="old-data">
-                    <strong>旧数据:</strong>
-                    <pre>{{ formatJson(row.old_data) }}</pre>
-                  </div>
-                  <div v-if="row.new_data" class="new-data">
-                    <strong>新数据:</strong>
-                    <pre>{{ formatJson(row.new_data) }}</pre>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewRecord(row)">查看</el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteRecord(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+  <div class="admin-page resource-record">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><List /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">资源记录</h1>
+            <p class="page-subtitle">记录系统中所有资源的创建、修改、删除等操作历史</p>
           </div>
         </div>
-
-        <!-- 批量操作 -->
-        <div class="batch-actions" v-if="selectedRecords.length > 0">
-          <el-button type="danger" @click="batchDelete">批量删除</el-button>
-          <el-button @click="exportRecords">导出记录</el-button>
-          <span class="selected-count">已选择 {{ selectedRecords.length }} 条记录</span>
+        <div class="header-actions">
+          <div class="refresh-controls">
+            <el-switch
+              v-model="autoRefresh"
+              active-text="自动刷新"
+              inactive-text="手动刷新"
+              style="margin-right: 10px;"
+            />
+            <span v-if="autoRefresh" class="refresh-info">每 {{ refreshInterval }}s 刷新</span>
+            <el-button @click="handleRefresh" :loading="loading">
+              <el-icon><Refresh /></el-icon>
+              立即刷新
+            </el-button>
+          </div>
         </div>
       </div>
-    </el-card>
+    </div>
 
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Document /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.total_records }}</div>
+            <div class="stat-label">总记录数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Plus /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.create_count }}</div>
+            <div class="stat-label">创建操作</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Edit /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.update_count }}</div>
+            <div class="stat-label">更新操作</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Delete /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.delete_count }}</div>
+            <div class="stat-label">删除操作</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选条件 -->
+    <div class="search-section">
+      <div class="search-left">
+        <el-select 
+          v-model="filterForm.resource_type" 
+          placeholder="资源类型" 
+          clearable
+          style="width: 150px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="绳包" value="Package" />
+          <el-option label="用户" value="User" />
+          <el-option label="分类" value="Category" />
+          <el-option label="评论" value="Comment" />
+          <el-option label="设置" value="Settings" />
+        </el-select>
+        
+        <el-select 
+          v-model="filterForm.action" 
+          placeholder="操作类型" 
+          clearable
+          style="width: 150px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="创建" value="Create" />
+          <el-option label="更新" value="Update" />
+          <el-option label="删除" value="Delete" />
+          <el-option label="下载" value="Download" />
+          <el-option label="上传" value="Upload" />
+          <el-option label="标星" value="Star" />
+          <el-option label="封禁" value="Ban" />
+        </el-select>
+        
+        <el-input 
+          v-model="filterForm.user_id" 
+          placeholder="输入用户ID" 
+          clearable
+          style="width: 150px"
+        />
+        
+        <el-date-picker
+          v-model="filterForm.date_range"
+          type="datetimerange"
+          range-separator="至"
+          start-placeholder="开始时间"
+          end-placeholder="结束时间"
+          format="YYYY-MM-DD HH:mm:ss"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          style="width: 350px"
+        />
+      </div>
+      
+      <div class="search-right">
+        <el-button type="primary" @click="handleFilter">
+          <el-icon><Search /></el-icon>
+          筛选
+        </el-button>
+        <el-button @click="resetFilter">
+          <el-icon><RefreshRight /></el-icon>
+          重置
+        </el-button>
+        <el-button type="success" @click="exportRecords">
+          <el-icon><Download /></el-icon>
+          导出记录
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 资源记录列表 -->
+    <div class="table-section">
+      <el-table 
+        :data="recordList" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+      >
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="resource_type" label="资源类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getResourceTypeTag(row.resource_type)">
+              {{ getResourceTypeLabel(row.resource_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="resource_id" label="资源ID" width="100" />
+        <el-table-column prop="action" label="操作类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getActionTag(row.action)">
+              {{ getActionLabel(row.action) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="user_id" label="操作用户" width="100" />
+        <el-table-column prop="details" label="操作详情" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="created_at" label="操作时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewRecord(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- 其余对话框保持不变 -->
     <!-- 记录详情对话框 -->
     <el-dialog 
       v-model="recordDialogVisible" 
@@ -784,6 +781,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 资源记录页面特定样式 */
+.refresh-controls {
+  display: flex;
+  align-items: center;
+}
+
+.refresh-info {
+  margin: 0 10px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* 保持其他特定样式不变 */
 .resource-record {
   padding: 20px;
 }

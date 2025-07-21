@@ -1,251 +1,213 @@
 <template>
-  <div class="user-action-log">
-    <el-card class="log-card">
-      <template #header>
-        <div class="log-header">
-          <h2>用户行为记录</h2>
-          <p>记录和分析用户在系统中的各种行为操作</p>
-        </div>
-      </template>
-
-      <div class="log-content">
-        <!-- 筛选条件 -->
-        <div class="filter-section">
-          <el-form :inline="true" :model="filterForm" class="filter-form">
-            <el-form-item label="行为类型">
-              <el-select v-model="filterForm.action_type" placeholder="选择行为类型" clearable>
-                <el-option label="全部" value="" />
-                <el-option label="登录" value="Login" />
-                <el-option label="登出" value="Logout" />
-                <el-option label="注册" value="Register" />
-                <el-option label="上传" value="Upload" />
-                <el-option label="下载" value="Download" />
-                <el-option label="评论" value="Comment" />
-                <el-option label="点赞" value="Like" />
-                <el-option label="分享" value="Share" />
-                <el-option label="设置" value="Settings" />
-                <el-option label="管理操作" value="Admin" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="用户ID">
-              <el-input v-model="filterForm.user_id" placeholder="输入用户ID" clearable />
-            </el-form-item>
-            <el-form-item label="操作结果">
-              <el-select v-model="filterForm.success" placeholder="选择结果" clearable>
-                <el-option label="全部" value="" />
-                <el-option label="成功" :value="true" />
-                <el-option label="失败" :value="false" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="时间范围">
-              <el-date-picker
-                v-model="filterForm.date_range"
-                type="datetimerange"
-                range-separator="至"
-                start-placeholder="开始时间"
-                end-placeholder="结束时间"
-                format="YYYY-MM-DD HH:mm:ss"
-                value-format="YYYY-MM-DD HH:mm:ss"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="handleFilter">筛选</el-button>
-              <el-button @click="resetFilter">重置</el-button>
-            </el-form-item>
-          </el-form>
-        </div>
-
-        <!-- 统计信息 -->
-        <div class="stats-section">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">📊</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.total_actions }}</div>
-                    <div class="stats-label">总行为数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">✅</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.success_actions }}</div>
-                    <div class="stats-label">成功操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">❌</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.failed_actions }}</div>
-                    <div class="stats-label">失败操作</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="stats-card">
-                <div class="stats-item">
-                  <div class="stats-icon">👥</div>
-                  <div class="stats-content">
-                    <div class="stats-value">{{ stats.active_users }}</div>
-                    <div class="stats-label">活跃用户</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-
-        <!-- 行为记录列表 -->
-        <div class="action-list">
-          <el-table 
-            :data="actionList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="user_id" label="用户ID" width="120" />
-            <el-table-column prop="action_type" label="行为类型" width="120">
-              <template #default="{ row }">
-                <el-tag :type="getActionTypeTag(row.action_type)">
-                  {{ getActionTypeLabel(row.action_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="target_type" label="目标类型" width="100" />
-            <el-table-column prop="target_id" label="目标ID" width="100" />
-            <el-table-column prop="description" label="行为描述" min-width="200">
-              <template #default="{ row }">
-                <div class="action-description">
-                  <p class="description-text">{{ row.description }}</p>
-                  <div class="description-meta">
-                    <span class="ip">{{ row.ip_address }}</span>
-                    <span class="time">{{ formatTime(row.timestamp) }}</span>
-                  </div>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="success" label="结果" width="80">
-              <template #default="{ row }">
-                <el-tag :type="row.success ? 'success' : 'danger'">
-                  {{ row.success ? '成功' : '失败' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="error_message" label="错误信息" width="150">
-              <template #default="{ row }">
-                <span v-if="row.error_message" class="error-message">
-                  {{ row.error_message }}
-                </span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewAction(row)">查看</el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteAction(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+  <div class="admin-page user-action-log">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><Monitor /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">用户行为记录</h1>
+            <p class="page-subtitle">查看和管理用户的所有行为活动记录</p>
           </div>
         </div>
-
-        <!-- 批量操作 -->
-        <div class="batch-actions" v-if="selectedActions.length > 0">
-          <el-button type="danger" @click="batchDelete">批量删除</el-button>
-          <el-button @click="exportActions">导出记录</el-button>
-          <span class="selected-count">已选择 {{ selectedActions.length }} 条记录</span>
+      <div class="header-actions">
+          <el-button type="danger" @click="clearAllLogs">
+            <el-icon><Delete /></el-icon>
+            清空日志
+          </el-button>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><DataLine /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.total_actions }}</div>
+            <div class="stat-label">总行为数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Check /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.success_actions }}</div>
+            <div class="stat-label">成功操作</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><WarningFilled /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.failed_actions }}</div>
+            <div class="stat-label">失败操作</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><User /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.active_users }}</div>
+            <div class="stat-label">活跃用户</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筛选条件 -->
+    <div class="search-section">
+      <div class="search-left">
+      <el-form :inline="true" :model="filterForm" class="filter-form">
+        <el-form-item label="行为类型">
+          <el-select v-model="filterForm.action_type" placeholder="选择行为类型" clearable>
+            <el-option label="全部" value="" />
+            <el-option label="登录" value="Login" />
+            <el-option label="登出" value="Logout" />
+            <el-option label="注册" value="Register" />
+            <el-option label="上传" value="Upload" />
+            <el-option label="下载" value="Download" />
+            <el-option label="评论" value="Comment" />
+            <el-option label="点赞" value="Like" />
+            <el-option label="分享" value="Share" />
+            <el-option label="设置" value="Settings" />
+            <el-option label="管理操作" value="Admin" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="用户ID">
+          <el-input v-model="filterForm.user_id" placeholder="输入用户ID" clearable />
+        </el-form-item>
+        <el-form-item label="操作结果">
+          <el-select v-model="filterForm.success" placeholder="选择结果" clearable>
+            <el-option label="全部" value="" />
+            <el-option label="成功" :value="true" />
+            <el-option label="失败" :value="false" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-date-picker
+            v-model="filterForm.date_range"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+          />
+        </el-form-item>
+      </el-form>
+      </div>
+      <div class="search-right">
+        <el-button type="primary" @click="handleFilter">
+          <el-icon><Search /></el-icon>
+          筛选
+        </el-button>
+        <el-button @click="resetFilter">
+          <el-icon><Refresh /></el-icon>
+          重置
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 行为记录列表 -->
+    <div class="content-section log-list-container" v-loading="loading">
+      <div class="log-list">
+        <div 
+          v-for="(action, index) in actionList" 
+          :key="action.id" 
+          class="log-item"
+        >
+          <div class="log-level">{{ getActionTypeLabel(action.action_type) }}</div>
+          <div class="log-time">{{ formatTime(action.timestamp) }}</div>
+          <div class="log-message">{{ action.description }}</div>
+          <div v-if="action.error_message" class="log-error">{{ action.error_message }}</div>
+        </div>
+      </div>
+
+      <!-- 没有数据时显示 -->
+      <el-empty v-if="actionList.length === 0 && !loading" description="暂无记录"></el-empty>
+    </div>
+
+      <!-- 分页 -->
+    <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+    </div>
 
     <!-- 行为详情对话框 -->
     <el-dialog 
-      v-model="actionDialogVisible" 
+      v-model="detailDialogVisible"
       title="行为详情" 
-      width="700px"
+      width="600px"
+      :close-on-click-modal="false"
     >
-      <div class="action-detail" v-if="currentAction">
+      <div v-if="selectedAction" class="action-detail">
         <div class="detail-item">
-          <label>记录ID:</label>
-          <span>{{ currentAction.id }}</span>
+          <label>ID:</label>
+          <span>{{ selectedAction.id }}</span>
         </div>
         <div class="detail-item">
           <label>用户ID:</label>
-          <span>{{ currentAction.user_id }}</span>
+          <span>{{ selectedAction.user_id }}</span>
         </div>
         <div class="detail-item">
           <label>行为类型:</label>
-          <el-tag :type="getActionTypeTag(currentAction.action_type)">
-            {{ getActionTypeLabel(currentAction.action_type) }}
-          </el-tag>
+          <span>{{ getActionTypeLabel(selectedAction.action_type) }}</span>
         </div>
         <div class="detail-item">
-          <label>目标类型:</label>
-          <span>{{ currentAction.target_type }}</span>
-        </div>
-        <div class="detail-item">
-          <label>目标ID:</label>
-          <span>{{ currentAction.target_id }}</span>
-        </div>
-        <div class="detail-item">
-          <label>行为描述:</label>
-          <div class="description-box">{{ currentAction.description }}</div>
+          <label>时间:</label>
+          <span>{{ formatTime(selectedAction.timestamp) }}</span>
         </div>
         <div class="detail-item">
           <label>IP地址:</label>
-          <span>{{ currentAction.ip_address }}</span>
+          <span>{{ selectedAction.ip_address || 'N/A' }}</span>
         </div>
         <div class="detail-item">
-          <label>用户代理:</label>
-          <span>{{ currentAction.user_agent }}</span>
+          <label>成功状态:</label>
+          <span :style="{ color: selectedAction.success ? '#67C23A' : '#F56C6C' }">
+            {{ selectedAction.success ? '成功' : '失败' }}
+          </span>
         </div>
         <div class="detail-item">
-          <label>时间戳:</label>
-          <span>{{ formatTime(currentAction.timestamp) }}</span>
+          <label>描述:</label>
+          <div class="description-box">{{ selectedAction.description }}</div>
         </div>
-        <div class="detail-item">
-          <label>操作结果:</label>
-          <el-tag :type="currentAction.success ? 'success' : 'danger'">
-            {{ currentAction.success ? '成功' : '失败' }}
-          </el-tag>
-        </div>
-        <div class="detail-item" v-if="currentAction.error_message">
+        <div class="detail-item" v-if="selectedAction.error_message">
           <label>错误信息:</label>
-          <div class="error-box">{{ currentAction.error_message }}</div>
+          <div class="error-box">{{ selectedAction.error_message }}</div>
         </div>
       </div>
+    </el-dialog>
+
+    <!-- 确认对话框 -->
+    <el-dialog
+      v-model="confirmDialogVisible"
+      title="确认操作"
+      width="400px"
+    >
+      <div class="confirm-content">
+        <p>{{ confirmMessage }}</p>
+      </div>
       <template #footer>
-        <el-button @click="actionDialogVisible = false">关闭</el-button>
+        <span class="dialog-footer">
+          <el-button @click="confirmDialogVisible = false">取消</el-button>
+          <el-button type="danger" @click="confirmAction">确认</el-button>
+        </span>
       </template>
     </el-dialog>
   </div>
@@ -254,17 +216,41 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { userActionApi } from '../../api/userActions'
+import { userActionApi, UserAction } from '../../api/userActions'
+import { 
+  Monitor, 
+  Delete, 
+  Search, 
+  Refresh, 
+  DataLine, 
+  Check, 
+  WarningFilled, 
+  User 
+} from '@element-plus/icons-vue'
+
+// 扩展UserAction接口添加我们需要的字段
+interface ExtendedUserAction extends UserAction {
+  description: string;
+  timestamp: number;
+  success: boolean;
+  error_message?: string;
+}
 
 // 响应式数据
 const loading = ref(false)
-const actionList = ref([])
-const selectedActions = ref([])
+const actionList = ref<ExtendedUserAction[]>([])
+const selectedActions = ref<ExtendedUserAction[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const actionDialogVisible = ref(false)
-const currentAction = ref(null)
+const currentAction = ref<ExtendedUserAction | null>(null)
+// 新增变量
+const detailDialogVisible = ref(false)
+const selectedAction = ref<ExtendedUserAction | null>(null)
+const confirmDialogVisible = ref(false)
+const confirmMessage = ref('')
+const confirmAction = ref(() => {})
 
 const stats = reactive({
   total_actions: 0,
@@ -277,21 +263,46 @@ const filterForm = reactive({
   action_type: '',
   user_id: '',
   success: '',
-  date_range: []
+  date_range: [] as string[]
 })
 
 // 方法
 async function loadActions() {
   loading.value = true
   try {
-    const params = {
+    const params: any = {
       page: currentPage.value,
-      size: pageSize.value,
-      ...filterForm
+      page_size: pageSize.value,
     }
+    
+    // 处理筛选条件
+    if (filterForm.action_type) {
+      params.action_type = filterForm.action_type
+    }
+    
+    if (filterForm.user_id) {
+      params.user_id = Number(filterForm.user_id)
+    }
+    
+    if (filterForm.success !== '') {
+      params.success = filterForm.success
+    }
+    
+    if (filterForm.date_range && filterForm.date_range.length === 2) {
+      params.start_time = filterForm.date_range[0]
+      params.end_time = filterForm.date_range[1]
+    }
+    
     const response = await userActionApi.getUserActions(params)
-    if (response.code === 0) {
-      actionList.value = response.data.list || []
+    if (response.code === 0 && response.data) {
+      // 转换API返回的数据到我们的扩展类型
+      actionList.value = (response.data.actions || []).map(action => ({
+        ...action,
+        description: action.details || '',
+        timestamp: new Date(action.created_at).getTime() / 1000,
+        success: true, // 假设所有记录都是成功的，除非有明确的错误信息
+        error_message: undefined
+      }))
       total.value = response.data.total || 0
       // 更新统计信息
       updateStats()
@@ -305,7 +316,7 @@ async function loadActions() {
 }
 
 function updateStats() {
-  // 这里应该从API获取统计数据
+  // 更新统计数据
   stats.total_actions = total.value
   stats.success_actions = actionList.value.filter(a => a.success).length
   stats.failed_actions = actionList.value.filter(a => !a.success).length
@@ -327,7 +338,7 @@ function resetFilter() {
   handleFilter()
 }
 
-function handleSelectionChange(selection: any[]) {
+function handleSelectionChange(selection: ExtendedUserAction[]) {
   selectedActions.value = selection
 }
 
@@ -341,12 +352,13 @@ function handleCurrentChange(page: number) {
   loadActions()
 }
 
-function viewAction(action: any) {
-  currentAction.value = action
-  actionDialogVisible.value = true
+function viewAction(action: ExtendedUserAction) {
+  // 更新到新变量
+  selectedAction.value = action
+  detailDialogVisible.value = true
 }
 
-async function deleteAction(action: any) {
+async function deleteAction(action: ExtendedUserAction) {
   try {
     await ElMessageBox.confirm('确定要删除这条行为记录吗？', '确认删除')
     const response = await userActionApi.deleteUserAction(action.id)
@@ -370,8 +382,13 @@ async function batchDelete() {
   try {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedActions.value.length} 条记录吗？`, '确认删除')
     // 批量删除逻辑
-    ElMessage.success('批量删除成功')
-    loadActions()
+    const ids = selectedActions.value.map(action => action.id)
+    const response = await userActionApi.batchDeleteUserActions(ids)
+    if (response.code === 0) {
+      ElMessage.success('批量删除成功')
+      loadActions()
+      selectedActions.value = []
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
@@ -379,12 +396,47 @@ async function batchDelete() {
   }
 }
 
+// 清空所有日志
+async function clearAllLogs() {
+  confirmMessage.value = '确定要清空所有行为记录吗？此操作不可恢复！'
+  confirmAction.value = async () => {
+    try {
+    // 使用批量删除API删除所有记录
+    const params = {
+      page: 1,
+      page_size: 1000 // 获取尽可能多的记录ID
+    }
+    const response = await userActionApi.getUserActions(params)
+    
+    if (response.code === 0 && response.data && response.data.actions.length > 0) {
+      const actionIds = response.data.actions.map(action => action.id)
+      const deleteResponse = await userActionApi.batchDeleteUserActions(actionIds)
+      
+      if (deleteResponse.code === 0) {
+          ElMessage.success('所有行为记录已清空')
+          loadActions() // 重新加载数据
+        } else {
+          ElMessage.error('清空记录失败')
+        }
+      } else {
+        ElMessage.info('没有记录可清空')
+    }
+  } catch (error) {
+      console.error('清空记录失败:', error)
+      ElMessage.error('清空记录失败')
+    } finally {
+      confirmDialogVisible.value = false
+    }
+  }
+  confirmDialogVisible.value = true
+}
+
 function exportActions() {
   ElMessage.info('导出功能开发中...')
 }
 
 function getActionTypeTag(type: string): string {
-  const tags = {
+  const tags: Record<string, string> = {
     Login: 'success',
     Logout: 'info',
     Register: 'primary',
@@ -394,157 +446,94 @@ function getActionTypeTag(type: string): string {
     Like: 'success',
     Share: 'primary',
     Settings: 'warning',
-    Admin: 'danger'
+    Admin: 'danger',
+    System: 'info'
   }
   return tags[type] || 'info'
 }
 
+// 获取行为类型标签
 function getActionTypeLabel(type: string): string {
-  const labels = {
-    Login: '登录',
-    Logout: '登出',
-    Register: '注册',
-    Upload: '上传',
-    Download: '下载',
-    Comment: '评论',
-    Like: '点赞',
-    Share: '分享',
-    Settings: '设置',
-    Admin: '管理操作'
+  const typeMap: Record<string, string> = {
+    'Login': '登录',
+    'Logout': '登出',
+    'Register': '注册',
+    'Upload': '上传',
+    'Download': '下载',
+    'Comment': '评论',
+    'Like': '点赞',
+    'Share': '分享',
+    'Settings': '设置',
+    'Admin': '管理操作'
   }
-  return labels[type] || type
+  return typeMap[type] || type
 }
 
+// 格式化时间
 function formatTime(timestamp: number): string {
-  if (!timestamp) return '-'
-  return new Date(timestamp * 1000).toLocaleString()
+  return new Date(timestamp * 1000).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
 }
 
+// 加载初始数据
 onMounted(() => {
   loadActions()
 })
 </script>
 
 <style scoped>
-.user-action-log {
-  padding: 20px;
-}
-
-.log-card {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.log-header {
-  text-align: center;
-}
-
-.log-header h2 {
-  margin: 0 0 10px 0;
-  color: var(--el-text-color-primary);
-}
-
-.log-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.log-content {
-  padding: 20px 0;
-}
-
-.filter-section {
-  margin-bottom: 20px;
-  padding: 20px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-}
-
-.filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.stats-section {
+/* 用户行为日志页面特定样式 */
+.log-list-container {
   margin-bottom: 20px;
 }
 
-.stats-card {
-  text-align: center;
-}
-
-.stats-item {
+.log-list {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
+  flex-direction: column;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 400;
 }
 
-.stats-icon {
-  font-size: 24px;
+.log-item {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 5px;
+  transition: all 0.3s ease;
 }
 
-.stats-content {
-  text-align: left;
+.log-item:hover {
+  background-color: var(--bg-secondary);
+  transform: translateX(4px);
 }
 
-.stats-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
+.log-level {
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: var(--brand-color);
 }
 
-.stats-label {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
+.log-time {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
 }
 
-.action-list {
-  margin-bottom: 20px;
+.log-message {
+  line-height: 1.5;
+  word-break: break-word;
+  margin-bottom: 5px;
 }
 
-.action-description {
-  max-width: 300px;
-}
-
-.description-text {
-  margin: 0 0 8px 0;
-  word-break: break-all;
-  line-height: 1.4;
-}
-
-.description-meta {
-  display: flex;
-  gap: 15px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.error-message {
-  color: var(--el-color-danger);
-  font-size: 12px;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.batch-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 15px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-  margin-top: 20px;
-}
-
-.selected-count {
-  margin-left: auto;
-  color: var(--el-text-color-secondary);
+.log-error {
+  color: var(--danger-color);
+  margin-top: 5px;
 }
 
 .action-detail {
@@ -560,19 +549,19 @@ onMounted(() => {
 .detail-item label {
   width: 100px;
   font-weight: 600;
-  color: var(--el-text-color-primary);
+  color: var(--text-primary);
 }
 
 .detail-item span {
   flex: 1;
-  color: var(--el-text-color-regular);
+  color: var(--text-secondary);
 }
 
 .description-box,
 .error-box {
   flex: 1;
   padding: 10px;
-  background: var(--el-bg-color-page);
+  background: var(--bg-secondary);
   border-radius: 4px;
   white-space: pre-wrap;
   word-break: break-all;
@@ -580,6 +569,6 @@ onMounted(() => {
 }
 
 .error-box {
-  color: var(--el-color-danger);
+  color: var(--danger-color);
 }
 </style> 

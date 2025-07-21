@@ -1,120 +1,220 @@
 <template>
-  <div class="announcement-manage">
-    <el-card class="manage-card">
-      <template #header>
-        <div class="manage-header">
-          <h2>公告提醒管理</h2>
-          <p>管理系统公告，包括发布、编辑、删除和状态管理</p>
+  <div class="admin-page announcement-manage">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><Bell /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">公告管理</h1>
+            <p class="page-subtitle">管理系统公告，包括发布、编辑、删除和状态管理</p>
+          </div>
         </div>
-      </template>
-
-      <div class="manage-content">
-        <!-- 快速操作 -->
-        <div class="quick-actions">
+        <div class="header-actions">
           <el-button type="primary" @click="createAnnouncement">
             <el-icon><Plus /></el-icon>
             发布公告
           </el-button>
-          <el-button type="success" @click="batchEnable">
-            <el-icon><Check /></el-icon>
-            批量启用
-          </el-button>
-          <el-button type="warning" @click="batchDisable">
-            <el-icon><Close /></el-icon>
-            批量禁用
-          </el-button>
-          <el-button type="danger" @click="batchDelete">
-            <el-icon><Delete /></el-icon>
-            批量删除
-          </el-button>
-        </div>
-
-        <!-- 公告列表 -->
-        <div class="announcement-list">
-          <el-table 
-            :data="announcementList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="title" label="标题" min-width="200">
-              <template #default="{ row }">
-                <div class="announcement-title">
-                  <span class="title-text">{{ row.title }}</span>
-                  <el-tag 
-                    :type="getPriorityTag(row.priority)" 
-                    size="small"
-                    class="priority-tag"
-                  >
-                    P{{ row.priority }}
-                  </el-tag>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="content" label="内容" min-width="300">
-              <template #default="{ row }">
-                <div class="announcement-content">
-                  <p class="content-text">{{ truncateText(row.content, 100) }}</p>
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column prop="type_" label="类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getTypeTag(row.type_)">
-                  {{ getTypeLabel(row.type_) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="100">
-              <template #default="{ row }">
-                <el-switch 
-                  v-model="row.enabled" 
-                  @change="toggleStatus(row)"
-                  :loading="row.statusLoading"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="start_time" label="开始时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.start_time) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="end_time" label="结束时间" width="180">
-              <template #default="{ row }">
-                {{ row.end_time ? formatTime(row.end_time) : '永久' }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewAnnouncement(row)">查看</el-button>
-                <el-button size="small" type="primary" @click="editAnnouncement(row)">编辑</el-button>
-                <el-button size="small" type="danger" @click="deleteAnnouncement(row)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
-          </div>
-        </div>
-
-        <!-- 批量操作 -->
-        <div class="batch-actions" v-if="selectedAnnouncements.length > 0">
-          <span class="selected-count">已选择 {{ selectedAnnouncements.length }} 条公告</span>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Document /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ announcementList.length }}</div>
+            <div class="stat-label">总公告数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Check /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ activeAnnouncements }}</div>
+            <div class="stat-label">已启用</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><WarningFilled /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ urgentAnnouncements }}</div>
+            <div class="stat-label">紧急公告</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Calendar /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ scheduledAnnouncements }}</div>
+            <div class="stat-label">定时公告</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 搜索和操作区域 -->
+    <div class="search-section">
+      <div class="search-left">
+        <el-input 
+          v-model="searchQuery" 
+          placeholder="搜索公告..." 
+          clearable
+          style="width: 250px"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        
+        <el-select 
+          v-model="filterType" 
+          placeholder="选择类型" 
+          clearable
+          style="width: 150px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="系统公告" value="System" />
+          <el-option label="活动公告" value="Event" />
+          <el-option label="维护公告" value="Maintenance" />
+          <el-option label="更新公告" value="Update" />
+        </el-select>
+        
+        <el-select 
+          v-model="filterStatus" 
+          placeholder="状态筛选" 
+          clearable
+          style="width: 150px"
+        >
+          <el-option label="全部" value="" />
+          <el-option label="已启用" value="enabled" />
+          <el-option label="已禁用" value="disabled" />
+        </el-select>
+      </div>
+      
+      <div class="search-right">
+        <el-button type="success" @click="batchEnable" :disabled="!selectedAnnouncements.length">
+          <el-icon><Check /></el-icon>
+          批量启用
+        </el-button>
+        <el-button type="warning" @click="batchDisable" :disabled="!selectedAnnouncements.length">
+          <el-icon><Close /></el-icon>
+          批量禁用
+        </el-button>
+        <el-button type="danger" @click="batchDelete" :disabled="!selectedAnnouncements.length">
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 公告列表 -->
+    <div class="table-section">
+      <el-table 
+        :data="filteredAnnouncements" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="title" label="标题" min-width="200">
+          <template #default="{ row }">
+            <div class="announcement-title">
+              <span class="title-text">{{ row.title }}</span>
+              <el-tag 
+                :type="getPriorityTag(row.priority)" 
+                size="small"
+                class="priority-tag"
+              >
+                P{{ row.priority }}
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="content" label="内容" min-width="300">
+          <template #default="{ row }">
+            <div class="announcement-content">
+              <p class="content-text">{{ truncateText(row.content, 100) }}</p>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="type_" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getTypeTag(row.type_)">
+              {{ getTypeLabel(row.type_) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="enabled" label="状态" width="100">
+          <template #default="{ row }">
+            <el-switch 
+              v-model="row.enabled" 
+              @change="toggleStatus(row)"
+              :loading="row.statusLoading"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="start_time" label="开始时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.start_time) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="end_time" label="结束时间" width="180">
+          <template #default="{ row }">
+            {{ row.end_time ? formatTime(row.end_time) : '永久' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewAnnouncement(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
+            <el-button size="small" type="primary" @click="editAnnouncement(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button size="small" type="danger" @click="deleteAnnouncement(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="filteredAnnouncements.length"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- 批量操作 -->
+    <div class="batch-actions" v-if="selectedAnnouncements.length > 0">
+      <span class="selected-count">已选择 {{ selectedAnnouncements.length }} 条公告</span>
+    </div>
 
     <!-- 公告编辑对话框 -->
     <el-dialog 
@@ -236,9 +336,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Check, Close, Delete } from '@element-plus/icons-vue'
+import {
+  Bell,
+  Document,
+  Check,
+  WarningFilled,
+  Calendar,
+  Search,
+  View,
+  Edit,
+  Delete,
+  Close,
+  Plus
+} from '@element-plus/icons-vue'
 import { 
   getAnnouncements, 
   createAnnouncement as createAnnouncementApi,
@@ -292,6 +404,49 @@ const formRules = {
     { required: true, message: '请选择开始时间', trigger: 'change' }
   ]
 }
+
+// 添加搜索和筛选变量
+const searchQuery = ref('')
+const filterType = ref('')
+const filterStatus = ref('')
+
+// 添加计算属性
+const activeAnnouncements = computed(() => {
+  return announcementList.value.filter(a => a.enabled).length
+})
+
+const urgentAnnouncements = computed(() => {
+  return announcementList.value.filter(a => a.priority === 1).length
+})
+
+const scheduledAnnouncements = computed(() => {
+  return announcementList.value.filter(a => a.end_time).length
+})
+
+// 筛选后的公告列表
+const filteredAnnouncements = computed(() => {
+  let result = announcementList.value
+
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    result = result.filter(a => 
+      a.title.toLowerCase().includes(query) || 
+      a.content.toLowerCase().includes(query)
+    )
+  }
+
+  if (filterType.value) {
+    result = result.filter(a => a.type_ === filterType.value)
+  }
+
+  if (filterStatus.value === 'enabled') {
+    result = result.filter(a => a.enabled)
+  } else if (filterStatus.value === 'disabled') {
+    result = result.filter(a => !a.enabled)
+  }
+
+  return result
+})
 
 // 方法
 async function loadAnnouncements() {
@@ -471,12 +626,11 @@ function handleSelectionChange(selection: any[]) {
 
 function handleSizeChange(size: number) {
   pageSize.value = size
-  loadAnnouncements()
+  currentPage.value = 1
 }
 
 function handleCurrentChange(page: number) {
   currentPage.value = page
-  loadAnnouncements()
 }
 
 function resetForm() {
@@ -535,123 +689,26 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.announcement-manage {
-  padding: 20px;
-}
-
-.manage-card {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.manage-header {
-  text-align: center;
-}
-
-.manage-header h2 {
-  margin: 0 0 10px 0;
-  color: var(--el-text-color-primary);
-}
-
-.manage-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.manage-content {
-  padding: 20px 0;
-}
-
-.quick-actions {
-  margin-bottom: 20px;
-  display: flex;
-  gap: 10px;
-}
-
-.announcement-list {
-  margin-bottom: 20px;
-}
+/* AnnouncementManage页面特定样式 */
 
 .announcement-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .title-text {
-  flex: 1;
+  font-weight: 500;
 }
 
 .priority-tag {
   flex-shrink: 0;
 }
 
-.announcement-content {
-  max-width: 300px;
-}
-
-.content-text {
+.announcement-content .content-text {
   margin: 0;
-  word-break: break-all;
-  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
-.pagination-wrapper {
-  display: flex;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.batch-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 15px;
-  background: var(--el-bg-color-page);
-  border-radius: 8px;
-  margin-top: 20px;
-}
-
-.selected-count {
-  margin-left: auto;
-  color: var(--el-text-color-secondary);
-}
-
-.announcement-detail {
-  padding: 20px;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 15px;
-  align-items: flex-start;
-}
-
-.detail-item label {
-  width: 100px;
-  font-weight: 600;
-  color: var(--el-text-color-primary);
-}
-
-.detail-item span {
-  flex: 1;
-  color: var(--el-text-color-regular);
-}
-
-.content-box {
-  flex: 1;
-  padding: 10px;
-  background: var(--el-bg-color-page);
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.5;
-}
-
-.priority-desc,
-.end-time-desc {
-  margin-left: 10px;
-  color: var(--el-text-color-secondary);
-  font-size: 14px;
-}
+/* 其余特定样式保持不变 */
 </style> 

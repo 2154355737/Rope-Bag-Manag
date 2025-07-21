@@ -97,4 +97,17 @@ export function batchDeleteAnnouncements(ids: number[]) {
  */
 export function getActiveAnnouncements() {
   return api.get('/api/v1/announcements/active')
-} 
+}
+
+// Export default object for convenience
+export const announcementApi = {
+  getAnnouncements,
+  createAnnouncement,
+  updateAnnouncement,
+  deleteAnnouncement,
+  batchUpdateAnnouncementStatus,
+  batchDeleteAnnouncements,
+  getActiveAnnouncements
+}
+
+export default announcementApi 

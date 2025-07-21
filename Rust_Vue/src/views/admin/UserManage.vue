@@ -1,127 +1,209 @@
 <template>
-  <div class="user-manage">
-    <el-card class="manage-card">
-      <template #header>
-        <div class="manage-header">
-          <h2>用户管理</h2>
-          <p>管理系统用户和社区用户，支持用户信息编辑、删除等操作</p>
+  <div class="admin-page user-manage">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><User /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">用户管理</h1>
+            <p class="page-subtitle">管理系统用户和社区用户，支持用户信息编辑、删除等操作</p>
+          </div>
         </div>
-      </template>
-
-      <div class="manage-content">
-        <!-- 搜索和过滤 -->
-        <div class="search-section">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-input
-                v-model="searchQuery"
-                placeholder="搜索用户名或QQ号"
-                clearable
-                @input="handleSearch"
-              >
-                <template #prefix>
-                  <el-icon><Search /></el-icon>
-                </template>
-              </el-input>
-            </el-col>
-            <el-col :span="4">
-              <el-select v-model="roleFilter" placeholder="角色筛选" clearable @change="handleFilter">
-                <el-option label="普通用户" value="Normal" />
-                <el-option label="开发者" value="Developer" />
-                <el-option label="元老" value="Elder" />
-              </el-select>
-            </el-col>
-            <el-col :span="4">
-              <el-select v-model="statusFilter" placeholder="状态筛选" clearable @change="handleFilter">
-                <el-option label="正常" value="Normal" />
-                <el-option label="封禁" value="Banned" />
-              </el-select>
-            </el-col>
-            <el-col :span="10">
-              <el-button type="primary" @click="showAddUserDialog = true">添加用户</el-button>
-              <el-button type="primary" @click="refreshUsers">刷新</el-button>
-              <el-button type="success" @click="exportUsers">导出用户</el-button>
-              <el-button type="danger" @click="batchDelete" :disabled="selectedUsers.length === 0">
-                批量删除
-              </el-button>
-            </el-col>
-          </el-row>
+        <div class="header-actions">
+          <el-button type="primary" @click="showAddUserDialog = true">
+            <el-icon><Plus /></el-icon>
+            添加用户
+          </el-button>
         </div>
+      </div>
+    </div>
 
-        <!-- 用户列表 -->
-        <div class="user-list">
-          <el-table 
-            :data="userList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="username" label="用户名" min-width="120" />
-            <el-table-column prop="star" label="星级" width="80">
-              <template #default="{ row }">
-                <el-rate v-model="row.star" disabled show-score />
-              </template>
-            </el-table-column>
-            <el-table-column prop="role" label="角色" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getRoleTag(row.role)">
-                  {{ getRoleLabel(row.role) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="ban_status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusTag(row.ban_status)">
-                  {{ getStatusLabel(row.ban_status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="qq_number" label="QQ号" width="120" />
-            <el-table-column prop="created_at" label="注册时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="last_login" label="最后登录" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.last_login) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="login_count" label="登录次数" width="100" />
-            <el-table-column prop="upload_count" label="上传数" width="80" />
-            <el-table-column prop="download_count" label="下载数" width="80" />
-            <el-table-column label="操作" width="200" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewUser(row)">查看</el-button>
-                <el-button size="small" type="primary" @click="editUser(row)">编辑</el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteUser(row)"
-                  :disabled="row.is_admin"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><UserFilled /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ totalUsers }}</div>
+            <div class="stat-label">总用户数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Star /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ developerUsers }}</div>
+            <div class="stat-label">开发者</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><WarningFilled /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ bannedUsers }}</div>
+            <div class="stat-label">已封禁</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Timer /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ newUsersThisMonth }}</div>
+            <div class="stat-label">本月新增</div>
           </div>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 搜索和过滤 -->
+    <div class="search-section">
+      <div class="search-left">
+        <el-input
+          v-model="searchQuery"
+          placeholder="搜索用户名或QQ号"
+          clearable
+          style="width: 250px"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        
+        <el-select 
+          v-model="roleFilter" 
+          placeholder="角色筛选" 
+          clearable 
+          style="width: 150px"
+          @change="handleFilter"
+        >
+          <el-option label="普通用户" value="Normal" />
+          <el-option label="开发者" value="Developer" />
+          <el-option label="元老" value="Elder" />
+        </el-select>
+        
+        <el-select 
+          v-model="statusFilter" 
+          placeholder="状态筛选" 
+          clearable 
+          style="width: 150px"
+          @change="handleFilter"
+        >
+          <el-option label="正常" value="Normal" />
+          <el-option label="封禁" value="Banned" />
+        </el-select>
+      </div>
+      
+      <div class="search-right">
+        <el-button @click="refreshUsers">
+          <el-icon><Refresh /></el-icon>
+          刷新
+        </el-button>
+        <el-button type="success" @click="exportUsers">
+          <el-icon><Download /></el-icon>
+          导出用户
+        </el-button>
+        <el-button 
+          type="danger" 
+          @click="batchDelete" 
+          :disabled="selectedUsers.length === 0"
+        >
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 用户列表 -->
+    <div class="table-section">
+      <el-table 
+        :data="userList" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="star" label="星级" width="80">
+          <template #default="{ row }">
+            <el-rate v-model="row.star" disabled show-score />
+          </template>
+        </el-table-column>
+        <el-table-column prop="role" label="角色" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getRoleTag(row.role)">
+              {{ getRoleLabel(row.role) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="ban_status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTag(row.ban_status)">
+              {{ getStatusLabel(row.ban_status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="qq_number" label="QQ号" width="120" />
+        <el-table-column prop="created_at" label="注册时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="last_login" label="最后登录" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.last_login) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="login_count" label="登录次数" width="100" />
+        <el-table-column prop="upload_count" label="上传数" width="80" />
+        <el-table-column prop="download_count" label="下载数" width="80" />
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewUser(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
+            <el-button size="small" type="primary" @click="editUser(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deleteUser(row)"
+            >
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
 
     <!-- 用户详情对话框 -->
     <el-dialog 
@@ -279,9 +361,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { 
+  User,
+  UserFilled, 
+  Plus, 
+  Edit, 
+  Delete, 
+  Search, 
+  Download, 
+  Star, 
+  View,
+  Timer,
+  Refresh,
+  WarningFilled 
+} from '@element-plus/icons-vue'
 import { userApi } from '../../api/users'
 
 // 响应式数据
@@ -567,70 +662,38 @@ function formatTime(time: string): string {
   return new Date(time).toLocaleString()
 }
 
+// 添加统计数据计算属性
+const totalUsers = computed(() => {
+  return total.value || 0
+})
+
+const developerUsers = computed(() => {
+  return userList.value.filter(user => user.role === 'Developer').length
+})
+
+const bannedUsers = computed(() => {
+  return userList.value.filter(user => user.ban_status === 'Banned').length
+})
+
+const newUsersThisMonth = computed(() => {
+  const now = new Date()
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+  return userList.value.filter(user => {
+    const createdAt = new Date(user.created_at)
+    return createdAt >= startOfMonth
+  }).length
+})
+
 onMounted(() => {
   loadUsers()
 })
 </script>
 
 <style scoped>
-.user-manage {
-  padding: 20px;
+/* 用户管理页特定样式 */
+.el-rate {
+  display: inline-flex;
 }
 
-.manage-card {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.manage-header {
-  text-align: center;
-}
-
-.manage-header h2 {
-  margin: 0 0 10px 0;
-  color: var(--el-text-color-primary);
-}
-
-.manage-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.manage-content {
-  padding: 20px 0;
-}
-
-.search-section {
-  margin-bottom: 20px;
-}
-
-.user-list {
-  margin-bottom: 20px;
-}
-
-.pagination-wrapper {
-  margin-top: 20px;
-  text-align: center;
-}
-
-.user-detail {
-  padding: 20px;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 15px;
-  align-items: center;
-}
-
-.detail-item label {
-  width: 100px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
-}
-
-.detail-item span {
-  flex: 1;
-  color: var(--el-text-color-regular);
-}
+/* 其余特定样式保持不变 */
 </style> 

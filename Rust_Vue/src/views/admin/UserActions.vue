@@ -1,156 +1,202 @@
 <template>
-  <div class="user-actions">
-    <el-card class="actions-card">
-      <template #header>
-        <div class="actions-header">
-          <h2>用户行为记录</h2>
-          <p>记录和分析用户在系统中的各种行为操作</p>
+  <div class="admin-page user-actions">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><Operation /></el-icon>
+          </div>
+          <div class="header-info">
+            <h1 class="page-title">用户行为记录</h1>
+            <p class="page-subtitle">记录和分析用户在系统中的各种行为操作</p>
+          </div>
         </div>
-      </template>
-
-      <div class="actions-content">
-        <!-- 搜索和过滤 -->
-        <div class="search-section">
-          <el-row :gutter="20">
-            <el-col :span="4">
-              <el-input
-                v-model="searchQuery.user_id"
-                placeholder="输入用户ID"
-                clearable
-                @input="handleSearch"
-              >
-                <template #prefix>
-                  <el-icon><User /></el-icon>
-                </template>
-              </el-input>
-            </el-col>
-            <el-col :span="4">
-              <el-select v-model="searchQuery.action_type" placeholder="行为类型" clearable @change="handleSearch">
-                <el-option label="登录" value="Login" />
-                <el-option label="登出" value="Logout" />
-                <el-option label="注册" value="Register" />
-                <el-option label="上传" value="Upload" />
-                <el-option label="下载" value="Download" />
-                <el-option label="评论" value="Comment" />
-                <el-option label="点赞" value="Like" />
-                <el-option label="分享" value="Share" />
-                <el-option label="设置" value="Settings" />
-                <el-option label="管理操作" value="Admin" />
-              </el-select>
-            </el-col>
-            <el-col :span="4">
-              <el-date-picker
-                v-model="searchQuery.start_time"
-                type="datetime"
-                placeholder="开始时间"
-                format="YYYY-MM-DD HH:mm:ss"
-                value-format="YYYY-MM-DD HH:mm:ss"
-                @change="handleSearch"
-              />
-            </el-col>
-            <el-col :span="4">
-              <el-date-picker
-                v-model="searchQuery.end_time"
-                type="datetime"
-                placeholder="结束时间"
-                format="YYYY-MM-DD HH:mm:ss"
-                value-format="YYYY-MM-DD HH:mm:ss"
-                @change="handleSearch"
-              />
-            </el-col>
-            <el-col :span="8">
-              <el-button type="primary" @click="refreshActions">刷新</el-button>
-              <el-button type="success" @click="exportActions">导出</el-button>
-              <el-button type="danger" @click="batchDelete" :disabled="selectedActions.length === 0">
-                批量删除
-              </el-button>
-            </el-col>
-          </el-row>
+        <div class="header-actions">
+          <el-button @click="refreshActions">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
         </div>
+      </div>
+    </div>
 
-        <!-- 统计信息 -->
-        <div class="stats-section">
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-card class="stat-card">
-                <div class="stat-content">
-                  <div class="stat-icon">📊</div>
-                  <div class="stat-info">
-                    <div class="stat-value">{{ stats.total_actions }}</div>
-                    <div class="stat-label">总行为数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="12">
-              <el-card class="stat-card">
-                <div class="stat-content">
-                  <div class="stat-icon">👥</div>
-                  <div class="stat-info">
-                    <div class="stat-value">{{ stats.active_users }}</div>
-                    <div class="stat-label">活跃用户</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><DataLine /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.total_actions }}</div>
+            <div class="stat-label">总行为数</div>
+          </div>
         </div>
-
-        <!-- 行为记录列表 -->
-        <div class="actions-list">
-          <el-table 
-            :data="actionsList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="user_id" label="用户ID" width="120" />
-            <el-table-column prop="action_type" label="行为类型" width="120">
-              <template #default="{ row }">
-                <el-tag :type="getActionTypeTag(row.action_type)">
-                  {{ getActionTypeLabel(row.action_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="target_type" label="目标类型" width="120" />
-            <el-table-column prop="target_id" label="目标ID" width="120" />
-            <el-table-column prop="details" label="行为描述" min-width="200" />
-            <el-table-column prop="created_at" label="时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewAction(row)">查看</el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteAction(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><User /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ stats.active_users }}</div>
+            <div class="stat-label">活跃用户</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Finished /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ successActions }}</div>
+            <div class="stat-label">成功操作</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Timer /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ todayActions }}</div>
+            <div class="stat-label">今日行为</div>
           </div>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 搜索和过滤 -->
+    <div class="search-section">
+      <div class="search-left">
+        <el-input
+          v-model="searchQuery.user_id"
+          placeholder="输入用户ID"
+          clearable
+          style="width: 150px"
+          @input="handleSearch"
+        >
+          <template #prefix>
+            <el-icon><User /></el-icon>
+          </template>
+        </el-input>
+        
+        <el-select 
+          v-model="searchQuery.action_type" 
+          placeholder="行为类型" 
+          clearable 
+          style="width: 150px"
+          @change="handleSearch"
+        >
+          <el-option label="登录" value="Login" />
+          <el-option label="登出" value="Logout" />
+          <el-option label="注册" value="Register" />
+          <el-option label="上传" value="Upload" />
+          <el-option label="下载" value="Download" />
+          <el-option label="评论" value="Comment" />
+          <el-option label="点赞" value="Like" />
+          <el-option label="分享" value="Share" />
+          <el-option label="设置" value="Settings" />
+          <el-option label="管理操作" value="Admin" />
+        </el-select>
+        
+        <el-date-picker
+          v-model="searchQuery.start_time"
+          type="datetime"
+          placeholder="开始时间"
+          format="YYYY-MM-DD HH:mm:ss"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          style="width: 200px"
+          @change="handleSearch"
+        />
+        
+        <el-date-picker
+          v-model="searchQuery.end_time"
+          type="datetime"
+          placeholder="结束时间"
+          format="YYYY-MM-DD HH:mm:ss"
+          value-format="YYYY-MM-DD HH:mm:ss"
+          style="width: 200px"
+          @change="handleSearch"
+        />
+      </div>
+      
+      <div class="search-right">
+        <el-button type="success" @click="exportActions">
+          <el-icon><Download /></el-icon>
+          导出数据
+        </el-button>
+        <el-button 
+          type="danger" 
+          @click="batchDelete" 
+          :disabled="selectedActions.length === 0"
+        >
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 行为记录列表 -->
+    <div class="table-section">
+      <el-table 
+        :data="actionsList" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="user_id" label="用户ID" width="100" />
+        <el-table-column prop="action_type" label="行为类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="getActionTypeTag(row.action_type)">
+              {{ getActionTypeLabel(row.action_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="details" label="描述" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="ip_address" label="IP地址" width="150" />
+        <el-table-column prop="created_at" label="时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="success" label="结果" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.success ? 'success' : 'danger'">
+              {{ row.success ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="viewAction(row)">
+              <el-icon><View /></el-icon>
+              详情
+            </el-button>
+            <el-button size="small" type="danger" @click="deleteAction(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
 
     <!-- 行为详情对话框 -->
     <el-dialog 
@@ -217,9 +263,19 @@
 
 <script setup lang="ts">
 // 导入所需依赖
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User } from '@element-plus/icons-vue'
+import { 
+  User, 
+  Operation, 
+  DataLine, 
+  View, 
+  Delete, 
+  Download, 
+  Refresh,
+  Finished,
+  Timer
+} from '@element-plus/icons-vue'
 import { userActionApi, UserAction, UserActionStats } from '../../api'
 
 // 响应式数据
@@ -242,6 +298,22 @@ const searchQuery = reactive({
 const stats = reactive({
   total_actions: 0,
   active_users: 0
+})
+
+// 计算成功操作数量
+const successActions = computed(() => {
+  return actionsList.value.filter(action => action.success).length
+})
+
+// 计算今日行为数量
+const todayActions = computed(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  return actionsList.value.filter(action => {
+    const actionTime = new Date(action.created_at)
+    return actionTime >= today
+  }).length
 })
 
 // 方法
@@ -434,98 +506,10 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.user-actions {
-  padding: 20px;
-}
-
-.actions-card {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-.actions-header {
-  text-align: center;
-}
-
-.actions-header h2 {
-  margin: 0 0 10px 0;
-  color: var(--el-text-color-primary);
-}
-
-.actions-header p {
-  margin: 0;
-  color: var(--el-text-color-secondary);
-}
-
-.actions-content {
-  padding: 20px 0;
-}
-
-.search-section {
-  margin-bottom: 20px;
-}
-
-.stats-section {
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  text-align: center;
-}
-
-.stat-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-}
-
-.stat-icon {
-  font-size: 32px;
-}
-
-.stat-info {
-  text-align: left;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
-}
-
-.stat-label {
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
-}
-
-.actions-list {
-  margin-bottom: 20px;
-}
-
-.pagination-wrapper {
+/* 用户行为记录特定样式 */
+.table-section {
   margin-top: 20px;
-  text-align: center;
 }
 
-.action-detail {
-  padding: 20px;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 15px;
-  align-items: center;
-}
-
-.detail-item label {
-  width: 100px;
-  font-weight: bold;
-  color: var(--el-text-color-primary);
-}
-
-.detail-item span {
-  flex: 1;
-  color: var(--el-text-color-regular);
-}
+/* 其余特定样式保持不变 */
 </style> 

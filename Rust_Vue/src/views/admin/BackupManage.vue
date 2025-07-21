@@ -1,208 +1,223 @@
 <template>
-  <div class="backup-manage">
-    <el-card class="manage-card">
-      <template #header>
-        <div class="manage-header">
-          <h2>数据库备份管理</h2>
-          <p>管理系统数据库的备份、恢复和监控功能</p>
-        </div>
-      </template>
-
-      <div class="manage-content">
-        <!-- 备份操作 -->
-        <div class="backup-actions">
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <el-card class="action-card">
-                <div class="action-item">
-                  <div class="action-icon">💾</div>
-                  <div class="action-content">
-                    <h3>手动备份</h3>
-                    <p>立即创建数据库备份</p>
-                    <el-button type="primary" @click="createBackup" :loading="backupLoading">
-                      开始备份
-                    </el-button>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="8">
-              <el-card class="action-card">
-                <div class="action-item">
-                  <div class="action-icon">🔄</div>
-                  <div class="action-content">
-                    <h3>自动备份</h3>
-                    <p>配置自动备份计划</p>
-                    <el-button type="success" @click="configureAutoBackup">
-                      配置计划
-                    </el-button>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="8">
-              <el-card class="action-card">
-                <div class="action-item">
-                  <div class="action-icon">📊</div>
-                  <div class="action-content">
-                    <h3>备份统计</h3>
-                    <p>查看备份统计信息</p>
-                    <el-button type="info" @click="viewBackupStats">
-                      查看统计
-                    </el-button>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-
-        <!-- 备份状态 -->
-        <div class="backup-status">
-          <el-row :gutter="20">
-            <el-col :span="6">
-              <el-card class="status-card">
-                <div class="status-item">
-                  <div class="status-icon">📁</div>
-                  <div class="status-content">
-                    <div class="status-value">{{ status.total_backups }}</div>
-                    <div class="status-label">总备份数</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="status-card">
-                <div class="status-item">
-                  <div class="status-icon">✅</div>
-                  <div class="status-content">
-                    <div class="status-value">{{ status.success_backups }}</div>
-                    <div class="status-label">成功备份</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="status-card">
-                <div class="status-item">
-                  <div class="status-icon">❌</div>
-                  <div class="status-content">
-                    <div class="status-value">{{ status.failed_backups }}</div>
-                    <div class="status-label">失败备份</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-            <el-col :span="6">
-              <el-card class="status-card">
-                <div class="status-item">
-                  <div class="status-icon">💿</div>
-                  <div class="status-content">
-                    <div class="status-value">{{ formatSize(status.total_size) }}</div>
-                    <div class="status-label">总大小</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
-        </div>
-
-        <!-- 备份列表 -->
-        <div class="backup-list">
-          <div class="list-header">
-            <h3>备份记录</h3>
-            <div class="list-actions">
-              <el-button type="primary" @click="refreshBackups">刷新</el-button>
-              <el-button @click="exportBackupList">导出列表</el-button>
-            </div>
+  <div class="admin-page backup-manage">
+    <!-- 页面头部 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">
+            <el-icon :size="32"><DataAnalysis /></el-icon>
           </div>
-
-          <el-table 
-            :data="backupList" 
-            v-loading="loading"
-            style="width: 100%"
-            @selection-change="handleSelectionChange"
-          >
-            <el-table-column type="selection" width="55" />
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="filename" label="文件名" min-width="200" />
-            <el-table-column prop="file_size" label="文件大小" width="120">
-              <template #default="{ row }">
-                {{ formatSize(row.file_size) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="backup_time" label="备份时间" width="180">
-              <template #default="{ row }">
-                {{ formatTime(row.backup_time) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="backup_type" label="备份类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getBackupTypeTag(row.backup_type)">
-                  {{ getBackupTypeLabel(row.backup_type) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusTag(row.status)">
-                  {{ getStatusLabel(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="描述" min-width="200" />
-            <el-table-column label="操作" width="250" fixed="right">
-              <template #default="{ row }">
-                <el-button size="small" @click="viewBackup(row)">查看</el-button>
-                <el-button 
-                  size="small" 
-                  type="success" 
-                  @click="downloadBackup(row)"
-                  v-if="row.status === 'Success'"
-                >
-                  下载
-                </el-button>
-                <el-button 
-                  size="small" 
-                  type="warning" 
-                  @click="restoreBackup(row)"
-                  v-if="row.status === 'Success'"
-                >
-                  恢复
-                </el-button>
-                <el-button 
-                  size="small" 
-                  type="danger" 
-                  @click="deleteBackup(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 分页 -->
-          <div class="pagination-wrapper">
-            <el-pagination
-              v-model:current-page="currentPage"
-              v-model:page-size="pageSize"
-              :page-sizes="[10, 20, 50, 100]"
-              :total="total"
-              layout="total, sizes, prev, pager, next, jumper"
-              @size-change="handleSizeChange"
-              @current-change="handleCurrentChange"
-            />
+          <div class="header-info">
+            <h1 class="page-title">数据库备份管理</h1>
+            <p class="page-subtitle">管理系统数据库的备份、恢复和监控功能</p>
           </div>
         </div>
-
-        <!-- 批量操作 -->
-        <div class="batch-actions" v-if="selectedBackups.length > 0">
-          <el-button type="danger" @click="batchDelete">批量删除</el-button>
-          <el-button @click="batchDownload">批量下载</el-button>
-          <span class="selected-count">已选择 {{ selectedBackups.length }} 个备份</span>
+        <div class="header-actions">
+          <el-button type="primary" @click="createBackup" :loading="backupLoading">
+            <el-icon><Upload /></el-icon>
+            开始备份
+          </el-button>
+          <el-button @click="refreshData">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
         </div>
       </div>
-    </el-card>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="stats-section">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Folder /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ status.total_backups }}</div>
+            <div class="stat-label">总备份数</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Check /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ status.success_backups }}</div>
+            <div class="stat-label">成功备份</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Close /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ status.failed_backups }}</div>
+            <div class="stat-label">失败备份</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <el-icon :size="24"><Odometer /></el-icon>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ status.total_size | formatSize }}</div>
+            <div class="stat-label">存储空间</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 备份操作区域 -->
+    <div class="content-section backup-operations">
+      <h2 class="section-title">备份操作</h2>
+      <div class="operations-grid">
+        <el-card class="operation-card" shadow="hover">
+          <div class="operation-icon">
+            <el-icon :size="32"><Timer /></el-icon>
+          </div>
+          <h3>定时备份</h3>
+          <p>配置自动备份计划</p>
+          <div class="operation-control">
+            <el-switch
+              v-model="autoBackupEnabled"
+              active-text="已启用"
+              inactive-text="已禁用"
+              @change="toggleAutoBackup"
+            />
+          </div>
+          <div v-if="autoBackupEnabled" class="schedule-info">
+            <p>当前计划: {{ autoBackupSchedule }}</p>
+          </div>
+          <el-button type="success" @click="configureAutoBackup">
+            <el-icon><SetUp /></el-icon>
+            配置计划
+          </el-button>
+        </el-card>
+
+        <el-card class="operation-card" shadow="hover">
+          <div class="operation-icon">
+            <el-icon :size="32"><Download /></el-icon>
+          </div>
+          <h3>导出备份</h3>
+          <p>将备份导出到本地</p>
+          <el-button type="primary" @click="exportBackup">
+            <el-icon><Download /></el-icon>
+            导出备份
+          </el-button>
+        </el-card>
+
+        <el-card class="operation-card" shadow="hover">
+          <div class="operation-icon">
+            <el-icon :size="32"><Upload /></el-icon>
+          </div>
+          <h3>导入备份</h3>
+          <p>从本地导入备份文件</p>
+          <el-button type="warning" @click="importBackup">
+            <el-icon><Upload /></el-icon>
+            导入备份
+          </el-button>
+        </el-card>
+
+        <el-card class="operation-card" shadow="hover">
+          <div class="operation-icon">
+            <el-icon :size="32"><Delete /></el-icon>
+          </div>
+          <h3>清理备份</h3>
+          <p>删除过期或不必要的备份</p>
+          <el-button type="danger" @click="cleanupBackups">
+            <el-icon><Delete /></el-icon>
+            清理备份
+          </el-button>
+        </el-card>
+      </div>
+    </div>
+
+    <!-- 备份列表 -->
+    <div class="table-section">
+      <h2 class="section-title">备份记录</h2>
+      <el-table 
+        :data="backupList" 
+        v-loading="loading"
+        style="width: 100%"
+        :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+        :row-style="{ background: 'var(--bg-card)' }"
+        border
+        stripe
+      >
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="filename" label="文件名" min-width="200" />
+        <el-table-column prop="type" label="类型" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getBackupTypeTag(row.type)">
+              {{ getBackupTypeLabel(row.type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="size" label="大小" width="120">
+          <template #default="{ row }">
+            {{ formatSize(row.size) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getStatusTag(row.status)">
+              {{ getStatusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="250" fixed="right">
+          <template #default="{ row }">
+            <el-button 
+              size="small" 
+              type="primary" 
+              @click="downloadBackup(row)"
+              :disabled="row.status !== 'Success'"
+            >
+              <el-icon><Download /></el-icon>
+              下载
+            </el-button>
+            <el-button 
+              size="small" 
+              type="warning" 
+              @click="restoreBackup(row)"
+              :disabled="row.status !== 'Success'"
+            >
+              <el-icon><RefreshRight /></el-icon>
+              恢复
+            </el-button>
+            <el-button size="small" type="danger" @click="deleteBackup(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-section">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </div>
+
+    <!-- 批量操作 -->
+    <div class="batch-actions" v-if="selectedBackups.length > 0">
+      <el-button type="danger" @click="batchDelete">批量删除</el-button>
+      <el-button @click="batchDownload">批量下载</el-button>
+      <span class="selected-count">已选择 {{ selectedBackups.length }} 个备份</span>
+    </div>
 
     <!-- 备份详情对话框 -->
     <el-dialog 
@@ -302,6 +317,20 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { 
+  DataAnalysis, 
+  Folder, 
+  Check, 
+  Close, 
+  Odometer, 
+  Timer, 
+  Upload, 
+  Download, 
+  Delete, 
+  Refresh, 
+  RefreshRight, 
+  SetUp
+} from '@element-plus/icons-vue'
 import { 
   getBackupRecords, 
   createBackup as createBackupApi,
@@ -742,5 +771,68 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
   font-size: 14px;
+}
+
+/* 备份管理页特定样式 */
+.operations-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.operation-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.operation-icon {
+  margin-bottom: 15px;
+  color: var(--brand-color);
+}
+
+.operation-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.operation-card p {
+  margin: 0 0 15px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.operation-control {
+  margin: 15px 0;
+}
+
+.schedule-info {
+  margin-bottom: 15px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--text-primary);
+}
+
+@media (max-width: 1200px) {
+  .operations-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .operations-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style> 

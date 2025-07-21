@@ -12,6 +12,7 @@ import './assets/base.css'
 import './assets/global.css'
 import './assets/element-plus-dark.css'
 import './assets/theme-variables.css'
+import './assets/admin-common.css' // 导入管理页面通用样式
 
 // 导入主应用组件
 import App from './App.vue'

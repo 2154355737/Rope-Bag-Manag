@@ -116,8 +116,11 @@
         <div class="content-right">
           <div class="notice-card">
             <h3 class="notice-title">社区公告</h3>
-            <ul class="notice-list">
-              <li v-for="item in notices" :key="item.id">
+            <div v-if="notices.length === 0" class="empty-notice">
+              <p>暂无公告信息</p>
+            </div>
+            <ul v-else class="notice-list">
+              <li v-for="item in notices" :key="item.id" class="notice-item">
                 {{ item.text }}
               </li>
             </ul>
@@ -391,6 +394,7 @@ import { getUserInfo } from '@/utils/auth'
 import { formatDate, formatFileSize } from '@/utils/format'
 import { packageApi, type Package } from '@/api/packages'
 import { categoryApi, type Category } from '@/api/categories'
+import { getActiveAnnouncements, type Announcement } from '@/api/announcements'
 
 const router = useRouter()
 
@@ -412,12 +416,32 @@ const totalUsers = ref(0)
 const totalLikes = ref(0)
 
 // 公告数据
-const notices = ref([
-  { id: 1, text: '欢迎来到资源社区！' },
-  { id: 2, text: '请遵守社区规范，文明发言。' },
-  { id: 3, text: '资源上传请确保无版权争议。' },
-  { id: 4, text: '如遇问题请联系管理员。' },
-])
+const notices = ref<{ id: number, text: string }[]>([])
+
+// 获取公告数据
+const fetchAnnouncements = async () => {
+  try {
+    const res = await getActiveAnnouncements()
+    if (res.code === 0 && res.data) {
+      notices.value = res.data.map(announcement => ({
+        id: announcement.id,
+        text: announcement.title + ': ' + announcement.content
+      }))
+    } else {
+      console.error('获取公告失败:', res.message)
+      // 设置默认公告
+      notices.value = [
+        { id: 1, text: '欢迎来到资源社区！' },
+        { id: 2, text: '请遵守社区规范，文明发言。' },
+        { id: 3, text: '资源上传请确保无版权争议。' },
+      ]
+    }
+  } catch (error) {
+    console.error('加载公告出错:', error)
+    // 设置默认公告
+    notices.value = [{ id: 0, text: '欢迎来到资源社区！请遵守社区规范，文明发言。' }]
+  }
+}
 
 // 分类数据
 const categories = ref<Category[]>([])
@@ -583,7 +607,7 @@ const handleCurrentChange = (page) => {
 }
 
 const viewResource = (id: number) => {
-  router.push(`/community/resource/${id}`)
+  router.push(`/resource/${id}`)
 }
 
 const downloadResource = async (id: number) => {
@@ -746,6 +770,7 @@ const loadCategories = async () => {
 onMounted(async () => {
   await loadCategories()
   await loadResources()
+  await fetchAnnouncements()
 })
 </script>
 
@@ -1132,6 +1157,23 @@ onMounted(async () => {
 
 .notice-list li:last-child {
   border-bottom: none;
+}
+
+.empty-notice {
+  padding: 20px 0;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.notice-item {
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.notice-item:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+  padding-left: 8px;
 }
 
 /* 上传对话框 */
