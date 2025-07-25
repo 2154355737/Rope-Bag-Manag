@@ -486,13 +486,6 @@ function viewAnnouncement(announcement: any) {
   detailDialogVisible.value = true
 }
 
-function toChinaTime(dateStr: string) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr.replace(/-/g, '/'))
-  d.setHours(d.getHours() + 8)
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`
-}
-
 async function saveAnnouncement() {
   if (!formRef.value) return
 
@@ -500,14 +493,8 @@ async function saveAnnouncement() {
     await formRef.value.validate()
     saving.value = true
 
-    // 修正时间为中国时区（东八区）字符串
+    // 直接用表单时间，不做任何时区转换
     const formToSave = { ...announcementForm }
-    if (formToSave.start_time) {
-      formToSave.start_time = toChinaTime(formToSave.start_time)
-    }
-    if (formToSave.end_time) {
-      formToSave.end_time = toChinaTime(formToSave.end_time)
-    }
 
     const response = isEdit.value 
       ? await updateAnnouncement(formToSave.id, formToSave)

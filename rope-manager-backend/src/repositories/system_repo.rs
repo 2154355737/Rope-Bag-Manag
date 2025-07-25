@@ -5,6 +5,7 @@ use anyhow::Result;
 use chrono::Utc;
 use uuid::Uuid;
 use std::collections::HashMap;
+use chrono::Local;
 
 // 导入所需模型
 use crate::models::user_action::UserAction;
@@ -773,81 +774,35 @@ impl SystemRepository {
     // 新增方法：获取公告
     pub async fn get_announcements(&self) -> Result<Vec<crate::services::admin_service::Announcement>> {
         let conn = self.conn.lock().await;
-        
-        // 首先检查表结构
-        let mut _has_type = false;
-        let mut _has_enabled = false;
-        let mut _has_start_time = false;
-        let mut _has_end_time = false;
-        
-        let _ = conn.query_row("PRAGMA table_info(announcements)", [], |_| Ok(()))?;
-        
-        // 获取表的列信息
-        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
-        let cols = stmt.query_map([], |row| {
-            let name: String = row.get(1)?;
-            Ok(name)
-        })?;
-        
-        // 检查列是否存在
-        for col_result in cols {
-            if let Ok(col_name) = col_result {
-                if col_name == "type" {
-                    _has_type = true;
-                } else if col_name == "enabled" {
-                    _has_enabled = true;
-                } else if col_name == "start_time" {
-                    _has_start_time = true;
-                } else if col_name == "end_time" {
-                    _has_end_time = true;
-                }
-            }
-        }
-        
-        // 使用动态SQL，根据实际存在的列构建查询
-        let sql = format!(
-            "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at FROM announcements ORDER BY priority DESC, created_at DESC",
-            if _has_type { "type," } else { "'' as type," },
-            if _has_enabled { "enabled," } else { "1 as enabled," },
-            if _has_start_time { "start_time," } else { "created_at as start_time," },
-            if _has_end_time { "end_time," } else { "NULL as end_time," }
-        );
-        
-        let mut stmt = conn.prepare(&sql)?;
-
+        let sql = "SELECT id, title, content, priority, start_time, end_time FROM announcements ORDER BY priority DESC";
+        let mut stmt = conn.prepare(sql)?;
         let announcements = stmt.query_map([], |row| {
             let id: i32 = row.get(0)?;
             let title: String = row.get(1)?;
             let content: String = row.get(2)?;
-            let type_: String = row.get(3).unwrap_or_else(|_| "Info".to_string());
-            let priority: i32 = row.get(4)?;
-            let enabled: bool = row.get(5).unwrap_or(true);
-            let start_time: String = row.get(6).unwrap_or_else(|_| chrono::Utc::now().to_rfc3339());
-            let end_time: Option<String> = row.get(7).ok();
-            let created_at: String = row.get(8)?;
-            let updated_at: String = row.get(9)?;
-            
+            let priority: i32 = row.get(3)?;
+            let start_time: String = row.get(4)?;
+            let end_time: Option<String> = row.get(5).ok();
             Ok(crate::services::admin_service::Announcement {
                 id,
                 title,
                 content,
-                type_,
+                type_: String::new(),
                 priority,
-                enabled,
+                enabled: true,
                 start_time,
                 end_time,
-                created_at,
-                updated_at
+                created_at: String::new(),
+                updated_at: String::new(),
             })
         })?
         .filter_map(|result| result.ok())
         .collect::<Vec<_>>();
-
         Ok(announcements)
     }
 
     // 新增方法：创建公告
-    pub async fn create_announcement(&self, title: &str, content: &str, priority: i32) -> Result<crate::services::admin_service::Announcement> {
+    pub async fn create_announcement(&self, title: &str, content: &str, priority: i32, start_time: &str, end_time: Option<&str>) -> Result<crate::services::admin_service::Announcement> {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
@@ -882,46 +837,12 @@ impl SystemRepository {
         let type_ = "Info";
         let enabled = true;
         let now = chrono::Utc::now().to_rfc3339();
-        let start_time = now.clone();
-        let end_time: Option<String> = None;
+        let start_time_str = start_time.to_string();
+        let end_time_opt = end_time.map(|s| s.to_string());
         
         // 构建适合当前表结构的INSERT语句
-        let mut sql = String::from("INSERT INTO announcements (title, content");
-        let mut values = String::from("?, ?");
-        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content];
-        
-        if _has_type {
-            sql.push_str(", type");
-            values.push_str(", ?");
-            params.push(&type_);
-        }
-        
-        sql.push_str(", priority");
-        values.push_str(", ?");
-        params.push(&priority);
-        
-        if _has_enabled {
-            sql.push_str(", enabled");
-            values.push_str(", ?");
-            params.push(&enabled);
-        }
-        
-        if _has_start_time {
-            sql.push_str(", start_time");
-            values.push_str(", ?");
-            params.push(&start_time);
-        }
-        
-        if _has_end_time {
-            sql.push_str(", end_time");
-            values.push_str(", ?");
-            params.push(&None::<String>);
-        }
-        
-        sql.push_str(", created_at, updated_at) VALUES (");
-        values.push_str(", datetime('now'), datetime('now'))");
-        
-        sql.push_str(&values);
+        let mut sql = String::from("INSERT INTO announcements (title, content, priority, start_time, end_time) VALUES (?, ?, ?, ?, ?)");
+        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority, &start_time_str, &end_time_opt];
         
         conn.execute(&sql, params.as_slice())?;
 
@@ -934,15 +855,15 @@ impl SystemRepository {
             type_: type_.to_string(),
             priority,
             enabled,
-            start_time,
-            end_time,
-            created_at: now.clone(),
-            updated_at: now,
+            start_time: start_time_str,
+            end_time: end_time_opt,
+            created_at: String::new(),
+            updated_at: String::new(),
         })
     }
 
     // 新增方法：更新公告
-    pub async fn update_announcement(&self, id: i32, title: &str, content: &str, priority: i32) -> Result<()> {
+    pub async fn update_announcement(&self, id: i32, title: &str, content: &str, priority: i32, start_time: &str, end_time: Option<&str>) -> Result<()> {
         let conn = self.conn.lock().await;
         
         // 首先检查表结构
@@ -974,11 +895,9 @@ impl SystemRepository {
         }
         
         // 构建UPDATE语句
-        let mut sql = String::from("UPDATE announcements SET title = ?, content = ?, priority = ?");
-        let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority];
-        
-        sql.push_str(", updated_at = datetime('now') WHERE id = ?");
-        params.push(&id);
+        let mut sql = String::from("UPDATE announcements SET title = ?, content = ?, priority = ?, start_time = ?, end_time = ? WHERE id = ?");
+        let end_time_str = end_time.unwrap_or("");
+        let params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority, &start_time, &end_time_str, &id];
         
         conn.execute(&sql, params.as_slice())?;
 
@@ -1118,103 +1037,34 @@ impl SystemRepository {
         Ok(deleted as usize)
     }
 
-    // 获取当前有效的公告
+    // 查询有效公告
     pub async fn get_active_announcements(&self) -> Result<Vec<crate::services::admin_service::Announcement>> {
         let conn = self.conn.lock().await;
-        
-        // 首先检查表结构
-        let mut _has_type = false;
-        let mut _has_enabled = false;
-        let mut _has_start_time = false;
-        let mut _has_end_time = false;
-        
-        // 获取表的列信息
-        let mut stmt = conn.prepare("PRAGMA table_info(announcements)")?;
-        let cols = stmt.query_map([], |row| {
-            let name: String = row.get(1)?;
-            Ok(name)
-        })?;
-        
-        // 检查列是否存在
-        for col_result in cols {
-            if let Ok(col_name) = col_result {
-                if col_name == "type" {
-                    _has_type = true;
-                } else if col_name == "enabled" {
-                    _has_enabled = true;
-                } else if col_name == "start_time" {
-                    _has_start_time = true;
-                } else if col_name == "end_time" {
-                    _has_end_time = true;
-                }
-            }
-        }
-        
-        let now = chrono::Utc::now().to_rfc3339();
-        
-        // 使用动态SQL，根据实际存在的列构建查询
-        let mut conditions = Vec::new();
-        
-        if _has_enabled {
-            conditions.push("enabled = 1".to_string());
-        }
-        
-        if _has_start_time {
-            conditions.push(format!("start_time <= '{}'", now));
-        }
-        
-        if _has_end_time {
-            conditions.push(format!("(end_time IS NULL OR end_time > '{}')", now));
-        }
-        
-        let where_clause = if !conditions.is_empty() {
-            format!("WHERE {}", conditions.join(" AND "))
-        } else {
-            String::new()
-        };
-        
-        let sql = format!(
-            "SELECT id, title, content, {} priority, {} {} {} created_at, updated_at 
-             FROM announcements 
-             {} 
-             ORDER BY priority DESC",
-            if _has_type { "type," } else { "'' as type," },
-            if _has_enabled { "enabled," } else { "1 as enabled," },
-            if _has_start_time { "start_time," } else { "created_at as start_time," },
-            if _has_end_time { "end_time," } else { "NULL as end_time," },
-            where_clause
-        );
-        
-        let mut stmt = conn.prepare(&sql)?;
-        
-        let announcements = stmt.query_map([], |row| {
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+        let sql = "SELECT id, title, content, priority, start_time, end_time FROM announcements WHERE start_time <= ? AND (end_time IS NULL OR end_time > ?) ORDER BY priority DESC";
+        let mut stmt = conn.prepare(sql)?;
+        let announcements = stmt.query_map([&now, &now], |row| {
             let id: i32 = row.get(0)?;
             let title: String = row.get(1)?;
             let content: String = row.get(2)?;
-            let type_: String = row.get(3).unwrap_or_else(|_| "Info".to_string());
-            let priority: i32 = row.get(4)?;
-            let enabled: bool = row.get(5).unwrap_or(true);
-            let start_time: String = row.get(6).unwrap_or_else(|_| chrono::Utc::now().to_rfc3339());
-            let end_time: Option<String> = row.get(7).ok();
-            let created_at: String = row.get(8)?;
-            let updated_at: String = row.get(9)?;
-            
+            let priority: i32 = row.get(3)?;
+            let start_time: String = row.get(4)?;
+            let end_time: Option<String> = row.get(5).ok();
             Ok(crate::services::admin_service::Announcement {
                 id,
                 title,
                 content,
-                type_,
+                type_: String::new(),
                 priority,
-                enabled,
+                enabled: true,
                 start_time,
                 end_time,
-                created_at,
-                updated_at
+                created_at: String::new(),
+                updated_at: String::new(),
             })
         })?
         .filter_map(|result| result.ok())
         .collect::<Vec<_>>();
-        
         Ok(announcements)
     }
 

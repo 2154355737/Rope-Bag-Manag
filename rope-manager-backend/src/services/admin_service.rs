@@ -100,8 +100,9 @@ impl AdminService {
         let title = data["title"].as_str().unwrap_or("").to_string();
         let content = data["content"].as_str().unwrap_or("").to_string();
         let priority = data["priority"].as_i64().unwrap_or(1);
-        
-        self.system_repo.create_announcement(&title, &content, priority as i32).await
+        let start_time = data["start_time"].as_str().unwrap_or("").to_string();
+        let end_time = data["end_time"].as_str().map(|s| s.to_string());
+        self.system_repo.create_announcement(&title, &content, priority as i32, &start_time, end_time.as_deref()).await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -110,8 +111,9 @@ impl AdminService {
         let title = data["title"].as_str().unwrap_or("").to_string();
         let content = data["content"].as_str().unwrap_or("").to_string();
         let priority = data["priority"].as_i64().unwrap_or(1);
-        
-        self.system_repo.update_announcement(id, &title, &content, priority as i32).await
+        let start_time = data["start_time"].as_str().unwrap_or("").to_string();
+        let end_time = data["end_time"].as_str().map(|s| s.to_string());
+        self.system_repo.update_announcement(id, &title, &content, priority as i32, &start_time, end_time.as_deref()).await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
