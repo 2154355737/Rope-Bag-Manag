@@ -6,7 +6,8 @@ import userActionService from './userActionService'
 /// <reference types="vite/client" />
 
 // API配置
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:15201'
+// 生产环境建议通过 .env.production 设置 VITE_API_BASE_URL=/api
+const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api'
 
 // 创建axios实例
 const apiClient: AxiosInstance = axios.create({
@@ -440,9 +441,10 @@ apiClient.interceptors.response.use(
 
 // API响应类型
 export interface ApiResponse<T = any> {
-  code: number
-  message: string
-  data?: T
+  code: number;
+  message?: string;
+  msg?: string;
+  data?: T;
 }
 
 // 通用API方法

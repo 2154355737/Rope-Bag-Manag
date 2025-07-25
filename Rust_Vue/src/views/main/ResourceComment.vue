@@ -242,7 +242,7 @@ const submitComment = async () => {
       content: commentForm.content.trim(),
       target_id: resourceId.value,
       target_type: 'package',
-      parent_id: commentForm.parentId
+      parent_id: commentForm.parentId ?? undefined
     })
     
     if (res.code === 0) {

@@ -624,7 +624,7 @@ async function addUser() {
 }
 
 function getRoleTag(role: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Normal: 'info',
     Developer: 'warning',
     Elder: 'success'
@@ -633,7 +633,7 @@ function getRoleTag(role: string): string {
 }
 
 function getRoleLabel(role: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Normal: '普通用户',
     Developer: '开发者',
     Elder: '元老'
@@ -642,7 +642,7 @@ function getRoleLabel(role: string): string {
 }
 
 function getStatusTag(status: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Normal: 'success',
     Banned: 'danger'
   }
@@ -650,7 +650,7 @@ function getStatusTag(status: string): string {
 }
 
 function getStatusLabel(status: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Normal: '正常',
     Banned: '封禁'
   }

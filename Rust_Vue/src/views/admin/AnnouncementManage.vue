@@ -457,7 +457,7 @@ async function loadAnnouncements() {
       size: pageSize.value
     }
     const response = await getAnnouncements(params)
-    if (response.code === 0) {
+    if (response && response.code === 0) {
       announcementList.value = response.data.list || []
       total.value = response.data.total || 0
     }
@@ -497,15 +497,15 @@ async function saveAnnouncement() {
     const formToSave = { ...announcementForm }
 
     const response = isEdit.value 
-      ? await updateAnnouncement(formToSave.id, formToSave)
+      ? formToSave.id !== null ? await updateAnnouncement(formToSave.id, formToSave) : undefined
       : await createAnnouncementApi(formToSave)
 
-    if (response.code === 0) {
+    if (response && response.code === 0) {
       ElMessage.success(isEdit.value ? '公告更新成功' : '公告发布成功')
       announcementDialogVisible.value = false
       loadAnnouncements()
     } else {
-      ElMessage.error(response.message || '操作失败')
+      ElMessage.error(response?.message || '操作失败')
     }
   } catch (error) {
     console.error('保存公告失败:', error)
@@ -566,7 +566,7 @@ async function batchEnable() {
     ElMessage.success('批量启用成功')
     loadAnnouncements()
     } else {
-      ElMessage.error(response.message || '操作失败')
+      ElMessage.error(response?.message || '操作失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -590,7 +590,7 @@ async function batchDisable() {
     ElMessage.success('批量禁用成功')
     loadAnnouncements()
     } else {
-      ElMessage.error(response.message || '操作失败')
+      ElMessage.error(response?.message || '操作失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -614,7 +614,7 @@ async function batchDelete() {
     ElMessage.success('批量删除成功')
     loadAnnouncements()
     } else {
-      ElMessage.error(response.message || '删除失败')
+      ElMessage.error(response?.message || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -650,7 +650,7 @@ function resetForm() {
 }
 
 function getTypeTag(type: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Info: 'info',
     Warning: 'warning',
     Error: 'danger',
@@ -660,7 +660,7 @@ function getTypeTag(type: string): string {
 }
 
 function getTypeLabel(type: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Info: '信息',
     Warning: '警告',
     Error: '错误',

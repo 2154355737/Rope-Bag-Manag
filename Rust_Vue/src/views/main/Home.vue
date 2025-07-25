@@ -211,7 +211,7 @@
                       </span>
                       <span class="meta-item">
                         <el-icon><Calendar /></el-icon>
-                        {{ formatDate(resource.created_at) }}
+                        {{ formatDateUtil(resource.created_at) }}
                       </span>
                     </div>
                     <div class="resource-actions">
@@ -389,9 +389,9 @@ import {
 import type { FormInstance, UploadFile } from 'element-plus'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { communityApi } from '@/api/community'
-import type { Resource, UploadForm } from '../../../types'
+import type { Resource, UploadForm } from '@/types'
 import { getUserInfo } from '@/utils/auth'
-import { formatDate, formatFileSize } from '@/utils/format'
+import { formatDate as formatDateUtil, formatFileSize } from '@/utils/format'
 import { packageApi, type Package } from '@/api/packages'
 import { categoryApi, type Category } from '@/api/categories'
 import { getActiveAnnouncements, type Announcement } from '@/api/announcements'
@@ -434,7 +434,7 @@ const fetchAnnouncements = async () => {
         }))
       } else if (res.data.list && Array.isArray(res.data.list)) {
         // 如果是 {list: []} 格式
-        notices.value = res.data.list.map(announcement => ({
+        notices.value = res.data.list.map((announcement: any) => ({
           id: announcement.id,
           text: announcement.title + ': ' + announcement.content
         }))
@@ -519,7 +519,7 @@ const filteredResources = computed(() => {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(resource =>
       resource.name.toLowerCase().includes(query) ||
-      resource.description.toLowerCase().includes(query) ||
+      resource.description?.toLowerCase().includes(query) ||
       resource.author.toLowerCase().includes(query)
     )
   }
@@ -611,13 +611,13 @@ const handleFilterChange = () => {
   // 如果后端支持按资源类型筛选，可以在这里重新请求数据
 }
 
-const handleSizeChange = (size) => {
+const handleSizeChange = (size: any) => {
   pageSize.value = size
   currentPage.value = 1 // 重置页码
   loadResources()
 }
 
-const handleCurrentChange = (page) => {
+const handleCurrentChange = (page: any) => {
   currentPage.value = page
   loadResources()
 }
@@ -670,8 +670,8 @@ const getCategoryLabel = (categoryId: number | null) => {
   return category ? category.name : '未分类'
 }
 
-const getCategoryColor = (categoryId: number) => {
-  const colorMap = {
+const getCategoryColor = (categoryId: any) => {
+  const colorMap: { [key: string]: string } = {
     1: '#409EFF', // 蓝色
     2: '#67C23A', // 绿色
     3: '#E6A23C', // 黄色

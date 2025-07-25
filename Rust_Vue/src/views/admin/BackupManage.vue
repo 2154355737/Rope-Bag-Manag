@@ -60,7 +60,7 @@
             <el-icon :size="24"><Odometer /></el-icon>
           </div>
           <div class="stat-content">
-            <div class="stat-number">{{ status.total_size | formatSize }}</div>
+            <div class="stat-number">{{ formatSize(Number(status.total_size)) }}</div>
             <div class="stat-label">存储空间</div>
           </div>
         </div>
@@ -368,6 +368,14 @@ const autoBackupConfig = reactive({
   max_backup_files: 10
 })
 
+const refreshData = () => {};
+const autoBackupEnabled = ref(false);
+const toggleAutoBackup = () => {};
+const autoBackupSchedule = ref('');
+const exportBackup = () => {};
+const importBackup = () => {};
+const cleanupBackups = () => {};
+
 // 方法
 async function loadBackups() {
   loading.value = true
@@ -544,7 +552,7 @@ function saveAutoBackupConfig() {
 }
 
 function getBackupTypeTag(type: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Auto: 'primary',
     Manual: 'success',
     Scheduled: 'warning'
@@ -553,7 +561,7 @@ function getBackupTypeTag(type: string): string {
 }
 
 function getBackupTypeLabel(type: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Auto: '自动备份',
     Manual: '手动备份',
     Scheduled: '定时备份'
@@ -562,7 +570,7 @@ function getBackupTypeLabel(type: string): string {
 }
 
 function getStatusTag(status: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Success: 'success',
     Failed: 'danger',
     InProgress: 'warning'
@@ -571,7 +579,7 @@ function getStatusTag(status: string): string {
 }
 
 function getStatusLabel(status: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Success: '成功',
     Failed: '失败',
     InProgress: '进行中'

@@ -336,7 +336,7 @@ const pageSize = ref(10)
 const selectedComments = ref<Comment[]>([])
 
 // 筛选表单
-const filterForm = reactive({
+const filterForm = reactive<{ [key: string]: any}>({
   status: '',
   target_type: '',
   user_id: '',
@@ -630,16 +630,16 @@ async function submitAddComment() {
 }
 
 function getTargetTypeTag(type: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Package: 'primary',
     User: 'success',
-    System: 'warning'
+    System: 'info'
   }
   return tags[type] || 'info'
 }
 
 function getTargetTypeLabel(type: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Package: '绳包',
     User: '用户',
     System: '系统'
@@ -648,7 +648,7 @@ function getTargetTypeLabel(type: string): string {
 }
 
 function getStatusTag(status: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Active: 'success',
     Hidden: 'warning',
     Deleted: 'danger'
@@ -657,7 +657,7 @@ function getStatusTag(status: string): string {
 }
 
 function getStatusLabel(status: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Active: '正常',
     Hidden: '隐藏',
     Deleted: '已删除'

@@ -21,7 +21,7 @@ export function useApiState<T>() {
     try {
       const response = await apiCall()
       if (response.code === 0) {
-        state.data = response.data || null
+        state.data = (response.data || null) as any
       } else {
         state.error = response.msg || '请求失败'
       }

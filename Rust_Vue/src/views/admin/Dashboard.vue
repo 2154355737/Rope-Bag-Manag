@@ -404,7 +404,7 @@ async function checkSystemHealth() {
         
         // 计算系统运行时间
         const startTime = new Date(healthRes.data.timestamp)
-        startTime.setSeconds(startTime.getSeconds() - healthRes.data.uptime)
+        startTime.setSeconds(startTime.getSeconds() - ((healthRes.data as any)?.uptime ?? 0))
         const now = new Date()
         const diff = Math.floor((now.getTime() - startTime.getTime()) / 1000)
         
@@ -632,6 +632,8 @@ onMounted(() => {
     loadDashboardData();
   }, 30000); // 30秒刷新一次
 });
+
+function updateUptime() {}
 </script>
 
 <style scoped>

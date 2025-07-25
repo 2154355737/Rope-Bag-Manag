@@ -47,9 +47,7 @@ export const logsApi = {
     if (params?.start_date) queryParams.append('start_date', params.start_date)
     if (params?.end_date) queryParams.append('end_date', params.end_date)
 
-    return api.get(`/api/v1/admin/logs/export?${queryParams.toString()}`, {
-      responseType: 'blob'
-    })
+    return api.get(`/api/v1/admin/logs/export?${queryParams.toString()}`, { responseType: 'blob' }) as unknown as Promise<Blob>;
   },
   
   // 清除日志（可选实现）
@@ -58,5 +56,10 @@ export const logsApi = {
     before_date?: string
   }): Promise<ApiResponse<{ deleted_count: number }>> => {
     return api.post('/api/v1/admin/logs/clear', params || {})
+  },
+
+  // 删除单条日志（补充实现，防止类型报错）
+  deleteLog: (id: number): Promise<ApiResponse<any>> => {
+    return api.delete(`/api/v1/admin/logs/${id}`)
   }
 } 

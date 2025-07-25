@@ -59,7 +59,7 @@ export const sessionTracker = {
    * 跟踪标签页可见性
    */
   trackTabVisibility() {
-    let hidden: string, visibilityChange: string
+    let hidden: string, visibilityChange: string = '';
     
     // 不同浏览器的属性兼容
     if (typeof document.hidden !== 'undefined') {
@@ -80,7 +80,7 @@ export const sessionTracker = {
       
       // 只记录已登录用户
       if (username !== '访客') {
-        if (document[hidden as any]) {
+        if (document[hidden as keyof Document]) {
           // 标签页不可见
           userActionService.logAction(
             'TabHidden', 
@@ -100,7 +100,9 @@ export const sessionTracker = {
       }
     }
     
-    document.addEventListener(visibilityChange, handleVisibilityChange, false)
+    if (typeof visibilityChange === 'string') {
+      document.addEventListener(visibilityChange, handleVisibilityChange, false)
+    }
   },
   
   /**

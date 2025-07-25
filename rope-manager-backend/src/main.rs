@@ -126,6 +126,7 @@ async fn main() -> std::io::Result<()> {
                         actix_web::http::header::AUTHORIZATION,
                         actix_web::http::header::CONTENT_TYPE,
                         actix_web::http::header::ACCEPT,
+                        
                     ])
                     .max_age(3600)
             )

@@ -150,9 +150,10 @@ import { healthCheck, authApi, userApi, adminApi, packageApi } from '../../api'
 
 // 状态管理
 const connectionStatus = reactive({
-  title: '未连接',
-  type: 'warning' as const,
-  description: '点击"测试连接"按钮检查后端服务状态'
+  type: '' as string,
+  message: '',
+  title: '',
+  description: ''
 })
 
 // 加载状态
@@ -165,12 +166,12 @@ const actionsLoading = ref(false)
 const batchLoading = ref(false)
 
 // 测试结果
-const authResult = ref(null)
-const usersResult = ref(null)
-const statsResult = ref(null)
-const packagesResult = ref(null)
-const logsResult = ref(null)
-const actionsResult = ref(null)
+const authResult = ref<any>(null)
+const usersResult = ref<any>(null)
+const statsResult = ref<any>(null)
+const packagesResult = ref<any>(null)
+const logsResult = ref<any>(null)
+const actionsResult = ref<any>(null)
 const batchResults = ref<Array<{name: string, success: boolean, message: string}>>([])
 
 // 测试连接
@@ -189,6 +190,7 @@ async function testConnection() {
       ElMessage.error('后端连接失败')
     }
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
     connectionStatus.title = '连接失败'
     connectionStatus.type = 'error'
     connectionStatus.description = '无法连接到后端服务，请检查服务是否启动'
@@ -207,7 +209,8 @@ async function testAuth() {
     authResult.value = response
     ElMessage.success('认证测试成功')
   } catch (error) {
-    authResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    authResult.value = { error: errorMsg }
     ElMessage.error('认证测试失败')
   } finally {
     authLoading.value = false
@@ -222,7 +225,8 @@ async function testUsers() {
     usersResult.value = response
     ElMessage.success('用户管理测试成功')
   } catch (error) {
-    usersResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    usersResult.value = { error: errorMsg }
     ElMessage.error('用户管理测试失败')
   } finally {
     usersLoading.value = false
@@ -237,7 +241,8 @@ async function testStats() {
     statsResult.value = response
     ElMessage.success('统计信息测试成功')
   } catch (error) {
-    statsResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    statsResult.value = { error: errorMsg }
     ElMessage.error('统计信息测试失败')
   } finally {
     statsLoading.value = false
@@ -252,7 +257,8 @@ async function testPackages() {
     packagesResult.value = response
     ElMessage.success('绳包管理测试成功')
   } catch (error) {
-    packagesResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    packagesResult.value = { error: errorMsg }
     ElMessage.error('绳包管理测试失败')
   } finally {
     packagesLoading.value = false
@@ -267,7 +273,8 @@ async function testLogs() {
     logsResult.value = response
     ElMessage.success('系统日志测试成功')
   } catch (error) {
-    logsResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    logsResult.value = { error: errorMsg }
     ElMessage.error('系统日志测试失败')
   } finally {
     logsLoading.value = false
@@ -282,7 +289,8 @@ async function testUserActions() {
     actionsResult.value = response
     ElMessage.success('用户行为测试成功')
   } catch (error) {
-    actionsResult.value = { error: error.message }
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    actionsResult.value = { error: errorMsg }
     ElMessage.error('用户行为测试失败')
   } finally {
     actionsLoading.value = false
@@ -313,10 +321,11 @@ async function runAllTests() {
         message: '测试通过'
       })
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
       batchResults.value.push({
         name: test.name,
         success: false,
-        message: error.message || '测试失败'
+        message: errorMsg || '测试失败'
       })
     }
   }

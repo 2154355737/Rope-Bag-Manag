@@ -226,18 +226,9 @@ import { settingsApi } from '../../api/settings'
 const saving = ref(false)
 
 const settings = reactive({
-  theme: {
-    community_theme: 'light',
-    admin_theme: 'light'
-  },
+  theme: {} as { [key: string]: any },
   system_mode: 'Normal',
-  feature_flags: {
-    enable_registration: true,
-    enable_community: true,
-    enable_upload: true,
-    enable_comments: true,
-    enable_qq_binding: true
-  },
+  feature_flags: {} as { [key: string]: any },
   backend_config: {
     proxy_address: '',
     api_timeout: 30,
@@ -266,12 +257,13 @@ async function loadSettings() {
     // 加载主题设置
     const themeResponse = await settingsApi.getThemeSettings()
     if (themeResponse.code === 0 && themeResponse.data) {
-      const themeData = themeResponse.data
-      settings.theme.primary_color = themeData.primary_color
-      settings.theme.secondary_color = themeData.secondary_color
-      settings.theme.dark_mode = themeData.dark_mode
-      settings.theme.font_size = themeData.font_size
-      settings.theme.language = themeData.language
+      const themeData = reactive<{ [key: string]: any }>({})
+      themeData.primary_color = themeResponse.data.primary_color
+      themeData.secondary_color = themeResponse.data.secondary_color
+      themeData.dark_mode = themeResponse.data.dark_mode
+      themeData.font_size = themeResponse.data.font_size
+      themeData.language = themeResponse.data.language
+      settings.theme = themeData
     }
     
     // 加载系统模式

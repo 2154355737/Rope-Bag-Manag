@@ -378,10 +378,10 @@ const loadCategoryName = async (categoryId: number) => {
   categoryName.value = category ? category.name : '未分类'
 }
 
-const getCategoryColor = (categoryId: number | null) => {
+const getCategoryColor = (categoryId: any) => {
   if (!categoryId) return '#409EFF'
   
-  const colorMap = {
+  const colorMap: { [key: string]: string } = {
     1: '#409EFF', // 蓝色
     2: '#67C23A', // 绿色
     3: '#E6A23C', // 黄色
@@ -469,7 +469,7 @@ const submitComment = async () => {
       content: commentForm.content.trim(),
       target_id: resourceId.value,
       target_type: 'package',
-      parent_id: commentForm.parentId
+      parent_id: commentForm.parentId ?? undefined
     })
     
     if (res.code === 0) {

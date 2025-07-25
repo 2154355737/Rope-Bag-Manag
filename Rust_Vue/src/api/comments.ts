@@ -43,7 +43,7 @@ export const commentApi = {
   // 获取资源评论
   getPackageComments: (packageId: number, params?: { page?: number; size?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
     // 过滤掉空字符串参数
-    const cleanParams = { ...params }
+    const cleanParams: { [key: string]: any } = { ...params }
     Object.keys(cleanParams).forEach(key => {
       if (cleanParams[key] === '') {
         delete cleanParams[key]
@@ -54,7 +54,7 @@ export const commentApi = {
   // 获取用户评论
   getUserComments: (userId: number, params?: { page?: number; size?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
     // 过滤掉空字符串参数
-    const cleanParams = { ...params }
+    const cleanParams: { [key: string]: any } = { ...params }
     Object.keys(cleanParams).forEach(key => {
       if (cleanParams[key] === '') {
         delete cleanParams[key]

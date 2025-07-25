@@ -178,12 +178,12 @@ async function handleLogin() {
     
     if (response.code === 0) {
       // 登录成功
-      setToken(response.data.token)
+      setToken(response.data?.token ?? '')
       // 修正：写入loginTime字段
-      const userInfo = { ...response.data.user, loginTime: new Date().toISOString() }
+      const userInfo = { ...response.data?.user, loginTime: new Date().toISOString() }
       localStorage.setItem('userInfo', JSON.stringify(userInfo))
       localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('loginToken', response.data.token)
+      localStorage.setItem('loginToken', response.data?.token ?? '')
       
       // 记录用户登录行为
       userActionService.logLogin(loginForm.username, true)
@@ -191,9 +191,9 @@ async function handleLogin() {
       
       ElMessage.success('登录成功')
       // 跳转
-      if (response.data.user.role === 'admin') {
+      if (response.data?.user?.role === 'admin') {
         router.push('/admin')
-      } else if (response.data.user.role === 'elder') {
+      } else if (response.data?.user?.role === 'elder') {
         router.push('/elder')
       } else {
         router.push('/user')

@@ -711,7 +711,7 @@ function showAddPackageDialog() {
 }
 
 // 查看绳包详情
-const viewPackage = (row) => {
+const viewPackage = (row: any) => {
   selectedPackage.value = row
   detailDialogVisible.value = true
   
@@ -721,7 +721,7 @@ const viewPackage = (row) => {
 }
 
 // 下载绳包
-const downloadPackage = async (row) => {
+const downloadPackage = async (row: any) => {
   try {
     // 检查资源状态是否为正常
     if (row.status !== '正常' && row.status !== 'Active') {

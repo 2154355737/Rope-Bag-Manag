@@ -101,9 +101,9 @@ async function handleRegister() {
     })
     if (response.code === 0) {
       // 注册成功后自动登录
-      localStorage.setItem('userInfo', JSON.stringify(response.data.user))
+      localStorage.setItem('userInfo', JSON.stringify(response.data?.user))
       localStorage.setItem('isLoggedIn', 'true')
-      localStorage.setItem('loginToken', response.data.token)
+      localStorage.setItem('loginToken', response.data?.token ?? '')
       
       // 记录用户注册成功行为
       userActionService.logRegister(registerForm.username, true)

@@ -342,8 +342,8 @@ async function loadActions() {
     const data = response
     
     if (data.code === 0) {
-      actionsList.value = data.data.actions || []
-      total.value = data.data.total || 0
+      actionsList.value = data.data?.actions || []
+      total.value = data.data?.total || 0
       updateStats()
     } else {
       ElMessage.error(data.message || '加载行为记录失败')
@@ -443,23 +443,27 @@ async function batchDelete() {
 }
 
 function getActionTypeTag(actionType: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Login: 'success',
     Logout: 'info',
-    Register: 'warning',
-    Upload: 'primary',
-    Download: 'success',
+    Register: 'primary',
+    Upload: 'warning',
+    Download: 'danger',
     Comment: 'info',
-    Like: 'warning',
+    Like: 'success',
     Share: 'primary',
     Settings: 'info',
-    Admin: 'danger'
+    Admin: 'danger',
+    PageView: 'info',
+    View: 'primary',
+    Navigation: 'success',
+    BrowseCategory: 'warning'
   }
   return tags[actionType] || 'info'
 }
 
 function getActionTypeLabel(actionType: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Login: '登录',
     Logout: '登出',
     Register: '注册',
@@ -469,23 +473,10 @@ function getActionTypeLabel(actionType: string): string {
     Like: '点赞',
     Share: '分享',
     Settings: '设置',
-    Admin: '管理操作',
-    PageView: '页面访问',
+    Admin: '管理员',
+    PageView: '页面浏览',
     View: '查看',
-    Navigation: '页面导航',
-    Search: '搜索',
-    EditPackage: '编辑资源',
-    DeletePackage: '删除资源',
-    CreatePackage: '创建资源',
-    UpdatePackage: '更新资源',
-    UpdateProfile: '更新资料',
-    DeleteComment: '删除评论',
-    SessionStart: '会话开始',
-    SessionEnd: '会话结束',
-    TabHidden: '离开页面',
-    TabVisible: '回到页面',
-    UserIdle: '用户闲置',
-    UserActive: '用户活跃',
+    Navigation: '导航',
     BrowseCategory: '浏览分类'
   }
   return labels[actionType] || actionType

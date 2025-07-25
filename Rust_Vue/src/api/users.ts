@@ -66,7 +66,7 @@ export const userApi = {
 
   // 批量删除用户
   batchDeleteUsers: (usernames: string[]): Promise<ApiResponse<null>> => {
-    return api.delete('/api/v1/users/batch', { usernames })
+    return api.delete('/api/v1/users/batch', { data: { usernames } })
   },
 
   // 创建用户

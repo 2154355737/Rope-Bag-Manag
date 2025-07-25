@@ -569,7 +569,7 @@ function handleRefresh() {
 }
 
 function getResourceTypeLabel(type: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Package: '绳包',
     User: '用户',
     Category: '分类',
@@ -592,7 +592,7 @@ function getResourceTypeLabel(type: string): string {
 }
 
 function getResourceTypeTag(type: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Package: 'primary',
     User: 'success',
     Category: 'warning',
@@ -615,7 +615,7 @@ function getResourceTypeTag(type: string): string {
 }
 
 function getActionLabel(action: string): string {
-  const labels = {
+  const labels: { [key: string]: string } = {
     Create: '创建',
     Update: '更新',
     Delete: '删除',
@@ -641,7 +641,7 @@ function getActionLabel(action: string): string {
 }
 
 function getActionTag(action: string): string {
-  const tags = {
+  const tags: { [key: string]: string } = {
     Create: 'success',
     Update: 'warning',
     Delete: 'danger',
