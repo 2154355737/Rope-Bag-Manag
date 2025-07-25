@@ -1,4 +1,4 @@
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{web, HttpResponse, HttpRequest, Error};
 use serde_json::json;
 use crate::services::admin_service::AdminService;
 
@@ -655,16 +655,19 @@ async fn batch_delete_announcements(
 
 // 获取当前有效的公告
 async fn get_active_announcements(
-) -> Result<HttpResponse, actix_web::Error> {
-    // 这里应该直接调用系统仓库获取有效公告
-    // 暂时返回空数组作为示例
-    Ok(HttpResponse::Ok().json(json!({
-        "code": 0,
-        "message": "success",
-        "data": {
-            "list": []
-        }
-    })))
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, Error> {
+    match admin_service.get_active_announcements().await {
+        Ok(list) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": { "list": list }
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("获取公告失败: {}", e)
+        })))
+    }
 } 
 
 // 获取所有设置

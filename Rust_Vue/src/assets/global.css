@@ -88,3 +88,16 @@ html, body, #app {
     border-radius: 12px;
   }
 } 
+
+@media (max-width: 768px) {
+  .main,
+  main,
+  #app > div,
+  .content-wrapper {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+} 

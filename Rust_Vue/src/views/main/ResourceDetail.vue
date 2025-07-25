@@ -345,11 +345,16 @@ const loadComments = async () => {
       comments.value = res.data.list || []
       totalComments.value = res.data.total || 0
     } else {
-      ElMessage.error(res.message || '加载评论失败')
+      console.warn('加载评论返回错误:', res.message)
+      // 设置默认空评论状态
+      comments.value = []
+      totalComments.value = 0
     }
   } catch (error) {
     console.error('加载评论出错:', error)
-    ElMessage.error('加载评论时发生错误')
+    // 不显示错误信息给用户，只是显示空评论状态
+    comments.value = []
+    totalComments.value = 0
   }
 }
 

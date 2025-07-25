@@ -47,4 +47,12 @@ import SideBar from '@/components/layout/UserSideBar.vue'
   width: 100%;
   color: var(--text-primary);
 }
+
+@media (max-width: 768px) {
+  .content-wrapper {
+    max-width: 100% !important;
+    padding: 8px !important;
+    margin: 0 !important;
+  }
+}
 </style> 

@@ -70,6 +70,11 @@ provide('setGlobalLoading', (loading: boolean) => {
   .desktop-layout {
     display: none;
   }
+  .content-wrapper {
+    max-width: 100% !important;
+    padding: 8px !important;
+    margin: 0 !important;
+  }
 }
 
 /* 滚动条样式 */

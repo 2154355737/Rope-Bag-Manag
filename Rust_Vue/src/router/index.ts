@@ -233,7 +233,7 @@ router.beforeEach((to, from, next) => {
 // 全局后置钩子 - 添加详细访问记录
 router.afterEach((to, from) => {
   // 如果用户已登录，记录更详细的页面访问信息
-  if (isLoggedIn()) {
+  if (localStorage.getItem('isLoggedIn') === 'true') {
     const userInfo = getUserInfo();
     const username = userInfo?.username || '未知用户';
     const fromPath = from.path;

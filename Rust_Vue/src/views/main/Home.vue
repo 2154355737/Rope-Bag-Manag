@@ -422,11 +422,27 @@ const notices = ref<{ id: number, text: string }[]>([])
 const fetchAnnouncements = async () => {
   try {
     const res = await getActiveAnnouncements()
+    console.log('公告数据结构:', res)
+    
     if (res.code === 0 && res.data) {
-      notices.value = res.data.map(announcement => ({
-        id: announcement.id,
-        text: announcement.title + ': ' + announcement.content
-      }))
+      // 处理不同的数据结构可能性
+      if (Array.isArray(res.data)) {
+        // 如果是数组，直接使用
+        notices.value = res.data.map(announcement => ({
+          id: announcement.id,
+          text: announcement.title + ': ' + announcement.content
+        }))
+      } else if (res.data.list && Array.isArray(res.data.list)) {
+        // 如果是 {list: []} 格式
+        notices.value = res.data.list.map(announcement => ({
+          id: announcement.id,
+          text: announcement.title + ': ' + announcement.content
+        }))
+      } else {
+        // 如果是单个对象
+        console.warn('公告数据不是预期的数组格式:', res.data)
+        notices.value = [{ id: 1, text: '欢迎来到资源社区！' }]
+      }
     } else {
       console.error('获取公告失败:', res.message)
       // 设置默认公告
