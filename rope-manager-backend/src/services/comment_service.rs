@@ -4,16 +4,23 @@ use chrono::Utc;
 use crate::models::Comment;
 use crate::repositories::comment_repo::CommentRepository;
 use crate::repositories::user_repo::UserRepository;
+use crate::services::forbidden_word_service::ForbiddenWordService;
 
 #[derive(Clone)]
 pub struct CommentService {
     comment_repo: CommentRepository,
     user_repo: UserRepository,
+    forbidden_service: Option<ForbiddenWordService>,
 }
 
 impl CommentService {
     pub fn new(comment_repo: CommentRepository, user_repo: UserRepository) -> Self {
-        Self { comment_repo, user_repo }
+        Self { comment_repo, user_repo, forbidden_service: None }
+    }
+
+    pub fn with_forbidden_service(mut self, service: ForbiddenWordService) -> Self {
+        self.forbidden_service = Some(service);
+        self
     }
 
     // 获取所有评论（管理员接口）
@@ -54,6 +61,13 @@ impl CommentService {
         content: String,
         parent_id: Option<i32>,
     ) -> Result<Comment> {
+        // 敏感词检测
+        if let Some(f_service) = &self.forbidden_service {
+            if f_service.contains_forbidden_word(&content).await.unwrap_or(false) {
+                return Err(anyhow::anyhow!("评论内容包含违禁词"));
+            }
+        }
+
         let now = Utc::now();
         let mut comment = Comment {
             id: 0, // 由数据库生成
@@ -64,6 +78,10 @@ impl CommentService {
             status: "Active".to_string(),
             parent_id,
             likes: 0,
+            author_name: None,
+            author_role: None,
+            author_avatar: None,
+            author_qq: None,
             dislikes: 0,
             created_at: now,
             updated_at: now,
@@ -74,6 +92,15 @@ impl CommentService {
 
         // 返回创建的评论（包括ID）
         comment.id = comment_id;
+
+        // 获取用户信息并填充
+        if let Some(user) = self.user_repo.find_by_id(user_id).await? {
+            comment.author_name = Some(user.nickname.clone().unwrap_or(user.username));
+            comment.author_role = Some(user.role.to_string());
+            comment.author_avatar = user.avatar_url.clone();
+            comment.author_qq = user.qq_number.clone();
+        }
+
         Ok(comment)
     }
 
@@ -113,20 +140,22 @@ impl CommentService {
     }
 
     // 删除评论
-    pub async fn delete_comment(&self, comment_id: i32) -> Result<()> {
-        // 使用软删除方式
+    pub async fn delete_comment(&self, comment_id: i32, is_admin: bool) -> Result<()> {
+
+        if is_admin {
+            // 管理员执行物理删除
+            self.comment_repo.delete_comment(comment_id).await?;
+            return Ok(());
+        }
+
+        // 普通用户软删除
         let mut comment = match self.comment_repo.get_comment_by_id(comment_id).await? {
             Some(c) => c,
             None => return Err(anyhow::anyhow!("评论不存在")),
         };
-
-        // 设置状态为已删除
         comment.status = "Deleted".to_string();
         comment.updated_at = Utc::now();
-
-        // 保存评论
         self.comment_repo.update_comment(&comment).await?;
-
         Ok(())
     }
 

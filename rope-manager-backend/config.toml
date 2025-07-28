@@ -37,4 +37,12 @@ max_size = 10485760  # 10MB
 allowed_origins = ["*"]
 allowed_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 allowed_headers = ["Content-Type", "Authorization", "X-Requested-With"]
-max_age = 3600 
+max_age = 3600
+
+# 邮件配置 (需要配置真实的SMTP信息才能发送邮件)
+[mail]
+smtp_server = "smtp.163.com"        # QQ邮箱SMTP服务器
+smtp_port = 25                    # QQ邮箱SSL端口
+username = "siguail196@163.com"     # 发送方邮箱地址
+password = "WLVu8KRNc6KE62Ls"       # SMTP授权码(不是登录密码)
+from_name = "绳包管理器"            # 发送方显示名称 

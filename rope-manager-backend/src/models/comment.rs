@@ -11,9 +11,17 @@ pub struct Comment {
     pub status: String, // "Active", "Hidden", "Deleted"
     pub parent_id: Option<i32>,
     pub likes: i32,
+    #[serde(skip_serializing_if = "Option::is_none")] // 可选字段
+    pub author_name: Option<String>,
     pub dislikes: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_avatar: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_qq: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

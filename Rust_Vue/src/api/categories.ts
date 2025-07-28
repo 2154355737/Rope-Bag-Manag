@@ -22,22 +22,22 @@ export interface UpdateCategoryRequest {
 
 export const categoryApi = {
   getCategories: (): Promise<ApiResponse<{ list: Category[] }>> => {
-    return api.get('/api/v1/categories')
+    return api.get('/v1/categories')
   },
   
   getCategory: (id: number): Promise<ApiResponse<Category>> => {
-    return api.get(`/api/v1/categories/${id}`)
+    return api.get(`/v1/categories/${id}`)
   },
   
   addCategory: (data: CreateCategoryRequest): Promise<ApiResponse<Category>> => {
-    return api.post('/api/v1/categories', data)
+    return api.post('/v1/categories', data)
   },
   
   updateCategory: (id: number, data: UpdateCategoryRequest): Promise<ApiResponse<Category>> => {
-    return api.put(`/api/v1/categories/${id}`, data)
+    return api.put(`/v1/categories/${id}`, data)
   },
   
   deleteCategory: (id: number): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/categories/${id}`)
+    return api.delete(`/v1/categories/${id}`)
   }
 } 

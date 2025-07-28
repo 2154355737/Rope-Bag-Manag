@@ -17,6 +17,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(reply_comment)
             .service(batch_update_status)
             .service(batch_delete_comments)
+            .service(batch_delete_comments_post)
             .service(like_comment)
             .service(dislike_comment)
     );
@@ -204,10 +205,14 @@ async fn create_comment(
             HttpResponse::Created().json(ApiResponse::success(comment))
         },
         Err(e) => {
-            log::error!("创建评论失败: {}", e);
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                500, &format!("创建评论失败: {}", e)
-            ))
+            let msg = e.to_string();
+            let (http_status, code) = if msg.contains("违禁词") {
+                (actix_web::http::StatusCode::OK, 400)
+            } else {
+                (actix_web::http::StatusCode::INTERNAL_SERVER_ERROR, 500)
+            };
+            log::warn!("创建评论失败: {}", msg);
+            HttpResponse::build(http_status).json(ApiResponse::<()>::error(code, &msg))
         }
     }
 }
@@ -280,7 +285,7 @@ async fn delete_comment(
             // 检查权限：只有评论作者、管理员或长老可以删除
             if comment.user_id == auth_user.id || auth_user.is_admin() || auth_user.is_elder() {
                 // 删除评论
-                match comment_service.delete_comment(comment_id).await {
+                match comment_service.delete_comment(comment_id, auth_user.is_admin()).await {
                     Ok(_) => {
                         HttpResponse::Ok().json(ApiResponse::<()>::success_msg("评论删除成功"))
                     },
@@ -543,6 +548,25 @@ async fn get_user_comments(
             HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
                 500, &format!("获取用户评论失败: {}", e)
             ))
+        }
+    }
+} 
+
+#[post("/batch-delete")]
+async fn batch_delete_comments_post(
+    req: web::Json<BatchIdsRequest>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    // 复用DELETE逻辑
+    if !auth_user.is_admin() {
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(403, "只有管理员可以批量删除评论"));
+    }
+    match comment_service.batch_delete_comments(req.ids.clone()).await {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量删除评论成功")),
+        Err(e) => {
+            log::error!("批量删除评论失败: {}", e);
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("批量删除评论失败: {}", e)))
         }
     }
 } 

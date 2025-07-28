@@ -3,6 +3,7 @@ use serde_json::json;
 use serde::Deserialize;
 use crate::services::package_service::PackageService;
 use crate::models::{CreatePackageRequest, UpdatePackageRequest};
+use crate::services::comment_service::CommentService;
 
 #[derive(Debug, Deserialize)]
 pub struct PackageQueryParams {
@@ -34,6 +35,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/{id}/upload")
                     .route(web::post().to(upload_package_file))
+            )
+            // 新增：获取包评论 /packages/{id}/comments
+            .service(
+                web::resource("/{id}/comments")
+                    .route(web::get().to(get_package_comments))
             )
             .service(
                 web::resource("/categories")
@@ -199,6 +205,33 @@ async fn get_package_categories(
             "code": 0,
             "message": "success",
             "data": categories
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
+} 
+
+// 获取包评论
+async fn get_package_comments(
+    path: web::Path<i32>,
+    query: web::Query<crate::api::v1::comment::CommentQueryParams>,
+    comment_service: web::Data<CommentService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let package_id = path.into_inner();
+    let page = query.page.unwrap_or(1);
+    let size = query.size.unwrap_or(20);
+    match comment_service.get_package_comments(package_id, page, size).await {
+        Ok((comments, total)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": {
+              "list": comments,
+              "total": total,
+              "page": page,
+              "size": size
+            }
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,

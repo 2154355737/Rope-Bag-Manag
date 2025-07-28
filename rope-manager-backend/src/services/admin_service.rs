@@ -1,9 +1,11 @@
 use anyhow::Result;
 use crate::repositories::system_repo::SystemRepository;
+use crate::repositories::mail_repo::MailRepository;
 use crate::services::user_service::UserService;
 use crate::models::{Stats, ResourceRecord, ResourceActionStats, CreateResourceRecordRequest};
 use crate::models::user_action::UserAction;
 use crate::models::system::{Category, BackupInfo, BackupStats};
+use crate::models::mail::MailSettings;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,11 +14,16 @@ use std::collections::HashMap;
 pub struct AdminService {
     system_repo: SystemRepository,
     user_service: UserService,
+    mail_repo: MailRepository,
 }
 
 impl AdminService {
-    pub fn new(system_repo: SystemRepository, user_service: UserService) -> Self {
-        Self { system_repo, user_service }
+    pub fn new(db_url: &str) -> Self {
+        Self {
+            system_repo: SystemRepository::new(db_url).expect("创建系统仓库失败"),
+            user_service: UserService::new(crate::repositories::UserRepository::new(db_url).expect("创建用户仓库失败")),
+            mail_repo: MailRepository::new(db_url),
+        }
     }
 
     pub async fn get_stats(&self) -> Result<Stats> {
@@ -203,6 +210,45 @@ impl AdminService {
     // 新增方法：获取当前有效公告
     pub async fn get_active_announcements(&self) -> Result<Vec<Announcement>> {
         self.system_repo.get_active_announcements().await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 备份计划
+    pub async fn get_backup_schedule(&self) -> Result<Value> {
+        let v = self.get_setting("backup_schedule").await?.unwrap_or("{}".to_string());
+        Ok(serde_json::from_str(&v).unwrap_or(Value::Object(Default::default())))
+    }
+
+    pub async fn update_backup_schedule(&self, config: &Value) -> Result<()> {
+        self.update_setting("backup_schedule", &config.to_string()).await
+    }
+
+    // 邮件设置管理 - 使用专门的邮件表
+    pub async fn get_mail_settings(&self) -> Result<Value> {
+        match self.mail_repo.get_mail_settings().await? {
+            Some(settings) => Ok(serde_json::to_value(settings)?),
+            None => {
+                // 如果数据库中没有配置，返回默认配置
+                let default_settings = MailSettings::default();
+                Ok(serde_json::to_value(default_settings)?)
+            }
+        }
+    }
+
+    pub async fn update_mail_settings(&self, config: &Value) -> Result<()> {
+        let settings: MailSettings = serde_json::from_value(config.clone())?;
+        self.mail_repo.save_mail_settings(&settings).await?;
+        Ok(())
+    }
+
+    // 邮件统计和日志
+    pub async fn get_mail_stats(&self) -> Result<Value> {
+        let stats = self.mail_repo.get_mail_stats().await?;
+        Ok(serde_json::to_value(stats)?)
+    }
+
+    pub async fn get_mail_logs(&self, limit: Option<i64>) -> Result<Value> {
+        let logs = self.mail_repo.get_mail_logs(limit, None).await?;
+        Ok(serde_json::to_value(logs)?)
     }
 }
 

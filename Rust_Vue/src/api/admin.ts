@@ -37,7 +37,7 @@ export interface UserAction {
 export const adminApi = {
   // 获取统计数据
   getStats: (): Promise<ApiResponse<Stats>> => {
-    return api.get('/api/v1/admin/stats')
+    return api.get('/v1/admin/stats')
   },
 
   // 获取系统日志
@@ -58,7 +58,7 @@ export const adminApi = {
     if (params?.level) queryParams.append('level', params.level)
     if (params?.search) queryParams.append('search', params.search)
 
-    return api.get(`/api/v1/admin/logs?${queryParams.toString()}`)
+    return api.get(`/v1/admin/logs?${queryParams.toString()}`)
   },
 
   // 获取用户行为记录
@@ -81,7 +81,7 @@ export const adminApi = {
     if (params?.action) queryParams.append('action', params.action)
     if (params?.search) queryParams.append('search', params.search)
 
-    return api.get(`/api/v1/admin/user-actions?${queryParams.toString()}`)
+    return api.get(`/v1/admin/user-actions?${queryParams.toString()}`)
   },
 
   // 创建数据备份
@@ -91,7 +91,7 @@ export const adminApi = {
     size: number
     created_at: string
   }>> => {
-    return api.post('/api/v1/admin/backup')
+    return api.post('/v1/admin/backup')
   },
 
   // 获取备份列表
@@ -103,17 +103,17 @@ export const adminApi = {
       created_at: string
     }>
   }>> => {
-    return api.get('/api/v1/admin/backups')
+    return api.get('/v1/admin/backups')
   },
 
   // 下载备份文件
   downloadBackup: (backupId: string): Promise<ApiResponse<string>> => {
-    return api.get(`/api/v1/admin/backup/${backupId}/download`)
+    return api.get(`/v1/admin/backup/${backupId}/download`)
   },
 
   // 删除备份
   deleteBackup: (backupId: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/admin/backup/${backupId}`)
+    return api.delete(`/v1/admin/backup/${backupId}`)
   },
 
   // 系统健康检查
@@ -128,5 +128,20 @@ export const adminApi = {
     }
   }>> => {
     return api.get('/health')
+  },
+
+  // 获取邮件SMTP设置
+  getMailSettings: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/admin/mail-settings')
+  },
+
+  // 更新邮件SMTP设置
+  updateMailSettings: (config: Record<string, any>): Promise<ApiResponse<null>> => {
+    return api.post('/v1/admin/mail-settings', config)
+  },
+
+  // 发送测试邮件
+  sendTestEmail: (email: string): Promise<ApiResponse<null>> => {
+    return api.post('/v1/admin/test-email', { email })
   },
 } 

@@ -66,6 +66,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/auth/Register.vue'),
     meta: { title: '注册', layout: 'independent', device: 'all' }
   },
+  {
+    path: '/forgot-password',
+    component: () => import('../views/auth/ForgotPassword.vue'),
+    meta: { title: '忘记密码', layout: 'independent', device: 'all' }
+  },
+  {
+    path: '/auth/reset-password',
+    component: () => import('../views/auth/ResetPassword.vue'),
+    meta: { title: '重置密码', layout: 'independent', device: 'all' }
+  },
   // 管理员后台
   {
     path: '/admin',
@@ -126,6 +136,11 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/user-action-log',
     component: () => import('../views/admin/UserActionLog.vue'),
     meta: { title: '用户操作日志', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop' }
+  },
+  {
+    path: '/admin/mail-settings',
+    component: () => import('../views/admin/MailSettings.vue'),
+    meta: { title: '邮件设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
   },
   // 元老后台
   {

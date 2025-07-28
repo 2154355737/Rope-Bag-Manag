@@ -106,56 +106,97 @@ impl UserRepository {
 
     pub async fn find_by_username(&self, username: &str) -> Result<Option<User>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, username, email, password_hash, nickname, role, star, ban_status, \
-                    ban_reason, qq_number, avatar_url, login_count, upload_count, download_count, \
-                    created_at, last_login, is_admin \
-             FROM users WHERE username = ?";
-        println!("[SQL] find_by_username: {} | username={}", sql, username);
-        let mut stmt = match conn.prepare(sql) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("[ERROR] prepare failed: {}", e);
-                return Err(e.into());
+        let user = conn.query_row(
+            "SELECT id, username, email, password_hash, nickname, role, star, ban_status, 
+                    ban_reason, qq_number, avatar_url, login_count, upload_count, download_count, 
+                    created_at, last_login, is_admin 
+             FROM users WHERE username = ?",
+            params![username],
+            |row| {
+                Ok(User {
+                    id: row.get(0)?,
+                    username: row.get(1)?,
+                    email: row.get(2)?,
+                    password_hash: row.get(3)?,
+                    nickname: row.get(4)?,
+                    role: match row.get::<_, String>(5)?.to_lowercase().as_str() {
+                        "admin" => crate::models::UserRole::Admin,
+                        "moderator" => crate::models::UserRole::Moderator,
+                        "elder" => crate::models::UserRole::Elder,
+                        _ => crate::models::UserRole::User,
+                    },
+                    star: row.get(6)?,
+                    ban_status: match row.get::<_, String>(7)?.as_str() {
+                        "suspended" => crate::models::BanStatus::Suspended,
+                        "banned" => crate::models::BanStatus::Banned,
+                        _ => crate::models::BanStatus::Normal,
+                    },
+                    ban_reason: row.get(8)?,
+                    qq_number: row.get(9)?,
+                    avatar_url: row.get(10)?,
+                    login_count: row.get(11)?,
+                    upload_count: row.get(12)?,
+                    download_count: row.get(13)?,
+                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(14, "created_at".to_string(), rusqlite::types::Type::Text))?
+                        .with_timezone(&chrono::Utc),
+                    last_login: row.get::<_, Option<String>>(15)?.map(|s| {
+                        chrono::DateTime::parse_from_rfc3339(&s)
+                            .map(|dt| dt.with_timezone(&chrono::Utc))
+                            .unwrap_or_else(|_| chrono::Utc::now())
+                    }),
+                    is_admin: row.get(16)?,
+                })
             }
-        };
-        let user = match stmt.query_row(params![username], |row| {
-            Ok(User {
-                id: row.get(0)?,
-                username: row.get(1)?,
-                email: row.get(2)?,
-                password_hash: row.get(3)?,
-                nickname: row.get(4)?,
-                role: match row.get::<_, String>(5)?.to_lowercase().as_str() {
-                    "admin" => crate::models::UserRole::Admin,
-                    "moderator" => crate::models::UserRole::Moderator,
-                    "elder" => crate::models::UserRole::Elder,
-                    _ => crate::models::UserRole::User,
-                },
-                star: row.get(6)?,
-                ban_status: match row.get::<_, String>(7)?.as_str() {
-                    "suspended" => crate::models::BanStatus::Suspended,
-                    "banned" => crate::models::BanStatus::Banned,
-                    _ => crate::models::BanStatus::Normal,
-                },
-                ban_reason: row.get(8)?,
-                qq_number: row.get(9)?,
-                avatar_url: row.get(10)?,
-                login_count: row.get(11)?,
-                upload_count: row.get(12)?,
-                download_count: row.get(13)?,
-                created_at: row.get(14)?,
-                last_login: row.get(15)?,
-                is_admin: row.get(16)?,
-            })
-        }) {
-            Ok(val) => Some(val),
-            Err(rusqlite::Error::QueryReturnedNoRows) => None,
-            Err(e) => {
-                println!("[ERROR] query_row failed: {}", e);
-                return Err(e.into());
+        ).optional()?;
+        Ok(user)
+    }
+
+    pub async fn find_by_email(&self, email: &str) -> Result<Option<User>> {
+        let conn = self.conn.lock().await;
+        let user = conn.query_row(
+            "SELECT id, username, email, password_hash, nickname, role, star, ban_status, 
+                    ban_reason, qq_number, avatar_url, login_count, upload_count, download_count, 
+                    created_at, last_login, is_admin 
+             FROM users WHERE email = ?",
+            params![email],
+            |row| {
+                Ok(User {
+                    id: row.get(0)?,
+                    username: row.get(1)?,
+                    email: row.get(2)?,
+                    password_hash: row.get(3)?,
+                    nickname: row.get(4)?,
+                    role: match row.get::<_, String>(5)?.to_lowercase().as_str() {
+                        "admin" => crate::models::UserRole::Admin,
+                        "moderator" => crate::models::UserRole::Moderator,
+                        "elder" => crate::models::UserRole::Elder,
+                        _ => crate::models::UserRole::User,
+                    },
+                    star: row.get(6)?,
+                    ban_status: match row.get::<_, String>(7)?.as_str() {
+                        "suspended" => crate::models::BanStatus::Suspended,
+                        "banned" => crate::models::BanStatus::Banned,
+                        _ => crate::models::BanStatus::Normal,
+                    },
+                    ban_reason: row.get(8)?,
+                    qq_number: row.get(9)?,
+                    avatar_url: row.get(10)?,
+                    login_count: row.get(11)?,
+                    upload_count: row.get(12)?,
+                    download_count: row.get(13)?,
+                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?)
+                        .map_err(|_| rusqlite::Error::InvalidColumnType(14, "created_at".to_string(), rusqlite::types::Type::Text))?
+                        .with_timezone(&chrono::Utc),
+                    last_login: row.get::<_, Option<String>>(15)?.map(|s| {
+                        chrono::DateTime::parse_from_rfc3339(&s)
+                            .map(|dt| dt.with_timezone(&chrono::Utc))
+                            .unwrap_or_else(|_| chrono::Utc::now())
+                    }),
+                    is_admin: row.get(16)?,
+                })
             }
-        };
-        println!("[SQL] find_by_username result: {:?}", user);
+        ).optional()?;
         Ok(user)
     }
 
@@ -320,11 +361,15 @@ impl UserRepository {
                 target_id: row.get(3)?,
                 content: row.get(4)?,
                 status: row.get(5)?,
-                parent_id: row.get(6)?,
+                parent_id: row.get(6)? ,
                 likes: row.get(7)?,
                 dislikes: row.get(8)?,
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
+                author_name: None,
+                author_role: None,
+                author_avatar: None,
+                author_qq: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

@@ -31,8 +31,10 @@ export interface UserListResponse {
 
 // 更新用户请求
 export interface UpdateUserRequest {
-  role?: string
-  status?: number
+  nickname?: string
+  qq_number?: string
+  avatar_url?: string
+  // 其他字段如star、role、ban_status等可按需添加
 }
 
 // 用户API
@@ -46,36 +48,41 @@ export const userApi = {
     if (params?.status) queryParams.append('status', params.status)
     if (params?.search) queryParams.append('search', params.search)
 
-    return api.get(`/api/v1/users?${queryParams.toString()}`)
+    return api.get(`/v1/users?${queryParams.toString()}`)
   },
 
   // 获取单个用户
   getUser: (id: number): Promise<ApiResponse<User>> => {
-    return api.get(`/api/v1/users/${id}`)
+    return api.get(`/v1/users/${id}`)
   },
 
   // 更新用户
   updateUser: (id: number, data: UpdateUserRequest): Promise<ApiResponse<User>> => {
-    return api.put(`/api/v1/users/${id}`, data)
+    return api.put(`/v1/users/${id}`, data)
   },
 
   // 删除用户
   deleteUser: (id: number): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/users/${id}`)
+    return api.delete(`/v1/users/${id}`)
   },
 
   // 批量删除用户
   batchDeleteUsers: (usernames: string[]): Promise<ApiResponse<null>> => {
-    return api.delete('/api/v1/users/batch', { data: { usernames } })
+    return api.delete('/v1/users/batch', { data: { usernames } })
   },
 
   // 创建用户
   createUser: (userData: any): Promise<ApiResponse<User>> => {
-    return api.post('/api/v1/users', userData)
+    return api.post('/v1/users', userData)
   },
 
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
     return api.get('/api/v1/auth/user-info')
+  },
+
+  // 更新当前用户信息
+  updateCurrentUser: (data: UpdateUserRequest): Promise<ApiResponse<any>> => {
+    return api.put('/api/v1/users/profile', data)
   },
 } 

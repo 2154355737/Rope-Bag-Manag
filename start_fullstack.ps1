@@ -34,7 +34,7 @@ if (-not $SkipBackend) {
 # 启动后端服务
 if (-not $SkipBackend) {
     Write-Host "`n2. 启动后端服务..." -ForegroundColor Cyan
-    Start-Process -FilePath "cmd" -ArgumentList "/k", "cd rope-manager-backend && cargo run" -WindowStyle Normal
+    Start-Process -FilePath "cmd" -ArgumentList "/k", "cd rope-manager-backend && cargo run --bin rope-manager-backend" -WindowStyle Normal
     Write-Host "等待后端服务启动..." -ForegroundColor Yellow
     Start-Sleep -Seconds 5
 }

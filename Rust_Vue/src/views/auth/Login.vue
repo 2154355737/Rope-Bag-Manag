@@ -93,7 +93,7 @@
               <el-checkbox v-model="rememberMe" class="remember-checkbox">
                 记住我
               </el-checkbox>
-              <a href="#" class="forgot-link">忘记密码？</a>
+              <a href="#" class="forgot-link" @click.prevent="goForgot">忘记密码？</a>
             </div>
 
             <el-button
@@ -290,6 +290,8 @@ function handleLogout() {
 function goRegister() {
   router.push('/register')
 }
+
+function goForgot(){ router.push('/forgot-password') }
 </script>
 
 <style scoped>

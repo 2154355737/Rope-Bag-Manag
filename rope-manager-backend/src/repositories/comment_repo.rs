@@ -124,6 +124,10 @@ impl CommentRepository {
                 dislikes: row.get(8)?,
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
+                author_name: None,
+                author_role: None,
+                author_avatar: None,
+                author_qq: None,
             })
         })?;
         
@@ -159,11 +163,12 @@ impl CommentRepository {
         )?;
         
         // 获取评论列表
-        let sql = "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                          likes, dislikes, created_at, updated_at 
-                   FROM comments 
-                   WHERE target_type = ? AND target_id = ? AND status != 'Deleted' AND parent_id IS NULL 
-                   ORDER BY created_at DESC 
+        let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
+                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                   FROM comments c 
+                   LEFT JOIN users u ON c.user_id = u.id 
+                   WHERE c.target_type = ? AND c.target_id = ? AND c.status != 'Deleted' 
+                   ORDER BY c.created_at DESC 
                    LIMIT ? OFFSET ?";
         
         let mut stmt = conn.prepare(sql)?;
@@ -182,6 +187,10 @@ impl CommentRepository {
                     dislikes: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
+                    author_name: row.get(11).ok(),
+                    author_role: row.get(12).ok(),
+                    author_avatar: row.get(13).ok(),
+                    author_qq: row.get(14).ok(),
                 })
             }
         )?;
@@ -197,10 +206,11 @@ impl CommentRepository {
     // 获取单个评论
     pub async fn get_comment_by_id(&self, comment_id: i32) -> Result<Option<Comment>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                          likes, dislikes, created_at, updated_at 
-                   FROM comments 
-                   WHERE id = ?";
+        let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
+                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number
+                   FROM comments c
+                   LEFT JOIN users u ON c.user_id = u.id
+                   WHERE c.id = ?";
         
         let mut stmt = conn.prepare(sql)?;
         let comment = stmt.query_row(params![comment_id], |row| {
@@ -216,6 +226,10 @@ impl CommentRepository {
                 dislikes: row.get(8)?,
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
+                author_name: row.get(11).ok(),
+                author_role: row.get(12).ok(),
+                author_avatar: row.get(13).ok(),
+                author_qq: row.get(14).ok(),
             })
         });
         
@@ -282,11 +296,12 @@ impl CommentRepository {
     // 获取评论回复
     pub async fn get_comment_replies(&self, comment_id: i32) -> Result<Vec<Comment>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                          likes, dislikes, created_at, updated_at 
-                   FROM comments 
-                   WHERE parent_id = ? AND status != 'Deleted' 
-                   ORDER BY created_at ASC";
+        let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
+                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                   FROM comments c 
+                   LEFT JOIN users u ON c.user_id = u.id 
+                   WHERE c.parent_id = ? AND c.status != 'Deleted' 
+                   ORDER BY c.created_at ASC";
         
         let mut stmt = conn.prepare(sql)?;
         let comment_iter = stmt.query_map(params![comment_id], |row| {
@@ -302,6 +317,10 @@ impl CommentRepository {
                 dislikes: row.get(8)?,
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
+                author_name: row.get(11).ok(),
+                author_role: row.get(12).ok(),
+                author_avatar: row.get(13).ok(),
+                author_qq: row.get(14).ok(),
             })
         })?;
         
@@ -326,11 +345,12 @@ impl CommentRepository {
         )?;
         
         // 获取评论列表
-        let sql = "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                          likes, dislikes, created_at, updated_at 
-                   FROM comments 
-                   WHERE user_id = ? AND status != 'Deleted' 
-                   ORDER BY created_at DESC 
+        let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
+                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                   FROM comments c 
+                   LEFT JOIN users u ON c.user_id = u.id 
+                   WHERE c.user_id = ? AND c.status != 'Deleted' 
+                   ORDER BY c.created_at DESC 
                    LIMIT ? OFFSET ?";
         
         let mut stmt = conn.prepare(sql)?;
@@ -349,6 +369,10 @@ impl CommentRepository {
                     dislikes: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
+                    author_name: row.get(11).ok(),
+                    author_role: row.get(12).ok(),
+                    author_avatar: row.get(13).ok(),
+                    author_qq: row.get(14).ok(),
                 })
             }
         )?;

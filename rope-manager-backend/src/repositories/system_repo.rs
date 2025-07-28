@@ -5,7 +5,7 @@ use anyhow::Result;
 use chrono::Utc;
 use uuid::Uuid;
 use std::collections::HashMap;
-use chrono::Local;
+
 
 // 导入所需模型
 use crate::models::user_action::UserAction;
@@ -841,7 +841,7 @@ impl SystemRepository {
         let end_time_opt = end_time.map(|s| s.to_string());
         
         // 构建适合当前表结构的INSERT语句
-        let mut sql = String::from("INSERT INTO announcements (title, content, priority, start_time, end_time) VALUES (?, ?, ?, ?, ?)");
+        let sql = String::from("INSERT INTO announcements (title, content, priority, start_time, end_time) VALUES (?, ?, ?, ?, ?)");
         let mut params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority, &start_time_str, &end_time_opt];
         
         conn.execute(&sql, params.as_slice())?;
@@ -895,7 +895,7 @@ impl SystemRepository {
         }
         
         // 构建UPDATE语句
-        let mut sql = String::from("UPDATE announcements SET title = ?, content = ?, priority = ?, start_time = ?, end_time = ? WHERE id = ?");
+        let sql = String::from("UPDATE announcements SET title = ?, content = ?, priority = ?, start_time = ?, end_time = ? WHERE id = ?");
         let end_time_str = end_time.unwrap_or("");
         let params: Vec<&dyn rusqlite::ToSql> = vec![&title, &content, &priority, &start_time, &end_time_str, &id];
         

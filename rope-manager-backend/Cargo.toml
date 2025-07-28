@@ -2,6 +2,7 @@
 name = "rope-manager-backend"
 version = "0.1.0"
 edition = "2021"
+default-run = "rope-manager-backend"
 
 [dependencies]
 # Web框架
@@ -16,7 +17,7 @@ serde_json = "1.0.141"
 
 # 数据库
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1.47.0", features = ["full", "macros", "rt-multi-thread"] }
 
 # 认证
 jsonwebtoken = "9.1"
@@ -40,3 +41,19 @@ toml = "0.9.2"
 mime_guess = "2.0"
 futures-util = "0.3"
 futures = "0.3"
+
+# 使用 tokio + native-tls（需 tokio1-native-tls），并启用 builder 与 smtp-transport 功能
+lettre = { version = "0.11.17", default-features = false, features = ["tokio1", "tokio1-native-tls", "smtp-transport", "builder"] }
+
+# 添加备用邮件发送方案
+reqwest = { version = "0.11", features = ["json"] }
+
+# 6位数验证码
+rand = "0.9.2"
+
+# HTML转纯文本
+html2text = "0.15.3"
+
+[[bin]]
+name = "simple_smtp_test"
+path = "simple_smtp_test.rs"

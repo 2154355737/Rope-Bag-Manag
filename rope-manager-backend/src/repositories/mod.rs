@@ -3,11 +3,18 @@ pub mod package_repo;
 pub mod system_repo;
 pub mod comment_repo;
 pub mod user_action_repo; // 添加用户行为记录仓库
+pub mod forbidden_word_repo; // 违禁词仓库
+pub mod email_verification_repo;
+pub mod subscription_repo;
+pub mod mail_repo; // 添加邮件仓库
 
 pub use user_repo::*;
 pub use package_repo::*;
 pub use comment_repo::*;
 pub use system_repo::*;
+
+pub use email_verification_repo::*;
+pub use subscription_repo::*;
 
 use rusqlite::{Connection, Result};
 use std::path::PathBuf;

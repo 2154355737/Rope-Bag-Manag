@@ -12,33 +12,40 @@ export interface Comment {
   dislikes: number
   status: string
   author_name?: string
+  author_role?: string
+  author_avatar?: string
+  author_qq?: string
   resource_id?: number // 兼容旧字段
 }
 
 export const commentApi = {
   // 获取资源评论
   getComments: (resourceId: number, params?: { page?: number; pageSize?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
-    return api.get(`/api/v1/resources/${resourceId}/comments`, { params })
+    return api.get(`/v1/resources/${resourceId}/comments`, { params })
   },
   // 创建评论
   createComment: (data: { content: string; target_id: number; target_type: string; parent_id?: number }): Promise<ApiResponse<Comment>> => {
-    return api.post('/api/v1/comments', data)
+    return api.post('/v1/comments', data)
   },
   // 更新评论
   updateComment: (commentId: number, data: { content?: string; status?: string }): Promise<ApiResponse<Comment>> => {
-    return api.put(`/api/v1/comments/${commentId}`, data)
+    return api.put(`/v1/comments/${commentId}`, data)
   },
   // 删除评论
   deleteComment: (commentId: number): Promise<ApiResponse> => {
-    return api.delete(`/api/v1/comments/${commentId}`)
+    return api.delete(`/v1/comments/${commentId}`)
   },
   // 批量删除
   batchDeleteComments: (commentIds: number[]): Promise<ApiResponse> => {
-    return api.post('/api/v1/comments/batch-delete', { ids: commentIds })
+    return api.post('/v1/comments/batch-delete', { ids: commentIds })
+  },
+  // 批量更新评论状态
+  batchUpdateStatus: (commentIds: number[], status: 'Active' | 'Hidden' | 'Deleted'): Promise<ApiResponse> => {
+    return api.put('/v1/comments/batch/status', { ids: commentIds, status })
   },
   // 管理员获取所有评论
   getAllComments: (params?: { page?: number; pageSize?: number; resource_id?: number; user_id?: number; search?: string; status?: string; target_type?: string; start_date?: Date; end_date?: Date }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
-    return api.get('/api/v1/comments', { params })
+    return api.get('/v1/comments', { params })
   },
   // 获取资源评论
   getPackageComments: (packageId: number, params?: { page?: number; size?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
@@ -49,7 +56,7 @@ export const commentApi = {
         delete cleanParams[key]
       }
     })
-    return api.get(`/api/v1/packages/${packageId}/comments`, { params: cleanParams })
+    return api.get(`/v1/packages/${packageId}/comments`, { params: cleanParams })
   },
   // 获取用户评论
   getUserComments: (userId: number, params?: { page?: number; size?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
@@ -60,6 +67,14 @@ export const commentApi = {
         delete cleanParams[key]
       }
     })
-    return api.get(`/api/v1/users/${userId}/comments`, { params: cleanParams })
+    return api.get(`/v1/users/${userId}/comments`, { params: cleanParams })
+  },
+  // 点赞/取消点赞评论
+  likeComment: (commentId: number, like: boolean = true): Promise<ApiResponse<number>> => {
+    return api.post(`/v1/comments/${commentId}/like`, { like })
+  },
+  // 回复评论
+  replyComment: (commentId: number, content: string): Promise<ApiResponse<Comment>> => {
+    return api.post(`/v1/comments/${commentId}/reply`, { content })
   }
 } 

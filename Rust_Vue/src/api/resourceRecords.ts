@@ -37,7 +37,7 @@ export interface ResourceActionStats {
 export const resourceRecordApi = {
   // 获取资源记录
   getResourceRecords: (params?: { page?: number; pageSize?: number; resource_id?: number; user_id?: number; action?: string; resource_type?: string; start_date?: string; end_date?: string }): Promise<ApiResponse<{ list: ResourceRecord[]; total: number; page: number; size: number }>> => {
-    return api.get('/api/v1/resource-records', { params })
+    return api.get('/v1/resource-records', { params })
   },
   
   // 记录资源操作
@@ -62,17 +62,17 @@ export const resourceRecordApi = {
     }
     
     console.log('记录资源操作:', data);
-    return api.post('/api/v1/resource-records', data)
+    return api.post('/v1/resource-records', data)
   },
   
   // 获取资源操作统计
   getResourceActionStats: (params?: { resource_type?: string; user_id?: number; start_date?: string; end_date?: string }): Promise<ApiResponse<ResourceActionStats>> => {
-    return api.get('/api/v1/resource-records/stats', { params })
+    return api.get('/v1/resource-records/stats', { params })
   },
   
   // 删除资源记录
   deleteResourceRecord: (recordId: number): Promise<ApiResponse> => {
-    return api.delete(`/api/v1/resource-records/${recordId}`)
+    return api.delete(`/v1/resource-records/${recordId}`)
   },
   
   // 批量删除资源记录

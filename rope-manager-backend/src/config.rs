@@ -60,6 +60,9 @@ pub struct CorsConfig {
     pub max_age: u64,
 }
 
+// MailConfig已移至models/mail.rs，此处保留是为了向后兼容
+// 实际的邮件配置现在存储在数据库中
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -113,15 +116,26 @@ impl Default for Config {
                 ],
                 max_age: 3600,
             },
+// 邮件配置已移至数据库，config.toml不再包含邮件配置
         }
     }
 }
 
 impl Config {
     pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
-        // 1. 尝试从配置文件加载
-        if let Ok(config) = Self::load_from_file("config.toml") {
-            return Ok(config);
+
+        // 1. 尝试从多种常见路径加载配置文件
+        let candidate_paths = [
+            "config.toml",                                     // 当前工作目录
+            "./config.toml",                                   // 显式当前目录
+            "rope-manager-backend/config.toml",                // 项目根目录启动时
+            "./rope-manager-backend/config.toml",              // 同上（显式）
+        ];
+
+        for path in &candidate_paths {
+            if let Ok(config) = Self::load_from_file(path) {
+                return Ok(config);
+            }
         }
 
         // 2. 尝试从环境变量加载
@@ -197,6 +211,8 @@ impl Config {
         if let Ok(file_path) = env::var("LOG_FILE") {
             config.logging.file_path = Some(file_path);
         }
+
+// 邮件配置环境变量已移除，配置现在存储在数据库中
 
         Ok(config)
     }

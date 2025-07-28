@@ -7,6 +7,7 @@ use crate::models::User;
 pub struct Claims {
     pub user_id: i32,
     pub username: String,
+    pub role: String,
     pub exp: usize,
 }
 
@@ -29,6 +30,7 @@ impl JwtUtils {
         let claims = Claims {
             user_id: user.id,
             username: user.username.clone(),
+            role: user.role.to_string(),
             exp: expiration,
         };
 

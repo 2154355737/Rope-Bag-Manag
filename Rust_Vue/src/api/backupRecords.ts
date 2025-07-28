@@ -132,7 +132,7 @@ export function configureAutoBackup(config: {
   retain_count: number
   auto_clean: boolean
 }) {
-  return api.post('/api/v1/admin/backup/schedule', config)
+  return api.post('/api/v1/admin/backup-schedule', config)
 }
 
 /**
@@ -140,5 +140,5 @@ export function configureAutoBackup(config: {
  * @returns 自动备份配置
  */
 export function getAutoBackupConfig() {
-  return api.get('/api/v1/admin/backup/schedule')
+  return api.get('/api/v1/admin/backup-schedule')
 } 

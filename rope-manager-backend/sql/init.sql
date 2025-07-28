@@ -181,4 +181,25 @@ INSERT OR IGNORE INTO system_settings (key, value, description) VALUES
 
 -- 插入默认管理员用户 (密码: admin123)
 INSERT OR IGNORE INTO users (id, username, email, password_hash, role, is_active, created_at) VALUES 
-(1, 'admin', 'admin@example.com', '$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 1, CURRENT_TIMESTAMP); 
+(1, 'admin', 'admin@example.com', '$2b$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 1, CURRENT_TIMESTAMP);
+
+-- 邮件验证码记录表
+CREATE TABLE IF NOT EXISTS email_verifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    email TEXT NOT NULL,
+    code TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 资源订阅表
+CREATE TABLE IF NOT EXISTS subscriptions (
+    user_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY(user_id, category_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+); 

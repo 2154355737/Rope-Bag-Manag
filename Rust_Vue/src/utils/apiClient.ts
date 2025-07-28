@@ -21,6 +21,11 @@ const apiClient: AxiosInstance = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
+    // 修正可能重复的 /api 前缀，避免出现 /api/api/*
+    if (config.url && config.url.startsWith('/api/')) {
+      config.url = config.url.replace(/^\/api/, '')
+    }
+
     // 添加认证token
     const token = localStorage.getItem('token')
     if (token) {
@@ -48,25 +53,25 @@ apiClient.interceptors.request.use(
 // 资源操作映射
 const resourceOperationMap: Record<string, { type: string, action: string }> = {
   // 包相关操作
-  'POST /api/v1/packages': { type: 'Package', action: 'Create' },
-  'PUT /api/v1/packages': { type: 'Package', action: 'Update' },
-  'DELETE /api/v1/packages': { type: 'Package', action: 'Delete' },
-  'GET /api/v1/packages/*/download': { type: 'Package', action: 'Download' },
+  'POST /v1/packages': { type: 'Package', action: 'Create' },
+  'PUT /v1/packages': { type: 'Package', action: 'Update' },
+  'DELETE /v1/packages': { type: 'Package', action: 'Delete' },
+  'GET /v1/packages/*/download': { type: 'Package', action: 'Download' },
   
   // 用户相关操作
-  'POST /api/v1/users': { type: 'User', action: 'Create' },
-  'PUT /api/v1/users': { type: 'User', action: 'Update' },
-  'DELETE /api/v1/users': { type: 'User', action: 'Delete' },
+  'POST /v1/users': { type: 'User', action: 'Create' },
+  'PUT /v1/users': { type: 'User', action: 'Update' },
+  'DELETE /v1/users': { type: 'User', action: 'Delete' },
   
   // 评论相关操作
-  'POST /api/v1/comments': { type: 'Comment', action: 'Create' },
-  'PUT /api/v1/comments': { type: 'Comment', action: 'Update' },
-  'DELETE /api/v1/comments': { type: 'Comment', action: 'Delete' },
+  'POST /v1/comments': { type: 'Comment', action: 'Create' },
+  'PUT /v1/comments': { type: 'Comment', action: 'Update' },
+  'DELETE /v1/comments': { type: 'Comment', action: 'Delete' },
   
   // 分类相关操作
-  'POST /api/v1/categories': { type: 'Category', action: 'Create' },
-  'PUT /api/v1/categories': { type: 'Category', action: 'Update' },
-  'DELETE /api/v1/categories': { type: 'Category', action: 'Delete' },
+  'POST /v1/categories': { type: 'Category', action: 'Create' },
+  'PUT /v1/categories': { type: 'Category', action: 'Update' },
+  'DELETE /v1/categories': { type: 'Category', action: 'Delete' },
 }
 
 // 自动记录资源操作
@@ -76,7 +81,7 @@ const logResourceOperation = async (method: string, url: string, response: any) 
     if (response?.code !== 0) return
     
     // 检查URL，如果是包创建操作，不在前端记录（已在后端记录）
-    if (method === 'POST' && url.includes('/api/v1/packages') && !url.includes('/api/v1/packages/')) {
+    if (method === 'POST' && url.includes('/v1/packages') && !url.includes('/v1/packages/')) {
       console.log(`[跳过前端记录] 包创建操作已在后端记录`)
       return
     }
@@ -199,7 +204,7 @@ window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
   // 只拦截API请求
   if (typeof urlString === 'string' && urlString.includes('/api/')) {
     // 检查URL，如果是包创建操作，不在前端记录（已在后端记录）
-    if (method === 'POST' && urlString.includes('/api/v1/packages') && !urlString.includes('/api/v1/packages/')) {
+    if (method === 'POST' && urlString.includes('/v1/packages') && !urlString.includes('/v1/packages/')) {
       console.log(`[跳过前端记录] 包创建操作已在后端记录`)
       return response
     }
@@ -310,7 +315,7 @@ apiClient.interceptors.response.use(
         }
         
         // 2. 资源操作相关
-        else if (method === 'POST' && url.includes('/api/v1/packages')) {
+        else if (method === 'POST' && url.includes('/v1/packages')) {
           // 记录包上传行为
           const packageId = data.data?.id
           const packageName = data.data?.name || '未命名包'
@@ -319,7 +324,7 @@ apiClient.interceptors.response.use(
               .catch(err => console.error('记录上传行为失败:', err))
           }
         }
-        else if (method === 'PUT' && url.includes('/api/v1/packages')) {
+        else if (method === 'PUT' && url.includes('/v1/packages')) {
           // 记录包更新行为
           const packageMatch = url.match(/\/packages\/(\d+)/)
           if (packageMatch && packageMatch[1]) {
@@ -333,7 +338,7 @@ apiClient.interceptors.response.use(
             ).catch(err => console.error('记录包更新行为失败:', err))
               }
             }
-        else if (method === 'DELETE' && url.includes('/api/v1/packages')) {
+        else if (method === 'DELETE' && url.includes('/v1/packages')) {
           // 记录包删除行为
             const packageMatch = url.match(/\/packages\/(\d+)/)
           if (packageMatch && packageMatch[1]) {
@@ -479,6 +484,16 @@ export const api = {
       },
     }).then(response => response.data)
   },
+}
+
+export const uploadFile = <T = any>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<ApiResponse<T>> => {
+  return apiClient.post(url, formData, {
+    ...config,
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...(config?.headers || {})
+    }
+  }).then(res => res.data)
 }
 
 // 健康检查

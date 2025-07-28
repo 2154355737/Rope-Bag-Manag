@@ -1,6 +1,11 @@
 use actix_web::{web, HttpResponse, HttpRequest, Error};
 use serde_json::json;
+use serde_json::Value;
 use crate::services::admin_service::AdminService;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use crate::services::email_service::EmailService;
+// MailConfig已移至models/mail.rs
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -55,6 +60,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(restore_backup))
             )
             .service(
+                web::resource("/backup-schedule")
+                    .route(web::get().to(get_backup_schedule))
+                    .route(web::post().to(update_backup_schedule))
+            )
+            .service(
                 web::resource("/announcements")
                     .route(web::get().to(get_announcements))
                     .route(web::post().to(create_announcement))
@@ -95,6 +105,15 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/resource-records")
                     .route(web::get().to(get_resource_records))
+            )
+            .service(
+                web::resource("/mail-settings")
+                    .route(web::get().to(get_mail_settings))
+                    .route(web::post().to(update_mail_settings))
+            )
+            .service(
+                web::resource("/test-email")
+                    .route(web::post().to(send_test_email))
             )
     );
 }
@@ -416,6 +435,25 @@ async fn get_backup_stats(
             "code": 500,
             "message": format!("获取备份统计失败: {}", e)
         })))
+    }
+}
+
+async fn get_backup_schedule(
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.get_backup_schedule().await {
+        Ok(cfg) => Ok(HttpResponse::Ok().json(json!({"code":0,"data":cfg}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500,"message":e.to_string()})))
+    }
+}
+
+async fn update_backup_schedule(
+    req: web::Json<Value>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.update_backup_schedule(&req.0).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0,"message":"success"}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500,"message":e.to_string()})))
     }
 }
 
@@ -841,4 +879,72 @@ async fn reset_settings(
         "code": 0,
         "message": "设置已重置"
     })))
+} 
+
+// 获取邮件设置
+async fn get_mail_settings(
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.get_mail_settings().await {
+        Ok(config) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": config
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("获取邮件设置失败: {}", e)
+        })))
+    }
+}
+
+// 更新邮件设置
+async fn update_mail_settings(
+    req: web::Json<Value>,
+    admin_service: web::Data<AdminService>,
+    email_service: web::Data<Arc<RwLock<EmailService>>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.update_mail_settings(&req.0).await {
+        Ok(_) => {
+            // 热更新邮件服务配置
+            let es = email_service.write().await;
+            if let Err(e) = es.reload_config().await {
+                eprintln!("热更新邮件服务配置失败: {}", e);
+            }
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "更新成功，邮件服务已热更新"
+            })))
+        },
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("更新邮件设置失败: {}", e)
+        })))
+    }
+}
+
+async fn send_test_email(
+    req: web::Json<Value>,
+    email_service: web::Data<Arc<RwLock<EmailService>>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let email = match req.get("email").and_then(|v| v.as_str()) {
+        Some(email) => email,
+        None => {
+            return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "缺少邮箱参数"
+            })));
+        }
+    };
+    let es = email_service.read().await;
+    match es.send_test_mail(email).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "测试邮件发送成功"
+        }))),
+        Err(e) => Ok(HttpResponse::Ok().json(json!({
+            "code": 500,
+            "message": format!("测试邮件发送失败: {}", e)
+        })))
+    }
 } 

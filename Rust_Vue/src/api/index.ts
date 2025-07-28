@@ -12,6 +12,7 @@ import { communityApi } from './community'
 import { userActionApi } from './userActions'
 import * as announcementApi from './announcements'
 import { logsApi } from './logs'
+import { subscriptionApi } from './subscriptions'
 
 export {
   commentApi,
@@ -26,7 +27,8 @@ export {
   communityApi,
   userActionApi,
   announcementApi,
-  logsApi
+  logsApi,
+  subscriptionApi
 }
 
 // 导出一个默认包含所有API的对象
@@ -43,7 +45,8 @@ const api = {
   community: communityApi,
   userAction: userActionApi,
   announcement: announcementApi,
-  logs: logsApi
+  logs: logsApi,
+  subscription: subscriptionApi
 }
 
 export default api
@@ -59,6 +62,7 @@ export type { SystemSettings } from './settings'
 export type { CacheData } from './cache'
 export type { UserAction, UserActionStats } from './userActions'
 export type { Announcement } from './announcements'
+export type { SubscriptionRequest } from './subscriptions'
 
 // 导出API客户端工具
 export { api, healthCheck, setToken, getToken, clearToken, isLoggedIn } from '../utils/apiClient'

@@ -21,7 +21,7 @@ export interface Announcement {
  * @param params 分页参数
  */
 export function getAnnouncements(params: { page?: number; size?: number }) {
-  return api.get('/api/v1/admin/announcements', {
+  return api.get('/v1/admin/announcements', {
     params: {
       page: params.page || 1,
       page_size: params.size || 20
@@ -42,7 +42,7 @@ export function createAnnouncement(data: {
   start_time: string
   end_time?: string
 }) {
-  return api.post('/api/v1/admin/announcements', data)
+  return api.post('/v1/admin/announcements', data)
 }
 
 /**
@@ -59,7 +59,7 @@ export function updateAnnouncement(id: number, data: {
   start_time?: string
   end_time?: string
 }) {
-  return api.put(`/api/v1/admin/announcements/${id}`, data)
+  return api.put(`/v1/admin/announcements/${id}`, data)
 }
 
 /**
@@ -67,7 +67,7 @@ export function updateAnnouncement(id: number, data: {
  * @param id 公告ID
  */
 export function deleteAnnouncement(id: number) {
-  return api.delete(`/api/v1/admin/announcements/${id}`)
+  return api.delete(`/v1/admin/announcements/${id}`)
 }
 
 /**
@@ -76,7 +76,7 @@ export function deleteAnnouncement(id: number) {
  * @param enabled 是否启用
  */
 export function batchUpdateAnnouncementStatus(ids: number[], enabled: boolean) {
-  return api.put('/api/v1/admin/announcements/batch-status', {
+  return api.put('/v1/admin/announcements/batch-status', {
     ids,
     enabled
   })
@@ -87,7 +87,7 @@ export function batchUpdateAnnouncementStatus(ids: number[], enabled: boolean) {
  * @param ids 公告ID数组
  */
 export function batchDeleteAnnouncements(ids: number[]) {
-  return api.post('/api/v1/admin/announcements/batch-delete', {
+  return api.post('/v1/admin/announcements/batch-delete', {
     ids
   })
 }
@@ -96,7 +96,7 @@ export function batchDeleteAnnouncements(ids: number[]) {
  * 获取当前有效的公告
  */
 export function getActiveAnnouncements() {
-  return api.get('/api/v1/announcements/active')
+  return api.get('/v1/announcements/active')
 }
 
 // Export default object for convenience

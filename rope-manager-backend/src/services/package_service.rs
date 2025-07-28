@@ -4,12 +4,18 @@ use crate::repositories::package_repo::PackageRepository;
 use crate::repositories::system_repo::SystemRepository;
 use crate::utils::file::FileUtils;
 use chrono::Utc;
+use crate::repositories::subscription_repo::SubscriptionRepository;
+use crate::services::email_service::EmailService;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct PackageService {
     package_repo: PackageRepository,
     system_repo: Option<SystemRepository>,
     file_utils: FileUtils,
+    subscription_repo: Option<SubscriptionRepository>,
+    email_service: Option<Arc<RwLock<EmailService>>>,
 }
 
 impl PackageService {
@@ -18,12 +24,20 @@ impl PackageService {
             package_repo,
             system_repo: None,
             file_utils: FileUtils::new(upload_path),
+            subscription_repo: None,
+            email_service: None,
         }
     }
 
     // 设置系统仓库，用于记录资源操作
     pub fn with_system_repo(mut self, system_repo: SystemRepository) -> Self {
         self.system_repo = Some(system_repo);
+        self
+    }
+
+    pub fn with_notifier(mut self, sub_repo: SubscriptionRepository, email_service: Arc<RwLock<EmailService>>) -> Self {
+        self.subscription_repo = Some(sub_repo);
+        self.email_service = Some(email_service);
         self
     }
 
@@ -79,6 +93,18 @@ impl PackageService {
                 log::error!("记录资源创建操作失败: {}", e);
             } else {
                 log::info!("成功记录资源创建操作: Package ID={}", created_package.id);
+            }
+        }
+
+        // 发送订阅邮件
+        if let (Some(sub_repo), Some(email_srv_arc)) = (&self.subscription_repo, &self.email_service) {
+            if let Some(cat_id) = created_package.category_id {
+                if let Ok(emails) = sub_repo.get_subscribed_emails(cat_id).await {
+                    let es = email_srv_arc.read().await;
+                    for mail in emails {
+                        let _ = es.send_resource_notification(&mail, &created_package.name, &created_package.description.as_deref().unwrap_or(""), &format!("https://example.com/resources/{}", created_package.id)).await;
+                    }
+                }
             }
         }
         

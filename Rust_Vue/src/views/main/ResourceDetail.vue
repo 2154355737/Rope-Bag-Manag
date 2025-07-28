@@ -132,7 +132,18 @@
             <div v-else class="comment-list">
               <div v-for="comment in comments" :key="comment.id" class="comment-item">
                 <div class="comment-header">
-                  <div class="comment-author">{{ comment.author_name || '匿名用户' }}</div>
+                  <el-avatar
+                    :src="comment.author_avatar"
+                    size="small"
+                    class="comment-avatar"
+                  >
+                    {{ (comment.author_name || '匿').charAt(0) }}
+                  </el-avatar>
+                  <div class="comment-meta">
+                    <span class="comment-author">{{ comment.author_name || '匿名用户' }}</span>
+                    <el-tag v-if="comment.author_role" size="small" type="success" class="ml-1">{{ formatRole(comment.author_role) }}</el-tag>
+                    <span v-if="comment.author_qq" class="comment-qq ml-1">QQ: {{ comment.author_qq }}</span>
+                  </div>
                   <div class="comment-time">{{ formatDate(comment.created_at) }}</div>
                 </div>
                 <div class="comment-content">{{ comment.content }}</div>
@@ -276,6 +287,18 @@ const currentUserId = computed(() => {
 // 格式化日期
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('zh-CN')
+}
+
+// 角色映射
+const formatRole = (role?: string) => {
+  if (!role) return ''
+  const map: Record<string, string> = {
+    admin: '管理员',
+    moderator: '版主',
+    elder: '长老',
+    user: '用户'
+  }
+  return map[role] || role
 }
 
 // 方法
@@ -468,7 +491,7 @@ const submitComment = async () => {
     const res = await commentApi.createComment({
       content: commentForm.content.trim(),
       target_id: resourceId.value,
-      target_type: 'package',
+      target_type: 'Package',
       parent_id: commentForm.parentId ?? undefined
     })
     
@@ -492,17 +515,15 @@ const submitComment = async () => {
 
 const likeComment = async (commentId: number) => {
   try {
-    // 这里假设有评论点赞API，实际使用时需要替换为真实API
-    // const res = await commentApi.likeComment(commentId)
-    const res = { code: 0, message: '点赞成功' } // 临时模拟
-    
+    const res = await commentApi.likeComment(commentId, true)
+ 
     if (res.code === 0) {
       ElMessage.success('点赞成功')
       
       // 更新评论的点赞数
       const comment = comments.value.find(c => c.id === commentId)
       if (comment) {
-        comment.likes = (comment.likes || 0) + 1
+        comment.likes = res.data ?? (comment.likes + 1)
       }
     } else {
       ElMessage.error(res.message || '点赞失败')
@@ -766,13 +787,30 @@ onMounted(async () => {
 
 .comment-header {
   display: flex;
+  align-items: center; /* Added for avatar alignment */
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+.comment-avatar {
+  margin-right: 12px;
+}
+
+.comment-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-grow: 1; /* Allow meta to grow and take available space */
 }
 
 .comment-author {
   font-weight: 500;
   color: #1f2937;
+}
+
+.comment-qq {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .comment-time {

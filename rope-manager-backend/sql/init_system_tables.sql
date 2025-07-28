@@ -11,9 +11,15 @@ CREATE TABLE IF NOT EXISTS system_logs (
 CREATE TABLE IF NOT EXISTS system_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
+    description TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- 旧版本若缺失 description 字段则补充
+PRAGMA table_info(system_settings);
+-- 上述语句仅检测，无副作用；真正添加字段：
+ALTER TABLE system_settings ADD COLUMN description TEXT;
 
 -- 插入默认的主题设置
 INSERT OR IGNORE INTO system_settings (key, value) VALUES ('primary_color', '#409EFF');

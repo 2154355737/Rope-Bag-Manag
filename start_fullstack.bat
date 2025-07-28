@@ -17,7 +17,7 @@ if not exist "rope-manager-backend\config.toml" (
 
 echo.
 echo 2. 启动后端服务...
-start "后端服务" cmd /k "cd rope-manager-backend && cargo run"
+start "后端服务" cmd /k "cd rope-manager-backend && cargo run --bin rope-manager-backend"
 
 echo.
 echo 3. 等待后端服务启动...

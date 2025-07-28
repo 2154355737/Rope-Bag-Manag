@@ -339,8 +339,12 @@ import {
   batchDeleteBackupRecords,
   restoreBackup as restoreBackupApi,
   getBackupDownloadUrl,
-  BackupRecord
+  BackupRecord,
+  getBackupStats,
+  configureAutoBackup as configAutoBackupApi,
+  getAutoBackupConfig
 } from '../../api/backupRecords'
+import { uploadFile } from '@/utils/apiClient'
 
 // 响应式数据
 const loading = ref(false)
@@ -368,13 +372,69 @@ const autoBackupConfig = reactive({
   max_backup_files: 10
 })
 
-const refreshData = () => {};
+const refreshData = async () => {
+  await Promise.all([loadBackups(), loadStats()])
+}
+
+const loadStats = async () => {
+  const res = await getBackupStats()
+  if (res.code === 0) {
+    Object.assign(status, res.data)
+  }
+}
+
 const autoBackupEnabled = ref(false);
-const toggleAutoBackup = () => {};
+const toggleAutoBackup = async () => {
+  autoBackupConfig.enable_auto_backup = autoBackupEnabled.value
+  await saveAutoBackupConfig()
+}
+
 const autoBackupSchedule = ref('');
-const exportBackup = () => {};
-const importBackup = () => {};
-const cleanupBackups = () => {};
+const exportBackup = async () => {
+  await createBackup()
+  ElMessage.info('备份创建后可在列表下载')
+}
+
+async function createBackup() {
+  backupLoading.value = true
+  try {
+    const res = await createBackupApi({ backup_type: 'Manual' })
+    if (res.code === 0) {
+      ElMessage.success('备份创建成功')
+      refreshData()
+    }
+  } catch (e) {
+    ElMessage.error('创建备份失败')
+  } finally { backupLoading.value=false }
+}
+
+const importBackup = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.db'
+  input.onchange = async () => {
+    if (!input.files?.length) return
+    const form = new FormData()
+    form.append('file', input.files[0])
+    const res = await uploadFile('/api/v1/admin/backup/upload', form)
+    if (res.code === 0) {
+      ElMessage.success('导入成功')
+      refreshData()
+    }
+  }
+  input.click()
+}
+
+const cleanupBackups = async () => {
+  await ElMessageBox.confirm('确定清理所有失败备份记录吗?', '提示')
+  const failIds = backupList.value.filter(b=>b.status!=='Success').map(b=>b.id)
+  if (failIds.length===0) {ElMessage.info('无失败备份');return}
+  const res = await batchDeleteBackupRecords(failIds)
+  if (res.code===0) {
+    ElMessage.success('已清理')
+    refreshData()
+  }
+}
 
 // 方法
 async function loadBackups() {
@@ -403,28 +463,6 @@ function updateStatus() {
   status.success_backups = backupList.value.filter(b => b.status === 'Success').length
   status.failed_backups = backupList.value.filter(b => b.status === 'Failed').length
   status.total_size = backupList.value.reduce((sum, b) => sum + (b.file_size || 0), 0)
-}
-
-async function createBackup() {
-  backupLoading.value = true
-  try {
-    const backupData = {
-      backup_type: 'Manual',
-      description: '手动创建的备份'
-    }
-    const response = await createBackupApi(backupData)
-    if (response.code === 0) {
-      ElMessage.success('备份创建成功')
-      loadBackups()
-    } else {
-      ElMessage.error(response.message || '备份创建失败')
-    }
-  } catch (error) {
-    console.error('创建备份失败:', error)
-    ElMessage.error('创建备份失败')
-  } finally {
-    backupLoading.value = false
-  }
 }
 
 function configureAutoBackup() {
@@ -600,8 +638,14 @@ function formatTime(time: string): string {
   return new Date(time).toLocaleString()
 }
 
-onMounted(() => {
-  loadBackups()
+onMounted(async () => {
+  await refreshData()
+  const cfg = await getAutoBackupConfig()
+  if (cfg.code === 0) {
+    Object.assign(autoBackupConfig, cfg.data)
+    autoBackupEnabled.value = autoBackupConfig.enable_auto_backup
+    autoBackupSchedule.value = `${autoBackupConfig.backup_interval_hours}h`
+  }
 })
 </script>
 

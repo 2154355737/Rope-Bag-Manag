@@ -80,17 +80,17 @@ export const packageApi = {
     if (params?.search) queryParams.append('search', params.search)
 
     console.log("请求参数:", queryParams.toString())
-    return api.get(`/api/v1/packages?${queryParams.toString()}`)
+    return api.get(`/v1/packages?${queryParams.toString()}`)
   },
 
   // 获取单个绳包
   getPackage: (id: number): Promise<ApiResponse<Package>> => {
-    return api.get(`/api/v1/packages/${id}`)
+    return api.get(`/v1/packages/${id}`)
   },
 
   // 创建绳包
   createPackage: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.post('/api/v1/packages', data).then(response => {
+    return api.post('/v1/packages', data).then(response => {
       // 如果创建成功，记录资源操作
       if (response.code === 0 && response.data && response.data.id) {
         console.log('自动记录创建绳包操作:', response.data.id)
@@ -103,7 +103,7 @@ export const packageApi = {
 
   // 更新绳包
   updatePackage: (id: number, data: UpdatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.put(`/api/v1/packages/${id}`, data).then(response => {
+    return api.put(`/v1/packages/${id}`, data).then(response => {
       // 如果更新成功，记录资源操作
       if (response.code === 0) {
         console.log('自动记录更新绳包操作:', id)
@@ -116,7 +116,7 @@ export const packageApi = {
 
   // 删除绳包
   deletePackage: (id: number): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/packages/${id}`).then(response => {
+    return api.delete(`/v1/packages/${id}`).then(response => {
       // 如果删除成功，记录资源操作
       if (response.code === 0) {
         console.log('自动记录删除绳包操作:', id)
@@ -129,7 +129,7 @@ export const packageApi = {
 
   // 下载绳包
   downloadPackage: (id: number): Promise<ApiResponse<string>> => {
-    return api.get(`/api/v1/packages/${id}/download`).then(response => {
+    return api.get(`/v1/packages/${id}/download`).then(response => {
       // 如果下载成功，记录资源操作
       if (response.code === 0) {
         console.log('自动记录下载绳包操作:', id)
@@ -144,7 +144,7 @@ export const packageApi = {
   uploadPackageFile: (id: number, file: File): Promise<ApiResponse<Package>> => {
     const formData = new FormData()
     formData.append('file', file)
-    return api.upload(`/api/v1/packages/${id}/upload`, formData).then(response => {
+    return api.upload(`/v1/packages/${id}/upload`, formData).then(response => {
       // 如果上传成功，记录资源操作
       if (response.code === 0) {
         console.log('自动记录上传绳包操作:', id)

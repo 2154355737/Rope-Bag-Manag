@@ -17,6 +17,10 @@
             <el-icon><Plus /></el-icon>
             添加评论
           </el-button>
+          <el-button @click="openForbiddenDialog">
+            <el-icon><Setting /></el-icon>
+            违禁词配置
+          </el-button>
         </div>
       </div>
     </div>
@@ -303,6 +307,23 @@
         <el-button type="primary" @click="submitAddComment">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 违禁词配置对话框 -->
+    <el-dialog v-model="forbiddenDialogVisible" title="违禁词列表" width="500">
+      <div class="mb-3">
+        <el-input v-model="newForbiddenWord" placeholder="输入敏感词" style="width: 300px" />
+        <el-button type="primary" class="ml-2" @click="addForbiddenWord">添加</el-button>
+      </div>
+      <el-table :data="forbiddenWords" style="width: 100%">
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="word" label="词语" />
+        <el-table-column label="操作" width="120">
+          <template #default="{ row }">
+            <el-button type="danger" size="small" @click="deleteForbiddenWord(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -321,11 +342,13 @@ import {
   Plus,
   Search,
   RefreshRight,
-  Timer
+  Timer,
+  Setting
 } from '@element-plus/icons-vue'
 import { commentApi, Comment } from '../../api/comments'
 import { resourceRecordApi } from '../../api/resourceRecords'
 import { packageApi } from '../../api/packages'
+import { forbiddenWordApi, type ForbiddenWord } from '@/api/forbiddenWords'
 
 // 评论列表数据
 const commentList = ref<Comment[]>([])
@@ -336,8 +359,8 @@ const pageSize = ref(10)
 const selectedComments = ref<Comment[]>([])
 
 // 筛选表单
-const filterForm = reactive<{ [key: string]: any}>({
-  status: '',
+const filterForm = reactive({
+  status: 'Active',
   target_type: '',
   user_id: '',
   date_range: [] as Date[]
@@ -357,6 +380,11 @@ const newComment = reactive({
 })
 const resources = ref<any[]>([])
 const resourcesLoaded = ref(false)
+
+// 违禁词配置
+const forbiddenDialogVisible = ref(false)
+const forbiddenWords = ref<ForbiddenWord[]>([])
+const newForbiddenWord = ref('')
 
 // 评论统计数据
 const totalComments = computed(() => {
@@ -420,8 +448,10 @@ async function loadComments() {
     
     // 将非空的filterForm字段添加到params
     Object.keys(filterForm).forEach(key => {
-      if (filterForm[key] !== null && filterForm[key] !== undefined && filterForm[key] !== '') {
-        params[key] = filterForm[key]
+      const typedKey = key as keyof typeof filterForm
+      const value = filterForm[typedKey]
+      if (value !== null && value !== undefined && value !== '') {
+        params[key] = value
       }
     })
     
@@ -451,7 +481,7 @@ function handleFilter() {
 
 function resetFilter() {
   Object.assign(filterForm, {
-    status: '',
+    status: 'Active',
     target_type: '',
     user_id: '',
     date_range: []
@@ -536,9 +566,14 @@ async function batchHide() {
   
   try {
     await ElMessageBox.confirm(`确定要隐藏选中的 ${selectedComments.value.length} 条评论吗？`, '确认操作')
-    // 批量操作逻辑
-    ElMessage.success('批量隐藏成功')
-    loadComments()
+    const ids = selectedComments.value.map(c => c.id)
+    const res = await commentApi.batchUpdateStatus(ids, 'Hidden')
+    if (res.code === 0) {
+      ElMessage.success('批量隐藏成功')
+      loadComments()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('操作失败')
@@ -554,9 +589,14 @@ async function batchShow() {
   
   try {
     await ElMessageBox.confirm(`确定要显示选中的 ${selectedComments.value.length} 条评论吗？`, '确认操作')
-    // 批量操作逻辑
-    ElMessage.success('批量显示成功')
-    loadComments()
+    const ids = selectedComments.value.map(c => c.id)
+    const res = await commentApi.batchUpdateStatus(ids, 'Active')
+    if (res.code === 0) {
+      ElMessage.success('批量显示成功')
+      loadComments()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('操作失败')
@@ -574,9 +614,14 @@ async function batchDelete() {
     await ElMessageBox.confirm(`确定要删除选中的 ${selectedComments.value.length} 条评论吗？此操作不可恢复！`, '确认删除', {
       type: 'warning'
     })
-    // 批量删除逻辑
-    ElMessage.success('批量删除成功')
-    loadComments()
+    const ids = selectedComments.value.map(c => c.id)
+    const res = await commentApi.batchDeleteComments(ids)
+    if (res.code === 0) {
+      ElMessage.success('批量删除成功')
+      loadComments()
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
@@ -668,6 +713,42 @@ function getStatusLabel(status: string): string {
 function formatTime(time: string): string {
   if (!time) return '-'
   return new Date(time).toLocaleString()
+}
+
+const openForbiddenDialog = async () => {
+  forbiddenDialogVisible.value = true
+  await loadForbiddenWords()
+}
+
+const loadForbiddenWords = async () => {
+  const res = await forbiddenWordApi.getAll()
+  if (res.code === 0) {
+    const list = (res.data as any[] || []).map((item: any) => {
+      if (Array.isArray(item) && item.length === 2) {
+        return { id: item[0], word: item[1] }
+      }
+      return item
+    })
+    forbiddenWords.value = list
+  }
+}
+
+const addForbiddenWord = async () => {
+  if (!newForbiddenWord.value.trim()) return
+  const res = await forbiddenWordApi.add(newForbiddenWord.value.trim())
+  if (res.code === 0) {
+    ElMessage.success('添加成功')
+    newForbiddenWord.value = ''
+    loadForbiddenWords()
+  }
+}
+
+const deleteForbiddenWord = async (id: number) => {
+  const res = await forbiddenWordApi.delete(id)
+  if (res.code === 0) {
+    ElMessage.success('已删除')
+    loadForbiddenWords()
+  }
 }
 
 onMounted(() => {

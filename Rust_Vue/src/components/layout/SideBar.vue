@@ -92,7 +92,8 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin/announcements', title: '公告管理', icon: 'Bell', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0, roles: ['admin'] },
   { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
-  { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] }
+  { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] },
+  { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] }
 ]
 const menuItems = ref<MenuItem[]>([])
 

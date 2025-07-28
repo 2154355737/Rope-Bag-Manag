@@ -8,6 +8,8 @@ pub mod cache;
 pub mod community;
 pub mod resource_records;
 pub mod user_actions; // 添加用户行为记录API模块
+pub mod forbidden_words;
+pub mod subscription;
 
 use actix_web::web;
 
@@ -25,5 +27,7 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
             .configure(community::configure_routes)
             .configure(resource_records::configure_routes)
             .configure(user_actions::configure_routes)
+            .configure(forbidden_words::configure_routes)
+            .configure(subscription::configure_routes)
     );
 } 
