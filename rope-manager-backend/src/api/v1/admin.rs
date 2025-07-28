@@ -5,11 +5,15 @@ use crate::services::admin_service::AdminService;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::services::email_service::EmailService;
+use crate::utils::auth_helper::AuthHelper;
+use crate::{require_admin, require_auth};
 // MailConfig已移至models/mail.rs
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/admin")
+            // TODO: 所有管理员路由都需要管理员权限 - 待权限中间件修复后启用
+            // .wrap(require_admin())
             .service(
                 web::resource("/stats")
                     .route(web::get().to(get_stats))
@@ -91,7 +95,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/settings")
                     .route(web::get().to(get_settings))
-                    .route(web::post().to(update_settings)) // 添加POST方法
+                    .route(web::post().to(update_settings))
             )
             .service(
                 web::resource("/settings/reset")
@@ -100,7 +104,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/settings/{key}")
                     .route(web::get().to(get_setting))
-                    .route(web::post().to(update_setting)) // 修改为POST方法
+                    .route(web::post().to(update_setting))
             )
             .service(
                 web::resource("/resource-records")
@@ -131,7 +135,11 @@ pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
 
 async fn get_stats(
     admin_service: web::Data<AdminService>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 验证管理员权限
+    let _user = require_admin!(&req);
+    
     match admin_service.get_stats().await {
         Ok(stats) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
@@ -147,7 +155,11 @@ async fn get_stats(
 
 async fn get_user_stats(
     admin_service: web::Data<AdminService>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 验证管理员权限
+    let _user = require_admin!(&req);
+    
     match admin_service.get_user_stats().await {
         Ok((total_users, active_users, total_actions)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
@@ -340,21 +352,48 @@ async fn download_backup(
     }
 }
 
-// 更新删除备份接口
+// 删除备份接口 - 应用权限验证和审计日志
 async fn delete_backup(
     path: web::Path<String>,
     admin_service: web::Data<AdminService>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, actix_web::Error> {
     let backup_id = path.into_inner();
+    
+    // 验证管理员权限
+    let user = require_admin!(&req);
+    
     match admin_service.delete_backup(&backup_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "备份删除成功"
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": format!("备份删除失败: {}", e)
-        })))
+        Ok(_) => {
+            // 记录成功的安全事件
+            AuthHelper::log_security_event(
+                Some(&user),
+                "backup_delete",
+                &format!("管理员删除备份: {}", backup_id),
+                &req,
+            ).await;
+            
+            log::info!("✅ 管理员 {} 删除备份: {}", user.username, backup_id);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "备份删除成功"
+            })))
+        },
+        Err(e) => {
+            // 记录失败的安全事件
+            AuthHelper::log_security_event(
+                Some(&user),
+                "backup_delete_failed",
+                &format!("管理员删除备份失败: {} - {}", backup_id, e),
+                &req,
+            ).await;
+            
+            log::error!("❌ 管理员 {} 删除备份失败 {}: {}", user.username, backup_id, e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("备份删除失败: {}", e)
+            })))
+        }
     }
 }
 

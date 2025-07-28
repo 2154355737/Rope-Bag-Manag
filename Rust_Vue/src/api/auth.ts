@@ -11,8 +11,20 @@ export interface RegisterRequest {
   username: string
   password: string
   email: string
-  nickname: string
-  qq_number: string
+  nickname: string | null
+  qq_number: string | null
+  verification_code: string // 邮箱验证码
+}
+
+// 邮箱验证码登录请求类型
+export interface EmailLoginRequest {
+  email: string
+  code: string
+}
+
+// 发送验证码请求类型
+export interface SendCodeRequest {
+  email: string
 }
 
 // 用户信息类型
@@ -39,6 +51,11 @@ export const authApi = {
     return api.post('/v1/auth/login', data)
   },
 
+  // 邮箱验证码登录
+  loginByEmail: (data: EmailLoginRequest): Promise<ApiResponse<LoginResponse>> => {
+    return api.post('/v1/auth/login-by-email', data)
+  },
+
   // 用户注册
   register: (data: RegisterRequest): Promise<ApiResponse<LoginResponse>> => {
     return api.post('/v1/auth/register', data)
@@ -49,14 +66,14 @@ export const authApi = {
     return api.get('/v1/auth/user-info')
   },
 
-  // 用户登出
-  logout: (): Promise<ApiResponse<null>> => {
-    return api.post('/v1/auth/logout')
+  // 发送注册验证码
+  sendRegisterCode: (data: SendCodeRequest): Promise<ApiResponse<null>> => {
+    return api.post('/v1/auth/send-register-code', data)
   },
 
-  // 发送邮箱验证码
-  sendCode: (email: string): Promise<ApiResponse<null>> => {
-    return api.post('/v1/auth/send-code', { email })
+  // 发送登录验证码
+  sendLoginCode: (data: SendCodeRequest): Promise<ApiResponse<null>> => {
+    return api.post('/v1/auth/send-login-code', data)
   },
 
   // 请求重置密码邮件
@@ -72,5 +89,10 @@ export const authApi = {
   // 重置密码
   resetPassword: (data: { email: string; token: string; new_password: string }): Promise<ApiResponse<null>> => {
     return api.post('/v1/auth/reset-password', data)
+  },
+
+  // 退出登录 (清除服务器端HttpOnly Cookie)
+  logout: (): Promise<ApiResponse<null>> => {
+    return api.post('/v1/auth/logout')
   },
 } 

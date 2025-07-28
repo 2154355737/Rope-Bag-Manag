@@ -21,15 +21,21 @@ export const sessionTracker = {
   trackSessionStartEnd() {
     // 记录会话开始
     const recordSessionStart = () => {
+      const token = localStorage.getItem('token')
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-      const username = userInfo?.username || '访客'
+      const username = userInfo?.username
       
-      userActionService.logAction(
-        'SessionStart', 
-        `用户${username}开始新会话`, 
-        'Session', 
-        undefined
-      ).catch(err => console.error('记录会话开始失败:', err))
+      // 只有在用户已认证时才记录会话开始
+      if (token && username) {
+        userActionService.logAction(
+          'SessionStart', 
+          `用户${username}开始新会话`, 
+          'Session', 
+          undefined
+        ).catch(err => console.error('记录会话开始失败:', err))
+      } else {
+        console.log('跳过会话开始记录：用户未认证')
+      }
     }
     
     // 记录会话结束
@@ -75,11 +81,12 @@ export const sessionTracker = {
     
     // 标签页可见性变化处理
     const handleVisibilityChange = () => {
+      const token = localStorage.getItem('token')
       const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-      const username = userInfo?.username || '访客'
+      const username = userInfo?.username
       
-      // 只记录已登录用户
-      if (username !== '访客') {
+      // 只记录已认证用户
+      if (token && username) {
         if (document[hidden as keyof Document]) {
           // 标签页不可见
           userActionService.logAction(
@@ -121,10 +128,11 @@ export const sessionTracker = {
       // 如果之前处于闲置状态，记录用户活动恢复
       if (isIdle) {
         isIdle = false
+        const token = localStorage.getItem('token')
         const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-        const username = userInfo?.username || '访客'
+        const username = userInfo?.username
         
-        if (username !== '访客') {
+        if (token && username) {
           userActionService.logAction(
             'UserActive', 
             `用户${username}恢复活动`, 
@@ -143,10 +151,11 @@ export const sessionTracker = {
         // 超过闲置阈值
         if (idleTime >= idleThreshold && !isIdle) {
           isIdle = true
+          const token = localStorage.getItem('token')
           const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
-          const username = userInfo?.username || '访客'
+          const username = userInfo?.username
           
-          if (username !== '访客') {
+          if (token && username) {
             userActionService.logAction(
               'UserIdle', 
               `用户${username}闲置${idleThreshold}分钟`, 

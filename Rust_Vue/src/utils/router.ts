@@ -1,5 +1,5 @@
 import { getDeviceType } from './device'
-import { isLoggedIn, isLoginExpired, getUserInfo } from './auth'
+import { isLoggedIn, getUserInfo, isLoginExpired, getToken } from './auth'
 import { RouteLocationNormalized } from 'vue-router'
 import userActionService from './userActionService'
 
@@ -84,7 +84,7 @@ export function checkAuthStatus() {
     isAuthenticated,
     isLoggedIn: isLoggedIn(),
     isExpired: isLoginExpired(),
-    userInfo: isAuthenticated ? JSON.parse(localStorage.getItem('userInfo') || '{}') : null
+    userInfo: isAuthenticated ? getUserInfo() : null
   }
 }
 
@@ -140,12 +140,19 @@ export const logRouteNavigation = (to: RouteLocationNormalized) => {
   
   try {
     const userInfo = getUserInfo()
-    console.log(`路由导航: ${toPath}, 页面: ${toName}`)
+    const token = getToken()
+    const isAuthenticated = !!token && !!userInfo
     
-    // 记录用户页面访问
-    if (userInfo && userInfo.id) {
+    console.log(`路由导航: ${toPath}, 页面: ${toName}`)
+    console.log('认证状态:', { isAuthenticated, hasToken: !!token, hasUserInfo: !!userInfo })
+    
+    // 只有在真正已登录（有Token且有用户信息）时才记录页面访问
+    if (isAuthenticated && userInfo.username) {
+      console.log('记录页面访问:', toPath)
       userActionService.logPageView(toPath)
         .catch(err => console.error('记录页面访问失败:', err))
+    } else {
+      console.log('跳过记录页面访问：用户未完全登录')
     }
     
   } catch (error) {

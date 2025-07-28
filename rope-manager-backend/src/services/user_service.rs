@@ -133,7 +133,7 @@ impl UserService {
             is_admin: role.to_lowercase() == "admin",
         };
 
-        self.user_repo.create_user(&user).await
+        self.user_repo.create_user(&user).await.map(|_| ())
     }
 
     // 新增方法：批量删除用户

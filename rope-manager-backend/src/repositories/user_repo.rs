@@ -137,13 +137,28 @@ impl UserRepository {
                     login_count: row.get(11)?,
                     upload_count: row.get(12)?,
                     download_count: row.get(13)?,
-                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?)
-                        .map_err(|_| rusqlite::Error::InvalidColumnType(14, "created_at".to_string(), rusqlite::types::Type::Text))?
-                        .with_timezone(&chrono::Utc),
+                    created_at: {
+                        let datetime_str = row.get::<_, String>(14)?;
+                        // 尝试解析SQLite默认格式: "YYYY-MM-DD HH:MM:SS"
+                        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&datetime_str, "%Y-%m-%d %H:%M:%S") {
+                            chrono::DateTime::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+                        } else if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&datetime_str) {
+                            // 备用：尝试RFC3339格式
+                            dt.with_timezone(&chrono::Utc)
+                        } else {
+                            // 最后备用：使用当前时间
+                            chrono::Utc::now()
+                        }
+                    },
                     last_login: row.get::<_, Option<String>>(15)?.map(|s| {
-                        chrono::DateTime::parse_from_rfc3339(&s)
-                            .map(|dt| dt.with_timezone(&chrono::Utc))
-                            .unwrap_or_else(|_| chrono::Utc::now())
+                        // 处理last_login字段，也可能是SQLite格式
+                        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S") {
+                            chrono::DateTime::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+                        } else if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                            dt.with_timezone(&chrono::Utc)
+                        } else {
+                            chrono::Utc::now()
+                        }
                     }),
                     is_admin: row.get(16)?,
                 })
@@ -185,13 +200,28 @@ impl UserRepository {
                     login_count: row.get(11)?,
                     upload_count: row.get(12)?,
                     download_count: row.get(13)?,
-                    created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?)
-                        .map_err(|_| rusqlite::Error::InvalidColumnType(14, "created_at".to_string(), rusqlite::types::Type::Text))?
-                        .with_timezone(&chrono::Utc),
+                    created_at: {
+                        let datetime_str = row.get::<_, String>(14)?;
+                        // 尝试解析SQLite默认格式: "YYYY-MM-DD HH:MM:SS"
+                        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&datetime_str, "%Y-%m-%d %H:%M:%S") {
+                            chrono::DateTime::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+                        } else if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&datetime_str) {
+                            // 备用：尝试RFC3339格式
+                            dt.with_timezone(&chrono::Utc)
+                        } else {
+                            // 最后备用：使用当前时间
+                            chrono::Utc::now()
+                        }
+                    },
                     last_login: row.get::<_, Option<String>>(15)?.map(|s| {
-                        chrono::DateTime::parse_from_rfc3339(&s)
-                            .map(|dt| dt.with_timezone(&chrono::Utc))
-                            .unwrap_or_else(|_| chrono::Utc::now())
+                        // 处理last_login字段，也可能是SQLite格式
+                        if let Ok(naive_dt) = chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S") {
+                            chrono::DateTime::from_naive_utc_and_offset(naive_dt, chrono::Utc)
+                        } else if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                            dt.with_timezone(&chrono::Utc)
+                        } else {
+                            chrono::Utc::now()
+                        }
                     }),
                     is_admin: row.get(16)?,
                 })
@@ -200,7 +230,7 @@ impl UserRepository {
         Ok(user)
     }
 
-    pub async fn create_user(&self, user: &User) -> Result<()> {
+    pub async fn create_user(&self, user: &User) -> Result<i32> {
         let conn = self.conn.lock().await;
         conn.execute(
             "INSERT INTO users (username, email, password_hash, nickname, role, star, ban_status, 
@@ -235,7 +265,10 @@ impl UserRepository {
                 user.is_admin,
             ]
         )?;
-        Ok(())
+        
+        // 返回新创建用户的ID
+        let user_id = conn.last_insert_rowid() as i32;
+        Ok(user_id)
     }
 
     pub async fn update_user(&self, user: &User) -> Result<()> {

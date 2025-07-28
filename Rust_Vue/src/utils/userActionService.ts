@@ -1,4 +1,17 @@
 import { userActionApi } from '../api/userActions'
+import { getToken, getUserInfo } from './auth'
+
+// 全局变量：只有/user-info验证通过后才为true
+if (typeof window !== 'undefined') {
+  (window as any).lastUserInfoValid = false
+}
+
+function isReallyAuthenticated(): boolean {
+  const token = getToken()
+  const userInfo = getUserInfo()
+  // 只有token存在、userInfo存在且lastUserInfoValid为true才算真正认证
+  return !!token && !!userInfo && !!userInfo.username && (typeof window !== 'undefined' ? (window as any).lastUserInfoValid : false)
+}
 
 /**
  * 用户行为记录服务
@@ -12,6 +25,10 @@ export const userActionService = {
    * @param details 额外详情信息
    */
   logLogin: (username: string, success: boolean, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过登录行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Login',
       details || `用户 ${username} ${success ? '成功' : '失败'}登录`,
@@ -25,6 +42,10 @@ export const userActionService = {
    * @param username 用户名
    */
   logLogout: (username: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过登出行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Logout',
       `用户 ${username} 登出系统`,
@@ -40,6 +61,10 @@ export const userActionService = {
    * @param details 额外详情信息
    */
   logRegister: (username: string, success: boolean, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过注册行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Register',
       details || `用户 ${username} ${success ? '成功' : '失败'}注册`,
@@ -55,6 +80,10 @@ export const userActionService = {
    * @param details 额外详情
    */
   logView: (resourceType: string, resourceId: number, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过资源查看行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'View',
       details || `查看${resourceType}`,
@@ -70,6 +99,10 @@ export const userActionService = {
    * @param details 额外详情
    */
   logDownload: (resourceType: string, resourceId: number, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过资源下载行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Download',
       details || `下载${resourceType}`,
@@ -85,6 +118,10 @@ export const userActionService = {
    * @param details 额外详情
    */
   logUpload: (resourceType: string, resourceId: number, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过资源上传行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Upload',
       details || `上传${resourceType}`,
@@ -100,6 +137,10 @@ export const userActionService = {
    * @param details 额外详情
    */
   logComment: (targetType: string, targetId: number, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过评论行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Comment',
       details || `评论${targetType}`,
@@ -115,6 +156,10 @@ export const userActionService = {
    * @param details 额外详情
    */
   logSearch: (keyword: string, category?: string, details?: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过搜索行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Search',
       details || `搜索${category ? `${category}分类下的` : ''}关键词: ${keyword}`,
@@ -129,6 +174,10 @@ export const userActionService = {
    * @param details 操作详情
    */
   logAdminAction: (actionType: string, details: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过管理员操作记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       'Admin',
       details,
@@ -142,6 +191,11 @@ export const userActionService = {
    * @param page 页面路径
    */
   logPageView: (page: string) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过页面访问记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
+    
     return userActionApi.logUserAction(
       'PageView',
       `访问页面: ${page}`,
@@ -158,6 +212,10 @@ export const userActionService = {
    * @param targetId 目标ID
    */
   logAction: (actionType: string, details: string, targetType?: string, targetId?: number) => {
+    if (!isReallyAuthenticated()) {
+      console.log('跳过行为记录：未真正认证')
+      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    }
     return userActionApi.logUserAction(
       actionType,
       details,

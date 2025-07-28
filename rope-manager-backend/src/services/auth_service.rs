@@ -30,9 +30,15 @@ impl AuthService {
         }
     }
 
-    pub async fn login(&self, username: &str, password: &str) -> Result<LoginResponse> {
-        // 查找用户
-        let user = self.user_repo.find_by_username(username).await?;
+    /// 用户名/邮箱 + 密码登录
+    pub async fn login(&self, username_or_email: &str, password: &str) -> Result<LoginResponse> {
+        // 首先尝试用户名登录，再尝试邮箱登录
+        let user = if username_or_email.contains('@') {
+            self.user_repo.find_by_email(username_or_email).await?
+        } else {
+            self.user_repo.find_by_username(username_or_email).await?
+        };
+        
         let user = user.ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
 
         // 验证密码
@@ -54,17 +60,77 @@ impl AuthService {
         Ok(LoginResponse { user, token })
     }
 
+    /// 邮箱验证码登录
+    pub async fn login_by_email_code(&self, email: &str, code: &str) -> Result<LoginResponse> {
+        // 验证邮箱验证码
+        if !self.email_repo.verify(email, code).await? {
+            return Err(anyhow::anyhow!("验证码错误或已过期"));
+        }
+
+        // 查找用户
+        let user = self.user_repo.find_by_email(email).await?;
+        let user = user.ok_or_else(|| anyhow::anyhow!("该邮箱未注册账户"))?;
+
+        // 检查用户状态
+        if user.ban_status != crate::models::BanStatus::Normal {
+            return Err(anyhow::anyhow!("用户已被封禁"));
+        }
+
+        // 生成JWT token
+        let token = self.jwt_utils.generate_token(&user)?;
+
+        // 更新最后登录时间
+        self.user_repo.update_last_login(user.id).await?;
+
+        Ok(LoginResponse { user, token })
+    }
+
+    /// 发送登录验证码
+    pub async fn send_login_code(&self, email: &str) -> Result<()> {
+        // 检查邮箱是否已注册
+        let user = self.user_repo.find_by_email(email).await?;
+        if user.is_none() {
+            return Err(anyhow::anyhow!("该邮箱未注册账户"));
+        }
+
+        // 生成6位验证码
+        let code = format!("{:06}", rand::random::<u32>() % 1_000_000);
+        let expires = chrono::Utc::now() + chrono::Duration::minutes(5);
+        
+        // 保存验证码
+        self.email_repo.create(None, email, &code, expires).await?;
+        
+        // 发送验证码邮件
+        {
+            let es = self.email_service.read().await;
+            es.send_verification_code(email, &code).await?;
+        }
+        
+        Ok(())
+    }
+
+    /// 用户注册（需要邮箱验证）
     pub async fn register(&self, req: &CreateUserRequest) -> Result<LoginResponse> {
+        // 验证邮箱验证码
+        if !self.email_repo.verify(&req.email, &req.verification_code).await? {
+            return Err(anyhow::anyhow!("邮箱验证码错误或已过期"));
+        }
+
         // 检查用户名是否已存在
         if let Some(_) = self.user_repo.find_by_username(&req.username).await? {
             return Err(anyhow::anyhow!("用户名已存在"));
+        }
+
+        // 检查邮箱是否已存在
+        if let Some(_) = self.user_repo.find_by_email(&req.email).await? {
+            return Err(anyhow::anyhow!("邮箱已被注册"));
         }
 
         // 加密密码
         let password_hash = self.password_utils.hash_password(&req.password)?;
 
         // 创建用户
-        let user = User {
+        let mut user = User {
             id: 0, // 数据库会自动生成
             username: req.username.clone(),
             email: req.email.clone(),
@@ -84,7 +150,9 @@ impl AuthService {
             is_admin: false,
         };
 
-        self.user_repo.create_user(&user).await?;
+        let user_id = self.user_repo.create_user(&user).await?;
+        user.id = user_id;
+        
         // 生成token
         let token = self.jwt_utils.generate_token(&user)?;
         Ok(LoginResponse { user, token })
@@ -118,7 +186,9 @@ impl AuthService {
         
         // 构建重置链接（应该是前端的重置页面地址）
         let reset_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-        let link = format!("{}/auth/reset-password?token={}&email={}", reset_url, link_token, email);
+        // 对邮箱地址进行URL编码，避免@符号等特殊字符导致邮件服务认为链接无效
+        let encoded_email = urlencoding::encode(email);
+        let link = format!("{}/auth/reset-password?token={}&email={}", reset_url, link_token, encoded_email);
         
         // 发送重置邮件
         {

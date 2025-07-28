@@ -29,6 +29,9 @@ import { resourceLogger } from './utils/loggerService'
 // 导入会话追踪器
 import sessionTracker from './utils/sessionTracker'
 
+// 导入认证相关函数
+import { refreshUserInfo } from './utils/auth'
+
 // 创建应用
 const app = createApp(App)
 
@@ -49,8 +52,17 @@ app.config.globalProperties.$resourceLogger = resourceLogger
 // 也可以通过provide/inject使用
 app.provide('resourceLogger', resourceLogger)
 
-// 初始化会话追踪器
-sessionTracker.init()
+// 暂时完全禁用会话追踪器，直到问题解决
+// sessionTracker.init()
+
+// 页面加载时自动调用refreshUserInfo，确保lastUserInfoValid正确。
+refreshUserInfo()
+  .then(() => {
+    console.log('用户信息刷新完成')
+  })
+  .catch(() => {
+    console.warn('用户信息刷新失败')
+  })
 
 // 挂载应用
 app.mount('#app')

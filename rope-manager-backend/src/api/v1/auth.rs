@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse, Result, HttpRequest};
 use serde_json::json;
-use crate::models::{CreateUserRequest, LoginRequest};
+use crate::models::{CreateUserRequest, LoginRequest, EmailLoginRequest, SendCodeRequest};
 use crate::services::auth_service::AuthService;
 use serde::Deserialize;
 
@@ -24,9 +24,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/auth")
             .service(web::resource("/login").route(web::post().to(login)))
+            .service(web::resource("/login-by-email").route(web::post().to(login_by_email)))
             .service(web::resource("/register").route(web::post().to(register)))
             .service(web::resource("/user-info").route(web::get().to(get_user_info)))
-            .service(web::resource("/send-code").route(web::post().to(send_code)))
+            .service(web::resource("/send-register-code").route(web::post().to(send_register_code)))
+            .service(web::resource("/send-login-code").route(web::post().to(send_login_code)))
             .service(web::resource("/verify-code").route(web::post().to(verify_code)))
             .service(web::resource("/reset-request").route(web::post().to(reset_request)))
             .service(web::resource("/reset-password").route(web::post().to(reset_password)))
@@ -37,16 +39,37 @@ async fn login(
     req: web::Json<LoginRequest>,
     auth_service: web::Data<AuthService>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 添加调试日志
+    println!("接收到登录请求: username='{}', password长度={}", req.username, req.password.len());
+    
     match auth_service.login(&req.username, &req.password).await {
-        Ok(response) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "登录成功",
-            "data": response
-        }))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
-            "code": 1,
-            "message": e.to_string()
-        })))
+        Ok(response) => {
+            println!("登录成功: 用户ID={}, 角色={:?}", response.user.id, response.user.role);
+            
+            // 设置HttpOnly Cookie
+            let cookie = actix_web::cookie::Cookie::build("auth_token", &response.token)
+                .path("/")
+                .max_age(actix_web::cookie::time::Duration::hours(24))
+                .same_site(actix_web::cookie::SameSite::Lax)
+                .http_only(true)
+                .secure(cfg!(not(debug_assertions))) // 生产环境使用HTTPS
+                .finish();
+            
+            Ok(HttpResponse::Ok()
+                .cookie(cookie)
+                .json(json!({
+                    "code": 0,
+                    "message": "登录成功",
+                    "data": response
+                })))
+        },
+        Err(e) => {
+            println!("登录失败: {}", e);
+            Ok(HttpResponse::BadRequest().json(json!({
+                "code": 1,
+                "message": e.to_string()
+            })))
+        }
     }
 }
 
@@ -71,50 +94,89 @@ async fn get_user_info(
     req: HttpRequest,
     auth_service: web::Data<AuthService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // 从请求头获取token
-    let auth_header = req.headers().get("Authorization");
-    if let Some(auth_value) = auth_header {
-        if let Ok(auth_str) = auth_value.to_str() {
+    // 先尝试从Authorization头获取token
+    let mut token: Option<&str> = None;
+    
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
             if auth_str.starts_with("Bearer ") {
-                let token = &auth_str[7..];
-                match auth_service.get_user_from_token(token).await {
-                    Ok(user) => Ok(HttpResponse::Ok().json(json!({
-                        "code": 0,
-                        "message": "success",
-                        "data": user
-                    }))),
-                    Err(_) => Ok(HttpResponse::Unauthorized().json(json!({
-                        "code": 401,
-                        "message": "无效的token"
-                    })))
-                }
-            } else {
-                Ok(HttpResponse::BadRequest().json(json!({
-                    "code": 400,
-                    "message": "无效的认证格式"
-                })))
+                token = Some(&auth_str[7..]);
             }
-        } else {
-            Ok(HttpResponse::BadRequest().json(json!({
-                "code": 400,
-                "message": "无效的认证头"
+        }
+    }
+    
+    // 如果Authorization头没有token，尝试从Cookie获取
+    if token.is_none() {
+        if let Some(cookie_header) = req.headers().get("Cookie") {
+            if let Ok(cookie_str) = cookie_header.to_str() {
+                for cookie in cookie_str.split(';') {
+                    let cookie = cookie.trim();
+                    if cookie.starts_with("auth_token=") {
+                        token = Some(&cookie[11..]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if let Some(token_str) = token {
+        match auth_service.get_user_from_token(token_str).await {
+            Ok(user) => Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": user
+            }))),
+            Err(_) => Ok(HttpResponse::Unauthorized().json(json!({
+                "code": 401,
+                "message": "无效的token"
             })))
         }
     } else {
         Ok(HttpResponse::Unauthorized().json(json!({
             "code": 401,
-            "message": "缺少认证头"
+            "message": "缺少认证信息"
         })))
     }
 }
 
-async fn send_code(
-    req: web::Json<EmailReq>,
+/// 邮箱验证码登录
+async fn login_by_email(
+    req: web::Json<EmailLoginRequest>,
+    auth_service: web::Data<AuthService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match auth_service.login_by_email_code(&req.email, &req.code).await {
+        Ok(response) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "登录成功",
+            "data": response
+        }))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
+            "code": 1,
+            "message": e.to_string()
+        })))
+    }
+}
+
+/// 发送注册验证码
+async fn send_register_code(
+    req: web::Json<SendCodeRequest>,
     auth_service: web::Data<AuthService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     match auth_service.send_register_code(&req.email).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"邮件已发送"}))),
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"验证码已发送"}))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500,"message":e.to_string()})))
+    }
+}
+
+/// 发送登录验证码
+async fn send_login_code(
+    req: web::Json<SendCodeRequest>,
+    auth_service: web::Data<AuthService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match auth_service.send_login_code(&req.email).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"验证码已发送"}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":1,"message":e.to_string()})))
     }
 }
 

@@ -31,11 +31,25 @@ pub enum UserRole {
     User,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub enum BanStatus {
     Normal,
     Suspended,
     Banned,
+}
+
+impl serde::Serialize for BanStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let s = match self {
+            BanStatus::Normal => "normal",
+            BanStatus::Suspended => "suspended", 
+            BanStatus::Banned => "banned",
+        };
+        serializer.serialize_str(s)
+    }
 }
 
 impl Default for UserRole {
@@ -47,6 +61,16 @@ impl Default for UserRole {
 impl Default for BanStatus {
     fn default() -> Self {
         BanStatus::Normal
+    }
+}
+
+impl fmt::Display for BanStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BanStatus::Normal => write!(f, "normal"),
+            BanStatus::Suspended => write!(f, "suspended"),
+            BanStatus::Banned => write!(f, "banned"),
+        }
     }
 }
 
@@ -84,12 +108,24 @@ pub struct CreateUserRequest {
     pub password: String,
     pub nickname: Option<String>,
     pub qq_number: Option<String>,
+    pub verification_code: String, // 邮箱验证码
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EmailLoginRequest {
+    pub email: String,
+    pub code: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SendCodeRequest {
+    pub email: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

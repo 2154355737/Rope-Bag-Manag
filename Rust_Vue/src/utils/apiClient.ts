@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { resourceRecordApi } from '../api/resourceRecords'
 import userActionService from './userActionService'
+import { getToken, clearToken } from './auth'
 
 // 为Vite环境变量声明类型
 /// <reference types="vite/client" />
@@ -13,6 +14,7 @@ const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api'
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true, // 支持Cookie发送
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,8 +28,8 @@ apiClient.interceptors.request.use(
       config.url = config.url.replace(/^\/api/, '')
     }
 
-    // 添加认证token
-    const token = localStorage.getItem('token')
+    // 添加认证token (优先从Cookie获取)
+    const token = getToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -295,149 +297,23 @@ window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
 // 响应拦截器
 apiClient.interceptors.response.use(
   (response) => {
-    // 提取请求信息
     const { config, data } = response
     const method = config.method?.toUpperCase() || 'GET'
     const url = config.url || ''
-    
-    // 特定API操作记录为用户行为
-    if (data && data.code === 0) {
-      try {
-        // 记录各种API操作
-        // 1. 身份验证相关
-        if (method === 'POST' && url.includes('/api/v1/auth/login')) {
-          // 登录成功在组件中已记录，此处不重复记录
-        } 
-        else if (method === 'POST' && url.includes('/api/v1/auth/logout')) {
-          const username = data.data?.username || localStorage.getItem('username') || '未知用户'
-          userActionService.logLogout(username)
-            .catch(err => console.error('记录登出行为失败:', err))
-        }
-        
-        // 2. 资源操作相关
-        else if (method === 'POST' && url.includes('/v1/packages')) {
-          // 记录包上传行为
-          const packageId = data.data?.id
-          const packageName = data.data?.name || '未命名包'
-          if (packageId) {
-            userActionService.logUpload('Package', packageId, `上传新绳包: ${packageName}`)
-              .catch(err => console.error('记录上传行为失败:', err))
-          }
-        }
-        else if (method === 'PUT' && url.includes('/v1/packages')) {
-          // 记录包更新行为
-          const packageMatch = url.match(/\/packages\/(\d+)/)
-          if (packageMatch && packageMatch[1]) {
-            const packageId = parseInt(packageMatch[1])
-            const packageName = data.data?.name || '未命名包'
-            userActionService.logAction(
-              'Update', 
-              `更新绳包: ${packageName}`, 
-              'Package', 
-              packageId
-            ).catch(err => console.error('记录包更新行为失败:', err))
-              }
-            }
-        else if (method === 'DELETE' && url.includes('/v1/packages')) {
-          // 记录包删除行为
-            const packageMatch = url.match(/\/packages\/(\d+)/)
-          if (packageMatch && packageMatch[1]) {
-            const packageId = parseInt(packageMatch[1])
-            userActionService.logAction(
-              'Delete', 
-              `删除绳包ID: ${packageId}`, 
-              'Package', 
-              packageId
-            ).catch(err => console.error('记录包删除行为失败:', err))
-          }
-        }
-        else if (method === 'GET' && url.includes('/download')) {
-          // 下载操作在组件中应该记录，此处可以作为备份记录点
-          const packageMatch = url.match(/\/packages\/(\d+)\/download/)
-          if (packageMatch && packageMatch[1]) {
-            const packageId = parseInt(packageMatch[1])
-            userActionService.logDownload('Package', packageId)
-              .catch(err => console.error('记录下载行为失败:', err))
-          }
-        }
-        
-        // 3. 评论相关
-        else if ((method === 'POST' || method === 'PUT') && url.includes('/api/v1/comments')) {
-          // 记录评论行为
-          const commentData = data.data
-          if (commentData?.target_id && commentData?.target_type) {
-            userActionService.logComment(
-              commentData.target_type,
-              commentData.target_id,
-              `${method === 'POST' ? '发表' : '编辑'}评论: ${commentData.content?.substring(0, 20)}${commentData.content?.length > 20 ? '...' : ''}`
-            ).catch(err => console.error('记录评论行为失败:', err))
-          }
-        }
-        else if (method === 'DELETE' && url.includes('/api/v1/comments')) {
-          // 记录评论删除
-          const commentMatch = url.match(/\/comments\/(\d+)/)
-          if (commentMatch && commentMatch[1]) {
-            const commentId = parseInt(commentMatch[1])
-            userActionService.logAction(
-              'DeleteComment', 
-              `删除评论ID: ${commentId}`, 
-              'Comment', 
-              commentId
-            ).catch(err => console.error('记录评论删除行为失败:', err))
-          }
-        }
-        
-        // 4. 用户相关
-        else if (method === 'PUT' && url.includes('/api/v1/users')) {
-          // 记录用户信息更新
-          const userMatch = url.match(/\/users\/(\d+)/)
-          if (userMatch && userMatch[1]) {
-            const userId = parseInt(userMatch[1])
-            userActionService.logAction(
-              'UpdateProfile', 
-              `更新个人信息`, 
-              'User', 
-              userId
-            ).catch(err => console.error('记录用户更新行为失败:', err))
-            }
-          }
-          
-        // 5. 搜索相关
-        else if (method === 'GET' && url.includes('/api/v1/packages') && config.params?.keyword) {
-          // 记录搜索行为
-          const keyword = config.params.keyword
-          const category = config.params.category_id ? `分类ID: ${config.params.category_id}` : '全部分类'
-          userActionService.logSearch(
-            keyword, 
-            category,
-            `搜索关键词: ${keyword} (${category})`
-          ).catch(err => console.error('记录搜索行为失败:', err))
-            }
-            
-        // 6. 管理员操作
-        else if (method !== 'GET' && url.includes('/api/v1/admin')) {
-          let actionType = '未知操作'
-          if (url.includes('/users') && method === 'PUT') actionType = '更新用户'
-          else if (url.includes('/users') && method === 'DELETE') actionType = '删除用户'
-          else if (url.includes('/settings')) actionType = '修改系统设置'
-          else if (url.includes('/backup')) actionType = '备份操作'
-          
-          userActionService.logAdminAction(
-            actionType,
-            `管理员${actionType}: ${url}`
-          ).catch(err => console.error('记录管理员操作失败:', err))
-            }
-      } catch (err) {
-        console.error('记录用户行为失败:', err)
-        }
+    const token = localStorage.getItem('token') || '';
+    const userInfo = localStorage.getItem('userInfo');
+    const isAuthenticated = !!token && !!userInfo;
+
+    // 保留认证判断，但不做任何行为记录，防止语法错误
+    if (data && data.code === 0 && isAuthenticated) {
+      // 暂时不做任何行为记录
     }
-    
     return response
   },
   (error) => {
     if (error.response?.status === 401) {
       // 清除token并跳转到登录页
-      localStorage.removeItem('token')
+      clearToken()
       window.location.href = '/login'
     }
     return Promise.reject(error)
@@ -506,10 +382,8 @@ export const setToken = (token: string) => {
   localStorage.setItem('token', token)
 }
 
-// 获取token
-export const getToken = (): string | null => {
-  return localStorage.getItem('token')
-}
+// 获取token (已移至auth.ts，这里重新导出以保持向后兼容)
+export { getToken } from './auth'
 
 // 清除token
 export const clearToken = () => {

@@ -7,7 +7,7 @@ import {
   checkAuthStatus,
   debugRouteInfo
 } from '../utils/router'
-import { getUserInfo } from '../utils/auth'
+import { getUserInfo, getToken, refreshUserInfo, isLoginExpired } from '../utils/auth'
 import { resourceLogger } from '../utils/loggerService'
 
 // 路由类型定义
@@ -209,8 +209,8 @@ const router = createRouter({
   routes,
 })
 
-// 全局前置守卫
-router.beforeEach((to, from, next) => {
+// 全局前置守卫 - 简化版本，解决循环跳转问题
+router.beforeEach(async (to, from, next) => {
   // 页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 绳包管理系统`
@@ -218,36 +218,99 @@ router.beforeEach((to, from, next) => {
     document.title = '绳包管理系统'
   }
   
-  // 检查页面权限
-  const authStatus = checkAuthStatus()
-  
-  // 先记录访问日志
-  logRouteNavigation(to)
-  
-  // 页面权限检查
-  const requiredRole = to.meta.requiresRole
-  const userRole = localStorage.getItem('userRole') || 'guest'
-  
-  if (requiredRole && requiredRole !== userRole) {
-    next({ path: '/forbidden', replace: true })
-    return
-  }
-  
-  // 检查登录状态
+  // 获取认证状态和用户信息
+  const token = getToken()
+  const userInfo = getUserInfo()
+  const isAuthenticated = !!token && !!userInfo
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
-  const isLoggedIn = localStorage.getItem('token')
   
-  if (requiresAuth && !isLoggedIn) {
-    next({ path: '/login', query: { redirect: to.fullPath } })
-    return
+  // 添加调试信息
+  console.log('🔍 路由守卫调试:', {
+    to: to.path,
+    from: from.path,
+    token: token ? '存在' : '无',
+    userInfo: userInfo ? `${userInfo.username}(${userInfo.role})` : '无',
+    isAuthenticated,
+    requiresAuth
+  })
+  
+  // 1. 如果是登录页面
+  if (to.path === '/login') {
+    if (isAuthenticated && userInfo?.role) {
+      // 已登录用户访问登录页，重定向到对应后台
+      let redirectPath = '/user'
+      if (userInfo.role === 'admin') {
+        redirectPath = '/admin'
+      } else if (userInfo.role === 'elder') {
+        redirectPath = '/elder'
+      }
+      console.log(`✅ 已登录用户重定向: ${userInfo.role} -> ${redirectPath}`)
+      return next({ path: redirectPath, replace: true })
+    } else {
+      // 未登录用户访问登录页，允许
+      return next()
+    }
   }
   
+  // 2. 需要认证的页面
+  if (requiresAuth) {
+    if (!isAuthenticated) {
+    console.warn(`🚫 未认证访问被拦截: ${to.path}`)
+    return next({ 
+      path: '/login', 
+      query: { redirect: to.fullPath },
+      replace: true 
+    })
+  }
+  
+    // 检查封禁状态
+    if (userInfo?.ban_status && userInfo.ban_status !== 'normal') {
+    console.warn(`🚫 封禁用户访问被拦截: ${userInfo.username} (${userInfo.ban_status})`)
+    // 清除认证信息
+    await logout()
+    return next({ 
+      path: '/login', 
+      query: { 
+        error: 'banned',
+        message: userInfo.ban_status === 'suspended' ? '账户已被暂停' : '账户已被封禁'
+      },
+      replace: true 
+    })
+  }
+  
+    // 检查角色权限
+  const requiredRoles = to.meta.roles as string[]
+  if (requiredRoles && requiredRoles.length > 0) {
+    const userRole = userInfo?.role || 'guest'
+  
+    if (!requiredRoles.includes(userRole)) {
+      console.warn(`🚫 角色权限不足: 需要 ${requiredRoles.join('|')}, 当前 ${userRole}`)
+      return next({ path: '/403', replace: true })
+    }
+  }
+  
+    // 检查管理员权限
+    if (to.meta.requiresAdmin && userInfo?.role !== 'admin') {
+      console.warn(`🚫 管理员权限不足: 当前角色 ${userInfo?.role}`)
+      return next({ path: '/403', replace: true })
+    }
+  }
+  
+  // 3. 记录路由访问日志（只有在用户已认证时才记录）
+  if (isAuthenticated && token && userInfo?.username) {
+    logRouteNavigation(to)
+  }
+  
+  // 4. 允许访问
+  console.log(`✅ 路由访问允许: ${to.path}`)
   next()
 })
 
 // 全局后置钩子 - 添加详细访问记录
 router.afterEach((to, from) => {
   // 如果用户已登录，记录更详细的页面访问信息
+  // 暂时禁用所有用户行为记录，避免疯狂请求问题
+  /*
   if (localStorage.getItem('isLoggedIn') === 'true') {
     const userInfo = getUserInfo();
     const username = userInfo?.username || '未知用户';
@@ -291,6 +354,20 @@ router.afterEach((to, from) => {
       }
     }
   }
+  */
 })
 
 export default router 
+
+// 添加安全相关的辅助函数
+function getDeviceType(): string {
+  const userAgent = navigator.userAgent
+  if (/mobile/i.test(userAgent)) return 'mobile'
+  if (/tablet/i.test(userAgent)) return 'tablet'
+  return 'desktop'
+}
+
+async function logout() {
+  const { logout } = await import('../utils/auth')
+  await logout()
+} 

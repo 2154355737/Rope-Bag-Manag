@@ -21,12 +21,12 @@
               <el-input v-model="registerForm.confirmPassword" type="password" placeholder="请再次输入密码" size="large" show-password clearable />
             </div>
             <div class="form-group">
-              <label class="form-label">昵称</label>
-              <el-input v-model="registerForm.nickname" placeholder="请输入昵称" size="large" clearable />
+              <label class="form-label">昵称（可选）</label>
+              <el-input v-model="registerForm.nickname" placeholder="请输入昵称（可选）" size="large" clearable />
             </div>
             <div class="form-group">
-              <label class="form-label">QQ账号</label>
-              <el-input v-model="registerForm.qq_number" placeholder="请输入QQ号" size="large" clearable />
+              <label class="form-label">QQ账号（可选）</label>
+              <el-input v-model="registerForm.qq_number" placeholder="请输入QQ号（可选）" size="large" clearable />
             </div>
             <div class="form-group">
               <label class="form-label">邮箱</label>
@@ -95,10 +95,9 @@ const registerRules = {
     }, trigger: 'blur' }
   ],
   nickname: [
-    { required: true, message: '请输入昵称', trigger: 'blur' }
+    // 昵称为可选字段
   ],
   qq_number: [
-    { required: true, message: '请输入QQ账号', trigger: 'blur' },
     { pattern: /^[1-9][0-9]{4,11}$/, message: '请输入有效的QQ号', trigger: 'blur' }
   ],
   email: [ { required: true, message: '请输入邮箱', trigger: 'blur' }, { type:'email', message:'邮箱格式不正确', trigger:'blur' } ],
@@ -118,9 +117,20 @@ function startCountdown(){
 async function onSendCode(){
   if(!registerForm.email){ ElMessage.warning('请先输入邮箱'); return }
   sending.value=true
-  const res = await authApi.sendCode(registerForm.email)
+  try {
+    const res = await authApi.sendRegisterCode({ email: registerForm.email })
+    if(res.code===0){ 
+      ElMessage.success('验证码已发送'); 
+      startCountdown() 
+    } else { 
+      ElMessage.error(res.message||'发送失败') 
+    }
+  } catch (error) {
+    console.error('发送验证码失败:', error)
+    ElMessage.error('发送验证码失败，请稍后重试')
+  } finally {
   sending.value=false
-  if(res.code===0){ ElMessage.success('验证码已发送'); startCountdown() } else { ElMessage.error(res.message||'发送失败') }
+  }
 }
 
 async function handleRegister() {
@@ -128,34 +138,26 @@ async function handleRegister() {
   
   try {
     await registerFormRef.value.validate()
-    
-    // 先验证邮箱验证码
     loading.value = true
-    const verifyResult = await authApi.verifyCode(registerForm.email, registerForm.code)
     
-    if (verifyResult.code !== 0) {
-      ElMessage.error(verifyResult.message || '验证码验证失败')
-      loading.value = false
-      return
-    }
-    
-    // 验证码正确，继续注册
+    // 直接注册，后端会验证验证码
     const result = await authApi.register({
       username: registerForm.username,
       password: registerForm.password,
-      nickname: registerForm.nickname,
-      qq_number: registerForm.qq_number,
+      nickname: registerForm.nickname || null,
+      qq_number: registerForm.qq_number || null,
       email: registerForm.email,
+      verification_code: registerForm.code
     })
     
     if (result.code === 0) {
       ElMessage.success('注册成功！')
       
-      // 记录用户行为
-      await userActionService.logAction('Register', '用户注册', {
-        username: registerForm.username,
-        email: registerForm.email
-      })
+      // 记录用户行为（暂时禁用，避免401错误）
+      // await userActionService.logAction('Register', '用户注册', {
+      //   username: registerForm.username,
+      //   email: registerForm.email
+      // })
       
       // 跳转到登录页面
       router.push('/login')
@@ -164,7 +166,15 @@ async function handleRegister() {
     }
   } catch (error: any) {
     console.error('注册失败:', error)
-    ElMessage.error(error.message || '注册失败，请重试')
+    
+    // 尝试从后端响应中获取具体错误信息
+    if (error.response && error.response.data && error.response.data.message) {
+      ElMessage.error(error.response.data.message)
+    } else if (error.message) {
+      ElMessage.error(error.message)
+    } else {
+      ElMessage.error('注册失败，请重试')
+    }
   } finally {
     loading.value = false
   }

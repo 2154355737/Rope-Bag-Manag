@@ -190,8 +190,10 @@ async fn main() -> std::io::Result<()> {
                         actix_web::http::header::AUTHORIZATION,
                         actix_web::http::header::CONTENT_TYPE,
                         actix_web::http::header::ACCEPT,
-                        
+                        actix_web::http::header::COOKIE,
+                        actix_web::http::header::SET_COOKIE,
                     ])
+                    .supports_credentials() // 支持Cookie
                     .max_age(3600)
             )
             .app_data(web::Data::new(auth_service))

@@ -74,11 +74,13 @@ const rules = {
 onMounted(() => {
   // 从URL参数中获取token和email
   form.token = (route.query.token as string) || ''
-  form.email = (route.query.email as string) || ''
+  // 对邮箱地址进行URL解码，因为后端发送时进行了编码
+  const emailParam = (route.query.email as string) || ''
+  form.email = emailParam ? decodeURIComponent(emailParam) : ''
   
   if (!form.token || !form.email) {
     ElMessage.error('重置链接无效或已过期')
-    router.push('/auth/forgot-password')
+    router.push('/forgot-password')
   }
 })
 
@@ -97,7 +99,7 @@ async function onSubmit() {
     
     if (response.code === 0) {
       ElMessage.success('密码重置成功，请使用新密码登录')
-      router.push('/auth/login')
+      router.push('/login')
     } else {
       ElMessage.error(response.message || '密码重置失败')
     }
@@ -110,7 +112,7 @@ async function onSubmit() {
 }
 
 function goLogin() {
-  router.push('/auth/login')
+  router.push('/login')
 }
 </script>
 

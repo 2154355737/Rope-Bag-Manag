@@ -139,7 +139,7 @@ impl EmailService {
                 let error_msg = "邮件服务未启用或配置无效";
                 self.mail_repo.update_mail_log_status(log_id, MailStatus::Failed, Some(error_msg.to_string())).await?;
                 return Err(anyhow::anyhow!(error_msg));
-            }
+        }
         };
 
         let settings_guard = self.settings.read().await;
@@ -156,7 +156,7 @@ impl EmailService {
                 MultiPart::alternative()
                                     .singlepart(
                     SinglePart::builder()
-                        .header(header::ContentType::TEXT_PLAIN)
+                    .header(header::ContentType::TEXT_PLAIN)
                         .body(html2text::from_read(content.as_bytes(), 80).unwrap_or_else(|_| content.to_string()))
                 )
                     .singlepart(
@@ -165,7 +165,7 @@ impl EmailService {
                             .body(content.to_string())
                     )
             )?;
-
+                    
         // 发送邮件
         match mailer.send(email).await {
             Ok(response) => {
@@ -250,7 +250,7 @@ impl EmailService {
         if !settings.enabled {
             return Err(anyhow::anyhow!("邮件服务已禁用"));
         }
-
+        
         let mailer_guard = self.mailer.read().await;
         match mailer_guard.as_ref() {
             Some(_) => Ok("邮件服务连接正常".to_string()),

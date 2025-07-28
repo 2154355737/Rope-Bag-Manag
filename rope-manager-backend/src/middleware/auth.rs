@@ -36,15 +36,38 @@ impl FromRequest for AuthenticatedUser {
     // 这里为了简化，我们暂时返回一个mock用户
     // 实际项目中，应从JWT中提取用户信息
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        // 解析Authorization头中的Bearer Token
+        let mut token: Option<&str> = None;
+        
+        // 1. 优先从Authorization头中获取Bearer Token
         if let Some(auth_header) = req.headers().get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
                 if auth_str.starts_with("Bearer ") {
-                    let token = &auth_str[7..];
-
+                    token = Some(&auth_str[7..]);
+                }
+            }
+        }
+        
+        // 2. 如果Authorization头中没有token，则从Cookie中获取
+        if token.is_none() {
+            if let Some(cookie_header) = req.headers().get("Cookie") {
+                if let Ok(cookie_str) = cookie_header.to_str() {
+                    // 解析Cookie字符串
+                    for cookie in cookie_str.split(';') {
+                        let cookie = cookie.trim();
+                        if cookie.starts_with("auth_token=") {
+                            token = Some(&cookie[11..]); // "auth_token=".len() = 11
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 3. 验证获取到的token
+        if let Some(token_value) = token {
                     // 从应用数据中获取 JwtUtils
                     if let Some(jwt_utils) = req.app_data::<actix_web::web::Data<crate::utils::jwt::JwtUtils>>() {
-                        match jwt_utils.verify_token(token) {
+                match jwt_utils.verify_token(token_value) {
                             Ok(claims) => {
                                 let role = match claims.role.as_str() {
                                     "admin" => UserRole::Admin,
@@ -64,8 +87,6 @@ impl FromRequest for AuthenticatedUser {
                         }
                     } else {
                         log::warn!("JwtUtils 未注入，无法验证Token");
-                    }
-                }
             }
         }
 

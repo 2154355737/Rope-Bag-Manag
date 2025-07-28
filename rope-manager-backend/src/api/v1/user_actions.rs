@@ -79,7 +79,17 @@ async fn log_user_action(
     let user_id_result = extract_user_id(&req);
     println!("提取用户ID结果: {:?}", user_id_result);
     
-    let user_id = user_id_result.unwrap_or(0);
+    // 如果无法获取有效的用户ID，返回401错误
+    let user_id = match user_id_result {
+        Some(id) if id > 0 => id,
+        _ => {
+            println!("无效的用户ID，返回401未授权");
+            return Ok(HttpResponse::Unauthorized().json(json!({
+                "code": 401,
+                "message": "需要有效的用户认证"
+            })));
+        }
+    };
     println!("使用的用户ID: {}", user_id);
     
     // 打印请求内容
