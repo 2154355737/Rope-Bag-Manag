@@ -109,61 +109,12 @@
       <!-- 内容包装器 -->
       <div class="content-wrapper">
                 <div class="main-content">
-          <!-- 整合后的主要内容区域 -->
-          <div class="unified-content">
-            <!-- 侧边信息栏 -->
-            <div class="sidebar">
-              <div class="notice-card">
-                <h3 class="notice-title">社区公告</h3>
-                <div v-if="notices.length === 0" class="empty-notice">
-                  <p>暂无公告信息</p>
-                </div>
-                <ul v-else class="notice-list">
-                  <li v-for="item in notices" :key="item.id" class="notice-item">
-                    {{ item.text }}
-                  </li>
-                </ul>
-              </div>
-              
-              <!-- 分类导航 -->
-              <div class="category-card">
-                <h3 class="category-title">
-                  <el-icon><Collection /></el-icon>
-                  资源分类
-                </h3>
-                <div class="category-list">
-                  <div 
-                    class="category-item"
-                    :class="{ 'active': activeCategory === 'all' }"
-                    @click="handleCategoryChange({ props: { name: 'all' } })"
-                  >
-                    <div class="category-item-content">
-                      <el-icon><Grid /></el-icon>
-                      <span>全部</span>
-                    </div>
-                    <span class="category-count">{{ totalResources }}</span>
-                  </div>
-                  <div 
-                    v-for="category in categories" 
-                    :key="category.id"
-                    class="category-item"
-                    :class="{ 'active': activeCategory === category.id.toString() }"
-                    @click="handleCategoryChange({ props: { name: category.id.toString() } })"
-                  >
-                    <div class="category-item-content">
-                      <el-icon><Document /></el-icon>
-                      <span>{{ category.name }}</span>
-                    </div>
-                    <span class="category-count">{{ getCategoryCount(category.id) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 主要内容区域 -->
-            <div class="main-area">
-          <!-- 精选资源轮播 -->
-          <div class="featured-resources">
+          <!-- 新的布局结构 -->
+          <div class="new-layout">
+            <!-- 左侧区域：精选资源 -->
+            <div class="left-section">
+              <!-- 精选资源轮播 -->
+              <div class="featured-resources">
             <div class="section-header">
               <h2 class="section-title">
                 <el-icon><Star /></el-icon>
@@ -232,9 +183,12 @@
               </el-button>
             </div>
           </div>
-
-          <!-- 资源列表 -->
-          <div class="resources">
+            </div>
+            
+            <!-- 右侧区域：全部资源 -->
+            <div class="right-section">
+              <!-- 资源列表 -->
+              <div class="resources">
             <div class="section-header">
               <h2 class="section-title">
                 <el-icon><Collection /></el-icon>
@@ -438,7 +392,7 @@
             <!-- 网格视图 -->
             <div v-else-if="viewMode === 'grid'" class="resources-grid">
               <div 
-                v-for="resource in paginatedResources" 
+                v-for="resource in paginatedResourcesWithPaging" 
                 :key="resource.id"
                 class="resource-card"
                 @click="viewResource(resource.id)"
@@ -483,7 +437,7 @@
             <!-- 列表视图 -->
             <div v-else-if="viewMode === 'list'" class="resources-list">
               <div 
-                v-for="resource in paginatedResources" 
+                v-for="resource in paginatedResourcesWithPaging" 
                 :key="resource.id"
                 class="resource-list-item"
                 @click="viewResource(resource.id)"
@@ -523,7 +477,7 @@
             <!-- 卡片视图 -->
             <div v-else-if="viewMode === 'card'" class="resources-cards">
               <div 
-                v-for="resource in paginatedResources" 
+                v-for="resource in paginatedResourcesWithPaging" 
                 :key="resource.id"
                 class="resource-card-item"
                 @click="viewResource(resource.id)"
@@ -565,9 +519,70 @@
                 </div>
               </div>
             </div>
+            
+            <!-- 分页器 -->
+            <div v-if="filteredResourcesForPagination.length > pageSize" class="pagination-wrapper">
+              <el-pagination
+                v-model:current-page="currentPage"
+                v-model:page-size="pageSize"
+                :page-sizes="[4, 8, 12, 16]"
+                :total="filteredResourcesForPagination.length"
+                layout="total, sizes, prev, pager, next, jumper"
+                class="resource-pagination"
+                background
+              />
+            </div>
           </div>
-          
-
+            </div>
+            
+            <!-- 底部区域：公告和分类 -->
+            <div class="bottom-section">
+              <!-- 左下：公告 -->
+              <div class="notice-card">
+                <h3 class="notice-title">社区公告</h3>
+                <div v-if="notices.length === 0" class="empty-notice">
+                  <p>暂无公告信息</p>
+                </div>
+                <ul v-else class="notice-list">
+                  <li v-for="item in notices" :key="item.id" class="notice-item">
+                    {{ item.text }}
+                  </li>
+                </ul>
+              </div>
+              
+              <!-- 右下：分类 -->
+              <div class="category-card">
+                <h3 class="category-title">
+                  <el-icon><Collection /></el-icon>
+                  资源分类
+                </h3>
+                <div class="category-list">
+                  <div 
+                    class="category-item"
+                    :class="{ 'active': activeCategory === 'all' }"
+                    @click="handleCategoryChange({ props: { name: 'all' } })"
+                  >
+                    <div class="category-item-content">
+                      <el-icon><Grid /></el-icon>
+                      <span>全部</span>
+                    </div>
+                    <span class="category-count">{{ totalResources }}</span>
+                  </div>
+                  <div 
+                    v-for="category in categories" 
+                    :key="category.id"
+                    class="category-item"
+                    :class="{ 'active': activeCategory === category.id.toString() }"
+                    @click="handleCategoryChange({ props: { name: category.id.toString() } })"
+                  >
+                    <div class="category-item-content">
+                      <el-icon><Document /></el-icon>
+                      <span>{{ category.name }}</span>
+                    </div>
+                    <span class="category-count">{{ getCategoryCount(category.id) }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -805,7 +820,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUpdated, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUpdated, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -857,6 +872,10 @@ const loading = ref(false)
 const totalDownloads = ref(0)
 const totalUsers = ref(0)
 const totalLikes = ref(0)
+
+// 分页数据
+const currentPage = ref(1)
+const pageSize = ref(4)
 
 // 公告数据
 const notices = ref<{ id: number, text: string }[]>([])
@@ -1461,8 +1480,20 @@ const paginatedResources = computed(() => {
       break
   }
 
-  // 移除分页，直接返回所有筛选结果
   return filtered
+})
+
+// 带筛选和排序的资源列表（用于分页计算）
+const filteredResourcesForPagination = computed(() => {
+  return paginatedResources.value
+})
+
+// 重新定义paginatedResources为真正的分页结果
+const paginatedResourcesWithPaging = computed(() => {
+  const filtered = paginatedResources.value
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filtered.slice(start, end)
 })
 
 const clearFilters = () => {
@@ -1474,7 +1505,13 @@ const clearFilters = () => {
   tagFilter.value = ''
   advancedSortBy.value = 'newest'
   showAdvancedFilters.value = false
+  currentPage.value = 1
 }
+
+// 监听筛选条件变化，重置页码
+watch([authorFilter, downloadFilter, dateFilter, keywordFilter, sizeFilter, tagFilter, advancedSortBy], () => {
+  currentPage.value = 1
+})
 
 const toggleAdvancedFilters = () => {
   showAdvancedFilters.value = !showAdvancedFilters.value
@@ -2168,12 +2205,59 @@ onUpdated(() => {
   padding: 24px 0;
 }
 
-/* 整合后的内容区域 */
-.unified-content {
-  display: flex;
-  gap: 24px;
+/* 新的布局结构 */
+.new-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 32px;
   width: 100%;
-  align-items: flex-start;
+  animation: fadeInUp 0.8s ease-out;
+}
+
+.left-section {
+  grid-column: 1 / 3; /* 占据整个顶部 */
+  grid-row: 1;
+  animation: slideInDown 0.6s ease-out;
+}
+
+.right-section {
+  grid-column: 2;
+  grid-row: 2;
+  animation: slideInRight 0.8s ease-out 0.2s both;
+}
+
+.bottom-section {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slideInLeft 0.8s ease-out 0.1s both;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .new-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  
+  .left-section {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  
+  .bottom-section {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+  }
+  
+  .right-section {
+    grid-column: 1;
+    grid-row: 3;
+  }
 }
 
 /* 侧边栏样式 */
@@ -2335,27 +2419,51 @@ onUpdated(() => {
 }
 
 .resource-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: var(--shadow-light);
-  transition: all 0.2s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  transform: translateZ(0);
+  position: relative;
+}
+
+.resource-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transition: left 0.6s ease;
+  z-index: 1;
+}
+
+.resource-card:hover::before {
+  left: 100%;
 }
 
 /* 浅色主题下的资源卡片 */
 :root:not(.dark) .resource-card {
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(248, 250, 252, 0.5) !important;
   backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(59, 130, 246, 0.2) !important;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.08) !important;
 }
 
 .resource-card:hover {
-  box-shadow: var(--shadow-base);
-  transform: translateY(-4px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+:root:not(.dark) .resource-card:hover {
+  box-shadow: 0 20px 60px rgba(71, 85, 105, 0.15) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
 }
 
 .resource-icon {
@@ -2459,20 +2567,35 @@ onUpdated(() => {
 
 /* 公告区 */
 .notice-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  padding: 18px 20px;
-  box-shadow: var(--shadow-light);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.notice-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 浅色主题下的公告卡片 */
 :root:not(.dark) .notice-card {
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(248, 250, 252, 0.5) !important;
   backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(59, 130, 246, 0.2) !important;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.08) !important;
+}
+
+:root:not(.dark) .notice-card:hover {
+  box-shadow: 0 16px 48px rgba(71, 85, 105, 0.12) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  background: rgba(248, 250, 252, 0.7) !important;
 }
 
 .notice-title {
@@ -3215,6 +3338,31 @@ onUpdated(() => {
 /* 精选资源轮播 */
 .featured-resources {
   margin-bottom: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.featured-resources:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 浅色主题下的精选资源 */
+:root:not(.dark) .featured-resources {
+  background: rgba(248, 250, 252, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.08);
+}
+
+:root:not(.dark) .featured-resources:hover {
+  box-shadow: 0 16px 48px rgba(71, 85, 105, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
 }
 
 .resource-carousel {
@@ -3411,20 +3559,35 @@ onUpdated(() => {
 }
 
 .category-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  padding: 16px 18px;
-  box-shadow: var(--shadow-light);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateZ(0);
+}
+
+.category-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* 浅色主题下的分类卡片 */
 :root:not(.dark) .category-card {
-  background: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(248, 250, 252, 0.5) !important;
   backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(59, 130, 246, 0.2) !important;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.08) !important;
+}
+
+:root:not(.dark) .category-card:hover {
+  box-shadow: 0 16px 48px rgba(71, 85, 105, 0.12) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  background: rgba(248, 250, 252, 0.7) !important;
 }
 
 .category-title {
@@ -3827,6 +3990,131 @@ onUpdated(() => {
   .filter-actions {
     flex-direction: column;
     gap: 8px;
+  }
+}
+
+/* 分页器样式 */
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 32px 0;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+:root:not(.dark) .pagination-wrapper {
+  background: rgba(248, 250, 252, 0.5) !important;
+  border: 1px solid rgba(148, 163, 184, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(71, 85, 105, 0.08) !important;
+}
+
+.resource-pagination {
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: var(--text-primary);
+  --el-pagination-button-bg-color: rgba(255, 255, 255, 0.1);
+  --el-pagination-button-color: var(--text-primary);
+  --el-pagination-hover-color: var(--primary-color);
+}
+
+.resource-pagination .el-pagination__total,
+.resource-pagination .el-pagination__sizes,
+.resource-pagination .el-pagination__jump {
+  color: var(--text-primary);
+}
+
+.resource-pagination .el-pagination__btn,
+.resource-pagination .el-pager li {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.resource-pagination .el-pagination__btn:hover,
+.resource-pagination .el-pager li:hover {
+  background: var(--primary-color);
+  color: white;
+  transform: translateY(-1px);
+}
+
+.resource-pagination .el-pager li.is-active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+:root:not(.dark) .resource-pagination .el-pagination__btn,
+:root:not(.dark) .resource-pagination .el-pager li {
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: var(--text-primary);
+}
+
+/* 页面动画关键帧 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
   }
 }
 </style> 
