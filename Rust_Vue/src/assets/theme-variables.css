@@ -235,7 +235,7 @@
 
 /* 全局主题应用 */
 body {
-  background-color: var(--bg-primary) !important;
+  background-color: transparent !important; /* 让动态背景可见 */
   color: var(--text-primary) !important;
   transition: background-color var(--transition-base), color var(--transition-base);
 }
@@ -314,7 +314,7 @@ p, span, div {
 
 /* 确保背景色正确应用 */
 #app {
-  background-color: var(--bg-primary) !important;
+  background-color: transparent !important; /* 让动态背景可见 */
 }
 
 /* 修复可能的CSS冲突 */
