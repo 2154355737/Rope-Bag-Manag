@@ -41,6 +41,34 @@ export interface ThemeSettings {
   language: string
 }
 
+// 社区设置接口
+export interface CommunitySettings {
+  site_title: string
+  site_subtitle: string
+  site_description: string
+  welcome_message: string
+  announcement: string | null
+  footer_text: string
+  contact_email: string
+  github_link: string | null
+  qq_group: string | null
+  wechat_group: string | null
+}
+
+// 更新社区设置请求
+export interface UpdateCommunitySettingsRequest {
+  site_title?: string
+  site_subtitle?: string
+  site_description?: string
+  welcome_message?: string
+  announcement?: string
+  footer_text?: string
+  contact_email?: string
+  github_link?: string
+  qq_group?: string
+  wechat_group?: string
+}
+
 export const settingsApi = {
   // 获取系统设置
   getSettings: (): Promise<ApiResponse<Record<string, string>>> => {
@@ -75,5 +103,20 @@ export const settingsApi = {
   // 更新主题设置
   updateThemeSettings: (settings: ThemeSettings): Promise<ApiResponse> => {
     return api.post('/api/v1/admin/theme-settings', settings)
-  }
+  },
+
+  // 获取社区设置
+  getCommunitySettings: (): Promise<ApiResponse<CommunitySettings>> => {
+    return api.get('/v1/admin/community-settings')
+  },
+
+  // 更新社区设置
+  updateCommunitySettings: (data: UpdateCommunitySettingsRequest): Promise<ApiResponse> => {
+    return api.post('/v1/admin/community-settings', data)
+  },
+
+  // 获取公开的社区设置（不需要管理员权限）
+  getPublicCommunitySettings: (): Promise<ApiResponse<CommunitySettings>> => {
+    return api.get('/v1/admin/public/community-settings')
+  },
 } 

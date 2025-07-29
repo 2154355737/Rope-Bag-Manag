@@ -52,6 +52,7 @@ pub enum MailType {
     Verification,
     ResetPassword,
     Notification,
+    AdminNotification, // 管理员通知（新资源待审核等）
     Test,
 }
 
@@ -61,6 +62,7 @@ impl ToString for MailType {
             MailType::Verification => "verification".to_string(),
             MailType::ResetPassword => "reset_password".to_string(),
             MailType::Notification => "notification".to_string(),
+            MailType::AdminNotification => "admin_notification".to_string(),
             MailType::Test => "test".to_string(),
         }
     }
@@ -72,6 +74,7 @@ impl From<&str> for MailType {
             "verification" => MailType::Verification,
             "reset_password" => MailType::ResetPassword,
             "notification" => MailType::Notification,
+            "admin_notification" => MailType::AdminNotification,
             "test" => MailType::Test,
             _ => MailType::Test,
         }

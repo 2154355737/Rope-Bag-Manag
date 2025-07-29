@@ -125,7 +125,7 @@ where
             }
             
             // 2. 验证JWT Token并构造用户对象
-            let claims = match crate::utils::jwt::JwtUtils::new("your_secret_key".to_string()).verify_token(token.unwrap()) {
+            let claims = match crate::utils::jwt::JwtUtils::new("your-secret-key-change-in-production".to_string()).verify_token(token.unwrap()) {
                 Ok(claims) => claims,
                 Err(e) => {
                     log::warn!("🚫 JWT验证失败: {}", e);

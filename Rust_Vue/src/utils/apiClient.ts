@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { resourceRecordApi } from '../api/resourceRecords'
 import userActionService from './userActionService'
-import { getToken, clearToken } from './auth'
+import { getToken, clearToken as clearAuthToken } from './auth'
 
 // 为Vite环境变量声明类型
 /// <reference types="vite/client" />
@@ -23,6 +23,14 @@ const apiClient: AxiosInstance = axios.create({
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
+    // 检查是否正在退出登录，如果是则阻止非登录相关的API调用
+    if (typeof window !== 'undefined' && (window as any).isLoggingOut) {
+      if (config.url && !config.url.includes('/auth/logout')) {
+        console.log('🚫 正在退出登录，阻止API调用:', config.url)
+        return Promise.reject(new Error('正在退出登录'))
+      }
+    }
+    
     // 修正可能重复的 /api 前缀，避免出现 /api/api/*
     if (config.url && config.url.startsWith('/api/')) {
       config.url = config.url.replace(/^\/api/, '')
@@ -312,9 +320,17 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      // 清除token并跳转到登录页
-      clearToken()
-      window.location.href = '/login'
+      // 清除token
+      clearAuthToken()
+      
+      // 检查当前是否已经在登录页，避免重复重定向
+      const currentPath = window.location.pathname
+      if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register') && !currentPath.startsWith('/forgot-password')) {
+        console.log('🚫 401错误，重定向到登录页')
+        window.location.href = '/login'
+      } else {
+        console.log('🚫 401错误，已在登录页面，不重复重定向')
+      }
     }
     return Promise.reject(error)
   }

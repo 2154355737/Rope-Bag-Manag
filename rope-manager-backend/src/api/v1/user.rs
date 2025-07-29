@@ -1,7 +1,9 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{web, HttpResponse, HttpRequest};
 use serde_json::json;
 use crate::services::user_service::UserService;
 use crate::models::UpdateUserRequest;
+use crate::utils::auth_helper::AuthHelper;
+#[macro_use] use crate::utils::auth_helper;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -14,12 +16,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/batch")
                     .route(web::delete().to(batch_delete_users))
-            )
-            .service(
-                web::resource("/{id}")
-                    .route(web::get().to(get_user))
-                    .route(web::put().to(update_user))
-                    .route(web::delete().to(delete_user))
             )
             .service(
                 web::resource("/profile")
@@ -38,27 +34,47 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/change-password")
                     .route(web::post().to(change_password))
             )
+            .service(
+                web::resource("/{id}/comments")
+                    .route(web::get().to(crate::api::v1::comment::get_user_comments))
+            )
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_user))
+                    .route(web::put().to(update_user))
+                    .route(web::delete().to(delete_user))
+            )
     );
 }
 
 async fn get_users(
+    http_req: HttpRequest,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    match user_service.get_users().await {
-        Ok(users) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {
-                "list": users,
-                "total": users.len(),
-                "page": 1,
-                "pageSize": users.len(),
-                "totalPages": 1
+    // 验证管理员权限
+    match AuthHelper::require_admin(&http_req) {
+        Ok(_admin_user) => {
+            match user_service.get_users().await {
+                Ok(users) => Ok(HttpResponse::Ok().json(json!({
+                    "code": 0,
+                    "message": "success",
+                    "data": {
+                        "list": users,
+                        "total": users.len(),
+                        "page": 1,
+                        "pageSize": users.len(),
+                        "totalPages": 1
+                    }
+                }))),
+                Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+                    "code": 500,
+                    "message": e.to_string()
+                })))
             }
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
+        },
+        Err(_) => Ok(HttpResponse::Forbidden().json(json!({
+            "code": 403,
+            "message": "需要管理员权限"
         })))
     }
 }
@@ -88,34 +104,54 @@ async fn get_user(
 async fn update_user(
     path: web::Path<i32>,
     req: web::Json<UpdateUserRequest>,
+    http_req: HttpRequest,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_id = path.into_inner();
-    match user_service.update_user(user_id, &req).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "更新成功"
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
+    // 验证管理员权限
+    match AuthHelper::require_admin(&http_req) {
+        Ok(_admin_user) => {
+            let user_id = path.into_inner();
+            match user_service.update_user(user_id, &req).await {
+                Ok(_) => Ok(HttpResponse::Ok().json(json!({
+                    "code": 0,
+                    "message": "更新成功"
+                }))),
+                Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+                    "code": 500,
+                    "message": e.to_string()
+                })))
+            }
+        },
+        Err(_) => Ok(HttpResponse::Forbidden().json(json!({
+            "code": 403,
+            "message": "需要管理员权限"
         })))
     }
 }
 
 async fn delete_user(
     path: web::Path<i32>,
+    http_req: HttpRequest,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let user_id = path.into_inner();
-    match user_service.delete_user(user_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "删除成功"
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
+    // 验证管理员权限
+    match AuthHelper::require_admin(&http_req) {
+        Ok(_admin_user) => {
+            let user_id = path.into_inner();
+            match user_service.delete_user(user_id).await {
+                Ok(_) => Ok(HttpResponse::Ok().json(json!({
+                    "code": 0,
+                    "message": "删除成功"
+                }))),
+                Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+                    "code": 500,
+                    "message": e.to_string()
+                })))
+            }
+        },
+        Err(_) => Ok(HttpResponse::Forbidden().json(json!({
+            "code": 403,
+            "message": "需要管理员权限"
         })))
     }
 }
@@ -166,22 +202,43 @@ async fn update_current_user_profile(
 
 // 新增方法：获取我的资源
 async fn get_my_resources(
+    http_req: HttpRequest,
+    query: web::Query<serde_json::Value>,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // TODO: 从JWT token获取当前用户ID
-    let current_user_id = 1; // 临时硬编码
+    // 验证用户认证并获取当前用户ID
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
     
-    match user_service.get_user_resources(current_user_id).await {
-        Ok(resources) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {
-                "list": resources,
-                "total": resources.len(),
-                "page": 1,
-                "pageSize": resources.len()
-            }
-        }))),
+    // 解析分页参数
+    let page = query.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    let page_size = query.get("pageSize").and_then(|v| v.as_u64()).unwrap_or(10) as i32;
+    
+    match user_service.get_user_resources(user.id).await {
+        Ok(resources) => {
+            let total = resources.len();
+            let start = ((page - 1) * page_size) as usize;
+            let end = std::cmp::min(start + page_size as usize, total);
+            let paginated_resources = if start < total {
+                resources[start..end].to_vec()
+            } else {
+                Vec::new()
+            };
+            
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "list": paginated_resources,
+                    "total": total,
+                    "page": page,
+                    "pageSize": page_size,
+                    "totalPages": (total as f64 / page_size as f64).ceil() as i32
+                }
+            })))
+        },
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": e.to_string()
@@ -191,22 +248,46 @@ async fn get_my_resources(
 
 // 新增方法：获取我的评论
 async fn get_my_comments(
+    http_req: HttpRequest,
+    query: web::Query<serde_json::Value>,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // TODO: 从JWT token获取当前用户ID
-    let current_user_id = 1; // 临时硬编码
+    // 验证用户认证并获取当前用户ID
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
     
-    match user_service.get_user_comments(current_user_id).await {
-        Ok(comments) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {
-                "list": comments,
-                "total": comments.len(),
-                "page": 1,
-                "pageSize": comments.len()
-            }
-        }))),
+    // 解析分页参数，支持size和pageSize两种参数名
+    let page = query.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    let page_size = query.get("size")
+        .or_else(|| query.get("pageSize"))
+        .and_then(|v| v.as_u64())
+        .unwrap_or(10) as i32;
+    
+    match user_service.get_user_comments(user.id).await {
+        Ok(comments) => {
+            let total = comments.len();
+            let start = ((page - 1) * page_size) as usize;
+            let end = std::cmp::min(start + page_size as usize, total);
+            let paginated_comments = if start < total {
+                comments[start..end].to_vec()
+            } else {
+                Vec::new()
+            };
+            
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "list": paginated_comments,
+                    "total": total,
+                    "page": page,
+                    "pageSize": page_size,
+                    "totalPages": (total as f64 / page_size as f64).ceil() as i32
+                }
+            })))
+        },
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": e.to_string()

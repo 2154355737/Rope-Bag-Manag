@@ -160,14 +160,16 @@ async fn main() -> std::io::Result<()> {
         let package_service = services::package_service::PackageService::new(
             package_repo.clone(), upload_path.clone()
         ).with_system_repo(system_repo.clone())
-        .with_notifier(subscription_repo.clone(), email_service.clone());
+        .with_notifier(subscription_repo.clone(), email_service.clone())
+        .with_user_repo(user_repo.clone());
         let admin_service = services::admin_service::AdminService::new(&db_url);
         let forbidden_word_service = services::forbidden_word_service::ForbiddenWordService::new(
             forbidden_word_repo.clone()
         );
         let comment_service = services::comment_service::CommentService::new(
             comment_repo.clone(), user_repo.clone()
-        ).with_forbidden_service(forbidden_word_service.clone());
+        ).with_package_repo(package_repo.clone())
+        .with_forbidden_service(forbidden_word_service.clone());
         let community_service = services::community_service::CommunityService::new(
             comment_repo.clone()
         );
@@ -207,7 +209,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(system_repo))
             .app_data(web::Data::new(user_action_service))
             .app_data(web::Data::new(email_service.clone()))
-            .configure(api::v1::configure_api)
+            .app_data(web::Data::new(subscription_repo))
+            .app_data(web::Data::new(package_repo))
+            .configure(api::configure_routes)  // 配置根级别API路由（包含health接口）
             .service(
                 web::scope("/uploads")
                     .service(Files::new("/", uploads_dir).show_files_listing())

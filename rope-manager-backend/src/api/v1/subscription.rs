@@ -9,7 +9,24 @@ struct SubReq { category_id:i32, enabled:bool }
 
 pub fn configure_routes(cfg:&mut web::ServiceConfig){
     cfg.service(web::scope("/subscriptions")
-        .service(web::resource("").route(web::post().to(set_subscription))));
+        .service(web::resource("").route(web::get().to(get_user_subscriptions)))
+        .service(web::resource("/set").route(web::post().to(set_subscription))));
+}
+
+async fn get_user_subscriptions(
+    repo: web::Data<SubscriptionRepository>,
+    user: AuthenticatedUser,
+) -> Result<HttpResponse, actix_web::Error> {
+    match repo.get_user_subscriptions(user.id).await {
+        Ok(subscriptions) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "data": subscriptions
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
 }
 
 async fn set_subscription(

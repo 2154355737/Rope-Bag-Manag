@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 default-run = "rope-manager-backend"
 
+[[bin]]
+name = "check_db_schema"
+path = "check_db_schema.rs"
+
 [dependencies]
 # Web框架
 actix-web = "4.4"
@@ -77,3 +81,7 @@ path = "fix_user_status.rs"
 [[bin]]
 name = "check_user_actions"
 path = "check_user_actions.rs"
+
+
+
+

@@ -26,26 +26,36 @@ export enum ResourceStatus {
 
 // 用户相关类型
 export interface User {
-  id: string
+  id: number
   username: string
-  nickname: string
-  password?: string
+  email: string
+  nickname?: string
+  password_hash?: string
   star: number
-  banned: boolean
-  sign_days: number
-  sign_total: number
-  last_sign: string
+  ban_status: BanStatus
+  ban_reason?: string | null
+  qq_number?: string | null
+  avatar_url?: string | null
+  login_count: number
+  upload_count: number
+  download_count: number
+  created_at: string
+  last_login?: string | null
   is_admin: boolean
-  role?: UserRole
-  status?: UserStatus
-  registerTime?: string
-  loginCount?: number
-  lastLogin?: string
+  role: UserRole
 }
 
 export enum UserRole {
   Admin = 'admin',
+  Moderator = 'moderator',
+  Elder = 'elder',
   User = 'user'
+}
+
+export enum BanStatus {
+  Normal = 'normal',
+  Suspended = 'suspended',
+  Banned = 'banned'
 }
 
 export enum UserStatus {
@@ -133,9 +143,15 @@ export interface UploadForm {
   description: string
   category: string
   tags: string[]
-  tagsInput: string
+  tagsInput?: string
+  file_url?: string
+  cover_url?: string
+  /** 资源文件对象，可在上传组件中使用 */
   file?: File
+  /** 封面文件对象，可在上传组件中使用 */
   cover?: File
+  /** 资源状态，例如 active */
+  status?: string
 }
 
 // 搜索和筛选类型

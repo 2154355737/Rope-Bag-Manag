@@ -4,18 +4,25 @@ use chrono::Utc;
 use crate::models::Comment;
 use crate::repositories::comment_repo::CommentRepository;
 use crate::repositories::user_repo::UserRepository;
+use crate::repositories::package_repo::PackageRepository;
 use crate::services::forbidden_word_service::ForbiddenWordService;
 
 #[derive(Clone)]
 pub struct CommentService {
     comment_repo: CommentRepository,
     user_repo: UserRepository,
+    package_repo: Option<PackageRepository>,
     forbidden_service: Option<ForbiddenWordService>,
 }
 
 impl CommentService {
     pub fn new(comment_repo: CommentRepository, user_repo: UserRepository) -> Self {
-        Self { comment_repo, user_repo, forbidden_service: None }
+        Self { comment_repo, user_repo, package_repo: None, forbidden_service: None }
+    }
+
+    pub fn with_package_repo(mut self, package_repo: PackageRepository) -> Self {
+        self.package_repo = Some(package_repo);
+        self
     }
 
     pub fn with_forbidden_service(mut self, service: ForbiddenWordService) -> Self {
@@ -78,13 +85,16 @@ impl CommentService {
             status: "Active".to_string(),
             parent_id,
             likes: 0,
+            pinned: false,
             author_name: None,
+            username: None,
             author_role: None,
             author_avatar: None,
             author_qq: None,
             dislikes: 0,
             created_at: now,
             updated_at: now,
+            target_title: None,
         };
 
         // 保存评论
@@ -264,5 +274,47 @@ impl CommentService {
     // 获取用户评论
     pub async fn get_user_comments(&self, user_id: i32, page: i32, size: i32) -> Result<(Vec<Comment>, i64)> {
         self.comment_repo.get_user_comments(user_id, page, size).await
+    }
+
+    // 置顶评论（仅资源作者、管理员和元老可用）
+    pub async fn pin_comment(&self, comment_id: i32, user_id: i32, pinned: bool) -> Result<Comment> {
+        // 获取评论信息
+        let comment = self.comment_repo.get_comment_by_id(comment_id).await?
+            .ok_or_else(|| anyhow::anyhow!("评论不存在"))?;
+        
+        // 获取用户信息
+        let user = self.user_repo.find_by_id(user_id).await?
+            .ok_or_else(|| anyhow::anyhow!("用户不存在"))?;
+        
+        // 权限检查：管理员、元老或资源作者可以置顶评论
+        let is_admin = matches!(user.role, crate::models::UserRole::Admin | crate::models::UserRole::Elder);
+        let mut is_resource_author = false;
+        
+        if comment.target_type == "Package" {
+            // 获取资源信息检查作者
+            if let Some(package_repo) = &self.package_repo {
+                if let Ok(Some(package)) = package_repo.find_by_id(comment.target_id).await {
+                    is_resource_author = package.author == user.username;
+                }
+            }
+        }
+        
+        if !is_admin && !is_resource_author {
+            return Err(anyhow::anyhow!("只有管理员、元老或资源作者可以置顶评论"));
+        }
+        
+        // 设置置顶状态
+        self.comment_repo.set_comment_pinned(
+            comment_id, 
+            &comment.target_type, 
+            comment.target_id, 
+            pinned
+        ).await?;
+        
+        // 返回更新后的评论
+        let updated_comment = self.comment_repo.get_comment_by_id(comment_id).await?
+            .ok_or_else(|| anyhow::anyhow!("获取更新后的评论失败"))?;
+        
+        Ok(updated_comment)
     }
 } 

@@ -14,9 +14,13 @@ export interface Package {
   like_count: number
   favorite_count: number
   category_id: number | null
-  status: string
+  status: 'Pending' | 'Active' | 'Rejected' | 'Inactive' | 'Deleted'
   created_at: string
   updated_at: string
+  // 审核相关字段
+  reviewer_id?: number | null
+  reviewed_at?: string | null
+  review_comment?: string | null
 }
 
 // 创建绳包请求
@@ -35,8 +39,18 @@ export interface UpdatePackageRequest {
   version?: string
   description?: string
   category_id?: number
-  status?: string | 'Active' | 'Inactive' | 'Deleted'
+  status?: 'Pending' | 'Active' | 'Rejected' | 'Inactive' | 'Deleted'
   file_url?: string
+  // 审核相关字段
+  reviewer_id?: number
+  reviewed_at?: string
+  review_comment?: string
+}
+
+// 审核资源请求
+export interface ReviewResourceRequest {
+  status: 'approved' | 'rejected'
+  comment?: string
 }
 
 // 绳包列表查询参数
@@ -101,6 +115,29 @@ export const packageApi = {
     })
   },
 
+  // 普通用户提交资源（自动设置作者为当前用户，状态为待审核）
+  userSubmitResource: (data: {
+    title: string
+    description?: string
+    category?: string
+    file_url: string
+  }): Promise<ApiResponse<Package>> => {
+    return api.post('/v1/packages/user-submit', data)
+  },
+
+  // 管理员创建资源（可设置任意作者和状态）
+  adminCreatePackage: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
+    return api.post('/v1/packages/admin-create', data).then(response => {
+      // 如果创建成功，记录资源操作
+      if (response.code === 0 && response.data && response.data.id) {
+        console.log('自动记录管理员创建绳包操作:', response.data.id)
+        resourceLogger.logCreate(response.data.id, 'Package', response.data)
+          .catch(err => console.error('记录创建操作失败:', err))
+      }
+      return response
+    })
+  },
+
   // 更新绳包
   updatePackage: (id: number, data: UpdatePackageRequest): Promise<ApiResponse<Package>> => {
     return api.put(`/v1/packages/${id}`, data).then(response => {
@@ -153,5 +190,20 @@ export const packageApi = {
       }
       return response
     })
+  },
+
+  // 获取待审核资源列表（管理员和元老可用）
+  getPendingResources: (params?: PackageQueryParams): Promise<ApiResponse<{
+    list: Package[]
+    total: number
+    page: number
+    pageSize: number
+  }>> => {
+    return api.get('/v1/packages/pending', { params })
+  },
+
+  // 审核资源（管理员和元老可用）
+  reviewResource: (id: number, data: ReviewResourceRequest): Promise<ApiResponse<Package>> => {
+    return api.post(`/v1/packages/${id}/review`, data)
   },
 } 

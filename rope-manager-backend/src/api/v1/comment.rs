@@ -20,6 +20,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(batch_delete_comments_post)
             .service(like_comment)
             .service(dislike_comment)
+            .service(pin_comment)
     );
     
     // 特定目标的评论接口
@@ -28,10 +29,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(get_package_comments)
     );
     
-    cfg.service(
-        web::scope("/users/{user_id}/comments")
-            .service(get_user_comments)
-    );
 }
 
 // 查询参数结构体
@@ -84,6 +81,12 @@ pub struct LikeRequest {
 #[derive(Deserialize)]
 pub struct DislikeRequest {
     pub dislike: bool,
+}
+
+// 置顶请求
+#[derive(Deserialize)]
+pub struct PinRequest {
+    pub pinned: bool,
 }
 
 // 获取所有评论（管理员接口）
@@ -483,6 +486,52 @@ async fn dislike_comment(
     }
 }
 
+// 置顶评论
+#[put("/{comment_id}/pin")]
+async fn pin_comment(
+    path: web::Path<i32>,
+    req: web::Json<PinRequest>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    let comment_id = path.into_inner();
+    
+    // 检查评论是否存在
+    match comment_service.get_comment_by_id(comment_id).await {
+        Ok(Some(comment)) => {
+            // 检查权限：只有评论作者或管理员可以置顶
+            if comment.user_id == auth_user.id || auth_user.is_admin() {
+                                 match comment_service.pin_comment(comment_id, auth_user.id, req.pinned).await {
+                    Ok(pinned_comment) => {
+                        HttpResponse::Ok().json(ApiResponse::success(pinned_comment))
+                    },
+                    Err(e) => {
+                        log::error!("置顶评论失败: {}", e);
+                        HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+                            500, &format!("置顶评论失败: {}", e)
+                        ))
+                    }
+                }
+            } else {
+                HttpResponse::Forbidden().json(ApiResponse::<()>::error(
+                    403, "无权置顶该评论"
+                ))
+            }
+        },
+        Ok(None) => {
+            HttpResponse::NotFound().json(ApiResponse::<()>::error(
+                404, "评论不存在"
+            ))
+        },
+        Err(e) => {
+            log::error!("获取评论详情失败: {}", e);
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+                500, &format!("获取评论详情失败: {}", e)
+            ))
+        }
+    }
+}
+
 // 获取资源评论
 #[get("")]
 async fn get_package_comments(
@@ -514,12 +563,11 @@ async fn get_package_comments(
 }
 
 // 获取用户评论
-#[get("")]
-async fn get_user_comments(
+pub async fn get_user_comments(
     path: web::Path<i32>,
     query: web::Query<CommentQueryParams>,
-    comment_service: web::Data<CommentService>,
     auth_user: AuthenticatedUser,
+    comment_service: web::Data<CommentService>,
 ) -> impl Responder {
     let user_id = path.into_inner();
     

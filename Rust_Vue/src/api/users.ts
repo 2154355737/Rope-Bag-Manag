@@ -34,7 +34,10 @@ export interface UpdateUserRequest {
   nickname?: string
   qq_number?: string
   avatar_url?: string
-  // 其他字段如star、role、ban_status等可按需添加
+  star?: number
+  role?: string
+  ban_status?: string
+  ban_reason?: string | null
 }
 
 // 用户API
@@ -78,11 +81,38 @@ export const userApi = {
 
   // 获取当前用户信息
   getCurrentUser: (): Promise<ApiResponse<User>> => {
-    return api.get('/api/v1/auth/user-info')
+    return api.get('/v1/auth/user-info')
   },
 
   // 更新当前用户信息
   updateCurrentUser: (data: UpdateUserRequest): Promise<ApiResponse<any>> => {
-    return api.put('/api/v1/users/profile', data)
+    return api.put('/v1/users/profile', data)
+  },
+
+  // 获取我的资源
+  getMyResources: (params?: {
+    page?: number
+    pageSize?: number
+    status?: string
+  }): Promise<ApiResponse<{
+    list: any[]
+    total: number
+    page: number
+    pageSize: number
+  }>> => {
+    return api.get('/v1/users/my-resources', { params })
+  },
+
+  // 获取我的评论
+  getMyComments: (params?: {
+    page?: number
+    size?: number
+  }): Promise<ApiResponse<{
+    list: any[]
+    total: number
+    page: number
+    size: number
+  }>> => {
+    return api.get('/v1/users/my-comments', { params })
   },
 } 

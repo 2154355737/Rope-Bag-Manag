@@ -7,7 +7,7 @@ import {
   checkAuthStatus,
   debugRouteInfo
 } from '../utils/router'
-import { getUserInfo, getToken, refreshUserInfo, isLoginExpired } from '../utils/auth'
+import { getUserInfo, getToken, refreshUserInfo, isLoginExpired, restoreAuthState } from '../utils/auth'
 import { resourceLogger } from '../utils/loggerService'
 
 // 路由类型定义
@@ -57,22 +57,26 @@ const routes: RouteRecordRaw[] = [
   // 登录
   {
     path: '/login',
+    name: 'Login',
     component: () => import('../views/auth/Login.vue'),
     meta: { title: '登录', layout: 'independent', device: 'all' }
   },
   // 注册
   {
     path: '/register',
+    name: 'Register',
     component: () => import('../views/auth/Register.vue'),
     meta: { title: '注册', layout: 'independent', device: 'all' }
   },
   {
     path: '/forgot-password',
+    name: 'ForgotPassword',
     component: () => import('../views/auth/ForgotPassword.vue'),
     meta: { title: '忘记密码', layout: 'independent', device: 'all' }
   },
   {
     path: '/auth/reset-password',
+    name: 'ResetPassword',
     component: () => import('../views/auth/ResetPassword.vue'),
     meta: { title: '重置密码', layout: 'independent', device: 'all' }
   },
@@ -108,6 +112,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '系统设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
   },
   {
+    path: '/admin/community-settings',
+    component: () => import('../views/admin/CommunitySettings.vue'),
+    meta: { title: '社区设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
+    path: '/admin/resource-review',
+    component: () => import('../views/admin/ResourceReview.vue'),
+    meta: { title: '资源审核', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
+  },
+  {
     path: '/admin/comments',
     component: () => import('../views/admin/CommentManage.vue'),
     meta: { title: '评论管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'moderator'] }
@@ -141,6 +155,11 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/mail-settings',
     component: () => import('../views/admin/MailSettings.vue'),
     meta: { title: '邮件设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
+    path: '/admin/subscriptions',
+    component: () => import('../views/admin/SubscriptionManage.vue'),
+    meta: { title: '订阅管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
   },
   // 元老后台
   {
@@ -209,8 +228,19 @@ const router = createRouter({
   routes,
 })
 
-// 全局前置守卫 - 简化版本，解决循环跳转问题
+// 全局前置守卫 - 改进版本，支持状态恢复
 router.beforeEach(async (to, from, next) => {
+  // 检查是否正在退出登录，如果是则直接放行到登录页
+  if (typeof window !== 'undefined' && (window as any).isLoggingOut) {
+    if (to.path === '/login') {
+      console.log('🚪 正在退出登录，允许访问登录页')
+      return next()
+    } else {
+      console.log('🚪 正在退出登录，重定向到登录页')
+      return next('/login')
+    }
+  }
+  
   // 页面标题
   if (to.meta.title) {
     document.title = `${to.meta.title} - 绳包管理系统`
@@ -218,17 +248,41 @@ router.beforeEach(async (to, from, next) => {
     document.title = '绳包管理系统'
   }
   
-  // 获取认证状态和用户信息
-  const token = getToken()
-  const userInfo = getUserInfo()
-  const isAuthenticated = !!token && !!userInfo
+  // 如果是页面刷新（from.name为null且不是从登录页跳转）或首次访问，尝试恢复认证状态
+  let isAuthenticated = false
+  let userInfo = null
+  
+  // 更精确的页面刷新判断：from.name为null但不是从认证相关页面的正常跳转
+  const isFromAuthPage = from.path.startsWith('/login') || from.path.startsWith('/register') || from.path.startsWith('/forgot-password') || from.path.startsWith('/auth/')
+  const isPageRefresh = !from.name && !isFromAuthPage && to.meta.requiresAuth
+  
+  if (isPageRefresh) {
+    console.log('🔄 检测到页面刷新/首次访问，尝试恢复认证状态...')
+    try {
+      const authState = await restoreAuthState()
+      isAuthenticated = authState.isAuthenticated
+      userInfo = authState.userInfo
+      console.log('🔄 认证状态恢复结果:', { isAuthenticated, userInfo: userInfo?.username })
+    } catch (error) {
+      console.warn('⚠️ 认证状态恢复失败:', error)
+      isAuthenticated = false
+      userInfo = null
+    }
+  } else {
+    // 常规路由跳转，使用快速检查
+    const token = getToken()
+    userInfo = getUserInfo()
+    isAuthenticated = !!token && !!userInfo
+  }
+  
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   
   // 添加调试信息
   console.log('🔍 路由守卫调试:', {
     to: to.path,
     from: from.path,
-    token: token ? '存在' : '无',
+    fromName: from.name,
+    isPageRefresh: !from.name,
     userInfo: userInfo ? `${userInfo.username}(${userInfo.role})` : '无',
     isAuthenticated,
     requiresAuth
@@ -297,7 +351,7 @@ router.beforeEach(async (to, from, next) => {
   }
   
   // 3. 记录路由访问日志（只有在用户已认证时才记录）
-  if (isAuthenticated && token && userInfo?.username) {
+  if (isAuthenticated && userInfo?.username) {
     logRouteNavigation(to)
   }
   

@@ -23,7 +23,7 @@ pub struct User {
     pub is_admin: bool,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UserRole {
     Admin,
     Moderator,
@@ -31,11 +31,42 @@ pub enum UserRole {
     User,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+impl<'de> serde::Deserialize<'de> for UserRole {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "admin" => Ok(UserRole::Admin),
+            "moderator" => Ok(UserRole::Moderator),
+            "elder" => Ok(UserRole::Elder),
+            "user" => Ok(UserRole::User),
+            _ => Err(serde::de::Error::custom(format!("Invalid user role: {}", s))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum BanStatus {
     Normal,
     Suspended,
     Banned,
+}
+
+impl<'de> serde::Deserialize<'de> for BanStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        match s.as_str() {
+            "normal" => Ok(BanStatus::Normal),
+            "suspended" => Ok(BanStatus::Suspended),
+            "banned" => Ok(BanStatus::Banned),
+            _ => Err(serde::de::Error::custom(format!("Invalid ban status: {}", s))),
+        }
+    }
 }
 
 impl serde::Serialize for BanStatus {
@@ -136,9 +167,11 @@ pub struct LoginResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateUserRequest {
+    pub email: Option<String>,
     pub nickname: Option<String>,
     pub star: Option<i32>,
     pub ban_status: Option<BanStatus>,
+    pub ban_reason: Option<String>,
     pub role: Option<UserRole>,
     pub qq_number: Option<String>,
     pub avatar_url: Option<String>,

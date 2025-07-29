@@ -142,7 +142,7 @@ impl SystemRepository {
         
         // 构建查询
         let sql = format!(
-            "SELECT id, name, {} {} created_at {} FROM categories",
+            "SELECT id, name, {} {} subscription_locked, created_at {} FROM categories",
             if has_description { "description," } else { "NULL as description," },
             if has_enabled { "enabled," } else { "1 as enabled," },
             if has_updated_at { ", updated_at" } else { ", NULL as updated_at" }
@@ -156,8 +156,9 @@ impl SystemRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 enabled: row.get(3).unwrap_or(true),
-                created_at: row.get(4)?,
-                updated_at: row.get(5).ok(),
+                subscription_locked: row.get(4).unwrap_or(false),
+                created_at: row.get(5)?,
+                updated_at: row.get(6).ok(),
             })
         })?;
         
@@ -1387,7 +1388,7 @@ impl SystemRepository {
     // 修复get_category_by_id方法
     pub async fn get_category_by_id(&self, id: i32) -> Result<Option<Category>> {
         let conn = self.conn.lock().await;
-        let sql = "SELECT id, name, description, enabled, created_at, updated_at FROM categories WHERE id = ?";
+        let sql = "SELECT id, name, description, enabled, subscription_locked, created_at, updated_at FROM categories WHERE id = ?";
         println!("[SQL] get_category_by_id: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
@@ -1398,8 +1399,9 @@ impl SystemRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 enabled: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                subscription_locked: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         }) {
             Ok(c) => Some(c),
@@ -1416,16 +1418,18 @@ impl SystemRepository {
     // 修复create_category方法
     pub async fn create_category(&self, req: &CreateCategoryRequest) -> Result<Category> {
         let conn = self.conn.lock().await;
-        let sql = "INSERT INTO categories (name, description, enabled, created_at) VALUES (?, ?, ?, datetime('now'))";
+        let sql = "INSERT INTO categories (name, description, enabled, subscription_locked, created_at) VALUES (?, ?, ?, ?, datetime('now'))";
         println!("[SQL] create_category: {}", sql);
         
         let enabled = req.enabled.unwrap_or(true);
+        let subscription_locked = req.subscription_locked.unwrap_or(false);
         
         let mut stmt = conn.prepare(sql)?;
         stmt.execute(rusqlite::params![
             req.name,
             req.description,
-            enabled
+            enabled,
+            subscription_locked
         ])?;
         
         let id = conn.last_insert_rowid() as i32;
@@ -1436,6 +1440,7 @@ impl SystemRepository {
             name: req.name.clone(),
             description: req.description.clone(),
             enabled,
+            subscription_locked,
             created_at: now,
             updated_at: None,
         };
@@ -1450,7 +1455,7 @@ impl SystemRepository {
             .ok_or_else(|| anyhow::anyhow!("分类不存在"))?;
         
         let conn = self.conn.lock().await;
-        let sql = "UPDATE categories SET name = ?, description = ?, enabled = ?, updated_at = datetime('now') WHERE id = ?";
+        let sql = "UPDATE categories SET name = ?, description = ?, enabled = ?, subscription_locked = ?, updated_at = datetime('now') WHERE id = ?";
         println!("[SQL] update_category: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
@@ -1458,6 +1463,7 @@ impl SystemRepository {
             req.name.as_ref().unwrap_or(&category.name),
             req.description.as_ref().or(category.description.as_ref()),
             req.enabled.unwrap_or(category.enabled),
+            req.subscription_locked.unwrap_or(category.subscription_locked),
             id
         ])?;
         
@@ -1468,6 +1474,7 @@ impl SystemRepository {
             name: req.name.clone().unwrap_or(category.name),
             description: req.description.clone().or(category.description),
             enabled: req.enabled.unwrap_or(category.enabled),
+            subscription_locked: req.subscription_locked.unwrap_or(category.subscription_locked),
             created_at: category.created_at,
             updated_at: Some(now),
         };
@@ -1484,6 +1491,102 @@ impl SystemRepository {
         let mut stmt = conn.prepare(sql)?;
         stmt.execute(rusqlite::params![id])?;
         
+        Ok(())
+    }
+
+    // 获取社区设置
+    pub async fn get_community_settings(&self) -> Result<crate::models::system::CommunitySettings> {
+        let mut settings = crate::models::system::CommunitySettings::default();
+        
+        // 从数据库读取配置，如果不存在则使用默认值
+        if let Ok(Some(title)) = self.get_setting("site_title").await {
+            settings.site_title = title;
+        }
+        if let Ok(Some(subtitle)) = self.get_setting("site_subtitle").await {
+            settings.site_subtitle = subtitle;
+        }
+        if let Ok(Some(description)) = self.get_setting("site_description").await {
+            settings.site_description = description;
+        }
+        if let Ok(Some(welcome)) = self.get_setting("welcome_message").await {
+            settings.welcome_message = welcome;
+        }
+        if let Ok(Some(announcement)) = self.get_setting("announcement").await {
+            settings.announcement = Some(announcement);
+        }
+        if let Ok(Some(footer)) = self.get_setting("footer_text").await {
+            settings.footer_text = footer;
+        }
+        if let Ok(Some(email)) = self.get_setting("contact_email").await {
+            settings.contact_email = email;
+        }
+        if let Ok(Some(github)) = self.get_setting("github_link").await {
+            settings.github_link = Some(github);
+        }
+        if let Ok(Some(qq)) = self.get_setting("qq_group").await {
+            settings.qq_group = Some(qq);
+        }
+        if let Ok(Some(wechat)) = self.get_setting("wechat_group").await {
+            settings.wechat_group = Some(wechat);
+        }
+
+        Ok(settings)
+    }
+
+    // 更新社区设置
+    pub async fn update_community_settings(&self, request: &crate::models::system::UpdateCommunitySettingsRequest) -> Result<()> {
+        if let Some(ref title) = request.site_title {
+            self.update_setting("site_title", title).await?;
+        }
+        if let Some(ref subtitle) = request.site_subtitle {
+            self.update_setting("site_subtitle", subtitle).await?;
+        }
+        if let Some(ref description) = request.site_description {
+            self.update_setting("site_description", description).await?;
+        }
+        if let Some(ref welcome) = request.welcome_message {
+            self.update_setting("welcome_message", welcome).await?;
+        }
+        if let Some(ref announcement) = request.announcement {
+            if announcement.is_empty() {
+                // 如果公告为空，则删除该设置
+                let conn = self.conn.lock().await;
+                conn.execute("DELETE FROM system_settings WHERE key = ?", params!["announcement"])?;
+            } else {
+                self.update_setting("announcement", announcement).await?;
+            }
+        }
+        if let Some(ref footer) = request.footer_text {
+            self.update_setting("footer_text", footer).await?;
+        }
+        if let Some(ref email) = request.contact_email {
+            self.update_setting("contact_email", email).await?;
+        }
+        if let Some(ref github) = request.github_link {
+            if github.is_empty() {
+                let conn = self.conn.lock().await;
+                conn.execute("DELETE FROM system_settings WHERE key = ?", params!["github_link"])?;
+            } else {
+                self.update_setting("github_link", github).await?;
+            }
+        }
+        if let Some(ref qq) = request.qq_group {
+            if qq.is_empty() {
+                let conn = self.conn.lock().await;
+                conn.execute("DELETE FROM system_settings WHERE key = ?", params!["qq_group"])?;
+            } else {
+                self.update_setting("qq_group", qq).await?;
+            }
+        }
+        if let Some(ref wechat) = request.wechat_group {
+            if wechat.is_empty() {
+                let conn = self.conn.lock().await;
+                conn.execute("DELETE FROM system_settings WHERE key = ?", params!["wechat_group"])?;
+            } else {
+                self.update_setting("wechat_group", wechat).await?;
+            }
+        }
+
         Ok(())
     }
 } 

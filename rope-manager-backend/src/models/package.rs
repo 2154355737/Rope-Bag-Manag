@@ -17,18 +17,24 @@ pub struct Package {
     pub status: PackageStatus,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // 审核相关字段
+    pub reviewer_id: Option<i32>,      // 审核者ID
+    pub reviewed_at: Option<DateTime<Utc>>, // 审核时间
+    pub review_comment: Option<String>, // 审核备注
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PackageStatus {
-    Active,
-    Inactive,
-    Deleted,
+    Pending,    // 待审核
+    Active,     // 已上架
+    Rejected,   // 审核拒绝
+    Inactive,   // 已下架
+    Deleted,    // 已删除
 }
 
 impl Default for PackageStatus {
     fn default() -> Self {
-        PackageStatus::Active
+        PackageStatus::Pending  // 新上传的资源默认为待审核状态
     }
 }
 
@@ -50,6 +56,10 @@ pub struct UpdatePackageRequest {
     pub category_id: Option<i32>,
     pub status: Option<PackageStatus>,
     pub file_url: Option<String>,
+    // 审核相关字段
+    pub reviewer_id: Option<i32>,
+    pub reviewed_at: Option<DateTime<Utc>>,
+    pub review_comment: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

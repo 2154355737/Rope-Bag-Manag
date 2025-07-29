@@ -238,6 +238,16 @@ impl SimpleEmailService {
         self.send_templated_mail(to_email, "notification", variables, MailType::Notification).await
     }
 
+    /// 发送管理员通知邮件（新资源待审核）
+    pub async fn send_admin_review_notification(&self, to_email: &str, resource_name: &str, author: &str, review_link: &str) -> Result<i64> {
+        let mut variables = HashMap::new();
+        variables.insert("resource_name".to_string(), resource_name.to_string());
+        variables.insert("author".to_string(), author.to_string());
+        variables.insert("review_link".to_string(), review_link.to_string());
+        
+        self.send_templated_mail(to_email, "admin_notification", variables, MailType::AdminNotification).await
+    }
+
     /// 发送测试邮件
     pub async fn send_test_mail(&self, to_email: &str) -> Result<i64> {
         let mut variables = HashMap::new();

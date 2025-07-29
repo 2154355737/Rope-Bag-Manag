@@ -31,7 +31,14 @@ export const communityApi = {
     return api.get(`/api/v1/packages/${id}/download`)
   },
   // 创建资源
-  createResource: (data: any): Promise<ApiResponse> => {
+  createResource: (data: {
+    title: string
+    description: string
+    category: string
+    tags?: string[]
+    file_url: string
+    cover_url?: string
+  }): Promise<ApiResponse> => {
     return api.post('/api/v1/packages', data)
   },
   // 更新资源

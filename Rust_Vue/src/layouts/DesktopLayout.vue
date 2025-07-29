@@ -8,13 +8,10 @@
     
     <!-- 主内容区域 -->
     <main class="desktop-main">
-      <div class="content-wrapper">
+      <div class="content-wrapper" v-loading="globalLoading" element-loading-text="加载中...">
         <router-view />
       </div>
     </main>
-    
-    <!-- 全局加载状态 -->
-    <el-loading v-if="globalLoading" :fullscreen="true" text="加载中..." />
   </div>
 </template>
 

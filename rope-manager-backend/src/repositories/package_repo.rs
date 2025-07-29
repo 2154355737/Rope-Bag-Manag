@@ -21,7 +21,7 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
-                    created_at, updated_at \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment \
              FROM packages ORDER BY created_at DESC";
         println!("[SQL] get_all_packages: {}", sql);
         let mut stmt = match conn.prepare(sql) {
@@ -45,12 +45,18 @@ impl PackageRepository {
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
                 status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
                     "inactive" => crate::models::PackageStatus::Inactive,
                     "deleted" => crate::models::PackageStatus::Deleted,
-                    _ => crate::models::PackageStatus::Active,
+                    _ => crate::models::PackageStatus::Pending,
                 },
                 created_at: row.get(12)?,
                 updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -73,7 +79,7 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
-                    created_at, updated_at \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment \
              FROM packages WHERE id = ?";
         println!("[SQL] find_by_id: {} | id={}", sql, id);
         let mut stmt = match conn.prepare(sql) {
@@ -97,12 +103,18 @@ impl PackageRepository {
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
                 status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
                     "inactive" => crate::models::PackageStatus::Inactive,
                     "deleted" => crate::models::PackageStatus::Deleted,
-                    _ => crate::models::PackageStatus::Active,
+                    _ => crate::models::PackageStatus::Pending,
                 },
                 created_at: row.get(12)?,
                 updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
             })
         }) {
             Ok(val) => Some(val),
@@ -135,7 +147,9 @@ impl PackageRepository {
             package.favorite_count,
             package.category_id,
             match package.status {
+                crate::models::PackageStatus::Pending => "pending",
                 crate::models::PackageStatus::Active => "active",
+                crate::models::PackageStatus::Rejected => "rejected",
                 crate::models::PackageStatus::Inactive => "inactive",
                 crate::models::PackageStatus::Deleted => "deleted",
             },
@@ -179,7 +193,9 @@ impl PackageRepository {
             package.favorite_count,
             package.category_id,
             match package.status {
+                crate::models::PackageStatus::Pending => "pending",
                 crate::models::PackageStatus::Active => "active",
+                crate::models::PackageStatus::Rejected => "rejected",
                 crate::models::PackageStatus::Inactive => "inactive",
                 crate::models::PackageStatus::Deleted => "deleted",
             },
@@ -236,7 +252,7 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         println!("[DEBUG] get_packages_advanced called");
         println!("[DEBUG] page: {}, page_size: {}, category: {:?}, search: {:?}, status: {:?}", page, page_size, category, search, status);
-        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at FROM packages WHERE 1=1");
+        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment FROM packages WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         if let Some(category_id) = category {
             sql.push_str(" AND category_id = ?");
@@ -258,7 +274,7 @@ impl PackageRepository {
         // 统计总数（修正：直接统计，不用子查询）
         let count_sql = sql.clone();
         let count_sql = count_sql.replacen(
-            "SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at",
+            "SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment",
             "SELECT COUNT(*)",
             1
         );
@@ -298,12 +314,18 @@ impl PackageRepository {
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
                 status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
                     "inactive" => crate::models::PackageStatus::Inactive,
                     "deleted" => crate::models::PackageStatus::Deleted,
-                    _ => crate::models::PackageStatus::Active,
+                    _ => crate::models::PackageStatus::Pending,
                 },
                 created_at: row.get::<_, String>(12)?.parse().unwrap(),
                 updated_at: row.get::<_, String>(13)?.parse().unwrap(),
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -325,7 +347,7 @@ impl PackageRepository {
     pub async fn get_categories(&self) -> Result<Vec<Category>> {
         let conn = self.conn.lock().await;
         
-        let mut stmt = conn.prepare("SELECT id, name, description, enabled, created_at, updated_at FROM categories")?;
+        let mut stmt = conn.prepare("SELECT id, name, description, enabled, subscription_locked, created_at, updated_at FROM categories")?;
         
         let categories = stmt.query_map([], |row| {
             Ok(Category {
@@ -333,8 +355,9 @@ impl PackageRepository {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 enabled: row.get(3)?,
-                created_at: row.get(4)?,
-                updated_at: row.get(5)?,
+                subscription_locked: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -368,5 +391,20 @@ impl PackageRepository {
         )?;
         
         Ok(file_url)
+    }
+
+    // 统计指定分类的资源数量（只统计active状态的资源）
+    pub async fn count_packages_by_category(&self, category_id: i32) -> Result<i32> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT COUNT(*) FROM packages WHERE category_id = ? AND status = 'active'";
+        println!("[SQL] count_packages_by_category: {} | category_id={}", sql, category_id);
+        
+        let count: i32 = conn.query_row(
+            sql,
+            params![category_id],
+            |row| row.get(0)
+        )?;
+        
+        Ok(count)
     }
 } 

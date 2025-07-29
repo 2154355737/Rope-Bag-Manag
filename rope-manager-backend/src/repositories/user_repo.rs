@@ -343,14 +343,22 @@ impl UserRepository {
     // 新增方法：获取用户资源
     pub async fn get_user_packages(&self, user_id: i32) -> Result<Vec<Package>> {
         let conn = self.conn.lock().await;
+        
+        // 先获取用户名
+        let username: String = conn.query_row(
+            "SELECT username FROM users WHERE id = ?",
+            params![user_id],
+            |row| row.get(0)
+        )?;
+        
         let mut stmt = conn.prepare(
             "SELECT id, name, author, version, description, file_url, file_size, 
                     download_count, like_count, favorite_count, category_id, status, 
-                    created_at, updated_at 
-             FROM packages WHERE author_id = ? ORDER BY created_at DESC"
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment 
+             FROM packages WHERE author = ? ORDER BY created_at DESC"
         )?;
 
-        let packages = stmt.query_map(params![user_id], |row| {
+        let packages = stmt.query_map(params![username], |row| {
             Ok(Package {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -364,12 +372,18 @@ impl UserRepository {
                 favorite_count: row.get(9)?,
                 category_id: row.get(10)?,
                 status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
                     "inactive" => crate::models::PackageStatus::Inactive,
                     "deleted" => crate::models::PackageStatus::Deleted,
-                    _ => crate::models::PackageStatus::Active,
+                    _ => crate::models::PackageStatus::Pending,
                 },
                 created_at: row.get(12)?,
                 updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -397,12 +411,15 @@ impl UserRepository {
                 parent_id: row.get(6)? ,
                 likes: row.get(7)?,
                 dislikes: row.get(8)?,
+                pinned: false, // 默认不置顶
                 created_at: row.get(9)?,
                 updated_at: row.get(10)?,
                 author_name: None,
+                username: None,
                 author_role: None,
                 author_avatar: None,
                 author_qq: None,
+                target_title: None,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -418,5 +435,20 @@ impl UserRepository {
             params![password_hash, user_id]
         )?;
         Ok(())
+    }
+
+    // 获取管理员和元老的邮箱地址（用于通知新资源待审核）
+    pub async fn get_admin_and_elder_emails(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare(
+            "SELECT email FROM users WHERE (role = 'admin' OR role = 'elder') AND ban_status = 'normal'"
+        )?;
+
+        let emails = stmt.query_map([], |row| {
+            Ok(row.get::<_, String>(0)?)
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(emails)
     }
 } 

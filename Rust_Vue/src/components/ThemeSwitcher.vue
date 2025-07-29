@@ -66,18 +66,37 @@ const handleThemeChange = (theme: string) => {
 }
 
 .theme-btn {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: var(--text-primary);
-  transition: all var(--transition-base);
-  box-shadow: var(--shadow-light);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  backdrop-filter: blur(12px);
+  border: none;
+  color: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.4);
+  position: relative;
+  overflow: hidden;
+  width: 40px;
+  height: 40px;
 }
 
 .theme-btn:hover {
-  background: rgba(255, 255, 255, 1);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-base);
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 8px 25px 0 rgba(102, 126, 234, 0.6);
+}
+
+.theme-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.theme-btn:hover::before {
+  left: 100%;
 }
 
 .theme-menu {
@@ -105,9 +124,12 @@ const handleThemeChange = (theme: string) => {
 }
 
 .theme-icon {
-  font-size: 1.5rem;
-  width: 24px;
+  font-size: 1.2rem;
+  width: 20px;
   text-align: center;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
 }
 
 .theme-info {
@@ -136,13 +158,13 @@ const handleThemeChange = (theme: string) => {
 
 /* 深色模式适配 */
 .dark .theme-btn {
-  background: rgba(44, 44, 44, 0.9);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary);
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 4px 15px 0 rgba(79, 70, 229, 0.4);
 }
 
 .dark .theme-btn:hover {
-  background: rgba(44, 44, 44, 1);
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  box-shadow: 0 8px 25px 0 rgba(79, 70, 229, 0.6);
 }
 
 .dark .theme-menu {

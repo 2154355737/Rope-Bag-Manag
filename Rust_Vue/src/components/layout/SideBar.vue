@@ -57,7 +57,9 @@ import {
   Files,
   Download,
   Bell,
-  UserFilled
+  UserFilled,
+  DocumentChecked,
+  Message // 新增订阅管理图标
 } from '@element-plus/icons-vue'
 import { databaseExport } from '../../utils/sqliteExport'
 
@@ -85,6 +87,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin', title: '仪表盘', icon: 'House', badge: 0 },
   { path: '/admin/users', title: '用户管理', icon: 'User', badge: 0, roles: ['admin'] },
   { path: '/admin/packages', title: '资源管理', icon: 'Box', badge: 0, roles: ['admin', 'moderator'] },
+  { path: '/admin/resource-review', title: '资源审核', icon: 'DocumentChecked', badge: 0, roles: ['admin', 'elder'] },
   { path: '/admin/comments', title: '评论管理', icon: 'ChatDotRound', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/user-actions', title: '行为记录', icon: 'Monitor', badge: 0, roles: ['admin'] },
   { path: '/admin/resource-records', title: '资源记录', icon: 'Files', badge: 0, roles: ['admin'] },
@@ -93,7 +96,9 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0, roles: ['admin'] },
   { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] },
-  { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] }
+  { path: '/admin/community-settings', title: '社区设置', icon: 'House', badge: 0, roles: ['admin'] },
+  { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] },
+  { path: '/admin/subscriptions', title: '订阅管理', icon: 'Message', badge: 0, roles: ['admin'] }
 ]
 const menuItems = ref<MenuItem[]>([])
 
@@ -110,7 +115,9 @@ const iconComponents: Record<string, any> = {
   Files,
   Download,
   Bell,
-  UserFilled
+  UserFilled,
+  DocumentChecked,
+  Message
 }
 
 // 例如在按钮点击事件中调用

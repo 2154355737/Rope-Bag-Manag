@@ -27,6 +27,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(web::resource("/login-by-email").route(web::post().to(login_by_email)))
             .service(web::resource("/register").route(web::post().to(register)))
             .service(web::resource("/user-info").route(web::get().to(get_user_info)))
+            .service(web::resource("/verify").route(web::get().to(verify_auth)))  // 新增认证验证接口
+            .service(web::resource("/logout").route(web::post().to(logout)))    // 新增退出登录接口
             .service(web::resource("/send-register-code").route(web::post().to(send_register_code)))
             .service(web::resource("/send-login-code").route(web::post().to(send_login_code)))
             .service(web::resource("/verify-code").route(web::post().to(verify_code)))
@@ -191,6 +193,56 @@ async fn verify_code(
     }
 }
 
+/// 验证认证状态（简化版本，只返回是否有效）
+async fn verify_auth(
+    req: HttpRequest,
+    auth_service: web::Data<AuthService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 先尝试从Authorization头获取token
+    let mut token: Option<&str> = None;
+    
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if auth_str.starts_with("Bearer ") {
+                token = Some(&auth_str[7..]);
+            }
+        }
+    }
+    
+    // 如果Authorization头没有token，尝试从Cookie获取
+    if token.is_none() {
+        if let Some(cookie_header) = req.headers().get("Cookie") {
+            if let Ok(cookie_str) = cookie_header.to_str() {
+                for cookie in cookie_str.split(';') {
+                    let cookie = cookie.trim();
+                    if cookie.starts_with("auth_token=") {
+                        token = Some(&cookie[11..]);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    if let Some(token_str) = token {
+        match auth_service.get_user_from_token(token_str).await {
+            Ok(_user) => Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "认证有效"
+            }))),
+            Err(_) => Ok(HttpResponse::Unauthorized().json(json!({
+                "code": 401,
+                "message": "认证无效"
+            })))
+        }
+    } else {
+        Ok(HttpResponse::Unauthorized().json(json!({
+            "code": 401,
+            "message": "缺少认证信息"
+        })))
+    }
+}
+
 async fn reset_request(
     req: web::Json<EmailReq>,
     auth_service: web::Data<AuthService>,
@@ -209,4 +261,25 @@ async fn reset_password(
         Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0,"message":"密码重置成功"}))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400,"message":e.to_string()})))
     }
+}
+
+/// 退出登录（清除HttpOnly Cookie）
+async fn logout() -> Result<HttpResponse, actix_web::Error> {
+    // 创建一个过期的Cookie来清除客户端的HttpOnly Cookie
+    let mut response = HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "退出登录成功"
+    }));
+    
+    // 设置过期的auth_token Cookie来清除客户端认证状态
+    let cookie = actix_web::http::header::HeaderValue::from_str(
+        "auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+    ).unwrap();
+    
+    response.headers_mut().insert(
+        actix_web::http::header::SET_COOKIE,
+        cookie
+    );
+    
+    Ok(response)
 } 

@@ -54,7 +54,10 @@
         <!-- 用户菜单 -->
         <el-dropdown trigger="click" placement="bottom-end">
           <div class="user-info">
-            <el-avatar :size="32" class="user-avatar">
+            <el-avatar :size="32" class="user-avatar" :src="userInfo.avatar_url" v-if="userInfo.avatar_url">
+              <img :src="userInfo.avatar_url" />
+            </el-avatar>
+            <el-avatar :size="32" class="user-avatar" v-else>
               <el-icon><User /></el-icon>
             </el-avatar>
             <span class="user-name">{{ userInfo.username }}</span>

@@ -13,7 +13,10 @@ pub struct Comment {
     pub likes: i32,
     #[serde(skip_serializing_if = "Option::is_none")] // 可选字段
     pub author_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
     pub dislikes: i32,
+    pub pinned: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -22,6 +25,8 @@ pub struct Comment {
     pub author_avatar: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author_qq: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_title: Option<String>, // 新增：评论所属资源的标题
 }
 
 #[derive(Debug, Serialize, Deserialize)]

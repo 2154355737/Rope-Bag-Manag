@@ -31,13 +31,16 @@ impl CommunityService {
             status: "Active".to_string(),
             parent_id: None,
             likes: 0,
+            pinned: false, // 默认不置顶
             author_name: None,
+            username: None,
             author_role: None,
             author_avatar: None,
             author_qq: None,
             dislikes: 0,
             created_at: now,
             updated_at: now,
+            target_title: None,
         };
 
         self.comment_repo.create_comment(&comment).await?;

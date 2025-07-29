@@ -27,6 +27,9 @@ impl UserService {
 
         // 更新用户信息
         let mut updated_user = user.clone();
+        if let Some(email) = &req.email {
+            updated_user.email = email.clone();
+        }
         if let Some(nickname) = &req.nickname {
             updated_user.nickname = Some(nickname.clone());
         }
@@ -35,6 +38,9 @@ impl UserService {
         }
         if let Some(ban_status) = &req.ban_status {
             updated_user.ban_status = ban_status.clone();
+        }
+        if let Some(ban_reason) = &req.ban_reason {
+            updated_user.ban_reason = Some(ban_reason.clone());
         }
         if let Some(role) = &req.role {
             updated_user.role = role.clone();

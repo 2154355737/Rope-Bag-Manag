@@ -5,6 +5,7 @@ export interface Category {
   name: string
   description: string | null
   enabled: boolean
+  subscription_locked: boolean
   created_at: string
 }
 

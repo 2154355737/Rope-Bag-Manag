@@ -85,9 +85,10 @@
           style="width: 150px"
           @change="handleFilter"
         >
-          <el-option label="普通用户" value="Normal" />
-          <el-option label="开发者" value="Developer" />
-          <el-option label="元老" value="Elder" />
+          <el-option label="普通用户" value="user" />
+          <el-option label="版主" value="moderator" />
+          <el-option label="元老" value="elder" />
+          <el-option label="管理员" value="admin" />
         </el-select>
         
         <el-select 
@@ -97,8 +98,9 @@
           style="width: 150px"
           @change="handleFilter"
         >
-          <el-option label="正常" value="Normal" />
-          <el-option label="封禁" value="Banned" />
+          <el-option label="正常" value="normal" />
+          <el-option label="暂停" value="suspended" />
+          <el-option label="封禁" value="banned" />
         </el-select>
       </div>
       
@@ -136,6 +138,16 @@
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="nickname" label="昵称" width="120">
+          <template #default="{ row }">
+            {{ row.nickname || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="email" label="邮箱" width="180">
+          <template #default="{ row }">
+            {{ row.email || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="star" label="星级" width="80">
           <template #default="{ row }">
             <el-rate v-model="row.star" disabled show-score />
@@ -169,7 +181,7 @@
         <el-table-column prop="login_count" label="登录次数" width="100" />
         <el-table-column prop="upload_count" label="上传数" width="80" />
         <el-table-column prop="download_count" label="下载数" width="80" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="viewUser(row)">
               <el-icon><View /></el-icon>
@@ -178,6 +190,24 @@
             <el-button size="small" type="primary" @click="editUser(row)">
               <el-icon><Edit /></el-icon>
               编辑
+            </el-button>
+            <el-button 
+              v-if="row.ban_status === 'normal'"
+              size="small" 
+              type="warning" 
+              @click="banUser(row)"
+            >
+              <el-icon><Lock /></el-icon>
+              封禁
+            </el-button>
+            <el-button 
+              v-else
+              size="small" 
+              type="success" 
+              @click="unbanUser(row)"
+            >
+              <el-icon><Unlock /></el-icon>
+              解封
             </el-button>
             <el-button 
               size="small" 
@@ -280,41 +310,56 @@
     <el-dialog 
       v-model="editDialogVisible" 
       title="编辑用户信息" 
-      width="500px"
+      width="600px"
     >
       <el-form :model="editForm" label-width="100px" v-if="currentUser">
         <el-form-item label="用户名">
-          <el-input v-model="editForm.username" />
+          <el-input v-model="editForm.username" disabled />
+        </el-form-item>
+        <el-form-item label="邮箱">
+          <el-input v-model="editForm.email" />
+        </el-form-item>
+        <el-form-item label="昵称">
+          <el-input v-model="editForm.nickname" placeholder="用户昵称（可选）" />
         </el-form-item>
         <el-form-item label="星级">
           <el-rate v-model="editForm.star" />
         </el-form-item>
         <el-form-item label="角色">
           <el-select v-model="editForm.role">
-            <el-option label="普通用户" value="Normal" />
-            <el-option label="开发者" value="Developer" />
-            <el-option label="元老" value="Elder" />
+            <el-option label="普通用户" value="user" />
+            <el-option label="版主" value="moderator" />
+            <el-option label="元老" value="elder" />
+            <el-option label="管理员" value="admin" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="editForm.ban_status">
-            <el-option label="正常" value="Normal" />
-            <el-option label="封禁" value="Banned" />
+            <el-option label="正常" value="normal" />
+            <el-option label="暂停" value="suspended" />
+            <el-option label="封禁" value="banned" />
           </el-select>
         </el-form-item>
-        <el-form-item label="封禁原因" v-if="editForm.ban_status === 'Banned'">
-          <el-input v-model="editForm.ban_reason" type="textarea" />
+        <el-form-item label="封禁原因" v-if="editForm.ban_status === 'banned' || editForm.ban_status === 'suspended'">
+          <el-input v-model="editForm.ban_reason" type="textarea" placeholder="请输入封禁/暂停原因" />
         </el-form-item>
         <el-form-item label="QQ号">
-          <el-input v-model="editForm.qq_number" />
+          <el-input v-model="editForm.qq_number" placeholder="用户QQ号（可选）" />
         </el-form-item>
-        <el-form-item label="管理员">
-          <el-switch v-model="editForm.is_admin" />
+        <el-form-item label="头像URL">
+          <el-input v-model="editForm.avatar_url" placeholder="头像图片链接（可选）" />
+        </el-form-item>
+        <el-form-item label="管理员权限">
+          <el-switch 
+            v-model="editForm.is_admin" 
+            active-text="是" 
+            inactive-text="否"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveUserEdit">保存</el-button>
+        <el-button type="primary" @click="saveUserEdit" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
 
@@ -375,7 +420,9 @@ import {
   View,
   Timer,
   Refresh,
-  WarningFilled 
+  WarningFilled,
+  Lock,
+  Unlock
 } from '@element-plus/icons-vue'
 import { userApi } from '../../api/users'
 
@@ -397,13 +444,19 @@ const addUserFormRef = ref()
 
 const editForm = reactive({
   username: '',
+  email: '',
+  nickname: '',
   star: 1,
-  role: 'Normal',
-  ban_status: 'Normal',
+  role: 'user',
+  ban_status: 'normal',
   ban_reason: '',
   qq_number: '',
+  avatar_url: '',
   is_admin: false
 })
+
+// 添加保存状态
+const saving = ref(false)
 
 // 添加用户表单
 const addUserForm = reactive({
@@ -510,28 +563,71 @@ function viewUser(user: any) {
 function editUser(user: any) {
   currentUser.value = user
   editForm.username = user.username
-  editForm.star = user.star
-  editForm.role = user.role
-  editForm.ban_status = user.ban_status
+  editForm.email = user.email || ''
+  editForm.nickname = user.nickname || ''
+  editForm.star = user.star || 1
+  editForm.role = user.role || 'user'
+  editForm.ban_status = user.ban_status || 'normal'
   editForm.ban_reason = user.ban_reason || ''
   editForm.qq_number = user.qq_number || ''
-  editForm.is_admin = user.is_admin
+  editForm.avatar_url = user.avatar_url || ''
+  editForm.is_admin = user.is_admin || false
   editDialogVisible.value = true
 }
 
 async function saveUserEdit() {
+  if (saving.value) return
+  
   try {
-    const response = await userApi.updateUser(currentUser.value.id, editForm)
+    saving.value = true
+    
+    // 构建更新数据，只包含有效字段
+    const updateData: any = {}
+    
+    if (editForm.email && editForm.email !== currentUser.value.email) {
+      updateData.email = editForm.email
+    }
+    if (editForm.nickname !== currentUser.value.nickname) {
+      updateData.nickname = editForm.nickname || null
+    }
+    if (editForm.star !== currentUser.value.star) {
+      updateData.star = editForm.star
+    }
+    if (editForm.role !== currentUser.value.role) {
+      updateData.role = editForm.role
+    }
+    if (editForm.ban_status !== currentUser.value.ban_status) {
+      updateData.ban_status = editForm.ban_status
+    }
+    if (editForm.ban_reason !== currentUser.value.ban_reason) {
+      updateData.ban_reason = editForm.ban_reason || null
+    }
+    if (editForm.qq_number !== currentUser.value.qq_number) {
+      updateData.qq_number = editForm.qq_number || null
+    }
+    if (editForm.avatar_url !== currentUser.value.avatar_url) {
+      updateData.avatar_url = editForm.avatar_url || null
+    }
+    if (editForm.is_admin !== currentUser.value.is_admin) {
+      updateData.is_admin = editForm.is_admin
+    }
+    
+    console.log('更新用户数据:', updateData)
+    
+    const response = await userApi.updateUser(currentUser.value.id, updateData)
     
     if (response.code === 0) {
       ElMessage.success('用户信息更新成功')
       editDialogVisible.value = false
       loadUsers()
     } else {
-      ElMessage.error(response.msg || '更新失败')
+      ElMessage.error(response.msg || response.message || '更新失败')
     }
-  } catch (error) {
-    ElMessage.error('更新失败')
+  } catch (error: any) {
+    console.error('保存用户编辑失败:', error)
+    ElMessage.error(error.response?.data?.message || '更新失败，请稍后重试')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -576,6 +672,60 @@ async function batchDelete() {
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('批量删除失败')
+    }
+  }
+}
+
+// 封禁用户
+async function banUser(user: any) {
+  try {
+    await ElMessageBox.confirm(`确定要封禁用户 "${user.username}" 吗？`, '确认封禁', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    const response = await userApi.updateUser(user.id, {
+      ban_status: 'banned',
+      ban_reason: '管理员封禁'
+    })
+
+    if (response.code === 0) {
+      ElMessage.success('用户已封禁')
+      loadUsers()
+    } else {
+      ElMessage.error(response.msg || '封禁失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('封禁操作失败')
+    }
+  }
+}
+
+// 解封用户
+async function unbanUser(user: any) {
+  try {
+    await ElMessageBox.confirm(`确定要解封用户 "${user.username}" 吗？`, '确认解封', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'success'
+    })
+
+    const response = await userApi.updateUser(user.id, {
+      ban_status: 'normal',
+      ban_reason: null
+    })
+
+    if (response.code === 0) {
+      ElMessage.success('用户已解封')
+      loadUsers()
+    } else {
+      ElMessage.error(response.msg || '解封失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('解封操作失败')
     }
   }
 }

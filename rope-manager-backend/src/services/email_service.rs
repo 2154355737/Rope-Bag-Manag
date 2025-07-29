@@ -214,6 +214,57 @@ impl EmailService {
         self.send_templated_mail(to_email, "notification", variables, MailType::Notification).await
     }
 
+    /// 发送分类通知
+    pub async fn send_category_notification(&self, to_email: &str, title: &str, content: &str) -> anyhow::Result<i64> {
+        let subject = format!("【绳包社区】{}", title);
+        let html_body = format!(
+            r#"
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #409EFF, #36CFC9); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+                    <h1 style="color: white; margin: 0; font-size: 24px;">绳包社区通知</h1>
+                    <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">{}</p>
+                </div>
+                <div style="background: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <div style="margin-bottom: 20px;">
+                        <p style="margin: 0; line-height: 1.6; color: #333; white-space: pre-line;">{}</p>
+                    </div>
+                    <div style="text-align: center; margin: 30px 0;">
+                        <a href="{}" style="display: inline-block; background: #409EFF; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">
+                            查看更多内容
+                        </a>
+                    </div>
+                    <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #999; font-size: 12px;">
+                        <p>此邮件由绳包社区系统自动发送，请勿直接回复。</p>
+                        <p>如需取消订阅，请登录您的账户进行设置。</p>
+                    </div>
+                </div>
+            </div>
+            "#,
+            title,
+            content,
+            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string())
+        );
+
+        let text_body = format!(
+            "绳包社区通知\n\n{}\n\n{}\n\n访问 {} 查看更多内容\n\n此邮件由绳包社区系统自动发送，请勿直接回复。",
+            title,
+            content,
+            std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string())
+        );
+
+        self.send_mail(to_email, &subject, &text_body, MailType::Notification).await
+    }
+
+    /// 发送管理员通知邮件（新资源待审核）
+    pub async fn send_admin_review_notification(&self, to_email: &str, resource_name: &str, author: &str, review_link: &str) -> Result<i64> {
+        let mut variables = HashMap::new();
+        variables.insert("resource_name".to_string(), resource_name.to_string());
+        variables.insert("author".to_string(), author.to_string());
+        variables.insert("review_link".to_string(), review_link.to_string());
+        
+        self.send_templated_mail(to_email, "admin_notification", variables, MailType::AdminNotification).await
+    }
+
     /// 发送测试邮件
     pub async fn send_test_mail(&self, to_email: &str) -> Result<i64> {
         let mut variables = HashMap::new();

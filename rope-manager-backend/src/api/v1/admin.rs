@@ -1,12 +1,16 @@
 use actix_web::{web, HttpResponse, HttpRequest, Error};
-use serde_json::json;
-use serde_json::Value;
-use crate::services::admin_service::AdminService;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use crate::repositories::system_repo::SystemRepository;
+use crate::repositories::subscription_repo::SubscriptionRepository;
+use crate::repositories::UserRepository;
 use crate::services::email_service::EmailService;
+use crate::services::admin_service::AdminService;
 use crate::utils::auth_helper::AuthHelper;
 use crate::{require_admin, require_auth};
+use crate::middleware::auth::AuthenticatedUser;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 // MailConfig已移至models/mail.rs
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
@@ -119,6 +123,25 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/test-email")
                     .route(web::post().to(send_test_email))
             )
+            .service(
+                web::resource("/community-settings")
+                    .route(web::get().to(get_community_settings))
+                    .route(web::post().to(update_community_settings))
+            )
+            .service(
+                web::resource("/public/community-settings")
+                    .route(web::get().to(get_public_community_settings))
+            )
+            // 订阅管理路由
+            .service(
+                web::scope("/subscriptions")
+                    .route("/stats", web::get().to(get_all_subscription_stats))
+                    .route("/category/{id}/stats", web::get().to(get_category_subscription_stats))
+                    .route("/category/{id}/subscribers", web::get().to(get_category_subscribers))
+                    .route("/user/{user_id}/category/{category_id}", web::delete().to(admin_unsubscribe))
+                    .route("/notify", web::post().to(send_category_notification))
+                    .route("/export", web::get().to(export_subscriptions))
+            )
     );
 }
 
@@ -145,6 +168,23 @@ async fn get_stats(
             "code": 0,
             "message": "success",
             "data": stats
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
+}
+
+// 获取公开的社区设置（不需要管理员权限）
+async fn get_public_community_settings(
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.get_community_settings().await {
+        Ok(settings) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": settings
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
@@ -985,5 +1025,255 @@ async fn send_test_email(
             "code": 500,
             "message": format!("测试邮件发送失败: {}", e)
         })))
+    }
+}
+
+// 获取社区设置
+async fn get_community_settings(
+    admin_service: web::Data<AdminService>,
+    req: HttpRequest,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 验证管理员权限
+    let _user = require_admin!(&req);
+    
+    match admin_service.get_community_settings().await {
+        Ok(settings) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": settings
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
+}
+
+// 更新社区设置
+async fn update_community_settings(
+    admin_service: web::Data<AdminService>,
+    req: HttpRequest,
+    settings_req: web::Json<crate::models::system::UpdateCommunitySettingsRequest>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 验证管理员权限
+    let _user = require_admin!(&req);
+    
+    match admin_service.update_community_settings(&settings_req).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "社区设置更新成功"
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
+} 
+
+// 订阅管理路由
+pub fn configure_subscription_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/admin/subscriptions")
+            .route("/stats", web::get().to(get_all_subscription_stats))
+            .route("/category/{id}/stats", web::get().to(get_category_subscription_stats))
+            .route("/category/{id}/subscribers", web::get().to(get_category_subscribers))
+            .route("/user/{user_id}/category/{category_id}", web::delete().to(admin_unsubscribe))
+            .route("/notify", web::post().to(send_category_notification))
+            .route("/export", web::get().to(export_subscriptions))
+    );
+}
+
+// 获取全部订阅统计
+async fn get_all_subscription_stats(
+    subscription_repo: web::Data<SubscriptionRepository>,
+    system_repo: web::Data<SystemRepository>,
+    _auth_user: AuthenticatedUser, // 确保是管理员
+) -> HttpResponse {
+    match system_repo.get_categories().await {
+        Ok(categories) => {
+            let mut stats = Vec::new();
+            
+            for category in categories {
+                match subscription_repo.count_category_subscriptions(category.id).await {
+                    Ok(count) => {
+                        stats.push(serde_json::json!({
+                            "category_id": category.id,
+                            "category_name": category.name,
+                            "category_description": category.description,
+                            "subscription_count": count
+                        }));
+                    },
+                    Err(e) => {
+                        println!("获取分类{}订阅统计失败: {}", category.id, e);
+                    }
+                }
+            }
+            
+            HttpResponse::Ok().json(serde_json::json!({
+                "code": 0,
+                "data": stats
+            }))
+        },
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("获取分类失败: {}", e)
+        }))
+    }
+}
+
+// 获取分类订阅统计
+async fn get_category_subscription_stats(
+    path: web::Path<i32>,
+    subscription_repo: web::Data<SubscriptionRepository>,
+    _auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    let category_id = path.into_inner();
+    
+    match subscription_repo.count_category_subscriptions(category_id).await {
+        Ok(count) => HttpResponse::Ok().json(serde_json::json!({
+            "code": 0,
+            "data": {
+                "count": count
+            }
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("获取订阅统计失败: {}", e)
+        }))
+    }
+}
+
+// 获取分类订阅者列表
+async fn get_category_subscribers(
+    path: web::Path<i32>,
+    subscription_repo: web::Data<SubscriptionRepository>,
+    _auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    let category_id = path.into_inner();
+    
+    match subscription_repo.get_category_subscribers(category_id).await {
+        Ok(subscribers) => HttpResponse::Ok().json(serde_json::json!({
+            "code": 0,
+            "data": {
+                "subscribers": subscribers
+            }
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("获取订阅者列表失败: {}", e)
+        }))
+    }
+}
+
+// 管理员取消用户订阅
+async fn admin_unsubscribe(
+    path: web::Path<(i32, i32)>,
+    subscription_repo: web::Data<SubscriptionRepository>,
+    _auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    let (user_id, category_id) = path.into_inner();
+    
+    match subscription_repo.set_subscription(user_id, category_id, false).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "code": 0,
+            "message": "取消订阅成功"
+        })),
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("取消订阅失败: {}", e)
+        }))
+    }
+}
+
+// 发送分类通知
+#[derive(serde::Deserialize)]
+struct NotificationRequest {
+    category_id: i32,
+    title: String,
+    content: String,
+}
+
+async fn send_category_notification(
+    req: web::Json<NotificationRequest>,
+    subscription_repo: web::Data<SubscriptionRepository>,
+    email_service: web::Data<Arc<RwLock<EmailService>>>,
+    _auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    match subscription_repo.get_subscribed_emails(req.category_id).await {
+        Ok(emails) => {
+            let es = email_service.read().await;
+            let mut success_count = 0;
+            let mut error_count = 0;
+            
+            for email in &emails {
+                match es.send_category_notification(email, &req.title, &req.content).await {
+                    Ok(_) => {
+                        success_count += 1;
+                        println!("成功发送通知到: {}", email);
+                    },
+                    Err(e) => {
+                        error_count += 1;
+                        println!("发送通知失败: {} -> {}", email, e);
+                    }
+                }
+            }
+            
+            HttpResponse::Ok().json(serde_json::json!({
+                "code": 0,
+                "message": format!("通知发送完成，成功: {}, 失败: {}", success_count, error_count),
+                "data": {
+                    "success_count": success_count,
+                    "error_count": error_count
+                }
+            }))
+        },
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("获取订阅邮箱失败: {}", e)
+        }))
+    }
+}
+
+// 导出订阅数据
+async fn export_subscriptions(
+    subscription_repo: web::Data<SubscriptionRepository>,
+    system_repo: web::Data<SystemRepository>,
+    _auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    match system_repo.get_categories().await {
+        Ok(categories) => {
+            let mut export_data = Vec::new();
+            
+            for category in categories {
+                match subscription_repo.get_category_subscribers(category.id).await {
+                    Ok(subscribers) => {
+                        export_data.push(serde_json::json!({
+                            "category": {
+                                "id": category.id,
+                                "name": category.name,
+                                "description": category.description
+                            },
+                            "subscribers": subscribers,
+                            "subscription_count": subscribers.len()
+                        }));
+                    },
+                    Err(e) => {
+                        println!("导出分类{}订阅数据失败: {}", category.id, e);
+                    }
+                }
+            }
+            
+            HttpResponse::Ok().json(serde_json::json!({
+                "code": 0,
+                "data": {
+                    "export_time": chrono::Utc::now().to_rfc3339(),
+                    "categories": export_data
+                }
+            }))
+        },
+        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "code": 500,
+            "message": format!("导出失败: {}", e)
+        }))
     }
 } 

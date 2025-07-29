@@ -354,7 +354,7 @@ function handleLoginSuccess(response: any, identifier: string) {
       
       ElMessage.success('登录成功')
       
-      // 延迟跳转和行为记录，确保认证状态完全更新
+      // 延迟跳转，确保认证状态完全更新且避免路由守卫时序问题
       setTimeout(() => {
         // 记录用户登录行为（暂时禁用，避免401错误）
         // userActionService.logLogin(identifier, true)
@@ -371,7 +371,7 @@ function handleLoginSuccess(response: any, identifier: string) {
           console.log('🚀 跳转到用户后台')
         router.push('/user')
       }
-      }, 200)
+      }, 500) // 增加延迟时间，确保认证状态稳定
 }
 
 // 处理登录

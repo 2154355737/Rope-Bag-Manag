@@ -36,15 +36,36 @@
             <el-icon><User /></el-icon>
             登录
           </el-button>
-          <el-button 
-            v-if="isLoggedIn" 
-            type="success" 
-            size="large"
-            @click="goToAdmin"
-          >
+          <div v-if="isLoggedIn" class="user-section">
+            <el-dropdown trigger="click" placement="bottom-end">
+              <div class="user-info">
+                <el-avatar :size="32" class="user-avatar" :src="userInfo.avatar_url" v-if="userInfo.avatar_url">
+                  <img :src="userInfo.avatar_url" />
+                </el-avatar>
+                <el-avatar :size="32" class="user-avatar" v-else>
+                  <el-icon><User /></el-icon>
+                </el-avatar>
+                <span class="user-name">{{ userInfo.nickname || userInfo.username }}</span>
+                <el-icon class="dropdown-icon"><Bottom /></el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu class="user-dropdown">
+                  <el-dropdown-item @click="goToUserProfile">
+                    <el-icon><User /></el-icon>
+                    个人资料
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="goToAdmin">
             <el-icon><Setting /></el-icon>
             管理后台
-          </el-button>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="handleLogout">
+                    <el-icon><Switch /></el-icon>
+                    退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
         </div>
       </div>
     </header>
@@ -247,6 +268,113 @@
       </div>
     </main>
 
+    <!-- 页脚 -->
+    <footer class="footer">
+      <div class="footer-content">
+        <div class="footer-sections">
+          <!-- 网站信息 -->
+          <div class="footer-section">
+            <div class="footer-logo">
+              <div class="footer-logo-icon">📚</div>
+              <div class="footer-logo-text">
+                <h3>资源社区</h3>
+                <p>分享、发现、学习</p>
+              </div>
+            </div>
+            <p class="footer-desc">
+              一个致力于知识分享和资源交流的开放平台，汇聚优质学习资源，助力每个人的成长之路。
+            </p>
+            <div class="footer-stats">
+              <div class="stat-item">
+                <span class="stat-number">{{ totalResources }}</span>
+                <span class="stat-label">资源</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ totalUsers }}</span>
+                <span class="stat-label">用户</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ formatNumber(totalDownloads) }}</span>
+                <span class="stat-label">下载</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 快速链接 -->
+          <div class="footer-section">
+            <h4 class="footer-title">快速链接</h4>
+            <ul class="footer-links">
+              <li><a href="#" @click.prevent="scrollToTop">回到顶部</a></li>
+              <li><a href="#" @click.prevent="handleCategoryChange({ props: { name: 'all' } })">全部资源</a></li>
+              <li><a href="#" @click.prevent="showUploadDialog = true">上传资源</a></li>
+              <li><a href="#" @click.prevent="goToLogin" v-if="!isLoggedIn">用户登录</a></li>
+              <li><a href="#" @click.prevent="goToUserProfile" v-if="isLoggedIn">个人中心</a></li>
+            </ul>
+          </div>
+
+          <!-- 分类导航 -->
+          <div class="footer-section">
+            <h4 class="footer-title">资源分类</h4>
+            <ul class="footer-links">
+              <li v-for="category in categories.slice(0, 5)" :key="category.id">
+                <a href="#" @click.prevent="handleCategoryChange({ props: { name: category.id.toString() } })">
+                  {{ category.name }}
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <!-- 联系信息 -->
+          <div class="footer-section">
+            <h4 class="footer-title">联系我们</h4>
+            <div class="footer-contact">
+              <div class="contact-item">
+                <el-icon><Message /></el-icon>
+                <span>support@example.com</span>
+              </div>
+              <div class="contact-item">
+                <el-icon><Phone /></el-icon>
+                <span>400-123-4567</span>
+              </div>
+              <div class="contact-item">
+                <el-icon><Location /></el-icon>
+                <span>北京市朝阳区</span>
+              </div>
+            </div>
+            <div class="social-links">
+              <a href="#" class="social-link" title="微信">
+                <span>💬</span>
+              </a>
+              <a href="#" class="social-link" title="QQ">
+                <span>🐧</span>
+              </a>
+              <a href="#" class="social-link" title="GitHub">
+                <span>⚡</span>
+              </a>
+              <a href="#" class="social-link" title="邮箱">
+                <span>📧</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 底部版权信息 -->
+        <div class="footer-bottom">
+          <div class="footer-copyright">
+            <p>&copy; {{ new Date().getFullYear() }} 资源社区. All rights reserved.</p>
+            <p>Built with ❤️ using Vue 3 + Rust</p>
+          </div>
+          <div class="footer-legal">
+            <a href="#" @click.prevent>隐私政策</a>
+            <span class="divider">|</span>
+            <a href="#" @click.prevent>服务条款</a>
+            <span class="divider">|</span>
+            <a href="#" @click.prevent>帮助中心</a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
     <!-- 上传对话框 -->
     <el-dialog
       v-model="showUploadDialog"
@@ -384,7 +512,12 @@ import {
   Upload,
   Document,
   Collection,
-  Picture
+  Picture,
+  Bottom,
+  Switch,
+  Message,
+  Phone,
+  Location
 } from '@element-plus/icons-vue'
 import type { FormInstance, UploadFile } from 'element-plus'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
@@ -417,6 +550,16 @@ const totalLikes = ref(0)
 
 // 公告数据
 const notices = ref<{ id: number, text: string }[]>([])
+
+// 用户信息
+const userInfo = computed(() => {
+  return getUserInfo() || { username: '用户' }
+})
+
+// 登录状态
+const isLoggedIn = computed(() => {
+  return !!getUserInfo()
+})
 
 // 获取公告数据
 const fetchAnnouncements = async () => {
@@ -502,10 +645,6 @@ const uploadRules = {
 }
 
 // 计算属性
-const isLoggedIn = computed(() => {
-  return localStorage.getItem('isLoggedIn') === 'true'
-})
-
 const filteredResources = computed(() => {
   let filtered = resources.value
 
@@ -664,6 +803,51 @@ const goToAdmin = () => {
   }
 }
 
+const goToUserProfile = () => {
+  const user = getUserInfo()
+  if (user?.role === 'elder') {
+    router.push('/elder/profile')
+  } else if (user?.role === 'user') {
+    router.push('/user/profile')
+  } else if (user?.role === 'admin') {
+    router.push('/admin/users')
+  } else {
+    router.push('/login')
+  }
+}
+
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要退出登录吗？',
+      '确认退出',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    // 清除用户信息
+    localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
+    localStorage.removeItem('isLoggedIn')
+    localStorage.removeItem('loginTime')
+    localStorage.removeItem('remember_me')
+    localStorage.removeItem('username')
+    
+    // 清除Cookie
+    document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    document.cookie = 'user_info=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    document.cookie = 'remember_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    
+    ElMessage.success('已退出登录')
+    router.push('/login')
+  } catch (error) {
+    // 用户取消
+  }
+}
+
 const getCategoryLabel = (categoryId: number | null) => {
   if (!categoryId) return '未分类'
   const category = categories.value.find(c => c.id === categoryId)
@@ -690,8 +874,8 @@ const formatNumber = (num: number) => {
 }
 
 const addTag = () => {
-  const tag = uploadForm.tagsInput.trim()
-  if (tag && !uploadForm.tags.includes(tag)) {
+  const tag = uploadForm.tagsInput?.trim()
+  if (tag && tag.length > 0 && !uploadForm.tags.includes(tag)) {
     uploadForm.tags.push(tag)
     uploadForm.tagsInput = ''
   }
@@ -725,9 +909,8 @@ const submitUpload = async () => {
       description: uploadForm.description,
       category: uploadForm.category,
       tags: uploadForm.tags,
-      status: 'active',
-      file: uploadForm.file,
-      cover: uploadForm.cover
+      file_url: uploadForm.file_url || '',
+      cover_url: uploadForm.cover_url
     })
 
     if (res.code === 0) {
@@ -788,22 +971,28 @@ onMounted(async () => {
   await loadResources()
   await fetchAnnouncements()
 })
+
+const scrollToTop = () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 </script>
 
 <style scoped>
 .home-container {
   min-height: 100vh;
-  background: #f6f8fa;
+  background: var(--bg-page);
+  transition: background-color var(--transition-base);
 }
 
 /* 顶部导航 */
 .header {
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
   padding: 16px 0;
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: all var(--transition-base);
 }
 
 .header-content {
@@ -830,13 +1019,13 @@ onMounted(async () => {
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .logo-text p {
   margin: 4px 0 0 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .search {
@@ -847,15 +1036,96 @@ onMounted(async () => {
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   flex-shrink: 0;
   margin-left: auto;
+  padding: 0 8px;
+}
+
+/* 用户信息区域 */
+.user-section {
+  display: flex;
+  align-items: center;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.user-info:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-color-hover);
+}
+
+.user-avatar {
+  border: 2px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.user-info:hover .user-avatar {
+  border-color: var(--brand-color);
+  transform: scale(1.05);
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-icon {
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+}
+
+.user-info:hover .dropdown-icon {
+  transform: rotate(180deg);
+}
+
+/* 用户下拉菜单 */
+.user-dropdown {
+  min-width: 180px;
+  padding: 8px 0;
+}
+
+.user-dropdown .el-dropdown-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 4px 8px;
+  transition: all 0.2s ease;
+}
+
+.user-dropdown .el-dropdown-menu__item:hover {
+  background-color: var(--bg-hover);
+}
+
+.user-dropdown .el-dropdown-menu__item.divided {
+  border-top: 1px solid var(--border-color);
+  margin-top: 8px;
+  padding-top: 16px;
 }
 
 /* 分类导航 */
 .nav {
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  transition: all var(--transition-base);
 }
 
 .nav-content {
@@ -874,19 +1144,24 @@ onMounted(async () => {
 
 .category-tabs :deep(.el-tabs__item) {
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-secondary);
+  transition: color var(--transition-base);
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .category-tabs :deep(.el-tabs__item.is-active) {
-  color: #3b82f6;
+  color: var(--brand-color);
   font-weight: 600;
 }
 
 /* 筛选栏 */
 .filter-bar {
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
   padding: 16px 0;
+  transition: all var(--transition-base);
 }
 
 .filter-content {
@@ -947,18 +1222,19 @@ onMounted(async () => {
 }
 
 .stat-card {
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 12px;
   padding: 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
+  border: 1px solid var(--border-color);
   transition: all 0.2s ease;
 }
 
 .stat-card:hover {
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-base);
   transform: translateY(-2px);
 }
 
@@ -966,7 +1242,7 @@ onMounted(async () => {
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -981,13 +1257,13 @@ onMounted(async () => {
 .stat-number {
   font-size: 24px;
   font-weight: 700;
-  color: #1f2937;
+  color: var(--text-primary);
   line-height: 1;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -999,9 +1275,10 @@ onMounted(async () => {
 .empty-state {
   text-align: center;
   padding: 80px 20px;
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
+  border: 1px solid var(--border-color);
 }
 
 .empty-icon {
@@ -1013,12 +1290,12 @@ onMounted(async () => {
   margin: 0 0 8px 0;
   font-size: 20px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .empty-state p {
   margin: 0 0 24px 0;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .resources-grid {
@@ -1031,16 +1308,17 @@ onMounted(async () => {
 }
 
 .resource-card {
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
+  border: 1px solid var(--border-color);
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .resource-card:hover {
-  box-shadow: 0 8px 25px 0 rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-base);
   transform: translateY(-4px);
 }
 
@@ -1079,7 +1357,7 @@ onMounted(async () => {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1089,7 +1367,7 @@ onMounted(async () => {
 
 .resource-desc {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 2px 0;
   line-height: 1.4;
   white-space: nowrap;
@@ -1109,7 +1387,7 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .resource-stats {
@@ -1123,7 +1401,7 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
@@ -1142,10 +1420,11 @@ onMounted(async () => {
 
 /* 公告区 */
 .notice-card {
-  background: #fff;
+  background: var(--bg-primary);
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-light);
+  border: 1px solid var(--border-color);
   position: sticky;
   top: 100px;
 }
@@ -1154,7 +1433,7 @@ onMounted(async () => {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .notice-list {
@@ -1166,9 +1445,9 @@ onMounted(async () => {
 .notice-list li {
   padding: 8px 0;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--text-secondary);
   line-height: 1.5;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-color-light);
 }
 
 .notice-list li:last-child {
@@ -1178,7 +1457,7 @@ onMounted(async () => {
 .empty-notice {
   padding: 20px 0;
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-muted);
   font-size: 14px;
 }
 
@@ -1188,7 +1467,7 @@ onMounted(async () => {
 }
 
 .notice-item:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: var(--bg-hover);
   padding-left: 8px;
 }
 
@@ -1280,46 +1559,291 @@ onMounted(async () => {
   }
 }
 
-/* 深色模式适配 */
-.dark .home-container {
-  background: #111827;
+/* 页脚样式 */
+.footer {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-color);
+  margin-top: 60px;
+  position: relative;
+  overflow: hidden;
 }
 
-.dark .header,
-.dark .nav,
-.dark .filter-bar {
-  background: #1f2937;
-  border-bottom-color: #374151;
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-color), transparent);
 }
 
-.dark .stat-card,
-.dark .resource-card,
-.dark .notice-card,
-.dark .empty-state {
-  background: #1f2937;
-  color: #f9fafb;
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 60px 24px 24px;
 }
 
-.dark .logo-text h1,
-.dark .resource-title,
-.dark .notice-title {
-  color: #f9fafb;
+.footer-sections {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 48px;
+  margin-bottom: 48px;
 }
 
-.dark .logo-text p,
-.dark .stat-label,
-.dark .resource-desc,
-.dark .meta-item,
-.dark .notice-list li {
-  color: #9ca3af;
+.footer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.dark .stat-number {
-  color: #f9fafb;
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.dark .resource-stats .stat-item {
-  color: #9ca3af;
+.footer-logo-icon {
+  font-size: 32px;
+}
+
+.footer-logo-text h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.footer-logo-text p {
+  margin: 4px 0 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.footer-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+}
+
+.footer-stats {
+  display: flex;
+  gap: 24px;
+}
+
+.footer-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  min-width: 80px;
+  transition: all 0.3s ease;
+}
+
+.footer-stats .stat-item:hover {
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+}
+
+.footer-stats .stat-number {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--brand-color);
+  margin-bottom: 4px;
+}
+
+.footer-stats .stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.footer-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--brand-color);
+  position: relative;
+}
+
+.footer-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 30px;
+  height: 2px;
+  background: var(--brand-color-light);
+}
+
+.footer-links {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.footer-links li a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+  position: relative;
+}
+
+.footer-links li a:hover {
+  color: var(--brand-color);
+  padding-left: 8px;
+}
+
+.footer-links li a::before {
+  content: '→';
+  position: absolute;
+  left: -20px;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.footer-links li a:hover::before {
+  opacity: 1;
+  left: -16px;
+}
+
+.footer-contact {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.contact-item .el-icon {
+  color: var(--brand-color);
+  font-size: 16px;
+}
+
+.social-links {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-secondary);
+  border-radius: 50%;
+  text-decoration: none;
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.social-link:hover {
+  background: var(--brand-color);
+  transform: translateY(-3px) scale(1.1);
+  box-shadow: var(--shadow-brand);
+}
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+.footer-copyright p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.footer-legal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-legal a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.footer-legal a:hover {
+  color: var(--brand-color);
+}
+
+.footer-legal .divider {
+  color: var(--text-muted);
+}
+
+/* 页脚响应式设计 */
+@media (max-width: 1024px) {
+  .footer-sections {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .footer-content {
+    padding: 40px 16px 16px;
+  }
+  
+  .footer-sections {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+  
+  .footer-stats {
+    justify-content: center;
+  }
+  
+  .footer-bottom {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-stats {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .footer-stats .stat-item {
+    min-width: 70px;
+    padding: 12px;
+  }
+  
+  .social-links {
+    justify-content: center;
+  }
 }
 
 /* 让 el-input 输入框背景透明 */
@@ -1338,52 +1862,5 @@ onMounted(async () => {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-}
-
-/* 主题适配 - 统计图标 */
-.stat-icon {
-  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark));
-  color: #fff;
-}
-
-/* 主题适配 - 标签页 */
-.category-tabs :deep(.el-tabs__item) {
-  color: var(--text-secondary);
-  transition: color var(--transition-base);
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.category-tabs :deep(.el-tabs__item.is-active) {
-  color: var(--brand-color);
-  font-weight: var(--font-weight-semibold);
-}
-
-.category-tabs :deep(.el-tabs__item:hover) {
-  color: var(--brand-color-light);
-}
-
-/* 主题适配 - 公告标题 */
-.notice-title {
-  color: var(--text-primary);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* 深色模式特殊处理 */
-.dark .stat-icon {
-  background: linear-gradient(135deg, #60a5fa, #3b82f6);
-}
-
-.dark .category-tabs :deep(.el-tabs__item) {
-  color: #9ca3af;
-}
-
-.dark .category-tabs :deep(.el-tabs__item.is-active) {
-  color: #60a5fa;
-}
-
-.dark .notice-title {
-  color: #f9fafb;
 }
 </style> 

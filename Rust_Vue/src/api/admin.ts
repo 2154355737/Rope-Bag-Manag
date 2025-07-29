@@ -40,6 +40,15 @@ export const adminApi = {
     return api.get('/v1/admin/stats')
   },
 
+  // 获取用户统计数据
+  getUserStats: (): Promise<ApiResponse<{
+    total_users: number
+    active_users: number
+    total_actions: number
+  }>> => {
+    return api.get('/v1/admin/user-stats')
+  },
+
   // 获取系统日志
   getLogs: (params?: {
     page?: number

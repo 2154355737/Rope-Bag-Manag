@@ -2,6 +2,7 @@ use actix_web::{web, HttpResponse};
 use serde_json::json;
 use crate::models::system::{CreateCategoryRequest, UpdateCategoryRequest};
 use crate::repositories::system_repo::SystemRepository;
+use crate::repositories::package_repo::PackageRepository;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -17,16 +18,38 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 // 获取所有分类
 async fn get_categories(
     system_repo: web::Data<SystemRepository>,
+    package_repo: web::Data<PackageRepository>,
 ) -> HttpResponse {
     // 从数据库获取分类
     match system_repo.get_categories().await {
-        Ok(categories) => HttpResponse::Ok().json(json!({
+        Ok(categories) => {
+            // 手动构建包含count的JSON响应
+            let mut categories_with_count = Vec::new();
+            
+            for cat in categories.iter() {
+                let count = package_repo.count_packages_by_category(cat.id).await
+                    .unwrap_or(0);
+                
+                categories_with_count.push(json!({
+                    "id": cat.id,
+                    "name": cat.name,
+                    "description": cat.description,
+                    "enabled": cat.enabled,
+                    "subscription_locked": cat.subscription_locked,
+                    "created_at": cat.created_at,
+                    "updated_at": cat.updated_at,
+                    "count": count
+                }));
+            }
+            
+            HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
             "data": {
-                "list": categories
+                    "list": categories_with_count
             }
-        })),
+            }))
+        },
         Err(e) => {
             println!("从数据库获取分类失败：{}", e);
             HttpResponse::InternalServerError().json(json!({

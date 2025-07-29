@@ -16,6 +16,7 @@ pub struct PackageService {
     file_utils: FileUtils,
     subscription_repo: Option<SubscriptionRepository>,
     email_service: Option<Arc<RwLock<EmailService>>>,
+    user_repo: Option<crate::repositories::UserRepository>,
 }
 
 impl PackageService {
@@ -26,6 +27,7 @@ impl PackageService {
             file_utils: FileUtils::new(upload_path),
             subscription_repo: None,
             email_service: None,
+            user_repo: None,
         }
     }
 
@@ -38,6 +40,11 @@ impl PackageService {
     pub fn with_notifier(mut self, sub_repo: SubscriptionRepository, email_service: Arc<RwLock<EmailService>>) -> Self {
         self.subscription_repo = Some(sub_repo);
         self.email_service = Some(email_service);
+        self
+    }
+
+    pub fn with_user_repo(mut self, user_repo: crate::repositories::UserRepository) -> Self {
+        self.user_repo = Some(user_repo);
         self
     }
 
@@ -68,9 +75,12 @@ impl PackageService {
             like_count: 0,
             favorite_count: 0,
             category_id: req.category_id,
-            status: crate::models::PackageStatus::Active,
+            status: crate::models::PackageStatus::Pending, // 新资源默认为待审核状态
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            reviewer_id: None,
+            reviewed_at: None,
+            review_comment: None,
         };
 
         // 创建包
@@ -96,13 +106,23 @@ impl PackageService {
             }
         }
 
-        // 发送订阅邮件
-        if let (Some(sub_repo), Some(email_srv_arc)) = (&self.subscription_repo, &self.email_service) {
-            if let Some(cat_id) = created_package.category_id {
-                if let Ok(emails) = sub_repo.get_subscribed_emails(cat_id).await {
-                    let es = email_srv_arc.read().await;
-                    for mail in emails {
-                        let _ = es.send_resource_notification(&mail, &created_package.name, &created_package.description.as_deref().unwrap_or(""), &format!("https://example.com/resources/{}", created_package.id)).await;
+        // 通知管理员和元老有新资源待审核
+        if let (Some(user_repo), Some(email_srv_arc)) = (&self.user_repo, &self.email_service) {
+            if let Ok(admin_emails) = user_repo.get_admin_and_elder_emails().await {
+                let es = email_srv_arc.read().await;
+                let review_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                let review_link = format!("{}/admin/resource-review", review_url);
+                
+                for email in admin_emails {
+                    if let Err(e) = es.send_admin_review_notification(
+                        &email, 
+                        &created_package.name, 
+                        &created_package.author, 
+                        &review_link
+                    ).await {
+                        log::error!("发送管理员通知邮件失败: {}", e);
+                    } else {
+                        log::info!("成功发送管理员通知邮件: {} -> {}", created_package.name, email);
                     }
                 }
             }
@@ -133,6 +153,9 @@ impl PackageService {
             favorite_count: package.favorite_count,
             created_at: package.created_at,
             updated_at: chrono::Utc::now(),
+            reviewer_id: req.reviewer_id.or(package.reviewer_id),
+            reviewed_at: req.reviewed_at.or(package.reviewed_at),
+            review_comment: req.review_comment.clone().or(package.review_comment),
         };
 
         self.package_repo.update_package(&updated_package).await?;
@@ -153,6 +176,33 @@ impl PackageService {
                 log::error!("记录资源更新操作失败: {}", e);
             } else {
                 log::info!("成功记录资源更新操作: Package ID={}", package_id);
+            }
+        }
+        
+        // 如果状态从非Active变为Active（审核通过），发送订阅者通知
+        if old_package.status != crate::models::PackageStatus::Active && 
+           updated_package.status == crate::models::PackageStatus::Active {
+            if let (Some(sub_repo), Some(email_srv_arc)) = (&self.subscription_repo, &self.email_service) {
+                if let Some(cat_id) = updated_package.category_id {
+                    if let Ok(emails) = sub_repo.get_subscribed_emails(cat_id).await {
+                        let es = email_srv_arc.read().await;
+                        let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                        let resource_link = format!("{}/resource/{}", resource_url, updated_package.id);
+                        
+                        for email in emails {
+                            if let Err(e) = es.send_resource_notification(
+                                &email, 
+                                &updated_package.name, 
+                                &updated_package.description.as_deref().unwrap_or(""), 
+                                &resource_link
+                            ).await {
+                                log::error!("发送订阅者通知邮件失败: {}", e);
+                            } else {
+                                log::info!("成功发送订阅者通知邮件: {} -> {}", updated_package.name, email);
+                            }
+                        }
+                    }
+                }
             }
         }
         

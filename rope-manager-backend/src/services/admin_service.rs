@@ -307,3 +307,15 @@ pub async fn get_dashboard_stats() -> DashboardStats {
         user_active: 78,
     }
 } 
+
+impl AdminService {
+    // 获取社区设置
+    pub async fn get_community_settings(&self) -> Result<crate::models::system::CommunitySettings> {
+        self.system_repo.get_community_settings().await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 更新社区设置
+    pub async fn update_community_settings(&self, request: &crate::models::system::UpdateCommunitySettingsRequest) -> Result<()> {
+        self.system_repo.update_community_settings(request).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+} 

@@ -19,6 +19,7 @@ pub struct Category {
     pub name: String,
     pub description: Option<String>,
     pub enabled: bool,
+    pub subscription_locked: bool,
     pub created_at: String,
     pub updated_at: Option<String>,
 }
@@ -28,6 +29,7 @@ pub struct CreateCategoryRequest {
     pub name: String,
     pub description: Option<String>,
     pub enabled: Option<bool>,
+    pub subscription_locked: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -35,6 +37,7 @@ pub struct UpdateCategoryRequest {
     pub name: Option<String>,
     pub description: Option<String>,
     pub enabled: Option<bool>,
+    pub subscription_locked: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -91,4 +94,50 @@ pub struct BackupStats {
     pub total_size: u64,
     pub last_backup_time: Option<String>,
     pub next_scheduled_backup: Option<String>,
+} 
+
+// 社区主页配置
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CommunitySettings {
+    pub site_title: String,
+    pub site_subtitle: String,
+    pub site_description: String,
+    pub welcome_message: String,
+    pub announcement: Option<String>,
+    pub footer_text: String,
+    pub contact_email: String,
+    pub github_link: Option<String>,
+    pub qq_group: Option<String>,
+    pub wechat_group: Option<String>,
+}
+
+impl Default for CommunitySettings {
+    fn default() -> Self {
+        Self {
+            site_title: "资源社区".to_string(),
+            site_subtitle: "分享、发现、学习".to_string(),
+            site_description: "一个专注于资源分享的社区平台".to_string(),
+            welcome_message: "欢迎来到我们的资源社区！在这里您可以分享和发现各种有价值的资源。".to_string(),
+            announcement: None,
+            footer_text: "© 2024 资源社区. All rights reserved.".to_string(),
+            contact_email: "contact@community.com".to_string(),
+            github_link: None,
+            qq_group: None,
+            wechat_group: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateCommunitySettingsRequest {
+    pub site_title: Option<String>,
+    pub site_subtitle: Option<String>,
+    pub site_description: Option<String>,
+    pub welcome_message: Option<String>,
+    pub announcement: Option<String>,
+    pub footer_text: Option<String>,
+    pub contact_email: Option<String>,
+    pub github_link: Option<String>,
+    pub qq_group: Option<String>,
+    pub wechat_group: Option<String>,
 } 

@@ -385,8 +385,41 @@ const loadStats = async () => {
 
 const autoBackupEnabled = ref(false);
 const toggleAutoBackup = async () => {
+  try {
+    // 切换自动备份状态
   autoBackupConfig.enable_auto_backup = autoBackupEnabled.value
-  await saveAutoBackupConfig()
+    
+    // 构建API请求参数
+    const config = {
+      enabled: autoBackupConfig.enable_auto_backup,
+      frequency: 'hourly',
+      time: '00:00',
+      retain_count: autoBackupConfig.max_backup_files,
+      auto_clean: true
+    }
+    
+    const result = await configAutoBackupApi(config)
+    
+    if (result.code === 0) {
+      // 更新本地状态
+      autoBackupSchedule.value = autoBackupConfig.enable_auto_backup 
+        ? `${autoBackupConfig.backup_interval_hours}h` 
+        : '已禁用'
+      
+      ElMessage.success(autoBackupConfig.enable_auto_backup ? '自动备份已启用' : '自动备份已禁用')
+    } else {
+      // 如果保存失败，回滚状态
+      autoBackupEnabled.value = !autoBackupEnabled.value
+      autoBackupConfig.enable_auto_backup = autoBackupEnabled.value
+      ElMessage.error(result.message || '配置保存失败')
+    }
+  } catch (error) {
+    console.error('切换自动备份状态失败:', error)
+    // 如果出错，回滚状态
+    autoBackupEnabled.value = !autoBackupEnabled.value
+    autoBackupConfig.enable_auto_backup = autoBackupEnabled.value
+    ElMessage.error('操作失败，请重试')
+  }
 }
 
 const autoBackupSchedule = ref('');
@@ -584,9 +617,34 @@ function batchDownload() {
   ElMessage.info('批量下载功能开发中...')
 }
 
-function saveAutoBackupConfig() {
+async function saveAutoBackupConfig() {
+  try {
+    // 构建API请求参数，将前端的配置结构转换为后端期望的格式
+    const config = {
+      enabled: autoBackupConfig.enable_auto_backup,
+      frequency: 'hourly', // 根据间隔小时数设定频率
+      time: '00:00',       // 默认时间
+      retain_count: autoBackupConfig.max_backup_files,
+      auto_clean: true
+    }
+    
+    const result = await configAutoBackupApi(config)
+    
+    if (result.code === 0) {
   ElMessage.success('自动备份配置已保存')
+      
+      // 更新本地状态
+      autoBackupEnabled.value = autoBackupConfig.enable_auto_backup
+      autoBackupSchedule.value = `${autoBackupConfig.backup_interval_hours}h`
+      
   autoBackupDialogVisible.value = false
+    } else {
+      ElMessage.error(result.message || '保存配置失败')
+    }
+  } catch (error) {
+    console.error('保存自动备份配置失败:', error)
+    ElMessage.error('保存配置时发生错误')
+  }
 }
 
 function getBackupTypeTag(type: string): string {
@@ -638,14 +696,37 @@ function formatTime(time: string): string {
   return new Date(time).toLocaleString()
 }
 
-onMounted(async () => {
-  await refreshData()
+// 加载自动备份配置
+async function loadAutoBackupConfig() {
+  try {
   const cfg = await getAutoBackupConfig()
-  if (cfg.code === 0) {
-    Object.assign(autoBackupConfig, cfg.data)
+    if (cfg.code === 0 && cfg.data) {
+      // 将后端配置映射到前端结构
+      Object.assign(autoBackupConfig, {
+        enable_auto_backup: cfg.data.enabled || false,
+        backup_interval_hours: 24, // 默认24小时，可根据frequency调整
+        backup_location: cfg.data.location || 'backups/',
+        max_backup_files: cfg.data.retain_count || 10
+      })
+      
     autoBackupEnabled.value = autoBackupConfig.enable_auto_backup
     autoBackupSchedule.value = `${autoBackupConfig.backup_interval_hours}h`
   }
+  } catch (error) {
+    console.error('加载自动备份配置失败:', error)
+    // 使用默认配置
+    Object.assign(autoBackupConfig, {
+      enable_auto_backup: false,
+      backup_interval_hours: 24,
+      backup_location: 'backups/',
+      max_backup_files: 10
+    })
+  }
+}
+
+onMounted(async () => {
+  await refreshData()
+  await loadAutoBackupConfig()
 })
 </script>
 

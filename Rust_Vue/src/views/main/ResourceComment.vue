@@ -37,13 +37,27 @@
         <div v-else class="comment-list">
           <div v-for="comment in comments" :key="comment.id" class="comment-item">
             <div class="comment-header">
-              <div class="comment-author">{{ comment.author_name || '匿名用户' }}</div>
+              <div class="comment-author">
+                {{ comment.author_name || '匿名用户' }}
+                <el-tag
+                  v-if="isAuthor(comment)"
+                  type="warning"
+                  size="small"
+                  class="ml-1"
+                >作者</el-tag>
+                <el-tag
+                  v-if="comment.pinned"
+                  type="primary"
+                  size="small"
+                  class="ml-1"
+                >置顶</el-tag>
+              </div>
               <div class="comment-time">{{ formatDate(comment.created_at) }}</div>
             </div>
             <div class="comment-content">{{ comment.content }}</div>
             <div class="comment-actions">
               <el-button 
-                type="text" 
+                link 
                 size="small" 
                 @click="likeComment(comment.id)"
               >
@@ -52,7 +66,7 @@
               </el-button>
               <el-button 
                 v-if="isLoggedIn"
-                type="text" 
+                link 
                 size="small" 
                 @click="replyToComment(comment.id)"
               >
@@ -61,12 +75,21 @@
               </el-button>
               <el-button 
                 v-if="canDeleteComment(comment)"
-                type="text" 
+                link 
                 size="small" 
                 @click="deleteComment(comment.id)"
               >
                 <el-icon><Delete /></el-icon>
                 删除
+              </el-button>
+                             <el-button 
+                 v-if="canPinComment(comment)"
+                 link 
+                 size="small" 
+                 @click="togglePinComment(comment)"
+               >
+                <el-icon><Top /></el-icon>
+                {{ comment.pinned ? '取消置顶' : '置顶' }}
               </el-button>
             </div>
           </div>
@@ -130,7 +153,8 @@ import {
   Back,
   Star,
   ChatRound,
-  Delete
+  Delete,
+  Top
 } from '@element-plus/icons-vue'
 import { getUserInfo } from '@/utils/auth'
 import { packageApi, type Package } from '@/api/packages'
@@ -219,6 +243,36 @@ const loadComments = async () => {
     // 不显示错误信息给用户，只是显示空评论状态
     comments.value = []
     totalComments.value = 0
+  }
+}
+
+// 判断评论是否为作者
+const isAuthor = (comment: Comment) => {
+  if (!resource.value) return false
+  return comment.username === resource.value.author
+}
+
+const canPinComment = (comment: Comment) => {
+  if (!isLoggedIn.value) return false
+  const userInfo = getUserInfo()
+  if (!userInfo || !resource.value) return false
+  // 管理员、元老或资源作者可以置顶评论
+  return userInfo.role === 'Admin' || userInfo.role === 'Elder' || userInfo.username === resource.value.author
+}
+
+const togglePinComment = async (comment: Comment) => {
+  try {
+    const res = await commentApi.pinComment(comment.id, !comment.pinned)
+    if (res.code === 0) {
+      ElMessage.success(comment.pinned ? '取消置顶成功' : '置顶成功')
+      // 重新加载评论列表以反映置顶状态变化
+      loadComments()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('置顶失败:', error)
+    ElMessage.error('置顶时发生错误')
   }
 }
 

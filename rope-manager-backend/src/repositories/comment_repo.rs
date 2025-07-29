@@ -88,8 +88,8 @@ impl CommentRepository {
         // 获取分页数据
         let sql = format!(
             "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                    likes, dislikes, created_at, updated_at 
-             FROM comments {} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    likes, dislikes, pinned, created_at, updated_at 
+             FROM comments {} ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?",
             where_clause
         );
         
@@ -122,12 +122,15 @@ impl CommentRepository {
                 parent_id: row.get(6)?,
                 likes: row.get(7)?,
                 dislikes: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                pinned: row.get::<_, i32>(9)? != 0,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
                 author_name: None,
+                username: None,
                 author_role: None,
                 author_avatar: None,
                 author_qq: None,
+                target_title: None,
             })
         })?;
         
@@ -164,11 +167,11 @@ impl CommentRepository {
         
         // 获取评论列表
         let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
-                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                          c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number 
                    FROM comments c 
                    LEFT JOIN users u ON c.user_id = u.id 
                    WHERE c.target_type = ? AND c.target_id = ? AND c.status != 'Deleted' 
-                   ORDER BY c.created_at DESC 
+                   ORDER BY c.pinned DESC, c.created_at DESC 
                    LIMIT ? OFFSET ?";
         
         let mut stmt = conn.prepare(sql)?;
@@ -185,12 +188,15 @@ impl CommentRepository {
                     parent_id: row.get(6)?,
                     likes: row.get(7)?,
                     dislikes: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    author_name: row.get(11).ok(),
-                    author_role: row.get(12).ok(),
-                    author_avatar: row.get(13).ok(),
-                    author_qq: row.get(14).ok(),
+                    pinned: row.get::<_, i32>(9)? != 0,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    author_name: row.get(12).ok(),
+                    username: row.get(13).ok(),
+                    author_role: row.get(14).ok(),
+                    author_avatar: row.get(15).ok(),
+                    author_qq: row.get(16).ok(),
+                    target_title: None,
                 })
             }
         )?;
@@ -207,7 +213,7 @@ impl CommentRepository {
     pub async fn get_comment_by_id(&self, comment_id: i32) -> Result<Option<Comment>> {
         let conn = self.conn.lock().await;
         let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
-                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number
+                          c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number
                    FROM comments c
                    LEFT JOIN users u ON c.user_id = u.id
                    WHERE c.id = ?";
@@ -224,12 +230,15 @@ impl CommentRepository {
                 parent_id: row.get(6)?,
                 likes: row.get(7)?,
                 dislikes: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                author_name: row.get(11).ok(),
-                author_role: row.get(12).ok(),
-                author_avatar: row.get(13).ok(),
-                author_qq: row.get(14).ok(),
+                pinned: row.get::<_, i32>(9)? != 0,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                author_name: row.get(12).ok(),
+                username: row.get(13).ok(),
+                author_role: row.get(14).ok(),
+                author_avatar: row.get(15).ok(),
+                author_qq: row.get(16).ok(),
+                target_title: None,
             })
         });
         
@@ -245,8 +254,8 @@ impl CommentRepository {
         let conn = self.conn.lock().await;
         conn.execute(
             "INSERT INTO comments (user_id, target_type, target_id, content, status, parent_id, 
-                                  likes, dislikes, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                  likes, dislikes, pinned, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 comment.user_id,
                 comment.target_type,
@@ -256,6 +265,7 @@ impl CommentRepository {
                 comment.parent_id,
                 comment.likes,
                 comment.dislikes,
+                if comment.pinned { 1 } else { 0 },
                 comment.created_at.to_rfc3339(),
                 comment.updated_at.to_rfc3339(),
             ]
@@ -271,13 +281,14 @@ impl CommentRepository {
         let conn = self.conn.lock().await;
         conn.execute(
             "UPDATE comments 
-             SET content = ?, status = ?, likes = ?, dislikes = ?, updated_at = ? 
+             SET content = ?, status = ?, likes = ?, dislikes = ?, pinned = ?, updated_at = ? 
              WHERE id = ?",
             params![
                 comment.content,
                 comment.status,
                 comment.likes,
                 comment.dislikes,
+                if comment.pinned { 1 } else { 0 },
                 comment.updated_at.to_rfc3339(),
                 comment.id,
             ]
@@ -297,7 +308,7 @@ impl CommentRepository {
     pub async fn get_comment_replies(&self, comment_id: i32) -> Result<Vec<Comment>> {
         let conn = self.conn.lock().await;
         let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
-                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                          c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number 
                    FROM comments c 
                    LEFT JOIN users u ON c.user_id = u.id 
                    WHERE c.parent_id = ? AND c.status != 'Deleted' 
@@ -315,12 +326,15 @@ impl CommentRepository {
                 parent_id: row.get(6)?,
                 likes: row.get(7)?,
                 dislikes: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
-                author_name: row.get(11).ok(),
-                author_role: row.get(12).ok(),
-                author_avatar: row.get(13).ok(),
-                author_qq: row.get(14).ok(),
+                pinned: row.get::<_, i32>(9)? != 0,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
+                author_name: row.get(12).ok(),
+                username: row.get(13).ok(),
+                author_role: row.get(14).ok(),
+                author_avatar: row.get(15).ok(),
+                author_qq: row.get(16).ok(),
+                target_title: None,
             })
         })?;
         
@@ -344,11 +358,13 @@ impl CommentRepository {
             |row| row.get(0)
         )?;
         
-        // 获取评论列表
+        // 获取评论列表，联表查询资源标题
         let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, 
-                          c.likes, c.dislikes, c.created_at, c.updated_at, u.nickname, u.role, u.avatar_url, u.qq_number 
+                          c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number,
+                          p.name as target_title
                    FROM comments c 
                    LEFT JOIN users u ON c.user_id = u.id 
+                   LEFT JOIN packages p ON c.target_type = 'Package' AND c.target_id = p.id
                    WHERE c.user_id = ? AND c.status != 'Deleted' 
                    ORDER BY c.created_at DESC 
                    LIMIT ? OFFSET ?";
@@ -367,12 +383,15 @@ impl CommentRepository {
                     parent_id: row.get(6)?,
                     likes: row.get(7)?,
                     dislikes: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
-                    author_name: row.get(11).ok(),
-                    author_role: row.get(12).ok(),
-                    author_avatar: row.get(13).ok(),
-                    author_qq: row.get(14).ok(),
+                    pinned: row.get::<_, i32>(9)? != 0,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    author_name: row.get(12).ok(),
+                    username: row.get(13).ok(),
+                    author_role: row.get(14).ok(),
+                    author_avatar: row.get(15).ok(),
+                    author_qq: row.get(16).ok(),
+                    target_title: row.get(17).ok(), // 新增：获取资源标题
                 })
             }
         )?;
@@ -448,6 +467,27 @@ impl CommentRepository {
         conn.execute(
             "DELETE FROM comment_dislikes WHERE comment_id = ? AND user_id = ?",
             params![comment_id, user_id]
+        )?;
+        
+        Ok(())
+    }
+
+    // 设置评论置顶状态
+    pub async fn set_comment_pinned(&self, comment_id: i32, target_type: &str, target_id: i32, pinned: bool) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        // 如果要置顶，先取消同一资源下的其他置顶评论
+        if pinned {
+            conn.execute(
+                "UPDATE comments SET pinned = 0 WHERE target_type = ? AND target_id = ? AND pinned = 1",
+                params![target_type, target_id]
+            )?;
+        }
+        
+        // 设置指定评论的置顶状态
+        conn.execute(
+            "UPDATE comments SET pinned = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            params![if pinned { 1 } else { 0 }, comment_id]
         )?;
         
         Ok(())

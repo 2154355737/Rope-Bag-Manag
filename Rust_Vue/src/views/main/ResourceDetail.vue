@@ -140,7 +140,11 @@
                     {{ (comment.author_name || '匿').charAt(0) }}
                   </el-avatar>
                   <div class="comment-meta">
-                    <span class="comment-author">{{ comment.author_name || '匿名用户' }}</span>
+                    <span class="comment-author">
+                      {{ comment.author_name || '匿名用户' }}
+                      <el-tag v-if="isAuthor(comment)" size="small" type="warning" class="ml-1">作者</el-tag>
+                      <el-tag v-if="comment.pinned" size="small" type="primary" class="ml-1">置顶</el-tag>
+                    </span>
                     <el-tag v-if="comment.author_role" size="small" type="success" class="ml-1">{{ formatRole(comment.author_role) }}</el-tag>
                     <span v-if="comment.author_qq" class="comment-qq ml-1">QQ: {{ comment.author_qq }}</span>
                   </div>
@@ -149,7 +153,7 @@
                 <div class="comment-content">{{ comment.content }}</div>
                 <div class="comment-actions">
                   <el-button 
-                    type="text" 
+                    link 
                     size="small" 
                     @click="likeComment(comment.id)"
                   >
@@ -158,7 +162,7 @@
                   </el-button>
                   <el-button 
                     v-if="isLoggedIn"
-                    type="text" 
+                    link 
                     size="small" 
                     @click="replyToComment(comment.id)"
                   >
@@ -167,12 +171,21 @@
                   </el-button>
                   <el-button 
                     v-if="canDeleteComment(comment)"
-                    type="text" 
+                    link 
                     size="small" 
                     @click="deleteComment(comment.id)"
                   >
                     <el-icon><Delete /></el-icon>
                     删除
+                  </el-button>
+                                     <el-button 
+                     v-if="canPinComment(comment)"
+                     link 
+                     size="small" 
+                     @click="togglePinComment(comment)"
+                   >
+                    <el-icon><Top /></el-icon>
+                    {{ comment.pinned ? '取消置顶' : '置顶' }}
                   </el-button>
                 </div>
               </div>
@@ -242,7 +255,8 @@ import {
   Calendar,
   Back,
   ChatRound,
-  Delete
+  Delete,
+  Top
 } from '@element-plus/icons-vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { getUserInfo } from '@/utils/auth'
@@ -582,6 +596,39 @@ const canDeleteComment = (comment: Comment) => {
   
   // 用户可以删除自己的评论
   return comment.user_id === userInfo.id
+}
+
+const canPinComment = (comment: Comment) => {
+  if (!isLoggedIn.value) return false
+  const userInfo = getUserInfo()
+  if (!userInfo || !resource.value) return false
+  // 管理员、元老或资源作者可以置顶评论
+  return userInfo.role === 'Admin' || userInfo.role === 'Elder' || userInfo.username === resource.value.author
+}
+
+const togglePinComment = async (comment: Comment) => {
+  try {
+    const res = await commentApi.pinComment(comment.id, !comment.pinned)
+    if (res.code === 0) {
+      ElMessage.success(comment.pinned ? '取消置顶成功' : '置顶成功')
+      comment.pinned = !comment.pinned
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('置顶失败:', error)
+    ElMessage.error('置顶时发生错误')
+  }
+}
+
+const isAuthor = (comment: Comment) => {
+  if (!resource.value) return false
+  console.log('检查作者身份:', {
+    comment_author: comment.username,
+    resource_author: resource.value.author,
+    is_match: comment.username === resource.value.author
+  })
+  return comment.username === resource.value.author
 }
 
 const handleSizeChange = (size: number) => {

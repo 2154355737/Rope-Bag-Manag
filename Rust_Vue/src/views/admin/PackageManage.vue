@@ -80,11 +80,11 @@
         />
         <el-select v-model="statusFilter" placeholder="状态筛选" clearable style="width: 150px">
           <el-option label="全部" value="" />
-          <el-option label="正常" value="正常" />
-          <el-option label="已发布" value="已发布" />
-          <el-option label="待审核" value="待审核" />
-          <el-option label="已拒绝" value="已拒绝" />
-          <el-option label="维护中" value="维护中" />
+          <el-option label="已发布" value="Active" />
+          <el-option label="待审核" value="Pending" />
+          <el-option label="已拒绝" value="Rejected" />
+          <el-option label="已下架" value="Inactive" />
+          <el-option label="已删除" value="Deleted" />
         </el-select>
         <el-select v-model="typeFilter" placeholder="分类筛选" clearable style="width: 150px">
           <el-option label="全部" value="" />
@@ -550,10 +550,7 @@ const filteredPackages = computed(() => {
     )
   }
   
-  // 状态过滤 - 使用后端状态名
-  if (statusFilter.value) {
-    filtered = filtered.filter(pkg => pkg.status === statusFilter.value)
-  }
+  // 状态过滤现在在API级别处理，不需要前端过滤
   
   // 类型过滤 - 使用后端分类名
   if (typeFilter.value) {
@@ -586,7 +583,8 @@ const refreshDownloadCount = async (pkgId: number) => {
 function setupWatchers() {
   // 监听筛选条件变化
   watch([statusFilter, typeFilter], () => {
-    // 当筛选条件变化时，不需要更新统计，因为我们统计的是总数
+    // 当筛选条件变化时，重新加载数据
+    loadPackages()
   })
   
   // 监听包数据变化
@@ -600,7 +598,17 @@ async function loadPackages() {
     loading.value = true
     // 强制清除缓存
     apiCache.delete('getPackages')
-    const res = await packageApi.getPackages()
+    
+    // 构建查询参数
+    const params: any = {}
+    if (statusFilter.value) {
+      params.status = statusFilter.value
+    }
+    if (searchQuery.value) {
+      params.search = searchQuery.value
+    }
+    
+    const res = await packageApi.getPackages(params)
     if (res.code === 0 && res.data) {
       packages.value = res.data.list?.map((pkg) => {
         // 根据分类ID查找分类名称
@@ -689,7 +697,8 @@ async function loadCategories() {
 }
 
 function handleSearch() {
-  // 搜索逻辑
+  // 重新加载数据以应用搜索条件
+  loadPackages()
 }
 
 async function refreshData() {
@@ -940,7 +949,8 @@ async function addPackage() {
     }
     
     console.log('创建绳包数据:', packageData)
-    const res = await packageApi.createPackage(packageData)
+    // 管理员使用专用创建接口，可以设置任意作者和状态
+const res = await packageApi.adminCreatePackage(packageData)
     if (res.code === 0) {
       ElMessage.success('绳包添加成功')
       
@@ -1094,21 +1104,32 @@ function getStatusText(status: string) {
     '待审核': '待审核',
     '已拒绝': '已拒绝',
     '维护中': '维护中',
-    // 英文枚举值
-    'Active': '正常',
-    'Inactive': '待审核',
-    'Deleted': '已拒绝'
+    // 英文枚举值（对应后端PackageStatus）
+    'Active': '已发布',
+    'Pending': '待审核',
+    'Rejected': '已拒绝',
+    'Inactive': '已下架',
+    'Deleted': '已删除'
   }
   return statusMap[status] || status
 }
 
 function getStatusType(status: string) {
   const typeMap: Record<string, string> = {
+    // 中文状态
     '正常': 'success',
     '已发布': 'success',
     '待审核': 'warning',
     '已拒绝': 'danger',
-    '维护中': 'warning'
+    '维护中': 'warning',
+    '已下架': 'info',
+    '已删除': 'danger',
+    // 英文状态（对应后端PackageStatus）
+    'Active': 'success',
+    'Pending': 'warning',
+    'Rejected': 'danger',
+    'Inactive': 'info',
+    'Deleted': 'danger'
   }
   return typeMap[status] || 'info'
 }

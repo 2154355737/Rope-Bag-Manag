@@ -2,20 +2,23 @@ import { api, ApiResponse } from '../utils/apiClient'
 
 export interface Comment {
   id: number
-  content: string
   user_id: number
-  target_id: number
   target_type: string
-  created_at: string
-  updated_at: string
+  target_id: number
+  content: string
+  status: string
+  parent_id?: number
   likes: number
   dislikes: number
-  status: string
+  pinned: boolean
+  created_at: string
+  updated_at: string
   author_name?: string
+  username?: string
   author_role?: string
   author_avatar?: string
   author_qq?: string
-  resource_id?: number // 兼容旧字段
+  target_title?: string
 }
 
 export const commentApi = {
@@ -76,5 +79,10 @@ export const commentApi = {
   // 回复评论
   replyComment: (commentId: number, content: string): Promise<ApiResponse<Comment>> => {
     return api.post(`/v1/comments/${commentId}/reply`, { content })
+  },
+
+  // 置顶/取消置顶评论
+  pinComment: (commentId: number, pinned: boolean): Promise<ApiResponse<Comment>> => {
+    return api.put(`/v1/comments/${commentId}/pin`, { pinned })
   }
 } 
