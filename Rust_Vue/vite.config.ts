@@ -12,25 +12,30 @@ export default defineConfig({
   ],
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:15201',
-      // 添加对外部资源的代理
-      '/fonts': {
-        target: 'https://rsms.me/',
+      // API代理 - 匹配 /api 开头的所有请求
+      '/api': {
+        target: 'http://127.0.0.1:15201',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/fonts/, '')
+        // 保持 /api 前缀，后端路由需要此前缀
+        rewrite: (path) => path
       },
+      // 文件上传/下载代理 - 匹配 /uploads 开头的所有请求
+      '/uploads': {
+        target: 'http://127.0.0.1:15201',
+        changeOrigin: true,
+        // 保持 /uploads 前缀
+        rewrite: (path) => path
+      },
+      // ESM模块代理（如果需要）
       '/esm': {
         target: 'https://esm.sh/',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/esm/, '')
-      },
-      '/uploads': {
-        target: 'http://127.0.0.1:15201',
-        changeOrigin: true,
-        // 不改写，保持 /uploads 前缀
-        rewrite: (pathStr) => pathStr
       }
     },
+    // 开发服务器配置
+    host: '0.0.0.0', // 允许外部访问
+    port: 5173,      // 默认端口
     // 防止网络问题
     hmr: {
       overlay: false

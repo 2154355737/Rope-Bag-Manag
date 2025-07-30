@@ -32,7 +32,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElForm } from 'element-plus'
 import { userApi, UpdateUserRequest } from '@/api/users'
-import { User } from '@/api/types'
+import type { User } from '@/types'
 import { User as UserIcon } from '@element-plus/icons-vue'
 
 const formRef = ref<InstanceType<typeof ElForm> | null>(null)

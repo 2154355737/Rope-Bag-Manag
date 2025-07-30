@@ -20,15 +20,15 @@ export interface Resource {
 export const communityApi = {
   // 获取资源列表
   getResources: (params?: { page?: number; pageSize?: number; category?: string; status?: string; search?: string }): Promise<ApiResponse<{ list: Resource[]; total: number; page: number; pageSize: number; totalPages?: number }>> => {
-    return api.get('/api/v1/packages', { params })
+    return api.get('/v1/packages', { params })
   },
   // 获取资源详情
   getResource: (id: number): Promise<ApiResponse<Resource>> => {
-    return api.get(`/api/v1/packages/${id}`)
+    return api.get(`/v1/packages/${id}`)
   },
   // 下载资源
   downloadResource: (id: number): Promise<ApiResponse<{ url: string }>> => {
-    return api.get(`/api/v1/packages/${id}/download`)
+    return api.get(`/v1/packages/${id}/download`)
   },
   // 创建资源
   createResource: (data: {
@@ -39,31 +39,31 @@ export const communityApi = {
     file_url: string
     cover_url?: string
   }): Promise<ApiResponse> => {
-    return api.post('/api/v1/packages', data)
+    return api.post('/v1/packages', data)
   },
   // 更新资源
   updateResource: (id: number, data: any): Promise<ApiResponse> => {
-    return api.put(`/api/v1/packages/${id}`, data)
+    return api.put(`/v1/packages/${id}`, data)
   },
   // 删除资源
   deleteResource: (id: number): Promise<ApiResponse> => {
-    return api.delete(`/api/v1/packages/${id}`)
+    return api.delete(`/v1/packages/${id}`)
   },
   // 批量删除资源
   batchDeleteResources: (ids: number[]): Promise<ApiResponse> => {
-    return api.post('/api/v1/packages/batch-delete', { ids })
+    return api.post('/v1/packages/batch-delete', { ids })
   },
   // 更新资源状态
   updateResourceStatus: (id: number, status: string): Promise<ApiResponse> => {
-    return api.put(`/api/v1/packages/${id}/status`, { status })
+    return api.put(`/v1/packages/${id}/status`, { status })
   },
   // 批量更新资源状态
   batchUpdateResourceStatus: (ids: number[], status: string): Promise<ApiResponse> => {
-    return api.post('/api/v1/packages/batch-update-status', { ids, status })
+    return api.post('/v1/packages/batch-update-status', { ids, status })
   },
   // 获取资源统计
   getResourceStats: (): Promise<ApiResponse<{ total: number }>> => {
-    return api.get('/api/v1/packages/stats')
+    return api.get('/v1/packages/stats')
   },
   
   // 分类管理API
@@ -73,12 +73,12 @@ export const communityApi = {
       enabled?: boolean
       search?: string
     }): Promise<ApiResponse<any>> => {
-      return api.get('/api/v1/categories', { params })
+      return api.get('/v1/categories', { params })
     },
 
     // 获取分类详情
     getCategory: (id: number): Promise<ApiResponse<any>> => {
-      return api.get(`/api/v1/categories/${id}`)
+      return api.get(`/v1/categories/${id}`)
     },
 
     // 创建分类
@@ -91,7 +91,7 @@ export const communityApi = {
       enabled: boolean
       tags?: string[]
     }): Promise<ApiResponse<any>> => {
-      return api.post('/api/v1/categories', data)
+      return api.post('/v1/categories', data)
     },
 
     // 更新分类
@@ -104,22 +104,22 @@ export const communityApi = {
       enabled?: boolean
       tags?: string[]
     }): Promise<ApiResponse<any>> => {
-      return api.put(`/api/v1/categories/${id}`, data)
+      return api.put(`/v1/categories/${id}`, data)
     },
 
     // 删除分类
     deleteCategory: (id: number): Promise<ApiResponse<any>> => {
-      return api.delete(`/api/v1/categories/${id}`)
+      return api.delete(`/v1/categories/${id}`)
     },
 
     // 批量删除分类
     batchDeleteCategories: (ids: number[]): Promise<ApiResponse<any>> => {
-      return api.post('/api/v1/categories/batch-delete', { ids })
+      return api.post('/v1/categories/batch-delete', { ids })
     },
 
     // 更新分类状态
     updateCategoryStatus: (id: number, enabled: boolean): Promise<ApiResponse<any>> => {
-      return api.put(`/api/v1/categories/${id}/status`, { enabled })
+      return api.put(`/v1/categories/${id}/status`, { enabled })
     }
   }
 }
@@ -134,7 +134,7 @@ export const communityUserApi = {
     status?: string
     search?: string
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/users', { params })
+    return api.get('/v1/users', { params })
   },
   
   // 其他用户相关API...
@@ -144,7 +144,7 @@ export const communityUserApi = {
 export const communityStatsApi = {
   // 获取社区总览统计
   getOverviewStats: (): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/overview')
+    return api.get('/v1/stats/overview')
   },
 
   // 获取资源统计
@@ -152,7 +152,7 @@ export const communityStatsApi = {
     period?: string
     category?: string
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/resources', { params })
+    return api.get('/v1/stats/resources', { params })
   },
 
   // 获取用户统计
@@ -160,14 +160,14 @@ export const communityStatsApi = {
     period?: string
     role?: string
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/users', { params })
+    return api.get('/v1/stats/users', { params })
   },
 
   // 获取分类统计
   getCategoryStats: (params?: {
     period?: string
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/categories', { params })
+    return api.get('/v1/stats/categories', { params })
   },
 
   // 获取热门资源
@@ -175,7 +175,7 @@ export const communityStatsApi = {
     period?: string
     limit?: number
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/hot-resources', { params })
+    return api.get('/v1/stats/hot-resources', { params })
   },
 
   // 获取活跃用户
@@ -183,7 +183,7 @@ export const communityStatsApi = {
     period?: string
     limit?: number
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/stats/active-users', { params })
+    return api.get('/v1/stats/active-users', { params })
   }
 }
 
@@ -195,7 +195,7 @@ export const communityModerationApi = {
     pageSize?: number
     type?: 'resource' | 'comment' | 'user'
   }): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/moderation/pending', { params })
+    return api.get('/v1/moderation/pending', { params })
   },
 
   // 审核资源
@@ -203,7 +203,7 @@ export const communityModerationApi = {
     action: 'approve' | 'reject'
     reason?: string
   }): Promise<ApiResponse<any>> => {
-    return api.post(`/api/v1/moderation/resources/${id}/review`, data)
+    return api.post(`/v1/moderation/resources/${id}/review`, data)
   },
 
   // 审核评论
@@ -211,7 +211,7 @@ export const communityModerationApi = {
     action: 'approve' | 'reject'
     reason?: string
   }): Promise<ApiResponse<any>> => {
-    return api.post(`/api/v1/moderation/comments/${id}/review`, data)
+    return api.post(`/v1/moderation/comments/${id}/review`, data)
   },
 
   // 审核用户
@@ -219,7 +219,7 @@ export const communityModerationApi = {
     action: 'approve' | 'reject'
     reason?: string
   }): Promise<ApiResponse<any>> => {
-    return api.post(`/api/v1/moderation/users/${id}/review`, data)
+    return api.post(`/v1/moderation/users/${id}/review`, data)
   },
 
   // 批量审核
@@ -229,12 +229,12 @@ export const communityModerationApi = {
     action: 'approve' | 'reject'
     reason?: string
   }): Promise<ApiResponse<any>> => {
-    return api.post('/api/v1/moderation/batch-review', data)
+    return api.post('/v1/moderation/batch-review', data)
   },
 
   // 获取审核统计
   getModerationStats: (): Promise<ApiResponse<any>> => {
-    return api.get('/api/v1/moderation/stats')
+    return api.get('/v1/moderation/stats')
   }
 }
 

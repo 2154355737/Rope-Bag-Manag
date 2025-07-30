@@ -68,7 +68,7 @@
             <template #default="{ row }">
               <el-switch 
                 v-model="subscribed[row.id]" 
-                @change="val => onToggle(row.id, val)"
+                @change="(val: boolean) => onToggle(row.id, val)"
                 :loading="toggleLoading[row.id]"
               />
             </template>
@@ -125,15 +125,19 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElForm } from 'element-plus'
 import { User, Plus } from '@element-plus/icons-vue'
-import { categoryApi, subscriptionApi, type UserSubscriptions } from '@/api'
+import { categoryApi, subscriptionApi } from '@/api'
+import type { UserSubscriptions } from '@/api/subscriptions'
 import { userApi, type UpdateUserRequest } from '@/api/users'
 import { getUserInfo, refreshUserInfo } from '@/utils/auth'
 
-interface Category { 
+interface CategoryWithCount { 
   id: number
   name: string
-  description: string
-  count: number
+  description: string | null
+  enabled: boolean
+  subscription_locked: boolean
+  created_at: string
+  count?: number
 }
 
 const formRef = ref<InstanceType<typeof ElForm> | null>(null)
@@ -146,7 +150,7 @@ const showEditDialog = ref(false)
 const userProfile = ref<any>({})
 
 // 分类列表
-const categoryList = ref<Category[]>([])
+const categoryList = ref<CategoryWithCount[]>([])
 const subscribed = reactive<Record<number, boolean>>({})
 const toggleLoading = reactive<Record<number, boolean>>({})
 

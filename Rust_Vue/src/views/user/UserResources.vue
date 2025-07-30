@@ -114,7 +114,7 @@
               <div class="resource-title" @click="$router.push(`/resource/${resource.id}`)">
                 {{ resource.name }}
               </div>
-              <el-dropdown @command="(command) => handleResourceAction(command, resource)">
+              <el-dropdown @command="(command: string) => handleResourceAction(command, resource)">
                 <el-button type="text" size="small">
                   <el-icon><MoreFilled /></el-icon>
                 </el-button>
@@ -296,7 +296,8 @@ const currentEditResource = ref<Package | null>(null)
 // 分页数据
 const pagination = reactive({
   page: 1,
-  pageSize: 12
+  pageSize: 12,
+  total: 0
 })
 
 // 搜索表单
@@ -338,7 +339,11 @@ const uploadRules = {
   ],
   file_url: [
     { required: true, message: '请输入文件链接', trigger: 'blur' },
-    { type: 'url', message: '请输入有效的URL地址', trigger: 'blur' }
+    { 
+      pattern: /^https?:\/\/.+/, 
+      message: '请输入有效的URL地址', 
+      trigger: 'blur' 
+    }
   ]
 }
 
@@ -406,7 +411,7 @@ const openEditDialog = (resource: Package) => {
   editForm.name = resource.name
   editForm.version = resource.version || ''
   editForm.description = resource.description || ''
-  editForm.category_id = resource.category_id
+  editForm.category_id = resource.category_id || undefined
   editForm.file_url = resource.file_url
   showEditDialog.value = true
 }

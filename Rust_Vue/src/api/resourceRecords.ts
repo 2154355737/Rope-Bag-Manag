@@ -77,11 +77,11 @@ export const resourceRecordApi = {
   
   // 批量删除资源记录
   batchDeleteResourceRecords: (recordIds: number[]): Promise<ApiResponse> => {
-    return api.post('/api/v1/resource-records/batch-delete', { ids: recordIds })
+    return api.post('/v1/resource-records/batch-delete', { ids: recordIds })
   },
   
   // 清空资源记录
   clearResourceRecords: (params?: { resource_id?: number; user_id?: number; before_date?: string }): Promise<ApiResponse> => {
-    return api.post('/api/v1/resource-records/clear', params)
+    return api.post('/v1/resource-records/clear', params)
   },
 } 

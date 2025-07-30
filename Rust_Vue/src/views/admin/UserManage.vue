@@ -192,7 +192,7 @@
               编辑
             </el-button>
             <el-button 
-              v-if="row.ban_status === 'normal'"
+              v-if="row.ban_status === 'normal' || row.ban_status === 'Normal'"
               size="small" 
               type="warning" 
               @click="banUser(row)"

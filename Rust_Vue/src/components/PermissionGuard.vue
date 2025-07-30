@@ -50,8 +50,9 @@ const hasPermission = computed(() => {
     return false
   }
   
-  // 检查封禁状态
-  if (userInfo.ban_status && userInfo.ban_status !== 'normal') {
+  // 检查封禁状态（不区分大小写）
+  const banStatus = userInfo.ban_status?.toLowerCase()
+  if (banStatus && banStatus !== 'normal') {
     return false
   }
   

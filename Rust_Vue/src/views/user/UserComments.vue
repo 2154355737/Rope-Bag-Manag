@@ -237,8 +237,8 @@ const loadComments = async () => {
     
     // 过滤空参数
     Object.keys(params).forEach(key => {
-      if (params[key] === '' || params[key] === null) {
-        delete params[key]
+      if ((params as any)[key] === '' || (params as any)[key] === null) {
+        delete (params as any)[key]
       }
     })
 

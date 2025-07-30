@@ -1,5 +1,5 @@
 // 认证相关工具函数
-import apiClient from './apiClient'
+import apiClient, { api, type ApiResponse } from './apiClient'
 import CookieManager from './cookie'
 
 // 获取登录状态（改进版本）
@@ -87,9 +87,8 @@ export function checkAuthStatus(): { hasToken: boolean; hasUserInfo: boolean; us
 // 验证服务器端登录状态（新增）
 export async function verifyServerAuth(): Promise<boolean> {
   try {
-    const response = await apiClient.get('/v1/auth/verify')
-    const responseData = response.data
-    return responseData.code === 0
+    const response = await api.get('/v1/auth/verify')
+    return response.code === 0
   } catch (error) {
     console.warn('服务器认证验证失败:', error)
     return false
@@ -105,9 +104,8 @@ export function refreshUserInfo() {
     return Promise.resolve(null)
   }
 
-  return apiClient.get('/v1/auth/user-info')
-    .then(res => {
-      const responseData = res.data
+  return api.get('/v1/auth/user-info')
+    .then((responseData: ApiResponse) => {
       if (responseData.code === 0 && responseData.data) {
         CookieManager.setUserInfo(responseData.data)
         if (typeof window !== 'undefined') {
@@ -122,7 +120,7 @@ export function refreshUserInfo() {
         return null
       }
     })
-    .catch(err => {
+    .catch((err: any) => {
       console.warn('获取用户信息失败:', err.response?.status)
       if (typeof window !== 'undefined') {
         (window as any).lastUserInfoValid = false
@@ -188,9 +186,11 @@ export async function logout() {
     
     if (response.ok) {
       console.log('✅ 服务器Cookie已清除')
+    } else {
+      console.warn('⚠️ 服务器退出登录返回非200状态:', response.status)
     }
   } catch (error) {
-    console.warn('⚠️ 服务器退出登录失败，仅清除本地数据:', error)
+    console.warn('⚠️ 服务器退出登录失败，但本地数据已清除:', error)
   } finally {
     // 清除所有本地认证数据
     CookieManager.clearAllAuthData()

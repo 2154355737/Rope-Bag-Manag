@@ -1,4 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+// 引入 fetch 拦截器（副作用）
+import './http/fetchInterceptor'
 import { resourceRecordApi } from '../api/resourceRecords'
 import userActionService from './userActionService'
 import { getToken, clearToken as clearAuthToken } from './auth'
@@ -6,13 +8,49 @@ import { getToken, clearToken as clearAuthToken } from './auth'
 // 为Vite环境变量声明类型
 /// <reference types="vite/client" />
 
-// API配置
-// 生产环境建议通过 .env.production 设置 VITE_API_BASE_URL=/api
-const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL || '/api'
+// API 基础路径：统一使用相对路径，通过代理转发到后端
+// 开发模式：Vite开发服务器代理 /api -> http://127.0.0.1:15201
+// 生产模式：nginx代理 /api/ -> http://127.0.0.1:15201
+const API_BASE_URL = '/api'
+
+// 可选：通过环境变量覆盖（用于特殊部署场景）
+const CUSTOM_API_URL = import.meta.env.VITE_API_BASE_URL
+let FINAL_API_BASE_URL = CUSTOM_API_URL || API_BASE_URL
+
+// 🔧 修正重复的 /api 路径问题
+if (FINAL_API_BASE_URL && FINAL_API_BASE_URL.includes('/api/api')) {
+  FINAL_API_BASE_URL = FINAL_API_BASE_URL.replace(/\/api\/api/g, '/api')
+  console.warn('⚠️ 检测到重复的 /api 路径，已自动修正:', FINAL_API_BASE_URL)
+}
+
+// 🔧 额外的路径验证和修正
+if (FINAL_API_BASE_URL) {
+  // 移除末尾的斜杠（如果有）
+  FINAL_API_BASE_URL = FINAL_API_BASE_URL.replace(/\/+$/, '')
+  
+  // 确保只有一个 /api 前缀
+  FINAL_API_BASE_URL = FINAL_API_BASE_URL.replace(/\/api(\/api)+/g, '/api')
+  
+  // 如果是空字符串，使用默认值
+  if (FINAL_API_BASE_URL === '') {
+    FINAL_API_BASE_URL = '/api'
+  }
+  
+  console.log('🔧 [路径修正] 最终API路径:', FINAL_API_BASE_URL)
+}
+
+// 🔍 临时调试信息 - 查找URL重复问题的根源
+console.group('🔍 [调试] API配置分析')
+console.log('🌍 import.meta.env:', import.meta.env)
+console.log('📝 CUSTOM_API_URL (环境变量):', CUSTOM_API_URL)
+console.log('🎯 API_BASE_URL (默认值):', API_BASE_URL)
+console.log('✅ FINAL_API_BASE_URL (最终使用):', FINAL_API_BASE_URL)
+console.log('🔧 Environment Mode:', import.meta.env.MODE)
+console.groupEnd()
 
 // 创建axios实例
 const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: FINAL_API_BASE_URL,
   timeout: 10000,
   withCredentials: true, // 支持Cookie发送
   headers: {
@@ -20,9 +58,50 @@ const apiClient: AxiosInstance = axios.create({
   },
 })
 
+// 调试信息：输出当前使用的API地址和环境配置
+if (import.meta.env.DEV || import.meta.env.VITE_DEBUG_API === 'true') {
+  console.group('🔧 API Client Configuration')
+  console.log('🔗 Final API Base URL:', FINAL_API_BASE_URL)
+  console.log('🌍 Environment Mode:', import.meta.env.MODE)
+  console.log('⚙️ Custom API URL:', CUSTOM_API_URL || 'None (using default)')
+  console.log('🏠 Default API URL:', API_BASE_URL)
+  
+  if (import.meta.env.DEV) {
+    console.log('🚀 Development Mode: Using Vite proxy')
+    console.log('   • /api -> http://127.0.0.1:15201')
+    console.log('   • /uploads -> http://127.0.0.1:15201')
+  } else {
+    console.log('🏭 Production Mode: Using nginx proxy or direct connection')
+    if (FINAL_API_BASE_URL.startsWith('/')) {
+      console.log('   • Using relative path (nginx proxy expected)')
+    } else {
+      console.log('   • Using direct connection to backend')
+    }
+  }
+  console.groupEnd()
+}
+
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
+    // 🔍 临时调试信息 - 查看实际请求URL
+    if (config.url) {
+      console.log('🚀 [调试] 请求信息:', {
+        baseURL: config.baseURL,
+        url: config.url,
+        fullURL: `${config.baseURL}${config.url}`,
+        method: config.method?.toUpperCase()
+      })
+      
+      // 🔧 最终的URL重复检查和修正
+      const fullURL = `${config.baseURL}${config.url}`
+      if (fullURL.includes('/api/api')) {
+        console.warn('⚠️ [紧急修正] 检测到最终URL中的重复路径:', fullURL)
+        config.url = config.url?.replace(/^\/api/, '') || config.url
+        console.log('✅ [紧急修正] 修正后的URL:', config.url)
+      }
+    }
+    
     // 检查是否正在退出登录，如果是则阻止非登录相关的API调用
     if (typeof window !== 'undefined' && (window as any).isLoggingOut) {
       if (config.url && !config.url.includes('/auth/logout')) {
@@ -31,10 +110,11 @@ apiClient.interceptors.request.use(
       }
     }
     
-    // 修正可能重复的 /api 前缀，避免出现 /api/api/*
-    if (config.url && config.url.startsWith('/api/')) {
-      config.url = config.url.replace(/^\/api/, '')
-    }
+    // 移除错误的前缀处理逻辑 - 这会导致路径错误
+    // 已禁用：避免去掉正确的 /api 前缀
+    // if (config.url && config.url.startsWith('/api/')) {
+    //   config.url = config.url.replace(/^\/api/, '')
+    // }
 
     // 添加认证token (优先从Cookie获取)
     const token = getToken()
@@ -192,115 +272,7 @@ const logResourceOperation = async (method: string, url: string, response: any) 
   }
 }
 
-// 直接请求拦截器
-// 替换原生fetch方法，用于拦截直接的fetch请求
-const originalFetch = window.fetch
-window.fetch = async function(input: RequestInfo | URL, init?: RequestInit) {
-  // 获取请求方法和URL
-  const method = init?.method || 'GET'
-  const urlString = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url
-  
-  // 只拦截API请求
-  if (typeof urlString === 'string' && urlString.includes('/api/')) {
-    console.log(`[Fetch拦截] ${method} ${urlString}`)
-  }
-  
-  // 调用原始fetch
-  const response = await originalFetch(input, init)
-  
-  // 克隆响应以便读取内容
-  const clone = response.clone()
-  
-  // 只拦截API请求
-  if (typeof urlString === 'string' && urlString.includes('/api/')) {
-    // 检查URL，如果是包创建操作，不在前端记录（已在后端记录）
-    if (method === 'POST' && urlString.includes('/v1/packages') && !urlString.includes('/v1/packages/')) {
-      console.log(`[跳过前端记录] 包创建操作已在后端记录`)
-      return response
-    }
-    
-    // 异步处理响应数据
-    clone.json().then(data => {
-      if (data && data.code === 0) {
-        // 处理成功响应，尝试记录操作
-        setTimeout(() => {
-          try {
-            // 提取操作类型和资源ID
-            let resourceId: number | null = null
-            let action: string = 'Unknown'
-            let resourceType: string = 'Unknown'
-            
-            // 从URL中提取资源ID
-            const urlStr = urlString
-            
-            // 识别资源类型
-            if (urlStr.includes('/packages/')) {
-              resourceType = 'Package'
-              const packageMatch = urlStr.match(/\/packages\/(\d+)/)
-              if (packageMatch) resourceId = parseInt(packageMatch[1])
-            } else if (urlStr.includes('/users/')) {
-              resourceType = 'User'
-              const userMatch = urlStr.match(/\/users\/(\d+)/)
-              if (userMatch) resourceId = parseInt(userMatch[1])
-            } else if (urlStr.includes('/comments/')) {
-              resourceType = 'Comment'
-              const commentMatch = urlStr.match(/\/comments\/(\d+)/)
-              if (commentMatch) resourceId = parseInt(commentMatch[1])
-            } else if (urlStr.includes('/categories/')) {
-              resourceType = 'Category'
-              const categoryMatch = urlStr.match(/\/categories\/(\d+)/)
-              if (categoryMatch) resourceId = parseInt(categoryMatch[1])
-            } else {
-              // 普通ID匹配
-              const idMatch = urlStr.match(/\/(\d+)(\/|$)/)
-              if (idMatch) {
-                resourceId = parseInt(idMatch[1])
-                // 从URL推断资源类型
-                if (urlStr.includes('/packages')) resourceType = 'Package'
-                else if (urlStr.includes('/users')) resourceType = 'User'
-                else if (urlStr.includes('/comments')) resourceType = 'Comment'
-                else if (urlStr.includes('/categories')) resourceType = 'Category'
-              }
-            }
-            
-            // 根据请求方法确定操作类型
-            if (method === 'POST') action = 'Create'
-            else if (method === 'PUT') action = 'Update'
-            else if (method === 'DELETE') action = 'Delete'
-            else if (method === 'GET' && urlStr.includes('/download')) action = 'Download'
-            
-            // 如果有资源ID和有效的操作类型，记录操作
-            if (resourceId && action !== 'Unknown' && resourceType !== 'Unknown') {
-              // 准备记录数据
-              const recordData: any = {
-                resource_type: resourceType
-              }
-              
-              // 如果有响应数据，添加为新数据
-              if (data.data && action !== 'Delete') {
-                recordData.new_data = JSON.stringify(data.data)
-              }
-              
-              console.log(`[Fetch记录] ${resourceType} ${action}操作：ID=${resourceId}`)
-              
-              // 使用资源记录服务记录操作
-              import('../utils/loggerService').then(({ resourceLogger }) => {
-                resourceLogger.logResourceOperation(resourceType, action, resourceId as number, null, data.data)
-                  .catch(err => console.warn('记录操作失败:', err))
-              }).catch(err => console.error('导入记录服务失败:', err))
-            }
-          } catch (err) {
-            console.warn('处理响应数据失败:', err)
-          }
-        }, 0)
-      }
-    }).catch(err => {
-      console.warn('解析响应JSON失败:', err)
-    })
-  }
-  
-  return response
-}
+// fetch 拦截器逻辑已迁移至 ./http/fetchInterceptor，便于维护
 
 // 响应拦截器
 apiClient.interceptors.response.use(

@@ -24,7 +24,7 @@ impl UserActionRepository {
         println!("开始创建用户行为记录，用户ID: {}", req.user_id);
         let conn = self.conn.lock().await;
         
-        // 确保表存在
+        // 确保表存在（移除外键约束以支持访客用户）
         println!("确保user_actions表存在");
         match conn.execute(
             "CREATE TABLE IF NOT EXISTS user_actions (
@@ -49,26 +49,28 @@ impl UserActionRepository {
         
         println!("准备执行SQL插入，用户ID: {}, 行为类型: {}", req.user_id, req.action_type);
         
-        // 先检查用户是否存在
-        let mut user_exists = false;
-        match conn.query_row("SELECT 1 FROM users WHERE id = ?", [req.user_id], |_| Ok(())) {
-            Ok(_) => {
-                println!("用户ID {} 在users表中存在", req.user_id);
-                user_exists = true;
-            },
-            Err(e) => println!("查询用户出错: {}", e),
+        // 对于访客用户(user_id = -1)，不检查用户是否存在
+        if req.user_id > 0 {
+            // 检查用户是否存在（仅对登录用户）
+            match conn.query_row(
+                "SELECT id FROM users WHERE id = ?",
+                params![req.user_id],
+                |_| Ok(())
+            ) {
+                Ok(_) => println!("用户ID {} 验证成功", req.user_id),
+                Err(e) => {
+                    println!("查询用户出错: {}", e);
+                    println!("警告: 用户ID {} 在users表中不存在，这可能导致外键约束错误", req.user_id);
+                }
+            }
+        } else {
+            println!("访客用户，跳过用户验证");
         }
         
-        if !user_exists {
-            println!("警告: 用户ID {} 在users表中不存在，这可能导致外键约束错误", req.user_id);
-        }
-        
-        // 执行插入
+        // 插入用户行为记录
         match conn.execute(
-            "INSERT INTO user_actions (
-                user_id, action_type, target_type, target_id, details, 
-                ip_address, user_agent, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO user_actions (user_id, action_type, target_type, target_id, details, ip_address, user_agent, created_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 req.user_id,
                 req.action_type,
@@ -78,29 +80,30 @@ impl UserActionRepository {
                 req.ip_address,
                 req.user_agent,
                 created_at_str
-            ],
+            ]
         ) {
-            Ok(rows) => println!("插入成功，影响行数: {}", rows),
+            Ok(_) => {
+                println!("插入成功");
+                let action_id = conn.last_insert_rowid() as i32;
+                                 let action = UserAction {
+                     id: action_id,
+                     user_id: req.user_id,
+                     action_type: req.action_type.clone(),
+                     target_type: req.target_type.clone(),
+                     target_id: req.target_id,
+                     details: req.details.clone(),
+                     ip_address: req.ip_address.clone(),
+                     user_agent: req.user_agent.clone(),
+                     created_at: timestamp,
+                 };
+                println!("用户行为记录创建成功: ID={}", action_id);
+                Ok(action)
+            },
             Err(e) => {
                 println!("插入失败: {}", e);
-                return Err(anyhow::anyhow!("插入用户行为记录失败: {}", e));
+                Err(anyhow::anyhow!("插入用户行为记录失败: {}", e))
             }
         }
-        
-        let id = conn.last_insert_rowid() as i32;
-        println!("新记录ID: {}", id);
-        
-        Ok(UserAction {
-            id,
-            user_id: req.user_id,
-            action_type: req.action_type.clone(),
-            target_type: req.target_type.clone(),
-            target_id: req.target_id,
-            details: req.details.clone(),
-            ip_address: req.ip_address.clone(),
-            user_agent: req.user_agent.clone(),
-            created_at: timestamp,
-        })
     }
 
     // 获取用户行为记录列表

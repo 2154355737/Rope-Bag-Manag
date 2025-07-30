@@ -72,37 +72,37 @@ export interface UpdateCommunitySettingsRequest {
 export const settingsApi = {
   // 获取系统设置
   getSettings: (): Promise<ApiResponse<Record<string, string>>> => {
-    return api.get('/api/v1/admin/settings')
+    return api.get('/v1/admin/settings')
   },
   
   // 更新系统设置
   updateSettings: (settings: Partial<SystemSettings>): Promise<ApiResponse> => {
-    return api.post('/api/v1/admin/settings', settings)
+    return api.post('/v1/admin/settings', settings)
   },
   
   // 获取单项设置
   getSetting: (key: string): Promise<ApiResponse<{key: string, value: string}>> => {
-    return api.get(`/api/v1/admin/settings/${key}`)
+    return api.get(`/v1/admin/settings/${key}`)
   },
   
   // 更新单项设置
   updateSetting: (key: string, value: any): Promise<ApiResponse> => {
-    return api.post(`/api/v1/admin/settings/${key}`, { value })
+    return api.post(`/v1/admin/settings/${key}`, { value })
   },
   
   // 重置设置
   resetSettings: (): Promise<ApiResponse> => {
-    return api.post('/api/v1/admin/settings/reset')
+    return api.post('/v1/admin/settings/reset')
   },
   
   // 获取主题设置
   getThemeSettings: (): Promise<ApiResponse<ThemeSettings>> => {
-    return api.get('/api/v1/admin/theme-settings')
+    return api.get('/v1/admin/theme-settings')
   },
   
   // 更新主题设置
   updateThemeSettings: (settings: ThemeSettings): Promise<ApiResponse> => {
-    return api.post('/api/v1/admin/theme-settings', settings)
+    return api.post('/v1/admin/theme-settings', settings)
   },
 
   // 获取社区设置

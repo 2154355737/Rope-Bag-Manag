@@ -317,20 +317,21 @@ router.beforeEach(async (to, from, next) => {
     })
   }
   
-    // 检查封禁状态
-    if (userInfo?.ban_status && userInfo.ban_status !== 'normal') {
-    console.warn(`🚫 封禁用户访问被拦截: ${userInfo.username} (${userInfo.ban_status})`)
-    // 清除认证信息
-    await logout()
-    return next({ 
-      path: '/login', 
-      query: { 
-        error: 'banned',
-        message: userInfo.ban_status === 'suspended' ? '账户已被暂停' : '账户已被封禁'
-      },
-      replace: true 
-    })
-  }
+    // 检查封禁状态 - 修复逻辑（不区分大小写）
+    const banStatus = userInfo?.ban_status?.toLowerCase()
+    if (banStatus && banStatus !== 'normal' && banStatus !== '') {
+      console.warn(`🚫 封禁用户访问被拦截: ${userInfo.username} (${userInfo.ban_status})`)
+      // 清除认证信息
+      await logout()
+      return next({ 
+        path: '/login', 
+        query: { 
+          error: 'banned',
+          message: userInfo.ban_status === 'suspended' ? '账户已被暂停' : '账户已被封禁'
+        },
+        replace: true 
+      })
+    }
   
     // 检查角色权限
   const requiredRoles = to.meta.roles as string[]

@@ -1,0 +1,18 @@
+2025/07/30 23:35:59 [emerg] 8144#21048: invalid event type "epoll" in D:\vue\zhiyuanshequ\rust\nginx-1.28.0/conf/nginx.conf:7
+2025/07/30 23:39:35 [notice] 16516#26448: signal process started
+2025/07/31 00:13:51 [notice] 23920#492: signal process started
+2025/07/31 00:25:35 [notice] 16764#3196: signal process started
+2025/07/31 00:27:05 [notice] 6404#23776: signal process started
+2025/07/31 00:34:27 [notice] 8324#18712: signal process started
+2025/07/31 00:34:35 [notice] 18500#27920: signal process started
+2025/07/31 00:34:35 [error] 18500#27920: OpenEvent("Global\ngx_quit_26504") failed (5: Access is denied)
+2025/07/31 00:35:29 [notice] 14528#18668: signal process started
+2025/07/31 00:35:29 [error] 14528#18668: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
+2025/07/31 00:35:58 [notice] 12824#8704: signal process started
+2025/07/31 00:35:58 [error] 12824#8704: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
+2025/07/31 00:36:24 [notice] 26544#5916: signal process started
+2025/07/31 00:36:24 [error] 26544#5916: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
+2025/07/31 00:39:27 [notice] 23128#20840: signal process started
+2025/07/31 00:39:27 [error] 23128#20840: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
+2025/07/31 00:41:15 [notice] 20512#27028: signal process started
+2025/07/31 00:41:15 [error] 20512#27028: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS system_logs (
     details TEXT
 );
 
--- 创建系统设置表
+-- 创建系统设置表（包含所有需要的列）
 CREATE TABLE IF NOT EXISTS system_settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL,
@@ -16,23 +16,18 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 旧版本若缺失 description 字段则补充
-PRAGMA table_info(system_settings);
--- 上述语句仅检测，无副作用；真正添加字段：
-ALTER TABLE system_settings ADD COLUMN description TEXT;
-
 -- 插入默认的主题设置
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('primary_color', '#409EFF');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('secondary_color', '#67C23A');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('dark_mode', 'false');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('font_size', '14px');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('language', 'zh-CN');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('primary_color', '#409EFF', '主要颜色');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('secondary_color', '#67C23A', '次要颜色');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('dark_mode', 'false', '深色模式');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('font_size', '14px', '字体大小');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('language', 'zh-CN', '系统语言');
 
 -- 插入默认的功能开关
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('enable_registration', 'true');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('enable_community', 'true');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('enable_upload', 'true');
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('enable_comments', 'true');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('enable_registration', 'true', '允许用户注册');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('enable_community', 'true', '启用社区功能');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('enable_upload', 'true', '允许文件上传');
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('enable_comments', 'true', '启用评论功能');
 
 -- 插入默认的系统模式
-INSERT OR IGNORE INTO system_settings (key, value) VALUES ('system_mode', 'Normal'); 
+INSERT OR IGNORE INTO system_settings (key, value, description) VALUES ('system_mode', 'Normal', '系统运行模式'); 

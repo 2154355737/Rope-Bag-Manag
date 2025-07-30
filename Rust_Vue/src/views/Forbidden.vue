@@ -117,7 +117,8 @@ const message = computed(() => {
     return '您需要登录后才能访问此页面'
   }
   
-  if (userInfo.value.ban_status !== 'normal') {
+  const banStatus = userInfo.value.ban_status?.toLowerCase()
+  if (banStatus && banStatus !== 'normal') {
     return '您的账户状态异常，无法访问此页面'
   }
   
@@ -126,7 +127,8 @@ const message = computed(() => {
 
 const alertTitle = computed(() => {
   if (!userInfo.value) return '需要登录'
-  if (userInfo.value.ban_status !== 'normal') return '账户状态异常'
+  const banStatus = userInfo.value.ban_status?.toLowerCase()
+  if (banStatus && banStatus !== 'normal') return '账户状态异常'
   return '权限不足'
 })
 
@@ -135,7 +137,8 @@ const alertDescription = computed(() => {
     return '此页面需要用户登录后才能访问，请先登录您的账户。'
   }
   
-  if (userInfo.value.ban_status !== 'normal') {
+  const banStatus = userInfo.value.ban_status?.toLowerCase()
+  if (banStatus && banStatus !== 'normal') {
     return '您的账户当前状态异常，无法正常访问系统功能。如有疑问请联系管理员。'
   }
   
@@ -167,8 +170,11 @@ function getUserRoleName(role: string): string {
 function getBanStatusType(status: string): string {
   const typeMap: Record<string, string> = {
     'normal': 'success',
+    'Normal': 'success',
     'suspended': 'warning',
-    'banned': 'danger'
+    'Suspended': 'warning',
+    'banned': 'danger',
+    'Banned': 'danger'
   }
   return typeMap[status] || 'info'
 }
@@ -177,8 +183,11 @@ function getBanStatusType(status: string): string {
 function getBanStatusName(status: string): string {
   const statusMap: Record<string, string> = {
     'normal': '正常',
+    'Normal': '正常',
     'suspended': '暂停',
-    'banned': '封禁'
+    'Suspended': '暂停',
+    'banned': '封禁',
+    'Banned': '封禁'
   }
   return statusMap[status] || status
 }

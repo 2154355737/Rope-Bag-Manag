@@ -34,7 +34,7 @@ export interface BackupStats {
  * @returns 备份记录列表及总数
  */
 export function getBackupRecords(params: { page?: number; size?: number }) {
-  return api.get('/api/v1/admin/backups', {
+  return api.get('/v1/admin/backups', {
     params: {
       page: params.page || 1,
       page_size: params.size || 20
@@ -47,7 +47,7 @@ export function getBackupRecords(params: { page?: number; size?: number }) {
  * @returns 备份统计数据
  */
 export function getBackupStats() {
-  return api.get('/api/v1/admin/backup/stats')
+  return api.get('/v1/admin/backup/stats')
 }
 
 /**
@@ -56,7 +56,7 @@ export function getBackupStats() {
  * @returns 创建结果
  */
 export function createBackup(data: { backup_type: string; description?: string }) {
-  return api.post('/api/v1/admin/backup', data)
+  return api.post('/v1/admin/backup', data)
 }
 
 /**
@@ -65,7 +65,7 @@ export function createBackup(data: { backup_type: string; description?: string }
  * @returns 备份详情
  */
 export function getBackupDetail(id: string) {
-  return api.get(`/api/v1/admin/backup/${id}`)
+  return api.get(`/v1/admin/backup/${id}`)
 }
 
 /**
@@ -74,7 +74,7 @@ export function getBackupDetail(id: string) {
  * @returns 删除结果
  */
 export function deleteBackupRecord(id: string) {
-  return api.delete(`/api/v1/admin/backup/${id}`)
+  return api.delete(`/v1/admin/backup/${id}`)
 }
 
 /**
@@ -83,7 +83,7 @@ export function deleteBackupRecord(id: string) {
  * @returns 删除结果
  */
 export function batchDeleteBackupRecords(ids: string[]) {
-  return api.post('/api/v1/admin/backup/batch-delete', {
+  return api.post('/v1/admin/backup/batch-delete', {
     backup_ids: ids
   })
 }
@@ -94,7 +94,7 @@ export function batchDeleteBackupRecords(ids: string[]) {
  * @returns 恢复结果
  */
 export function restoreBackup(id: string) {
-  return api.post(`/api/v1/admin/backup/${id}/restore`, {
+  return api.post(`/v1/admin/backup/${id}/restore`, {
     confirm: true
   })
 }
@@ -105,6 +105,7 @@ export function restoreBackup(id: string) {
  * @returns 下载URL
  */
 export function getBackupDownloadUrl(id: string) {
+  // 使用相对路径，避免硬编码 /api 前缀
   return `/api/v1/admin/backup/${id}/download`
 }
 
@@ -114,7 +115,7 @@ export function getBackupDownloadUrl(id: string) {
  * @returns 文件二进制流
  */
 export function downloadBackup(id: string) {
-  return api.get(`/api/v1/admin/backup/${id}/download`, {
+  return api.get(`/v1/admin/backup/${id}/download`, {
     responseType: 'blob'
   })
 }
@@ -132,7 +133,7 @@ export function configureAutoBackup(config: {
   retain_count: number
   auto_clean: boolean
 }) {
-  return api.post('/api/v1/admin/backup-schedule', config)
+  return api.post('/v1/admin/backup-schedule', config)
 }
 
 /**
@@ -140,5 +141,5 @@ export function configureAutoBackup(config: {
  * @returns 自动备份配置
  */
 export function getAutoBackupConfig() {
-  return api.get('/api/v1/admin/backup-schedule')
+  return api.get('/v1/admin/backup-schedule')
 } 

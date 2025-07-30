@@ -183,10 +183,17 @@ async fn main() -> std::io::Result<()> {
             .wrap(Logger::default())
             .wrap(
                 Cors::default()
+                    // 开发环境
                     .allowed_origin("http://localhost:5173")
                     .allowed_origin("http://127.0.0.1:5173")
                     .allowed_origin("http://localhost:3000")
                     .allowed_origin("http://127.0.0.1:3000")
+                    // 生产环境 - 添加你的服务器地址
+                    .allowed_origin("http://39.105.113.219")
+                    .allowed_origin("https://39.105.113.219")
+                    // 如果有域名，也添加上
+                    // .allowed_origin("http://yourdomain.com")
+                    // .allowed_origin("https://yourdomain.com")
                     .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
                     .allowed_headers(vec![
                         actix_web::http::header::AUTHORIZATION,

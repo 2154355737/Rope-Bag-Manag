@@ -195,6 +195,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Bell, User, Grid, Message, Refresh, Download } from '@element-plus/icons-vue'
 import { subscriptionApi, categoryApi } from '@/api'
+import type { Category } from '@/api/categories'
+import type { Subscriber } from '@/api/subscriptions'
+
+// 扩展Category类型以包含统计信息
+interface CategoryWithStats extends Category {
+  subscription_count: number
+  resource_count: number
+}
 
 // 数据定义
 const loading = ref(false)
@@ -210,13 +218,13 @@ const totalCategories = ref(0)
 const sentNotifications = ref(0)
 
 // 分类统计数据
-const categoryStats = ref([])
-const subscribers = ref([])
-const selectedCategory = ref(null)
+const categoryStats = ref<CategoryWithStats[]>([])
+const subscribers = ref<Subscriber[]>([])
+const selectedCategory = ref<CategoryWithStats | null>(null)
 
 // 通知表单
 const notificationForm = reactive({
-  category_id: '',
+  category_id: 0,
   title: '',
   content: ''
 })
@@ -244,14 +252,14 @@ const loadSubscriptionStats = async () => {
           return {
             ...category,
             subscription_count: subscriptionsRes.data?.count || 0,
-            resource_count: category.count || 0,
+            resource_count: 0, // TODO: 需要从API获取具体的资源数量
             subscription_locked: category.subscription_locked || false
           }
         } catch (error) {
           return {
             ...category,
             subscription_count: 0,
-            resource_count: category.count || 0,
+            resource_count: 0, // TODO: 需要从API获取具体的资源数量
             subscription_locked: category.subscription_locked || false
           }
         }
@@ -294,7 +302,7 @@ const getSubscriptionRate = (subscriptionCount: number) => {
 }
 
 // 查看订阅者
-const viewSubscribers = async (category) => {
+const viewSubscribers = async (category: CategoryWithStats) => {
   selectedCategory.value = category
   subscribersDialogVisible.value = true
   subscribersLoading.value = true
@@ -321,6 +329,11 @@ const unsubscribeUser = async (userId: number) => {
       type: 'warning'
     })
     
+    if (!selectedCategory.value) {
+      ElMessage.error('未选择分类')
+      return
+    }
+    
     const res = await subscriptionApi.adminUnsubscribe(userId, selectedCategory.value.id)
     if (res.code === 0) {
       ElMessage.success('取消订阅成功')
@@ -336,7 +349,7 @@ const unsubscribeUser = async (userId: number) => {
 }
 
 // 发送通知
-const sendNotification = (category) => {
+const sendNotification = (category: CategoryWithStats) => {
   notificationForm.category_id = category.id
   notificationForm.title = `${category.name} 分类更新通知`
   notificationForm.content = `亲爱的用户，${category.name} 分类有新的内容更新，快来查看吧！`
@@ -383,7 +396,7 @@ const exportSubscriptions = async () => {
 }
 
 // 切换订阅锁定状态
-const toggleSubscriptionLock = async (category) => {
+const toggleSubscriptionLock = async (category: CategoryWithStats) => {
   try {
     const action = category.subscription_locked ? '解锁' : '锁定'
     await ElMessageBox.confirm(

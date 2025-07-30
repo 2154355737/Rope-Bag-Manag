@@ -356,21 +356,30 @@ const loadComments = async () => {
       ...searchForm
     }
     
-    // 过滤空参数
+    // 过滤空参数并转换日期类型
     Object.keys(params).forEach(key => {
-      if (params[key] === '' || params[key] === null) {
-        delete params[key]
+      if ((params as any)[key] === '' || (params as any)[key] === null) {
+        delete (params as any)[key]
       }
     })
+
+    // 转换日期字符串为Date对象
+    const apiParams: any = { ...params }
+    if (apiParams.start_date && typeof apiParams.start_date === 'string') {
+      apiParams.start_date = new Date(apiParams.start_date)
+    }
+    if (apiParams.end_date && typeof apiParams.end_date === 'string') {
+      apiParams.end_date = new Date(apiParams.end_date)
+    }
 
     let res
     if (currentTab.value === 'my') {
       // 获取我的评论
       if (!userInfo?.id) return
-      res = await commentApi.getUserComments(userInfo.id, params)
+      res = await commentApi.getUserComments(userInfo.id, apiParams)
     } else {
       // 获取全站评论
-      res = await commentApi.getAllComments(params)
+      res = await commentApi.getAllComments(apiParams)
     }
     
     if (res.code === 0) {

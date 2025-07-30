@@ -47,7 +47,11 @@ const form = reactive({
 const rules = {
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
+    { 
+      pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, 
+      message: '邮箱格式不正确', 
+      trigger: 'blur' 
+    }
   ],
   token: [
     { required: true, message: '重置令牌不能为空', trigger: 'blur' }

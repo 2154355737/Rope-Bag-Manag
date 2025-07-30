@@ -75,21 +75,12 @@ async fn log_user_action(
     // 打印详细日志
     println!("开始记录用户行为");
     
-    // 从JWT中提取用户ID
+    // 从JWT中提取用户ID，访客用户使用特殊ID -1
     let user_id_result = extract_user_id(&req);
     println!("提取用户ID结果: {:?}", user_id_result);
     
-    // 如果无法获取有效的用户ID，返回401错误
-    let user_id = match user_id_result {
-        Some(id) if id > 0 => id,
-        _ => {
-            println!("无效的用户ID，返回401未授权");
-            return Ok(HttpResponse::Unauthorized().json(json!({
-                "code": 401,
-                "message": "需要有效的用户认证"
-            })));
-        }
-    };
+    // 获取用户ID，访客用户使用-1作为特殊标识
+    let user_id = user_id_result.unwrap_or(-1);
     println!("使用的用户ID: {}", user_id);
     
     // 打印请求内容
@@ -128,15 +119,15 @@ async fn log_user_action(
             println!("记录成功: ID={}", action.id);
             Ok(HttpResponse::Ok().json(json!({
                 "code": 0,
-                "message": "操作记录成功",
+                "message": "用户行为记录成功",
                 "data": action
             })))
         },
         Err(e) => {
-            println!("记录失败: {}", e.to_string());
+            println!("记录失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
-                "message": e.to_string()
+                "message": format!("记录失败: {}", e)
             })))
         }
     }

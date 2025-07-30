@@ -808,7 +808,7 @@ async function updatePackage() {
     }
     
     // 将状态字符串转换为后端需要的枚举
-    let statusEnum: string = 'Active'
+    let statusEnum: 'Pending' | 'Active' | 'Rejected' | 'Inactive' | 'Deleted' = 'Active'
     switch (editingPackage.value.status) {
       case '正常':
       case '已发布':

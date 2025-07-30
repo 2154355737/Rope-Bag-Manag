@@ -1,28 +1,31 @@
 <template>
   <div class="resource-detail-container">
-    <!-- 动态背景 -->
-    <div class="animated-background">
-      <!-- 大型装饰性渐变球 -->
-      <div class="gradient-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
+    <!-- 统一动态背景（移植自 /home 页面） -->
+    <div class="dynamic-background">
+      <!-- 主背景渐变层 -->
+      <div class="gradient-layer"></div>
+      <!-- 几何形状 -->
+      <div class="geometric-shapes">
+        <div class="shape triangle-1"></div>
+        <div class="shape triangle-2"></div>
+        <div class="shape circle-1"></div>
+        <div class="shape circle-2"></div>
+        <div class="shape square-1"></div>
+        <div class="shape circle-3"></div>
+        <div class="shape triangle-3"></div>
+        <div class="shape square-2"></div>
       </div>
-      
-      <!-- 脉冲波纹效果 -->
-      <div class="pulse-waves">
-        <div class="wave wave-1"></div>
-        <div class="wave wave-2"></div>
-      </div>
-      
-      <div class="background-shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
-        <div class="shape shape-4"></div>
-      </div>
+      <!-- 浮动粒子 -->
       <div class="floating-particles">
-        <div class="particle" v-for="n in 12" :key="n" :style="getParticleStyle(n)"></div>
+        <div class="particle" v-for="n in 20" :key="n" :style="getParticleStyle(n)"></div>
+      </div>
+      <!-- 波纹效果 -->
+      <div class="ripple-effects">
+        <div class="ripple ripple-1"></div>
+        <div class="ripple ripple-2"></div>
+        <div class="ripple ripple-3"></div>
+        <div class="ripple ripple-4"></div>
+        <div class="ripple ripple-5"></div>
       </div>
     </div>
 
@@ -697,18 +700,18 @@ onMounted(async () => {
 <style scoped>
 .resource-detail-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f1419 0%, #1a202c 50%, #2d3748 100%);
+  background: transparent;
   transition: background-color var(--transition-base);
   position: relative;
 }
 
 /* 为浅色主题添加不同的背景 */
 :root:not(.dark) .resource-detail-container {
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 50%, #e2e8f0 100%);
+  background: transparent;
 }
 
-/* 动态背景 */
-.animated-background {
+/* 统一动态背景新增样式 */
+.dynamic-background {
   position: fixed;
   top: 0;
   left: 0;
@@ -718,130 +721,107 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.gradient-orbs {
+.gradient-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at top right, rgba(236, 72, 153, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at center left, rgba(168, 85, 247, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at center right, rgba(34, 197, 94, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #0a0f23 0%, #1a1d3a 25%, #2d1b69 50%, #1e293b 75%, #0f172a 100%);
+  z-index: -10;
+}
+
+:root:not(.dark) .gradient-layer {
+  background:
+    radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at top right, rgba(236, 72, 153, 0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at center left, rgba(168, 85, 247, 0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at center right, rgba(34, 197, 94, 0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at bottom center, rgba(245, 158, 11, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 25%, #fdf4ff 50%, #f0fdf4 75%, #fffbeb 100%);
+}
+
+.ripple-effects {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  z-index: -7;
 }
 
-.orb {
+.ripple {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.1;
-  animation: pulse 10s infinite ease-in-out;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(5px);
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  opacity: 0;
+  animation: ripple-pulse 3s infinite;
 }
 
-.orb-1 {
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, rgba(64, 158, 255, 0.1), rgba(59, 130, 246, 0.05));
-  animation-delay: -2s;
+:root:not(.dark) .ripple {
+  background: rgba(59, 130, 246, 0.15);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 40px rgba(59, 130, 246, 0.2);
 }
 
-.orb-2 {
-  width: 150px;
-  height: 150px;
-  background: radial-gradient(circle, rgba(103, 194, 58, 0.1), rgba(76, 175, 80, 0.05));
-  animation-delay: -4s;
-}
+.ripple-1 { width: 100px; height: 100px; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.ripple-2 { width: 150px; height: 150px; top: 20%; left: 20%; transform: translate(-50%, -50%); }
+.ripple-3 { width: 200px; height: 200px; bottom: 10%; right: 15%; transform: translate(-50%, -50%); }
+.ripple-4 { width: 120px; height: 120px; bottom: 25%; left: 35%; transform: translate(-50%, -50%); animation-delay: 1s; }
+.ripple-5 { width: 160px; height: 160px; bottom: 15%; right: 30%; transform: translate(-50%, -50%); animation-delay: 2s; }
 
-.orb-3 {
-  width: 180px;
-  height: 180px;
-  background: radial-gradient(circle, rgba(230, 162, 60, 0.1), rgba(217, 119, 6, 0.05));
-  animation-delay: -6s;
+@keyframes ripple-pulse {
+  0% { opacity: 0.5; transform: scale(0.5); }
+  50% { opacity: 0.2; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
 }
+/* 统一动态背景新增样式结束 */
 
-.pulse-waves {
+/* ====== 背景几何形状 & 粒子 ====== */
+.geometric-shapes {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  overflow: hidden;
-}
-
-.wave {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.1;
-  animation: pulse-wave 15s infinite ease-in-out;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(5px);
-}
-
-.wave-1 {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(64, 158, 255, 0.05), rgba(59, 130, 246, 0.02));
-  animation-delay: -1s;
-}
-
-.wave-2 {
-  width: 250px;
-  height: 250px;
-  background: radial-gradient(circle, rgba(103, 194, 58, 0.05), rgba(76, 175, 80, 0.02));
-  animation-delay: -5s;
-}
-
-.background-shapes {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
+  z-index: -9;
 }
 
 .shape {
   position: absolute;
-  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08), rgba(59, 130, 246, 0.12));
+  background: rgba(59, 130, 246, 0.08);
   border-radius: 50%;
-  animation: float 12s infinite ease-in-out;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(64, 158, 255, 0.15);
+  opacity: 0.1;
+  filter: blur(1px);
+  animation: float 10s infinite ease-in-out;
 }
 
-.shape-1 {
-  width: 80px;
-  height: 80px;
-  top: 15%;
-  left: 15%;
-  animation-delay: -1s;
+:root:not(.dark) .shape {
+  background: rgba(59, 130, 246, 0.15);
+  opacity: 0.3;
+  filter: blur(0.5px);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
-.shape-2 {
-  width: 120px;
-  height: 120px;
-  top: 60%;
-  right: 15%;
-  animation-delay: -3s;
-}
-
-.shape-3 {
-  width: 100px;
-  height: 100px;
-  bottom: 25%;
-  left: 40%;
-  animation-delay: -5s;
-}
-
-.shape-4 {
-  width: 90px;
-  height: 90px;
-  top: 35%;
-  right: 30%;
-  animation-delay: -7s;
-}
+/* 各形状位置参考 Home.vue */
+.shape.triangle-1 { width: 100px; height: 100px; top: 20%; left: 10%; transform: rotate(45deg); background: rgba(236,72,153,0.08); }
+.shape.triangle-2 { width: 80px; height: 80px; top: 60%; right: 10%; transform: rotate(-45deg); background: rgba(168,85,247,0.08); }
+.shape.circle-1   { width: 120px; height: 120px; bottom: 20%; left: 40%; background: rgba(34,197,94,0.08); }
+.shape.circle-2   { width: 150px; height: 150px; top: 30%; right: 30%; background: rgba(245,158,11,0.08); }
+.shape.square-1   { width: 100px; height: 100px; bottom: 15%; left: 70%; background: rgba(139,92,246,0.08); }
+.shape.circle-3   { width: 90px; height: 90px; bottom: 25%; left: 15%; background: rgba(245,158,11,0.08); }
+.shape.triangle-3 { width: 70px; height: 70px; bottom: 8%; right: 25%; transform: rotate(90deg); background: rgba(34,197,94,0.08); }
+.shape.square-2   { width: 85px; height: 85px; bottom: 35%; right: 5%; background: rgba(236,72,153,0.08); }
 
 .floating-particles {
   position: absolute;
@@ -850,67 +830,52 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  overflow: hidden;
+  z-index: -8;
 }
 
 .particle {
   position: absolute;
-  background: radial-gradient(circle, rgba(64, 158, 255, 0.25), rgba(59, 130, 246, 0.08));
+  width: 5px;
+  height: 5px;
+  background: rgba(59, 130, 246, 0.4);
   border-radius: 50%;
-  animation: float 18s infinite ease-in-out;
-  box-shadow: 0 0 8px rgba(64, 158, 255, 0.2);
+  opacity: 0.5;
+  animation: float 10s infinite ease-in-out;
+}
+
+:root:not(.dark) .particle {
+  background: rgba(59, 130, 246, 0.6);
+  opacity: 0.8;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
 }
 
 @keyframes float {
-  0% {
-    transform: translateY(0) translateX(0) scale(1) rotate(0deg);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.4;
-  }
-  50% {
-    transform: translateY(-15px) translateX(8px) scale(1.05) rotate(180deg);
-    opacity: 0.7;
-  }
-  80% {
-    opacity: 0.4;
-  }
-  100% {
-    transform: translateY(0) translateX(0) scale(1) rotate(360deg);
-    opacity: 0;
-  }
+  0% { transform: translateY(0) translateX(0) rotate(0deg); }
+  25% { transform: translateY(-10px) translateX(10px) rotate(5deg); }
+  50% { transform: translateY(0) translateX(0) rotate(0deg); }
+  75% { transform: translateY(10px) translateX(-10px) rotate(-5deg); }
+  100% { transform: translateY(0) translateX(0) rotate(0deg); }
+}
+/* ====== 背景几何形状 & 粒子结束 ====== */
+
+/* ====== 毛玻璃效果补丁 ====== */
+.resource-content,
+.comments-section,
+.header {
+  background: rgba(255, 255, 255, 0.33) !important; /* 再提高暗色模式可视度 */
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes pulse {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.5;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(0.9);
-    opacity: 0.5;
-  }
+/* 浅色主题下稍微提高不透明度，边框替换为灰蓝色，保证可读性 */
+:root:not(.dark) :deep(.resource-content),
+:root:not(.dark) :deep(.comments-section),
+:root:not(.dark) :deep(.header) {
+  background: rgba(248, 250, 252, 0.9) !important; /* 再提高浅色模式可视度 */
+  backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
 }
-
-@keyframes pulse-wave {
-  0% {
-    transform: scale(1);
-    opacity: 0.1;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 0.2;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.1;
-  }
-}
+/* ====== 毛玻璃效果补丁结束 ====== */
 
 .header {
   background: var(--bg-primary);

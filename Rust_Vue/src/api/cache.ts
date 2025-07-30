@@ -12,22 +12,22 @@ export interface CacheData {
 export const apiCache = {
   // 获取缓存
   get: (key: string): Promise<ApiResponse<any>> => {
-    return api.get(`/api/v1/cache/${key}`)
+    return api.get(`/v1/cache/${key}`)
   },
 
   // 设置缓存
   set: (key: string, value: any, ttl?: number): Promise<ApiResponse<null>> => {
-    return api.post('/api/v1/cache', { key, value, ttl })
+    return api.post('/v1/cache', { key, value, ttl })
   },
 
   // 删除缓存
   delete: (key: string): Promise<ApiResponse<null>> => {
-    return api.delete(`/api/v1/cache/${key}`)
+    return api.delete(`/v1/cache/${key}`)
   },
 
   // 清空所有缓存
   clear: (): Promise<ApiResponse<null>> => {
-    return api.delete('/api/v1/cache')
+    return api.delete('/v1/cache')
   },
 
   // 获取缓存统计
@@ -36,6 +36,6 @@ export const apiCache = {
     total_size: number
     hit_rate: number
   }>> => {
-    return api.get('/api/v1/cache/stats')
+    return api.get('/v1/cache/stats')
   }
 } 

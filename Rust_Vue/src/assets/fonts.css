@@ -1,84 +1,62 @@
-/* Inter字体本地代理 */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Thin.woff2') format('woff2');
+/* 使用系统字体作为主要字体，避免外部字体加载问题 */
+
+/* 主字体栈 - 优先使用系统字体 */
+:root {
+  --font-family-base: 
+    /* 系统UI字体 */
+    system-ui, 
+    -apple-system, 
+    BlinkMacSystemFont,
+    /* Windows字体 */
+    "Segoe UI",
+    /* macOS字体 */
+    "SF Pro Display",
+    "SF Pro Text",
+    /* Linux字体 */
+    "Noto Sans",
+    "Ubuntu",
+    /* Web Safe字体 */
+    "Helvetica Neue",
+    "Arial",
+    /* 中文字体 */
+    "PingFang SC",
+    "Microsoft YaHei",
+    "微软雅黑",
+    /* 通用fallback */
+    sans-serif;
+    
+  --font-family-mono: 
+    "SF Mono",
+    "Monaco",
+    "Cascadia Code",
+    "Roboto Mono",
+    "Consolas",
+    "Liberation Mono",
+    "Menlo",
+    monospace;
 }
 
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 200;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-ExtraLight.woff2') format('woff2');
+/* 重置默认字体 */
+html, body {
+  font-family: var(--font-family-base);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Light.woff2') format('woff2');
+/* 代码字体 */
+code, pre, .code {
+  font-family: var(--font-family-mono);
 }
 
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Regular.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Medium.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
+/* 标题字体优化 */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-family-base);
   font-weight: 600;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-SemiBold.woff2') format('woff2');
 }
 
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Bold.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 800;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-ExtraBold.woff2') format('woff2');
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 900;
-  font-display: swap;
-  src: url('/fonts/inter/font-files/Inter-Black.woff2') format('woff2');
-}
-
-/* 备用字体 */
-@font-face {
-  font-family: 'Inter fallback';
-  font-style: normal;
-  font-weight: 400;
-  src: local('Arial');
-  ascent-override: 90%;
-  descent-override: 22%;
-  line-gap-override: 0%;
-  size-adjust: 107%;
+/* 确保Element Plus组件使用正确字体 */
+.el-button, .el-input, .el-select, .el-table {
+  font-family: var(--font-family-base);
 } 

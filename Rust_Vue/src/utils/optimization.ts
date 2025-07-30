@@ -37,13 +37,8 @@ class OptimizationManager {
     criticalCSS.href = '/src/assets/base.css'
     document.head.appendChild(criticalCSS)
 
-    // 预加载关键字体
-    const fontPreload = document.createElement('link')
-    fontPreload.rel = 'preload'
-    fontPreload.as = 'font'
-    fontPreload.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap'
-    fontPreload.crossOrigin = 'anonymous'
-    document.head.appendChild(fontPreload)
+    // 移除外部字体预加载 - 现在使用系统字体
+    // 系统字体已在用户设备上可用，提供更好的性能和稳定性
   }
 
   // 优化图片加载
@@ -107,4 +102,4 @@ if (typeof window !== 'undefined') {
   window.addEventListener('load', () => {
     optimizationManager.init()
   })
-} 
+}

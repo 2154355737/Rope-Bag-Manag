@@ -5,8 +5,11 @@ export interface User {
   id: number
   username: string
   email: string
+  nickname?: string
   role: string
   status: number
+  qq_number?: string | null
+  avatar_url?: string | null
   created_at: string
   updated_at: string
 }

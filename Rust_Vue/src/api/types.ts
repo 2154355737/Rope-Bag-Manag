@@ -15,21 +15,45 @@ export interface PaginatedResponse<T> {
 
 // 用户相关类型
 export interface User {
+  id: number
   username: string
-  nickname: string
+  email: string
+  nickname?: string
   role: string
   star: number
   banned: boolean
+  ban_status?: string
+  ban_reason?: string | null
+  qq_number?: string | null
+  avatar_url?: string | null
+  login_count: number
+  upload_count: number
+  download_count: number
+  created_at: string
+  last_login?: string | null
+  is_admin: boolean
   create_time: string
   last_login_time?: string
 }
 
 export interface UserInfo {
+  id: number
   username: string
-  nickname: string
+  email: string
+  nickname?: string
   role: string
   star: number
   banned: boolean
+  ban_status?: string
+  ban_reason?: string | null
+  qq_number?: string | null
+  avatar_url?: string | null
+  login_count: number
+  upload_count: number
+  download_count: number
+  created_at: string
+  last_login?: string | null
+  is_admin: boolean
   create_time: string
   last_login_time?: string
   qq_binding?: string

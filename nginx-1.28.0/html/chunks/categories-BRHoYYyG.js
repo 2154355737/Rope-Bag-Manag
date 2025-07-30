@@ -1,0 +1,1 @@
+import{a as t}from"../assets/index-C28i2SJl.js";const o={getCategories:()=>t.get("/v1/categories"),getCategory:e=>t.get(`/v1/categories/${e}`),addCategory:e=>t.post("/v1/categories",e),updateCategory:(e,r)=>t.put(`/v1/categories/${e}`,r),deleteCategory:e=>t.delete(`/v1/categories/${e}`)};export{o as c};
