@@ -16,3 +16,9 @@
 2025/07/31 00:39:27 [error] 23128#20840: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
 2025/07/31 00:41:15 [notice] 20512#27028: signal process started
 2025/07/31 00:41:15 [error] 20512#27028: invalid PID number "" in "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/logs/nginx.pid"
+2025/07/31 00:50:32 [notice] 8944#5620: signal process started
+2025/07/31 00:52:58 [notice] 10204#12780: signal process started
+2025/07/31 09:25:12 [notice] 14504#9180: signal process started
+2025/07/31 09:46:52 [notice] 23236#10256: signal process started
+2025/07/31 09:49:29 [error] 10572#16620: *4 CreateFile() "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/html/pages/Dashboard-DlmTmHyk.js" failed (2: The system cannot find the file specified), client: 127.0.0.1, server: localhost, request: "GET /pages/Dashboard-DlmTmHyk.js HTTP/1.1", host: "localhost"
+2025/07/31 09:51:50 [notice] 10060#16316: signal process started

@@ -15,7 +15,7 @@
           :show-file-list="false"
           :before-upload="handleAvatarUpload"
         >
-          <img v-if="form.avatar_url" :src="form.avatar_url" class="avatar" />
+          <img v-if="form.avatar_url" :src="form.avatar_url" class="avatar" @error="handleAvatarError" />
           <el-icon v-else><User /></el-icon>
         </el-upload>
         <el-input v-model="form.avatar_url" placeholder="或粘贴头像图片URL" style="margin-top: 8px;" />
@@ -66,6 +66,17 @@ function handleAvatarUpload(file: File) {
   }
   reader.readAsDataURL(file)
   return false // 阻止自动上传
+}
+
+// 头像加载失败处理
+const handleAvatarError = (event: Event) => {
+  console.warn('头像加载失败:', event)
+  // 如果是QQ头像请求失败，我们可以选择隐藏错误的图片
+  const target = event.target as HTMLImageElement
+  if (target && target.src.includes('q.qlogo.cn')) {
+    // 对于QQ头像加载失败，设置为null让el-avatar显示默认图标
+    target.style.display = 'none'
+  }
 }
 
 // 保存

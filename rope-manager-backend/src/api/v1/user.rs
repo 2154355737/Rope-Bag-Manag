@@ -158,12 +158,16 @@ async fn delete_user(
 
 // 新增方法：获取当前用户资料
 async fn get_current_user_profile(
+    http_req: HttpRequest,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // TODO: 从JWT token获取当前用户ID
-    let current_user_id = 1; // 临时硬编码
+    // 验证用户认证并获取当前用户ID
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
     
-    match user_service.get_user_by_id(current_user_id).await {
+    match user_service.get_user_by_id(user.id).await {
         Ok(Some(user)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
@@ -183,12 +187,16 @@ async fn get_current_user_profile(
 // 新增方法：更新当前用户资料
 async fn update_current_user_profile(
     req: web::Json<UpdateUserRequest>,
+    http_req: HttpRequest,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    // TODO: 从JWT token获取当前用户ID
-    let current_user_id = 1; // 临时硬编码
+    // 验证用户认证并获取当前用户ID
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
     
-    match user_service.update_user(current_user_id, &req).await {
+    match user_service.update_user(user.id, &req).await {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "资料更新成功"

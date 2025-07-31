@@ -13,7 +13,7 @@
         <div class="profile-info">
           <div class="avatar-section">
             <el-avatar :size="80" :src="userProfile.avatar_url" v-if="userProfile.avatar_url">
-              <img :src="userProfile.avatar_url" />
+              <img :src="userProfile.avatar_url" @error="handleAvatarError" />
             </el-avatar>
             <el-avatar :size="80" v-else>
               <el-icon><User /></el-icon>
@@ -95,7 +95,7 @@
               :before-upload="handleAvatarUpload"
               accept="image/*"
             >
-              <img v-if="editForm.avatar_url" :src="editForm.avatar_url" class="avatar-preview" />
+              <img v-if="editForm.avatar_url" :src="editForm.avatar_url" class="avatar-preview" @error="handleAvatarError" />
               <div v-else class="avatar-uploader-icon">
                 <el-icon><Plus /></el-icon>
                 <span>上传头像</span>
@@ -274,6 +274,17 @@ const handleAvatarUpload = (file: File) => {
   }
   reader.readAsDataURL(file)
   return false // 阻止自动上传
+}
+
+// 头像加载失败处理
+const handleAvatarError = (event: Event) => {
+  console.warn('头像加载失败:', event)
+  // 如果是QQ头像请求失败，我们可以选择隐藏错误的图片
+  const target = event.target as HTMLImageElement
+  if (target && target.src.includes('q.qlogo.cn')) {
+    // 对于QQ头像加载失败，设置为null让el-avatar显示默认图标
+    target.style.display = 'none'
+  }
 }
 
 // 保存个人信息
