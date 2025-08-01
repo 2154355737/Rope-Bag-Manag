@@ -21,6 +21,8 @@ pub struct Package {
     pub reviewer_id: Option<i32>,      // 审核者ID
     pub reviewed_at: Option<DateTime<Utc>>, // 审核时间
     pub review_comment: Option<String>, // 审核备注
+    // 关联标签
+    pub tags: Option<Vec<String>>, // 名称列表，避免循环引用
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -46,6 +48,7 @@ pub struct CreatePackageRequest {
     pub description: Option<String>,
     pub category_id: Option<i32>,
     pub file_url: Option<String>,
+    pub tags: Option<Vec<String>>, // 新增
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,6 +59,7 @@ pub struct UpdatePackageRequest {
     pub category_id: Option<i32>,
     pub status: Option<PackageStatus>,
     pub file_url: Option<String>,
+    pub tags: Option<Vec<String>>, // 新增
     // 审核相关字段
     pub reviewer_id: Option<i32>,
     pub reviewed_at: Option<DateTime<Utc>>,

@@ -26,6 +26,16 @@ export const commentApi = {
   getComments: (resourceId: number, params?: { page?: number; pageSize?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
     return api.get(`/v1/resources/${resourceId}/comments`, { params })
   },
+
+  // 获取帖子评论
+  getPostComments: (postId: number, params?: { page?: number; size?: number }): Promise<ApiResponse<{ list: Comment[]; total: number; page: number; size: number }>> => {
+    const query = {
+      target_type: 'Post',
+      target_id: postId,
+      ...(params || {})
+    }
+    return api.get('/v1/comments', { params: query })
+  },
   // 创建评论
   createComment: (data: { content: string; target_id: number; target_type: string; parent_id?: number }): Promise<ApiResponse<Comment>> => {
     return api.post('/v1/comments', data)

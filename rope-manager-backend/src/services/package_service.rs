@@ -81,6 +81,7 @@ impl PackageService {
             reviewer_id: None,
             reviewed_at: None,
             review_comment: None,
+            tags: req.tags.clone(),
         };
 
         // 创建包
@@ -156,6 +157,7 @@ impl PackageService {
             reviewer_id: req.reviewer_id.or(package.reviewer_id),
             reviewed_at: req.reviewed_at.or(package.reviewed_at),
             review_comment: req.review_comment.clone().or(package.review_comment),
+            tags: req.tags.clone().or(package.tags),
         };
 
         self.package_repo.update_package(&updated_package).await?;

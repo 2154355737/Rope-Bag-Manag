@@ -31,6 +31,7 @@ export interface CreatePackageRequest {
   description?: string
   category_id?: number
   file_url?: string
+  tags?: string[]
 }
 
 // 更新绳包请求

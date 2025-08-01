@@ -384,6 +384,7 @@ impl UserRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                tags: None, // 用户仓库中暂时不处理标签
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

@@ -13,6 +13,8 @@ import { userActionApi } from './userActions'
 import * as announcementApi from './announcements'
 import { logsApi } from './logs'
 import { subscriptionApi } from './subscriptions'
+import * as postApi from './posts'
+import * as tagApi from './tags'
 
 export {
   commentApi,
@@ -28,7 +30,9 @@ export {
   userActionApi,
   announcementApi,
   logsApi,
-  subscriptionApi
+  subscriptionApi,
+  postApi,
+  tagApi
 }
 
 // 导出一个默认包含所有API的对象
@@ -46,7 +50,9 @@ const api = {
   userAction: userActionApi,
   announcement: announcementApi,
   logs: logsApi,
-  subscription: subscriptionApi
+  subscription: subscriptionApi,
+  post: postApi,
+  tag: tagApi
 }
 
 export default api
@@ -63,6 +69,8 @@ export type { CacheData } from './cache'
 export type { UserAction, UserActionStats } from './userActions'
 export type { Announcement } from './announcements'
 export type { SubscriptionRequest } from './subscriptions'
+export type { Post, CreatePostRequest, UpdatePostRequest, PostQueryParams, PostListResponse } from './posts'
+export type { Tag, CreateTagRequest, UpdateTagRequest, TagQueryParams, TagListResponse } from './tags'
 
 // 导出API客户端工具
 export { api, healthCheck, setToken, getToken, clearToken, isLoggedIn } from '../utils/apiClient'

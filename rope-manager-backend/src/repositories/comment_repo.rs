@@ -87,9 +87,12 @@ impl CommentRepository {
         
         // 获取分页数据
         let sql = format!(
-            "SELECT id, user_id, target_type, target_id, content, status, parent_id, 
-                    likes, dislikes, pinned, created_at, updated_at 
-             FROM comments {} ORDER BY pinned DESC, created_at DESC LIMIT ? OFFSET ?",
+            "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, \
+                    c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, \
+                    COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number \
+             FROM comments c \
+             LEFT JOIN users u ON c.user_id = u.id \
+             {} ORDER BY c.pinned DESC, c.created_at DESC LIMIT ? OFFSET ?",
             where_clause
         );
         
@@ -125,11 +128,11 @@ impl CommentRepository {
                 pinned: row.get::<_, i32>(9)? != 0,
                 created_at: row.get(10)?,
                 updated_at: row.get(11)?,
-                author_name: None,
-                username: None,
-                author_role: None,
-                author_avatar: None,
-                author_qq: None,
+                author_name: row.get(12).ok(),
+                username: row.get(13).ok(),
+                author_role: row.get(14).ok(),
+                author_avatar: row.get(15).ok(),
+                author_qq: row.get(16).ok(),
                 target_title: None,
             })
         })?;

@@ -18,6 +18,10 @@ export interface Resource {
 }
 
 export const communityApi = {
+  // 获取聚合帖子+资源Feed
+  getFeed: (params?: { page?: number; page_size?: number; category_id?: number; search?: string; tag?: string }): Promise<ApiResponse<{ list: any[]; total: number; page: number; page_size: number }>> => {
+    return api.get('/v1/community/feed', { params })
+  },
   // 获取资源列表
   getResources: (params?: { page?: number; pageSize?: number; category?: string; status?: string; search?: string }): Promise<ApiResponse<{ list: Resource[]; total: number; page: number; pageSize: number; totalPages?: number }>> => {
     return api.get('/v1/packages', { params })

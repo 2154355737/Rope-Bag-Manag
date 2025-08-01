@@ -121,12 +121,18 @@
                 精选资源
               </h2>
               <p class="section-subtitle">发现社区最受欢迎的优质资源</p>
+              <div class="section-actions">
+                <el-button type="primary" text @click="$router.push('/posts')">
+                  <el-icon><ChatDotRound /></el-icon>
+                  社区帖子
+                </el-button>
+              </div>
             </div>
             
             <el-carousel 
               v-if="featuredResources.length > 0"
               :interval="5000" 
-              :arrow="resources.length > 1 ? 'hover' : 'never'"
+              :arrow="featuredResourceGroups.length > 1 ? 'hover' : 'never'"
               indicator-position="outside"
               class="resource-carousel"
               height="280px"
@@ -176,11 +182,7 @@
             <div v-else class="featured-empty">
               <div class="empty-icon">⭐</div>
               <h3>暂无精选资源</h3>
-              <p>快来上传优质资源，成为精选内容吧！</p>
-              <el-button type="primary" @click="showUploadDialog = true">
-                <el-icon><Upload /></el-icon>
-                上传资源
-              </el-button>
+              <p>暂无精选资源，敬请期待</p>
             </div>
           </div>
             </div>
@@ -221,14 +223,7 @@
                     </el-button>
                   </el-button-group>
                 </div>
-                <el-button 
-                  type="primary" 
-                  size="default"
-                  @click="showUploadDialog = true"
-                >
-                  <el-icon><Upload /></el-icon>
-                  上传资源
-                </el-button>
+
                 </div>
               </div>
               
@@ -272,7 +267,7 @@
                 </div>
                 
                 <div class="filter-group">
-                  <label class="filter-label">上传时间</label>
+                  <label class="filter-label">创建时间</label>
                   <el-select 
                     v-model="dateFilter" 
                     placeholder="时间范围" 
@@ -366,8 +361,8 @@
                         size="small"
                         class="filter-input"
                       >
-                        <el-option label="最新上传" value="newest" />
-                        <el-option label="最早上传" value="oldest" />
+                                            <el-option label="最新创建" value="newest" />
+                    <el-option label="最早创建" value="oldest" />
                         <el-option label="下载最多" value="most_downloaded" />
                         <el-option label="下载最少" value="least_downloaded" />
                         <el-option label="名称A-Z" value="name_asc" />
@@ -382,11 +377,7 @@
             <div v-if="resources.length === 0" class="empty-state">
               <div class="empty-icon">📦</div>
               <h3>暂无资源</h3>
-              <p>还没有资源被上传，快来分享你的第一个资源吧！</p>
-              <el-button type="primary" @click="showUploadDialog = true">
-                <el-icon><Upload /></el-icon>
-                上传资源
-              </el-button>
+              <p>暂无资源，敬请期待</p>
             </div>
             
             <!-- 网格视图 -->
@@ -627,7 +618,7 @@
             <ul class="footer-links">
               <li><a href="#" @click.prevent="scrollToTop">回到顶部</a></li>
               <li><a href="#" @click.prevent="handleCategoryChange({ props: { name: 'all' } })">全部资源</a></li>
-              <li><a href="#" @click.prevent="showUploadDialog = true">上传资源</a></li>
+
               <li><a href="#" @click.prevent="goToLogin" v-if="!isLoggedIn">用户登录</a></li>
               <li><a href="#" @click.prevent="goToUserProfile" v-if="isLoggedIn">个人中心</a></li>
             </ul>
@@ -696,126 +687,7 @@
       </div>
     </footer>
 
-    <!-- 上传对话框 -->
-    <el-dialog
-      v-model="showUploadDialog"
-      title="上传资源"
-      width="600px"
-      :before-close="handleUploadClose"
-      destroy-on-close
-    >
-      <el-form 
-        :model="uploadForm" 
-        :rules="uploadRules" 
-        ref="uploadFormRef" 
-        label-width="100px"
-        size="large"
-      >
-        <el-form-item label="资源标题" prop="title">
-          <el-input 
-            v-model="uploadForm.title" 
-            placeholder="请输入资源标题"
-            clearable
-          />
-        </el-form-item>
-        
-        <el-form-item label="资源描述" prop="description">
-          <el-input
-            v-model="uploadForm.description"
-            type="textarea"
-            :rows="4"
-            placeholder="请输入资源描述"
-            show-word-limit
-            maxlength="500"
-          />
-        </el-form-item>
-        
-        <el-form-item label="资源分类" prop="category">
-          <el-select v-model="uploadForm.category" placeholder="选择分类" style="width: 100%">
-            <el-option label="教程" value="tutorial" />
-            <el-option label="工具" value="tool" />
-            <el-option label="模板" value="template" />
-            <el-option label="其他" value="other" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="资源标签">
-          <el-input
-            v-model="uploadForm.tagsInput"
-            placeholder="输入标签，用逗号分隔"
-            @keyup.enter="addTag"
-            clearable
-          />
-          <div class="tags-container">
-            <el-tag
-              v-for="tag in uploadForm.tags"
-              :key="tag"
-              closable
-              @close="removeTag(tag)"
-              effect="light"
-            >
-              {{ tag }}
-            </el-tag>
-          </div>
-        </el-form-item>
-        
-        <el-form-item label="资源文件" prop="file">
-          <el-upload
-            ref="uploadRef"
-            :auto-upload="false"
-            :on-change="handleFileChange"
-            :limit="1"
-            accept=".zip,.rar,.7z,.pdf,.doc,.docx"
-            drag
-          >
-            <el-icon class="el-icon--upload"><Upload /></el-icon>
-            <div class="el-upload__text">
-              将文件拖到此处，或<em>点击上传</em>
-            </div>
-            <template #tip>
-              <div class="el-upload__tip">
-                支持 zip, rar, 7z, pdf, doc, docx 格式，文件大小不超过100MB
-              </div>
-            </template>
-          </el-upload>
-        </el-form-item>
-        
-        <el-form-item label="封面图片">
-          <el-upload
-            ref="coverUploadRef"
-            :auto-upload="false"
-            :on-change="handleCoverChange"
-            :limit="1"
-            accept="image/*"
-            drag
-          >
-            <el-icon class="el-icon--upload"><Picture /></el-icon>
-            <div class="el-upload__text">
-              将图片拖到此处，或<em>点击上传</em>
-            </div>
-            <template #tip>
-              <div class="el-upload__tip">
-                支持 jpg, png, gif 格式，建议尺寸 300x200
-              </div>
-            </template>
-          </el-upload>
-        </el-form-item>
-      </el-form>
-      
-      <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="showUploadDialog = false" size="large">取消</el-button>
-          <el-button 
-            type="primary" 
-            @click="submitUpload" 
-            :loading="uploading"
-            size="large"
-          >
-            上传资源
-          </el-button>
-        </span>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
@@ -830,10 +702,8 @@ import {
   Download,
   Star,
   Calendar,
-  Upload,
   Document,
   Collection,
-  Picture,
   Bottom,
   Switch,
   Message,
@@ -845,15 +715,16 @@ import {
   Filter,
   PriceTag
 } from '@element-plus/icons-vue'
-import type { FormInstance, UploadFile } from 'element-plus'
+import type { FormInstance } from 'element-plus'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 import { communityApi } from '@/api/community'
-import type { Resource, UploadForm } from '@/types'
+import type { Resource } from '@/types'
 import { getUserInfo } from '@/utils/auth'
 import { formatDate as formatDateUtil, formatFileSize } from '@/utils/format'
-import { packageApi, type Package } from '@/api/packages'
 import { categoryApi, type Category } from '@/api/categories'
 import { getActiveAnnouncements, type Announcement } from '@/api/announcements'
+import type { Package } from '@/api/packages'
+
 
 const router = useRouter()
 
@@ -864,8 +735,7 @@ const sortBy = ref('latest')
 const filterType = ref('all')
 
 const totalResources = ref(0)
-const showUploadDialog = ref(false)
-const uploading = ref(false)
+
 const loading = ref(false)
 
 // 统计数据
@@ -921,7 +791,7 @@ const fetchAnnouncements = async () => {
       notices.value = [
         { id: 1, text: '欢迎来到资源社区！' },
         { id: 2, text: '请遵守社区规范，文明发言。' },
-        { id: 3, text: '资源上传请确保无版权争议。' },
+        { id: 3, text: '资源分享请确保无版权争议。' },
       ]
     }
   } catch (error) {
@@ -963,33 +833,7 @@ const featuredResourceGroups = computed(() => {
   return groups
 })
 
-// 上传表单
-const uploadForm = reactive<UploadForm>({
-  title: '',
-  description: '',
-  category: '',
-  tags: [],
-  tagsInput: '',
-  file: undefined,
-  cover: undefined
-})
 
-const uploadRules = {
-  title: [
-    { required: true, message: '请输入资源标题', trigger: 'blur' },
-    { min: 2, max: 50, message: '标题长度在2到50个字符', trigger: 'blur' }
-  ],
-  description: [
-    { required: true, message: '请输入资源描述', trigger: 'blur' },
-    { min: 10, max: 500, message: '描述长度在10到500个字符', trigger: 'blur' }
-  ],
-  category: [
-    { required: true, message: '请选择资源分类', trigger: 'change' }
-  ],
-  file: [
-    { required: true, message: '请选择资源文件', trigger: 'change' }
-  ]
-}
 
 // 计算属性
 const filteredResources = computed(() => {
@@ -1051,16 +895,20 @@ const loadResources = async () => {
       params.type = filterType.value
     }
     
-    console.log("请求参数:", params)
-    const res = await packageApi.getPackages(params)
+    // 转换分页参数以符合后端 /community/feed 接口
+    params.page = currentPage.value
+    params.page_size = pageSize.value
+    
+    console.log("请求Feed参数:", params)
+    const res = await communityApi.getFeed(params)
     
     if (res.code === 0 && res.data) {
       resources.value = res.data.list
       totalResources.value = res.data.total
       
       // 计算统计数据
-      totalDownloads.value = resources.value.reduce((sum, resource) => sum + resource.download_count, 0)
-      totalLikes.value = resources.value.reduce((sum, resource) => sum + resource.like_count, 0)
+      totalDownloads.value = resources.value.reduce((sum, resource) => sum + (resource.download_count || 0), 0)
+      totalLikes.value = resources.value.reduce((sum, resource) => sum + (resource.like_count || 0), 0)
       
       // 统计数据可能通过API获取更准确
       totalUsers.value = Math.floor(Math.random() * 1000) + 500
@@ -1209,82 +1057,7 @@ const formatNumber = (num: number) => {
   return num.toLocaleString()
 }
 
-const addTag = () => {
-  const tag = uploadForm.tagsInput?.trim()
-  if (tag && tag.length > 0 && !uploadForm.tags.includes(tag)) {
-    uploadForm.tags.push(tag)
-    uploadForm.tagsInput = ''
-  }
-}
 
-const removeTag = (tag: string) => {
-  const index = uploadForm.tags.indexOf(tag)
-  if (index > -1) {
-    uploadForm.tags.splice(index, 1)
-  }
-}
-
-const handleFileChange = (file: UploadFile) => {
-  uploadForm.file = file.raw as File | undefined
-}
-
-const handleCoverChange = (file: UploadFile) => {
-  uploadForm.cover = file.raw as File | undefined
-}
-
-const submitUpload = async () => {
-  if (!uploadForm.file) {
-    ElMessage.error('请选择资源文件')
-    return
-  }
-
-  try {
-    uploading.value = true
-    const res = await communityApi.createResource({
-      title: uploadForm.title,
-      description: uploadForm.description,
-      category: uploadForm.category,
-      tags: uploadForm.tags,
-      file_url: uploadForm.file_url || '',
-      cover_url: uploadForm.cover_url
-    })
-
-    if (res.code === 0) {
-      ElMessage.success('资源上传成功')
-      showUploadDialog.value = false
-      Object.assign(uploadForm, {
-        title: '',
-        description: '',
-        category: '',
-        tags: [],
-        tagsInput: '',
-        file: undefined,
-        cover: undefined
-      })
-      loadResources()
-    } else {
-      ElMessage.error(res.msg || '上传失败')
-    }
-  } catch (error) {
-    console.error('上传失败:', error)
-    ElMessage.error('上传失败')
-  } finally {
-    uploading.value = false
-  }
-}
-
-const handleUploadClose = () => {
-  showUploadDialog.value = false
-  Object.assign(uploadForm, {
-    title: '',
-    description: '',
-    category: '',
-    tags: [],
-    tagsInput: '',
-    file: undefined,
-    cover: undefined
-  })
-}
 
 // 加载分类数据
 const loadCategories = async () => {
@@ -2155,10 +1928,7 @@ onUpdated(() => {
   width: 140px;
 }
 
-.upload-btn {
-  flex-shrink: 0;
-  font-weight: 500;
-}
+
 
 /* 主内容区 */
 .main {
@@ -2640,10 +2410,7 @@ onUpdated(() => {
   padding-left: 8px;
 }
 
-/* 上传对话框 */
-.upload-dialog :deep(.el-dialog) {
-  border-radius: 12px;
-}
+
 
 /* 对话框头部背景透明 */
 :deep(.el-dialog__header) {

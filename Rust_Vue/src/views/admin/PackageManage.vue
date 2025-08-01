@@ -8,14 +8,14 @@
             <el-icon :size="32"><Box /></el-icon>
           </div>
           <div class="header-info">
-            <h1 class="page-title">资源管理</h1>
+            <h1 class="page-title">内容管理</h1>
             <p class="page-subtitle">管理绳包资源和社区内容</p>
           </div>
         </div>
         <div class="header-actions">
           <el-button type="primary" @click="showAddPackageDialog">
             <el-icon><Plus /></el-icon>
-            添加资源
+            添加内容
           </el-button>
           <el-button @click="showCategoryDialog = true">
             <el-icon><Folder /></el-icon>
@@ -231,25 +231,35 @@
       </div>
     </el-dialog>
 
-    <!-- 添加绳包对话框 -->
+    <!-- 添加内容对话框 -->
     <el-dialog
       v-model="addDialogVisible"
-      title="添加资源"
+      title="添加内容"
       width="600px"
       :close-on-click-modal="false"
     >
       <el-form :model="newPackage" label-width="100px">
-        <el-form-item label="名称">
-          <el-input v-model="newPackage.name" placeholder="请输入资源名称" />
+        <el-form-item label="内容类型">
+          <el-radio-group v-model="newPackage.type">
+            <el-radio label="package">资源</el-radio>
+            <el-radio label="post">帖子</el-radio>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item label="作者">
+        
+        <el-form-item :label="newPackage.type === 'package' ? '资源名称' : '帖子标题'">
+          <el-input v-model="newPackage.name" :placeholder="newPackage.type === 'package' ? '请输入资源名称' : '请输入帖子标题'" />
+        </el-form-item>
+        
+        <el-form-item label="作者" v-if="newPackage.type === 'package'">
           <el-input v-model="newPackage.author" placeholder="请输入作者" />
         </el-form-item>
-        <el-form-item label="版本">
+        
+        <el-form-item label="版本" v-if="newPackage.type === 'package'">
           <el-input v-model="newPackage.version" placeholder="请输入版本号" />
         </el-form-item>
-        <el-form-item label="分类">
-          <el-select v-model="newPackage.category_id" placeholder="选择分类">
+        
+        <el-form-item :label="newPackage.type === 'package' ? '资源分类' : '帖子分类'">
+          <el-select v-model="newPackage.category_id" :placeholder="newPackage.type === 'package' ? '选择资源分类' : '选择帖子分类'">
             <el-option 
               v-for="cat in categories" 
               :key="cat.id" 
@@ -259,7 +269,8 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
+        
+        <el-form-item label="状态" v-if="newPackage.type === 'package'">
           <el-select v-model="newPackage.status" placeholder="选择状态">
             <el-option label="正常" value="正常" />
             <el-option label="已发布" value="已发布" />
@@ -268,21 +279,45 @@
             <el-option label="维护中" value="维护中" />
           </el-select>
         </el-form-item>
-        <el-form-item label="描述">
+        
+        <el-form-item :label="newPackage.type === 'package' ? '资源描述' : '帖子内容'">
           <el-input 
             v-model="newPackage.description" 
             type="textarea" 
             :rows="3"
-            placeholder="请输入描述"
+            :placeholder="newPackage.type === 'package' ? '请输入资源描述' : '请输入帖子内容'"
           />
         </el-form-item>
-        <el-form-item label="项目链接">
+        
+        <el-form-item label="标签">
+          <el-input
+            v-model="newPackage.tagsInput"
+            placeholder="输入标签，用逗号分隔"
+            @keyup.enter="addTag"
+            clearable
+          />
+          <div class="tags-container">
+            <el-tag
+              v-for="tag in newPackage.tags"
+              :key="tag"
+              closable
+              @close="removeTag(tag)"
+              effect="light"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="项目链接" v-if="newPackage.type === 'package'">
           <el-input v-model="newPackage.url" placeholder="请输入项目链接" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="addDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="addPackage">添加</el-button>
+        <el-button type="primary" @click="addPackage">
+          {{ newPackage.type === 'package' ? '添加资源' : '发布帖子' }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -472,6 +507,7 @@ import {
   PackageListResponse 
 } from '../../api/packages'
 import { Category, CreateCategoryRequest, UpdateCategoryRequest } from '../../api/categories'
+import { createPost } from '../../api/posts'
 import axios from 'axios' // 导入axios
 import userActionService from '../../utils/userActionService'
 
@@ -500,15 +536,18 @@ const maintenancePackages = ref(0)
 // 分类数据
 const categories = ref<any[]>([])
 
-// 新绳包表单
+// 新内容表单
 const newPackage = ref({
+  type: 'package' as 'package' | 'post',
   name: '',
   author: '',
   version: '1.0.0',
   category_id: undefined as number | undefined,
   status: '正常',
   description: '',
-  url: ''
+  url: '',
+  tags: [] as string[],
+  tagsInput: ''
 })
 
 // 新分类表单
@@ -919,65 +958,122 @@ async function updateSinglePackageStatus(pkgId: number, newStatus: string) {
   }
 }
 
+// 标签处理函数
+function addTag() {
+  const tag = newPackage.value.tagsInput?.trim()
+  if (tag && tag.length > 0 && !newPackage.value.tags.includes(tag)) {
+    newPackage.value.tags.push(tag)
+    newPackage.value.tagsInput = ''
+  }
+}
+
+function removeTag(tag: string) {
+  const index = newPackage.value.tags.indexOf(tag)
+  if (index > -1) {
+    newPackage.value.tags.splice(index, 1)
+  }
+}
+
 async function addPackage() {
   try {
     // 验证表单数据
     if (!newPackage.value.name.trim()) {
-      ElMessage.error('请输入绳包名称')
-      return
-    }
-    if (!newPackage.value.author.trim()) {
-      ElMessage.error('请输入作者')
+      ElMessage.error('请输入标题')
       return
     }
     if (!newPackage.value.description.trim()) {
-      ElMessage.error('请输入描述')
-      return
-    }
-    if (!newPackage.value.url.trim()) {
-      ElMessage.error('请输入项目链接')
+      ElMessage.error('请输入内容')
       return
     }
     
-    const packageData: CreatePackageRequest = {
-      name: newPackage.value.name,
-      author: newPackage.value.author,
-      version: newPackage.value.version,
-      description: newPackage.value.description,
-      category_id: newPackage.value.category_id,
-      file_url: newPackage.value.url // 添加file_url字段
-    }
-    
-    console.log('创建绳包数据:', packageData)
-    // 管理员使用专用创建接口，可以设置任意作者和状态
-const res = await packageApi.adminCreatePackage(packageData)
-    if (res.code === 0) {
-      ElMessage.success('绳包添加成功')
-      
-      // 注意：资源操作记录已在API层自动处理，不需要在这里重复记录
-      
-      addDialogVisible.value = false
-      // 清空表单
-      newPackage.value = {
-        name: '',
-        author: '',
-        version: '1.0.0',
-        category_id: undefined,
-        status: '正常',
-        description: '',
-        url: ''
+    if (newPackage.value.type === 'package') {
+      // 验证资源特有字段
+      if (!newPackage.value.author.trim()) {
+        ElMessage.error('请输入作者')
+        return
       }
-      // 延迟刷新数据，确保后端数据已更新
-      setTimeout(async () => {
-        await loadCategories() // 先加载分类数据
-        await loadPackages() // 再加载绳包数据
-      }, 500)
+      if (!newPackage.value.url.trim()) {
+        ElMessage.error('请输入项目链接')
+        return
+      }
+      
+      const packageData: CreatePackageRequest = {
+        name: newPackage.value.name,
+        author: newPackage.value.author,
+        version: newPackage.value.version,
+        description: newPackage.value.description,
+        category_id: newPackage.value.category_id,
+        file_url: newPackage.value.url,
+        tags: newPackage.value.tags
+      }
+      
+      console.log('创建资源数据:', packageData)
+      // 管理员使用专用创建接口，可以设置任意作者和状态
+      const res = await packageApi.adminCreatePackage(packageData)
+      if (res.code === 0) {
+        ElMessage.success('资源添加成功')
+        
+        addDialogVisible.value = false
+        // 清空表单
+        newPackage.value = {
+          type: 'package',
+          name: '',
+          author: '',
+          version: '1.0.0',
+          category_id: undefined,
+          status: '正常',
+          description: '',
+          url: '',
+          tags: [],
+          tagsInput: ''
+        }
+        // 延迟刷新数据，确保后端数据已更新
+        setTimeout(async () => {
+          await loadCategories() // 先加载分类数据
+          await loadPackages() // 再加载绳包数据
+        }, 500)
+      } else {
+        ElMessage.error(res.msg || '添加失败')
+      }
     } else {
-      ElMessage.error(res.message || '添加失败')
+      // 发布帖子
+      const res = await createPost({
+        title: newPackage.value.name,
+        content: newPackage.value.description,
+        category_id: newPackage.value.category_id,
+        tags: newPackage.value.tags,
+        status: 'Published'
+      })
+      
+      if (res.code === 0) {
+        ElMessage.success('帖子发布成功')
+        
+        addDialogVisible.value = false
+        // 清空表单
+        newPackage.value = {
+          type: 'package',
+          name: '',
+          author: '',
+          version: '1.0.0',
+          category_id: undefined,
+          status: '正常',
+          description: '',
+          url: '',
+          tags: [],
+          tagsInput: ''
+        }
+        // 延迟刷新数据
+        setTimeout(async () => {
+          await loadCategories()
+          await loadPackages()
+        }, 500)
+      } else {
+        ElMessage.error(res.msg || '发布失败')
+      }
     }
   } catch (error) {
-    console.error('添加绳包错误:', error)
-    ElMessage.error('添加失败')
+    console.error('添加内容错误:', error)
+    ElMessage.error(newPackage.value.type === 'package' ? '添加失败' : '发布失败')
   }
 }
 
@@ -1656,5 +1752,12 @@ onMounted(async () => {
   .el-table__row:hover {
     transform: none;
   }
+}
+
+.tags-container {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 </style> 

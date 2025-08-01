@@ -10,5 +10,7 @@ pub mod email_service;
 pub mod simple_email_service;
 pub mod http_email_service;
 pub mod optimized_smtp_service;
+pub mod post_service; // 添加帖子服务
+pub mod tag_service; // 添加标签服务
 
  

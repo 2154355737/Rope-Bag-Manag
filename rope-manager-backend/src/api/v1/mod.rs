@@ -10,6 +10,9 @@ pub mod resource_records;
 pub mod user_actions; 
 pub mod forbidden_words;
 pub mod subscription;
+pub mod post;
+pub mod feed;
+pub mod tag;
 
 use actix_web::web;
 
@@ -26,5 +29,8 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(resource_records::configure_routes)
         .configure(user_actions::configure_routes)
         .configure(forbidden_words::configure_routes)
-        .configure(subscription::configure_routes);
+        .configure(subscription::configure_routes)
+        .configure(post::configure_routes)
+        .configure(feed::configure_routes)
+        .configure(tag::configure_routes);
 } 

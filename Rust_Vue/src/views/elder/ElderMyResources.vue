@@ -3,10 +3,10 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
-    <h2>我的资源</h2>
+    <h2>我的内容</h2>
         <div class="header-actions">
           <el-button type="primary" icon="Plus" @click="showUploadDialog = true">
-            上传新资源
+            提交内容
           </el-button>
         </div>
       </div>
@@ -22,7 +22,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-number">{{ totalResources }}</div>
-              <div class="stat-label">总资源数</div>
+              <div class="stat-label">总内容数</div>
             </div>
           </div>
         </el-card>
@@ -113,9 +113,9 @@
     <el-card shadow="hover" class="resource-list-card">
       <div v-loading="loading">
         <div v-if="resourceList.length === 0 && !loading" class="empty-state">
-          <el-empty description="还没有上传任何资源">
+          <el-empty description="还没有提交任何内容">
             <el-button type="primary" @click="showUploadDialog = true">
-              立即上传
+              立即提交
             </el-button>
           </el-empty>
         </div>
@@ -232,30 +232,38 @@
       </div>
     </el-card>
 
-    <!-- 上传资源对话框 -->
-    <el-dialog v-model="showUploadDialog" title="上传新资源" width="700px" :close-on-click-modal="false">
+    <!-- 提交内容对话框 -->
+    <el-dialog v-model="showUploadDialog" title="提交内容" width="700px" :close-on-click-modal="false">
       <el-form :model="uploadForm" :rules="uploadRules" ref="uploadFormRef" label-width="100px">
+        <el-form-item label="内容类型">
+          <el-radio-group v-model="uploadForm.type">
+            <el-radio label="package">资源</el-radio>
+            <el-radio label="post">帖子</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="资源名称" prop="name">
-              <el-input v-model="uploadForm.name" placeholder="请输入资源名称" />
+            <el-form-item :label="uploadForm.type === 'package' ? '资源名称' : '帖子标题'" prop="name">
+              <el-input v-model="uploadForm.name" :placeholder="uploadForm.type === 'package' ? '请输入资源名称' : '请输入帖子标题'" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="12" v-if="uploadForm.type === 'package'">
             <el-form-item label="作者" prop="author">
               <el-input v-model="uploadForm.author" placeholder="请输入作者名称" />
             </el-form-item>
           </el-col>
         </el-row>
+        
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="12" v-if="uploadForm.type === 'package'">
             <el-form-item label="版本" prop="version">
               <el-input v-model="uploadForm.version" placeholder="请输入版本号（可选）" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="分类" prop="category_id">
-              <el-select v-model="uploadForm.category_id" placeholder="请选择分类" style="width: 100%">
+            <el-form-item :label="uploadForm.type === 'package' ? '资源分类' : '帖子分类'" prop="category_id">
+              <el-select v-model="uploadForm.category_id" :placeholder="uploadForm.type === 'package' ? '请选择资源分类' : '请选择帖子分类'" style="width: 100%">
                 <el-option 
                   v-for="category in categoryList" 
                   :key="category.id" 
@@ -266,17 +274,39 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="资源描述" prop="description">
+        
+        <el-form-item :label="uploadForm.type === 'package' ? '资源描述' : '帖子内容'" prop="description">
           <el-input 
             v-model="uploadForm.description" 
             type="textarea" 
             :rows="4" 
-            placeholder="请输入资源描述"
+            :placeholder="uploadForm.type === 'package' ? '请输入资源描述' : '请输入帖子内容'"
             show-word-limit
             maxlength="500"
           />
         </el-form-item>
-        <el-form-item label="文件链接" prop="file_url">
+        
+        <el-form-item label="标签">
+          <el-input
+            v-model="uploadForm.tagsInput"
+            placeholder="输入标签，用逗号分隔"
+            @keyup.enter="addTag"
+            clearable
+          />
+          <div class="tags-container">
+            <el-tag
+              v-for="tag in uploadForm.tags"
+              :key="tag"
+              closable
+              @close="removeTag(tag)"
+              effect="light"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="文件链接" prop="file_url" v-if="uploadForm.type === 'package'">
           <el-input 
             v-model="uploadForm.file_url" 
             placeholder="请输入文件下载链接"
@@ -288,7 +318,8 @@
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item label="元老特权">
+        
+        <el-form-item label="元老特权" v-if="uploadForm.type === 'package'">
           <el-checkbox v-model="uploadForm.skipReview">
             跳过审核（直接发布）
           </el-checkbox>
@@ -302,7 +333,7 @@
         <div class="dialog-footer">
           <el-button @click="showUploadDialog = false">取消</el-button>
           <el-button type="primary" @click="handleUpload" :loading="uploading">
-            {{ uploadForm.skipReview ? '立即发布' : '提交审核' }}
+            {{ uploadForm.type === 'package' ? (uploadForm.skipReview ? '立即发布资源' : '提交资源审核') : '发布帖子' }}
           </el-button>
         </div>
       </template>
@@ -381,6 +412,7 @@ import {
 } from '@element-plus/icons-vue'
 import { packageApi, type Package, type CreatePackageRequest, type UpdatePackageRequest } from '@/api/packages'
 import { categoryApi } from '@/api'
+import { createPost } from '@/api/posts'
 import { getUserInfo } from '@/utils/auth'
 
 const uploadFormRef = ref<InstanceType<typeof ElForm> | null>(null)
@@ -415,14 +447,17 @@ const searchForm = reactive({
 })
 
 // 上传表单
-const uploadForm = reactive<CreatePackageRequest & { skipReview?: boolean }>({
+const uploadForm = reactive({
+  type: 'package' as 'package' | 'post',
   name: '',
   author: userInfo?.username || '',
   version: '',
   description: '',
-  category_id: undefined,
+  category_id: undefined as number | undefined,
   file_url: '',
-  skipReview: false
+  skipReview: false,
+  tags: [] as string[],
+  tagsInput: ''
 })
 
 // 编辑表单
@@ -581,33 +616,76 @@ const validateFileUrl = async () => {
   }
 }
 
+// 标签处理函数
+const addTag = () => {
+  const tag = uploadForm.tagsInput?.trim()
+  if (tag && tag.length > 0 && !uploadForm.tags.includes(tag)) {
+    uploadForm.tags.push(tag)
+    uploadForm.tagsInput = ''
+  }
+}
+
+const removeTag = (tag: string) => {
+  const index = uploadForm.tags.indexOf(tag)
+  if (index > -1) {
+    uploadForm.tags.splice(index, 1)
+  }
+}
+
 // 处理上传
 const handleUpload = async () => {
   if (!uploadFormRef.value) return
   try {
+    // 根据内容类型动态验证
+    if (uploadForm.type === 'package' && !uploadForm.file_url) {
+      ElMessage.error('请填写文件链接')
+      return
+    }
+    
     await uploadFormRef.value.validate()
     uploading.value = true
     
-    // 如果选择跳过审核，直接设置状态为Active
-    const data = { ...uploadForm }
-    if (uploadForm.skipReview) {
-      delete data.skipReview
-      // 这里需要调用特殊的API来直接发布
-    }
-    
-    // 元老使用管理员创建接口，可以设置作者和其他字段
-const res = await packageApi.adminCreatePackage(data)
-    if (res.code === 0) {
-      ElMessage.success(uploadForm.skipReview ? '资源发布成功' : '资源上传成功，等待审核')
-      showUploadDialog.value = false
-      resetUploadForm()
-      loadResources()
+    if (uploadForm.type === 'package') {
+      // 提交资源
+      const { type, tags, tagsInput, skipReview, ...data } = uploadForm
+      
+      // 如果选择跳过审核，直接设置状态为Active
+      if (skipReview) {
+        // 这里需要调用特殊的API来直接发布
+      }
+      
+      // 元老使用管理员创建接口，可以设置作者和其他字段
+      const res = await packageApi.adminCreatePackage(data)
+      if (res.code === 0) {
+        ElMessage.success(uploadForm.skipReview ? '资源发布成功' : '资源上传成功，等待审核')
+        showUploadDialog.value = false
+        resetUploadForm()
+        loadResources()
+      } else {
+        ElMessage.error(res.msg || '上传失败')
+      }
     } else {
-      ElMessage.error(res.message || '上传失败')
+      // 发布帖子
+      const res = await createPost({
+        title: uploadForm.name,
+        content: uploadForm.description,
+        category_id: uploadForm.category_id,
+        tags: uploadForm.tags,
+        status: 'Published'
+      })
+      
+      if (res.code === 0) {
+        ElMessage.success('帖子发布成功')
+        showUploadDialog.value = false
+        resetUploadForm()
+        loadResources()
+      } else {
+        ElMessage.error(res.msg || '发布失败')
+      }
     }
   } catch (error) {
-    console.error('上传资源失败:', error)
-    ElMessage.error('上传失败')
+    console.error('提交失败:', error)
+    ElMessage.error(uploadForm.type === 'package' ? '上传失败' : '发布失败')
   } finally {
     uploading.value = false
   }
@@ -665,13 +743,16 @@ const handleDelete = async (resource: Package) => {
 // 重置上传表单
 const resetUploadForm = () => {
   Object.assign(uploadForm, {
+    type: 'package',
     name: '',
     author: userInfo?.username || '',
     version: '',
     description: '',
     category_id: undefined,
     file_url: '',
-    skipReview: false
+    skipReview: false,
+    tags: [],
+    tagsInput: ''
   })
 }
 
@@ -926,6 +1007,13 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.tags-container {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 @media screen and (max-width: 768px) {

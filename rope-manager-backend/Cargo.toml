@@ -82,6 +82,14 @@ path = "fix_user_status.rs"
 name = "check_user_actions"
 path = "check_user_actions.rs"
 
+[[bin]]
+name = "fix_tags_table"
+path = "fix_tags_table.rs"
+
+[[bin]]
+name = "test_tags_api"
+path = "test_tags_api.rs"
+
 
 
 

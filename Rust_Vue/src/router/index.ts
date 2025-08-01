@@ -54,6 +54,16 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/main/ResourceComment.vue'),
     meta: { title: '资源评论', layout: 'independent', device: 'all' }
   },
+  {
+    path: '/posts',
+    component: () => import('../views/main/Posts.vue'),
+    meta: { title: '社区帖子', layout: 'independent', device: 'all' }
+  },
+  {
+    path: '/posts/:id',
+    component: () => import('../views/main/PostDetail.vue'),
+    meta: { title: '帖子详情', layout: 'independent', device: 'all' }
+  },
   // 登录
   {
     path: '/login',
@@ -127,6 +137,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '评论管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'moderator'] }
   },
   {
+    path: '/admin/posts',
+    component: () => import('../views/admin/PostManage.vue'),
+    meta: { title: '帖子管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
+  },
+  {
     path: '/admin/user-actions',
     component: () => import('../views/admin/UserActions.vue'),
     meta: { title: '用户行为记录', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
@@ -160,6 +175,11 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/subscriptions',
     component: () => import('../views/admin/SubscriptionManage.vue'),
     meta: { title: '订阅管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
+    path: '/admin/tags',
+    component: () => import('../views/admin/TagManage.vue'),
+    meta: { title: '标签管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
   },
   // 元老后台
   {

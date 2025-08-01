@@ -59,7 +59,8 @@ import {
   Bell,
   UserFilled,
   DocumentChecked,
-  Message // 新增订阅管理图标
+  Message, // 新增订阅管理图标
+  Tickets // 新增标签图标
 } from '@element-plus/icons-vue'
 import { databaseExport } from '../../utils/sqliteExport'
 
@@ -97,6 +98,8 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] },
   { path: '/admin/community-settings', title: '社区设置', icon: 'House', badge: 0, roles: ['admin'] },
+  { path: '/admin/posts', title: '帖子管理', icon: 'ChatDotRound', badge: 0, roles: ['admin', 'elder'] },
+  { path: '/admin/tags', title: '标签管理', icon: 'Tickets', badge: 0, roles: ['admin', 'elder'] },
   { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] },
   { path: '/admin/subscriptions', title: '订阅管理', icon: 'Message', badge: 0, roles: ['admin'] }
 ]
@@ -117,7 +120,8 @@ const iconComponents: Record<string, any> = {
   Bell,
   UserFilled,
   DocumentChecked,
-  Message
+  Message,
+  Tickets
 }
 
 // 例如在按钮点击事件中调用

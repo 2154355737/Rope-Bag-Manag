@@ -5,6 +5,8 @@ pub mod resource_record;
 pub mod system;
 pub mod user_action; // 添加用户行为记录模型
 pub mod mail; // 添加邮件模块
+pub mod post; // 添加帖子模型
+pub mod tag; // 添加标签模型
 
 use serde::{Serialize, Deserialize};
 
@@ -13,6 +15,8 @@ pub use package::*;
 pub use comment::*;
 pub use system::*;
 pub use resource_record::*;
+pub use post::*;
+pub use tag::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {

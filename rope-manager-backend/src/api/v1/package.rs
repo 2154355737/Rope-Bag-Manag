@@ -159,6 +159,7 @@ async fn review_resource(
         reviewer_id: Some(user.id),
         reviewed_at: Some(chrono::Utc::now()),
         review_comment: req.comment.clone(),
+        tags: None,
     };
     
     match package_service.update_package(resource_id, &update_req).await {
@@ -372,6 +373,7 @@ async fn user_submit_resource(
         description: req.description.clone(),
         category_id,
         file_url: Some(req.file_url.clone()),
+        tags: req.tags.clone(),
     };
     
     match package_service.create_package(&create_req).await {

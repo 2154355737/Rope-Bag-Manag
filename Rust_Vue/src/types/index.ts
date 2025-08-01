@@ -66,7 +66,11 @@ export enum UserStatus {
 // API响应类型
 export interface ApiResponse<T = any> {
   code: number
-  msg: string
+  /** 错误或提示信息（后端字段 msg）*/
+  msg?: string
+  /** 错误或提示信息（某些接口使用 message）*/
+  message?: string
+  /** 具体数据 */
   data?: T
 }
 
@@ -139,6 +143,7 @@ export interface Category {
 
 // 上传相关类型
 export interface UploadForm {
+  type: 'package' | 'post'  // 内容类型：资源或帖子
   title: string
   description: string
   category: string

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rusqlite::{Connection, params, OptionalExtension};
 use crate::models::{Package, Category};
+use crate::models::Tag; // 需要Tag模型
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -31,7 +32,7 @@ impl PackageRepository {
                 return Err(e.into());
             }
         };
-        let packages = match stmt.query_map([], |row| {
+        let mut packages = match stmt.query_map([], |row| {
             Ok(Package {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -57,6 +58,7 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                tags: None, // 这里会在后面填充
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -72,6 +74,10 @@ impl PackageRepository {
             }
         };
         println!("[SQL] get_all_packages result count: {}", packages.len());
+        // 为每个package填充标签
+        for pkg in &mut packages {
+            pkg.tags = Some(Self::get_tags_for_package_internal(&conn, pkg.id)?);
+        }
         Ok(packages)
     }
 
@@ -115,6 +121,7 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                tags: None, // 这里会在后面填充
             })
         }) {
             Ok(val) => Some(val),
@@ -125,6 +132,11 @@ impl PackageRepository {
             }
         };
         println!("[SQL] find_by_id result: {:?}", package);
+        let package = if let Some(mut pkg) = package {
+            pkg.tags = Some(Self::get_tags_for_package_internal(&conn, pkg.id)?);
+            Some(pkg)
+        } else { None };
+        println!("[SQL] find_by_id tags fetched");
         Ok(package)
     }
 
@@ -170,7 +182,10 @@ impl PackageRepository {
         // 创建包含ID的新包对象
         let mut created_package = package.clone();
         created_package.id = last_id;
-        
+        // 插入标签关联
+        if let Some(ref tags) = created_package.tags {
+            Self::replace_tags_for_package_internal(&conn, created_package.id, tags)?;
+        }
         Ok(created_package)
     }
 
@@ -209,6 +224,10 @@ impl PackageRepository {
                 println!("[ERROR] update_package failed: {}", e);
                 return Err(e.into());
             }
+        }
+        // 更新标签关联
+        if let Some(ref tags) = package.tags {
+            Self::replace_tags_for_package_internal(&conn, package.id, tags)?;
         }
         Ok(())
     }
@@ -326,6 +345,7 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                tags: None, // 这里会在后面填充
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -406,5 +426,41 @@ impl PackageRepository {
         )?;
         
         Ok(count)
+    }
+
+    /* ---------------- 标签关联辅助 ---------------- */
+    // 获取指定包的标签名称列表
+    fn get_tags_for_package_internal(conn: &Connection, package_id: i32) -> anyhow::Result<Vec<String>> {
+        let mut stmt = conn.prepare("SELECT t.name FROM tags t JOIN package_tags pt ON t.id = pt.tag_id WHERE pt.package_id = ?")?;
+        let tags = stmt.query_map(params![package_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tags)
+    }
+
+    // 替换一个包的标签（先删后插）
+    fn replace_tags_for_package_internal(conn: &Connection, package_id: i32, tags: &[String]) -> anyhow::Result<()> {
+        // 删除旧关联
+        conn.execute("DELETE FROM package_tags WHERE package_id = ?", params![package_id])?;
+
+        if tags.is_empty() {
+            return Ok(());
+        }
+
+        // 为每个标签名称找到ID，如果不存在则跳过
+        for tag_name in tags {
+            let tag_id: Option<i32> = conn.query_row(
+                "SELECT id FROM tags WHERE name = ?",
+                params![tag_name],
+                |row| row.get(0),
+            ).optional()?;
+
+            if let Some(id) = tag_id {
+                conn.execute(
+                    "INSERT OR IGNORE INTO package_tags(package_id, tag_id) VALUES(?, ?)",
+                    params![package_id, id],
+                )?;
+            }
+        }
+        Ok(())
     }
 } 

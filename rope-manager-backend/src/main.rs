@@ -78,6 +78,18 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // 执行帖子和标签表创建SQL
+    match conn.execute_batch(include_str!("../sql/migrate_posts_and_tags.sql")) {
+        Ok(_) => info!("帖子和标签表初始化成功"),
+        Err(e) => {
+            if e.to_string().contains("already exists") {
+                info!("帖子和标签表已存在，跳过初始化");
+            } else {
+                eprintln!("帖子和标签表初始化失败: {}", e);
+            }
+        }
+    }
+
     // 检查并启用邮件服务（如果配置了有效的SMTP信息）
     match conn.prepare("SELECT username, password, enabled FROM mail_settings WHERE id = 1") {
         Ok(mut stmt) => {
@@ -176,6 +188,8 @@ async fn main() -> std::io::Result<()> {
         let user_action_service = services::user_action_service::UserActionService::new(
             user_action_repo.clone()
         );
+        let post_service = services::post_service::PostService::new(db_url.clone());
+        let tag_service = services::tag_service::TagService::new(db_url.clone());
 
         let uploads_dir = &config.file.upload_path;
 
@@ -218,6 +232,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(email_service.clone()))
             .app_data(web::Data::new(subscription_repo))
             .app_data(web::Data::new(package_repo))
+            .app_data(web::Data::new(post_service))
+            .app_data(web::Data::new(tag_service))
             .configure(api::configure_routes)  // 配置根级别API路由（包含health接口）
             .service(
                 web::scope("/uploads")
