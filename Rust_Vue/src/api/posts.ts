@@ -16,6 +16,12 @@ export interface Post {
   is_featured: boolean;
   created_at: string;
   updated_at: string;
+  // 前端展示需要的额外字段
+  author_avatar?: string;
+  category?: string;
+  tags?: string[];
+  excerpt?: string;
+  cover?: string;
 }
 
 export interface CreatePostRequest {

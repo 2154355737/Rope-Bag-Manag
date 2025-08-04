@@ -159,6 +159,7 @@ import {
 import { getUserInfo } from '@/utils/auth'
 import { packageApi, type Package } from '@/api/packages'
 import { commentApi, type Comment } from '@/api/comments'
+import userActionService from '@/utils/userActionService'
 
 const route = useRoute()
 const router = useRouter()
@@ -301,6 +302,11 @@ const submitComment = async () => {
     
     if (res.code === 0) {
       ElMessage.success('评论发布成功')
+      
+      // 记录用户行为
+      userActionService.logComment('Package', resourceId.value, `评论资源: ${resource.value?.name || '未知资源'}`)
+        .catch(err => console.error('记录评论行为失败:', err))
+      
       commentForm.content = ''
       commentForm.parentId = null
       

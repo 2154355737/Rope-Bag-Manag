@@ -75,8 +75,9 @@ impl AuthHelper {
         // 1. 提取Token
         let token = Self::extract_token(req).ok_or(AuthError::TokenMissing)?;
         
-        // 2. 验证JWT Token
-        let jwt_utils = JwtUtils::new("your-secret-key-change-in-production".to_string()); // 修复：使用与配置文件一致的secret
+        // 2. 从app_data中获取JWT Utils
+        let jwt_utils = req.app_data::<actix_web::web::Data<JwtUtils>>()
+            .ok_or(AuthError::TokenInvalid)?;
         let claims = jwt_utils.verify_token(&token).map_err(|_| AuthError::TokenInvalid)?;
         
         // 3. 构造用户对象
@@ -137,6 +138,21 @@ impl AuthHelper {
         }
         
         Ok(user)
+    }
+
+    /// 检查是否为管理员
+    pub fn is_admin(req: &HttpRequest) -> bool {
+        Self::verify_user(req).map(|user| user.role == UserRole::Admin).unwrap_or(false)
+    }
+
+    /// 从请求中提取用户ID
+    pub fn extract_user_id(req: &HttpRequest) -> Option<i32> {
+        Self::verify_user(req).ok().map(|user| user.id)
+    }
+
+    /// 从请求中获取用户名
+    pub fn get_username(req: &HttpRequest) -> Option<String> {
+        Self::verify_user(req).ok().map(|user| user.username)
     }
 
     /// 检查是否为资源所有者或管理员

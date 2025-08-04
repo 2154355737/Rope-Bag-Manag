@@ -22,7 +22,8 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
-                    created_at, updated_at, reviewer_id, reviewed_at, review_comment \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
+                    is_pinned, is_featured \
              FROM packages ORDER BY created_at DESC";
         println!("[SQL] get_all_packages: {}", sql);
         let mut stmt = match conn.prepare(sql) {
@@ -58,6 +59,8 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
                 tags: None, // 这里会在后面填充
             })
         }) {
@@ -85,7 +88,8 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
-                    created_at, updated_at, reviewer_id, reviewed_at, review_comment \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
+                    is_pinned, is_featured \
              FROM packages WHERE id = ?";
         println!("[SQL] find_by_id: {} | id={}", sql, id);
         let mut stmt = match conn.prepare(sql) {
@@ -121,6 +125,8 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
                 tags: None, // 这里会在后面填充
             })
         }) {
@@ -144,8 +150,8 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "INSERT INTO packages (name, author, version, description, file_url, file_size, \
                                   download_count, like_count, favorite_count, category_id, status, \
-                                  created_at, updated_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                  created_at, updated_at, is_pinned, is_featured) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         println!("[SQL] create_package: {}", sql);
         let params = params![
             package.name,
@@ -167,6 +173,8 @@ impl PackageRepository {
             },
             package.created_at.to_rfc3339(),
             package.updated_at.to_rfc3339(),
+            package.is_pinned,
+            package.is_featured,
         ];
         match conn.execute(sql, params) {
             Ok(rows) => println!("[SQL] create_package affected rows: {}", rows),
@@ -194,7 +202,7 @@ impl PackageRepository {
         let sql = "UPDATE packages SET name = ?, author = ?, version = ?, description = ?, \
                     file_url = ?, file_size = ?, download_count = ?, like_count = ?, \
                     favorite_count = ?, category_id = ?, status = ?, created_at = ?, \
-                    updated_at = ? WHERE id = ?";
+                    updated_at = ?, is_pinned = ?, is_featured = ? WHERE id = ?";
         println!("[SQL] update_package: {} | id={}", sql, package.id);
         let params = params![
             package.name,
@@ -216,6 +224,8 @@ impl PackageRepository {
             },
             package.created_at.to_rfc3339(),
             package.updated_at.to_rfc3339(),
+            package.is_pinned,
+            package.is_featured,
             package.id,
         ];
         match conn.execute(sql, params) {
@@ -271,7 +281,7 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         println!("[DEBUG] get_packages_advanced called");
         println!("[DEBUG] page: {}, page_size: {}, category: {:?}, search: {:?}, status: {:?}", page, page_size, category, search, status);
-        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment FROM packages WHERE 1=1");
+        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment, is_pinned, is_featured FROM packages WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         if let Some(category_id) = category {
             sql.push_str(" AND category_id = ?");
@@ -293,7 +303,7 @@ impl PackageRepository {
         // 统计总数（修正：直接统计，不用子查询）
         let count_sql = sql.clone();
         let count_sql = count_sql.replacen(
-            "SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment",
+            "SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment, is_pinned, is_featured",
             "SELECT COUNT(*)",
             1
         );
@@ -345,6 +355,8 @@ impl PackageRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
                 tags: None, // 这里会在后面填充
             })
         }) {

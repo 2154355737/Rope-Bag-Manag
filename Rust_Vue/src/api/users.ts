@@ -49,7 +49,7 @@ export const userApi = {
   getUsers: (params?: UserQueryParams): Promise<ApiResponse<UserListResponse>> => {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append('page', params.page.toString())
-    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())  // 使用page_size发送给后端
     if (params?.role) queryParams.append('role', params.role)
     if (params?.status) queryParams.append('status', params.status)
     if (params?.search) queryParams.append('search', params.search)

@@ -35,7 +35,7 @@ export interface UserAction {
 
 // 管理员API
 export const adminApi = {
-  // 获取统计数据
+  // 获取统计信息
   getStats: (): Promise<ApiResponse<Stats>> => {
     return api.get('/v1/admin/stats')
   },
@@ -50,45 +50,22 @@ export const adminApi = {
   },
 
   // 获取系统日志
-  getLogs: (params?: {
-    page?: number
-    pageSize?: number
-    level?: string
-    search?: string
-  }): Promise<ApiResponse<{
-    list: SystemLog[]
-    total: number
-    page: number
-    pageSize: number
-  }>> => {
+  getLogs: (params?: { page?: number; pageSize?: number; level?: string }): Promise<ApiResponse<{ logs: SystemLog[]; total: number; page: number; pageSize: number }>> => {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append('page', params.page.toString())
-    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())  // 使用page_size
     if (params?.level) queryParams.append('level', params.level)
-    if (params?.search) queryParams.append('search', params.search)
 
     return api.get(`/v1/admin/logs?${queryParams.toString()}`)
   },
 
-  // 获取用户行为记录
-  getUserActions: (params?: {
-    page?: number
-    pageSize?: number
-    user_id?: number
-    action?: string
-    search?: string
-  }): Promise<ApiResponse<{
-    list: UserAction[]
-    total: number
-    page: number
-    pageSize: number
-  }>> => {
+  // 获取用户操作记录
+  getUserActions: (params?: { page?: number; pageSize?: number; userId?: number; action?: string }): Promise<ApiResponse<{ actions: UserAction[]; total: number; page: number; pageSize: number }>> => {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append('page', params.page.toString())
-    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
-    if (params?.user_id) queryParams.append('user_id', params.user_id.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())  // 使用page_size
+    if (params?.userId) queryParams.append('user_id', params.userId.toString())
     if (params?.action) queryParams.append('action', params.action)
-    if (params?.search) queryParams.append('search', params.search)
 
     return api.get(`/v1/admin/user-actions?${queryParams.toString()}`)
   },
@@ -123,6 +100,65 @@ export const adminApi = {
   // 删除备份
   deleteBackup: (backupId: string): Promise<ApiResponse<null>> => {
     return api.delete(`/v1/admin/backup/${backupId}`)
+  },
+
+  // 获取下载安全统计
+  getDownloadSecurityStats: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/download-security/stats')
+  },
+
+  // 获取下载安全配置
+  getDownloadSecurityConfig: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/download-security/config')
+  },
+
+  // 更新下载安全配置
+  updateDownloadSecurityConfig: (config: any): Promise<ApiResponse<any>> => {
+    return api.put('/v1/download-security/config', config)
+  },
+
+  // 获取异常记录
+  getDownloadAnomalies: (params?: { hours?: number }): Promise<ApiResponse<any>> => {
+    const queryParams = new URLSearchParams()
+    if (params?.hours) queryParams.append('hours', params.hours.toString())
+    
+    const queryString = queryParams.toString()
+    const url = queryString ? `/v1/download-security/anomalies?${queryString}` : '/v1/download-security/anomalies'
+    
+    return api.get(url)
+  },
+
+  // IP封禁管理相关API
+  getBanStats: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/security-management/ban-stats')
+  },
+
+  getIpBans: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/security-management/ip-bans')
+  },
+
+  banIp: (data: any): Promise<ApiResponse<any>> => {
+    return api.post('/v1/security-management/ip-bans', data)
+  },
+
+  unbanIp: (data: any): Promise<ApiResponse<any>> => {
+    return api.delete('/v1/security-management/ip-bans', { data })
+  },
+
+  deleteIpBan: (banId: number): Promise<ApiResponse<any>> => {
+    return api.delete(`/v1/security-management/ip-bans/${banId}`)
+  },
+
+  getIpWhitelist: (): Promise<ApiResponse<any>> => {
+    return api.get('/v1/security-management/ip-whitelist')
+  },
+
+  addIpToWhitelist: (data: any): Promise<ApiResponse<any>> => {
+    return api.post('/v1/security-management/ip-whitelist', data)
+  },
+
+  removeIpFromWhitelist: (data: any): Promise<ApiResponse<any>> => {
+    return api.delete('/v1/security-management/ip-whitelist', { data })
   },
 
   // 系统健康检查

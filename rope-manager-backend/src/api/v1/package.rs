@@ -156,6 +156,8 @@ async fn review_resource(
         category_id: None,
         status: Some(new_status),
         file_url: None,
+        is_pinned: None,
+        is_featured: None,
         reviewer_id: Some(user.id),
         reviewed_at: Some(chrono::Utc::now()),
         review_comment: req.comment.clone(),
@@ -233,7 +235,6 @@ async fn get_packages(
     package_service: web::Data<PackageService>,
     query: web::Query<PackageQueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    use crate::utils::auth_helper::AuthHelper;
     
     println!("[DEBUG] get_packages called with query: {:?}", query);
     let page = query.page.unwrap_or(1);
@@ -340,7 +341,7 @@ async fn user_submit_resource(
     // 验证用户认证
     let user = require_auth!(&http_req);
     
-    // 验证URL格式
+    // 验证URL格式（对普通用户要求更严格）
     if !req.file_url.starts_with("http://") && !req.file_url.starts_with("https://") {
         return Ok(HttpResponse::BadRequest().json(json!({
             "code": 400,
@@ -374,6 +375,8 @@ async fn user_submit_resource(
         category_id,
         file_url: Some(req.file_url.clone()),
         tags: req.tags.clone(),
+        is_pinned: None,
+        is_featured: None,
     };
     
     match package_service.create_package(&create_req).await {
@@ -397,40 +400,62 @@ async fn admin_create_package(
 ) -> Result<HttpResponse, actix_web::Error> {
     use crate::utils::auth_helper::AuthHelper;
     
+    println!("[DEBUG] admin_create_package called with data: {:?}", req);
+    
     // 验证管理员权限
     let user = match AuthHelper::verify_user(&http_req) {
-        Ok(user) => user,
-        Err(e) => return Ok(e.to_response()),
+        Ok(user) => {
+            println!("[DEBUG] User verified: {:?}", user.username);
+            user
+        },
+        Err(e) => {
+            println!("[ERROR] User verification failed: {:?}", e);
+            return Ok(e.to_response());
+        }
     };
     
     // 检查是否为管理员或元老
     if !matches!(user.role, crate::models::UserRole::Admin | crate::models::UserRole::Elder) {
+        println!("[ERROR] User role not allowed: {:?}", user.role);
         return Ok(HttpResponse::Forbidden().json(json!({
             "code": 403,
             "message": "只有管理员和元老可以直接创建资源"
         })));
     }
     
-    // 验证URL格式（如果提供了）
+    println!("[DEBUG] User role check passed");
+    
+    // 验证URL格式（如果提供了且不为空）
     if let Some(file_url) = &req.file_url {
-        if !file_url.starts_with("http://") && !file_url.starts_with("https://") {
-            return Ok(HttpResponse::BadRequest().json(json!({
-                "code": 400,
-                "message": "资源文件链接必须是有效的HTTP或HTTPS地址"
-            })));
+        println!("[DEBUG] Checking file_url: '{}'", file_url);
+        // 放宽URL验证：只要不为空就接受，可以是任意文本
+        // 管理员可以输入任意形式的资源标识符
+        if file_url.is_empty() {
+            println!("[DEBUG] Empty URL, will be stored as empty string");
+        } else {
+            println!("[DEBUG] URL accepted: '{}'", file_url);
         }
     }
     
+    println!("[DEBUG] URL validation passed, calling package_service.create_package");
+    
     match package_service.create_package(&req).await {
-        Ok(package) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "资源创建成功",
-            "data": package
-        }))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
-            "code": 400,
-            "message": format!("创建失败: {}", e)
-        })))
+        Ok(package) => {
+            println!("[DEBUG] Package created successfully: {:?}", package.id);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "资源创建成功",
+                "data": package
+            })))
+        },
+        Err(e) => {
+            println!("[ERROR] Package creation failed: {}", e);
+            println!("[ERROR] Error details: {:?}", e);
+            Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": format!("创建失败: {}", e)
+            })))
+        }
     }
 }
 
@@ -509,20 +534,47 @@ async fn delete_package(
 }
 
 async fn download_package(
+    req: HttpRequest,
     path: web::Path<i32>,
     package_service: web::Data<PackageService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let package_id = path.into_inner();
-    match package_service.download_package(package_id).await {
+    
+    // 获取用户信息
+    let user_id = crate::utils::auth_helper::AuthHelper::extract_user_id(&req);
+    
+    // 获取IP地址
+    let connection_info = req.connection_info();
+    let ip_address = connection_info.realip_remote_addr().unwrap_or("unknown");
+    
+    // 获取User-Agent
+    let user_agent = req.headers().get("User-Agent").and_then(|v| v.to_str().ok());
+    
+    match package_service.download_package_with_security(
+        package_id, 
+        user_id, 
+        ip_address, 
+        user_agent
+    ).await {
         Ok(file_path) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
             "data": file_path
         }))),
-        Err(e) => Ok(HttpResponse::NotFound().json(json!({
+        Err(e) => {
+            // 如果是安全检测阻止的下载，返回403状态码
+            if e.to_string().contains("下载被阻止") {
+                Ok(HttpResponse::Forbidden().json(json!({
+                    "code": 403,
+                    "message": e.to_string()
+                })))
+            } else {
+                Ok(HttpResponse::NotFound().json(json!({
             "code": 404,
             "message": e.to_string()
         })))
+            }
+        }
     }
 }
 

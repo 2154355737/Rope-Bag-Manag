@@ -178,7 +178,7 @@
           <template #default="{ row }">
             <el-button 
               v-if="row.resource_id"
-              type="text" 
+              link 
               size="small"
               @click="$router.push(`/resource/${row.resource_id}`)"
             >
@@ -207,7 +207,7 @@
             <div class="table-actions">
               <el-button 
                 v-if="currentTab === 'my' && row.status === 'Active'"
-                type="text" 
+                link 
                 size="small" 
                 icon="Edit"
                 @click="openEditDialog(row)"
@@ -216,7 +216,7 @@
               </el-button>
               <el-button 
                 v-if="currentTab === 'all'"
-                type="text" 
+                link 
                 size="small" 
                 :icon="row.status === 'Active' ? 'Hide' : 'View'"
                 @click="toggleCommentStatus(row)"
@@ -224,7 +224,7 @@
                 {{ row.status === 'Active' ? '隐藏' : '显示' }}
               </el-button>
               <el-button 
-                type="text" 
+                link 
                 size="small" 
                 icon="Delete"
                 @click="handleDelete(row)"

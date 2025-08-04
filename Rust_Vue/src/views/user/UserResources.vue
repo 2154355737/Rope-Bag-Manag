@@ -115,7 +115,7 @@
                 {{ resource.name }}
               </div>
               <el-dropdown @command="(command: string) => handleResourceAction(command, resource)">
-                <el-button type="text" size="small">
+                <el-button link size="small">
                   <el-icon><MoreFilled /></el-icon>
                 </el-button>
                 <template #dropdown>
@@ -287,6 +287,28 @@
         <el-form-item label="文件链接" prop="file_url">
           <el-input v-model="editForm.file_url" placeholder="请输入文件下载链接" />
         </el-form-item>
+        <el-form-item label="标签" prop="tags">
+          <el-input 
+            v-model="editForm.tagsInput" 
+            placeholder="请输入标签，用逗号分隔"
+            @input="handleTagsInput"
+          />
+          <div class="tags-display" v-if="editForm.tags && editForm.tags.length > 0">
+            <el-tag 
+              v-for="tag in editForm.tags" 
+              :key="tag" 
+              closable 
+              @close="removeTag(tag)"
+              style="margin: 4px 4px 0 0;"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        <el-form-item label="状态设置">
+          <el-checkbox v-model="editForm.is_pinned">置顶</el-checkbox>
+          <el-checkbox v-model="editForm.is_featured">精华</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -311,6 +333,7 @@ import { packageApi, type Package, type CreatePackageRequest, type UpdatePackage
 import { categoryApi, userApi } from '@/api'
 import { createPost } from '@/api/posts'
 import { getUserInfo } from '@/utils/auth'
+import userActionService from '@/utils/userActionService'
 
 const uploadFormRef = ref<InstanceType<typeof ElForm> | null>(null)
 const editFormRef = ref<InstanceType<typeof ElForm> | null>(null)
@@ -353,9 +376,10 @@ const uploadForm = reactive({
 })
 
 // 编辑表单
-const editForm = reactive<UpdatePackageRequest>({
+const editForm = reactive<UpdatePackageRequest & { tagsInput: string }>({
   name: '',
   version: '',
+  tagsInput: '',
   description: '',
   category_id: undefined,
   file_url: ''
@@ -449,7 +473,29 @@ const openEditDialog = (resource: Package) => {
   editForm.description = resource.description || ''
   editForm.category_id = resource.category_id || undefined
   editForm.file_url = resource.file_url
+  editForm.tags = resource.tags || []
+  editForm.tagsInput = (resource.tags || []).join(', ')
+  editForm.is_pinned = resource.is_pinned || false
+  editForm.is_featured = resource.is_featured || false
   showEditDialog.value = true
+}
+
+// 处理标签输入
+const handleTagsInput = () => {
+  if (editForm.tagsInput) {
+    const tags = editForm.tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
+    editForm.tags = tags
+  } else {
+    editForm.tags = []
+  }
+}
+
+// 移除标签
+const removeTag = (tagToRemove: string) => {
+  if (editForm.tags) {
+    editForm.tags = editForm.tags.filter(tag => tag !== tagToRemove)
+    editForm.tagsInput = editForm.tags.join(', ')
+  }
 }
 
 // 标签处理函数
@@ -499,6 +545,11 @@ const handleUpload = async () => {
       
       if (res.code === 0) {
         ElMessage.success('资源上传成功，等待审核')
+        
+        // 记录用户行为
+        userActionService.logUpload('Package', res.data?.id || 0, `上传资源: ${uploadForm.name}`)
+          .catch(err => console.error('记录上传行为失败:', err))
+        
         showUploadDialog.value = false
         resetUploadForm()
         loadResources()
@@ -517,6 +568,11 @@ const handleUpload = async () => {
       
       if (res.code === 0) {
         ElMessage.success('帖子发布成功')
+        
+        // 记录用户行为
+        userActionService.logAction('Create', `创建帖子: ${uploadForm.name}`, 'Post', res.data?.id || 0)
+          .catch(err => console.error('记录创建帖子行为失败:', err))
+        
         showUploadDialog.value = false
         resetUploadForm()
         loadResources()
@@ -832,6 +888,15 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.tags-display {
+  margin-top: 8px;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background-color: var(--el-fill-color-lighter);
 }
 
 .tags-container {

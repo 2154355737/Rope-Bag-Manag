@@ -132,7 +132,7 @@
                 {{ resource.name }}
               </div>
               <el-dropdown @command="(command: string) => handleResourceAction(command, resource)">
-                <el-button type="text" size="small">
+                <el-button link size="small">
                   <el-icon><MoreFilled /></el-icon>
                 </el-button>
                 <template #dropdown>
@@ -390,6 +390,28 @@
         <el-form-item label="文件链接" prop="file_url">
           <el-input v-model="editForm.file_url" placeholder="请输入文件下载链接" />
         </el-form-item>
+        <el-form-item label="标签" prop="tags">
+          <el-input 
+            v-model="editForm.tagsInput" 
+            placeholder="请输入标签，用逗号分隔"
+            @input="handleTagsInput"
+          />
+          <div class="tags-display" v-if="editForm.tags && editForm.tags.length > 0">
+            <el-tag 
+              v-for="tag in editForm.tags" 
+              :key="tag" 
+              closable 
+              @close="removeTag(tag)"
+              style="margin: 4px 4px 0 0;"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        <el-form-item label="状态设置">
+          <el-checkbox v-model="editForm.is_pinned">置顶</el-checkbox>
+          <el-checkbox v-model="editForm.is_featured">精华</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -461,13 +483,14 @@ const uploadForm = reactive({
 })
 
 // 编辑表单
-const editForm = reactive<UpdatePackageRequest>({
+const editForm = reactive<UpdatePackageRequest & { tagsInput: string }>({
   name: '',
   version: '',
   description: '',
   category_id: undefined,
   file_url: '',
-  status: 'Active'
+  status: 'Active',
+  tagsInput: ''
 })
 
 // 表单验证规则
@@ -594,7 +617,29 @@ const openEditDialog = (resource: Package) => {
   editForm.category_id = resource.category_id || undefined
   editForm.file_url = resource.file_url
   editForm.status = resource.status
+  editForm.tags = resource.tags || []
+  editForm.tagsInput = (resource.tags || []).join(', ')
+  editForm.is_pinned = resource.is_pinned || false
+  editForm.is_featured = resource.is_featured || false
   showEditDialog.value = true
+}
+
+// 处理标签输入
+const handleTagsInput = () => {
+  if (editForm.tagsInput) {
+    const tags = editForm.tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
+    editForm.tags = tags
+  } else {
+    editForm.tags = []
+  }
+}
+
+// 移除标签
+const removeTag = (tagToRemove: string) => {
+  if (editForm.tags) {
+    editForm.tags = editForm.tags.filter(tag => tag !== tagToRemove)
+    editForm.tagsInput = editForm.tags.join(', ')
+  }
 }
 
 // 验证文件链接
@@ -1007,6 +1052,15 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.tags-display {
+  margin-top: 8px;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background-color: var(--el-fill-color-lighter);
 }
 
 .tags-container {

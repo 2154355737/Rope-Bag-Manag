@@ -1530,6 +1530,33 @@ impl SystemRepository {
             settings.wechat_group = Some(wechat);
         }
 
+        // 新增主页配置字段
+        if let Ok(Some(hero_title)) = self.get_setting("hero_title").await {
+            settings.hero_title = Some(hero_title);
+        }
+        if let Ok(Some(hero_subtitle)) = self.get_setting("hero_subtitle").await {
+            settings.hero_subtitle = Some(hero_subtitle);
+        }
+        if let Ok(Some(sections_str)) = self.get_setting("homepage_sections").await {
+            // 解析JSON字符串为Vec<String>
+            if let Ok(sections) = serde_json::from_str::<Vec<String>>(&sections_str) {
+                settings.homepage_sections = Some(sections);
+            }
+        }
+        if let Ok(Some(resources_per_page_str)) = self.get_setting("resources_per_page").await {
+            if let Ok(count) = resources_per_page_str.parse::<i32>() {
+                settings.resources_per_page = Some(count);
+            }
+        }
+        if let Ok(Some(posts_per_page_str)) = self.get_setting("posts_per_page").await {
+            if let Ok(count) = posts_per_page_str.parse::<i32>() {
+                settings.posts_per_page = Some(count);
+            }
+        }
+        if let Ok(Some(default_sort)) = self.get_setting("default_sort").await {
+            settings.default_sort = Some(default_sort);
+        }
+
         Ok(settings)
     }
 
@@ -1585,6 +1612,28 @@ impl SystemRepository {
             } else {
                 self.update_setting("wechat_group", wechat).await?;
             }
+        }
+        
+        // 新增主页配置字段处理
+        if let Some(ref hero_title) = request.hero_title {
+            self.update_setting("hero_title", hero_title).await?;
+        }
+        if let Some(ref hero_subtitle) = request.hero_subtitle {
+            self.update_setting("hero_subtitle", hero_subtitle).await?;
+        }
+        if let Some(ref homepage_sections) = request.homepage_sections {
+            // 将Vec<String>序列化为JSON字符串存储
+            let sections_json = serde_json::to_string(homepage_sections).unwrap_or_default();
+            self.update_setting("homepage_sections", &sections_json).await?;
+        }
+        if let Some(resources_per_page) = request.resources_per_page {
+            self.update_setting("resources_per_page", &resources_per_page.to_string()).await?;
+        }
+        if let Some(posts_per_page) = request.posts_per_page {
+            self.update_setting("posts_per_page", &posts_per_page.to_string()).await?;
+        }
+        if let Some(ref default_sort) = request.default_sort {
+            self.update_setting("default_sort", default_sort).await?;
         }
 
         Ok(())

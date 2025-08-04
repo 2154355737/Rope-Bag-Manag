@@ -7,6 +7,7 @@ pub mod forbidden_word_repo; // 违禁词仓库
 pub mod email_verification_repo;
 pub mod subscription_repo;
 pub mod mail_repo; // 添加邮件仓库
+pub mod download_security_repo; // 添加下载安全仓库
 
 pub use user_repo::*;
 pub use package_repo::*;

@@ -400,7 +400,7 @@ const handleSubmitComment = async () => {
         post.value.comment_count++
       }
     } else {
-      ElMessage.error(response.message || '评论发表失败')
+              ElMessage.error(response.msg || response.message || '评论发表失败')
     }
   } catch (error) {
     console.error('发表评论失败:', error)
@@ -473,7 +473,7 @@ const deleteComment = async (commentId: number) => {
         post.value.comment_count--
       }
     } else {
-      ElMessage.error(response.message || '删除失败')
+              ElMessage.error(response.msg || response.message || '删除失败')
     }
   } catch (error) {
     console.error('删除评论失败:', error)

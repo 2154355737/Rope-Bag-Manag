@@ -53,6 +53,13 @@ export interface CommunitySettings {
   github_link: string | null
   qq_group: string | null
   wechat_group: string | null
+  // 新增主页配置字段
+  hero_title?: string
+  hero_subtitle?: string
+  homepage_sections?: string[]
+  resources_per_page?: number
+  posts_per_page?: number
+  default_sort?: string
 }
 
 // 更新社区设置请求
@@ -67,6 +74,13 @@ export interface UpdateCommunitySettingsRequest {
   github_link?: string
   qq_group?: string
   wechat_group?: string
+  // 新增主页配置字段
+  hero_title?: string
+  hero_subtitle?: string
+  homepage_sections?: string[]
+  resources_per_page?: number
+  posts_per_page?: number
+  default_sort?: string
 }
 
 export const settingsApi = {

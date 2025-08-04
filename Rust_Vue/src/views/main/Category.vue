@@ -130,6 +130,7 @@ import { ElMessage } from 'element-plus'
 import { categoryApi, type Category } from '@/api/categories'
 import { packageApi, type Package } from '@/api/packages'
 import { formatDate } from '@/utils/format'
+import { handleDownloadError } from '@/utils/downloadErrorHandler'
 
 const router = useRouter()
 
@@ -275,9 +276,8 @@ const downloadResource = async (id: number) => {
     } else {
       ElMessage.error('下载资源失败')
     }
-  } catch (error) {
-    console.error('下载资源错误:', error)
-    ElMessage.error('下载资源出错')
+  } catch (error: any) {
+    handleDownloadError(error, '下载资源失败')
   }
 }
 

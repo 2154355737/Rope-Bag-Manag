@@ -21,6 +21,9 @@ pub struct Package {
     pub reviewer_id: Option<i32>,      // 审核者ID
     pub reviewed_at: Option<DateTime<Utc>>, // 审核时间
     pub review_comment: Option<String>, // 审核备注
+    // 置顶和精华字段
+    pub is_pinned: bool,               // 是否置顶
+    pub is_featured: bool,             // 是否精华
     // 关联标签
     pub tags: Option<Vec<String>>, // 名称列表，避免循环引用
 }
@@ -49,6 +52,9 @@ pub struct CreatePackageRequest {
     pub category_id: Option<i32>,
     pub file_url: Option<String>,
     pub tags: Option<Vec<String>>, // 新增
+    // 置顶和精华字段
+    pub is_pinned: Option<bool>,
+    pub is_featured: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -60,6 +66,9 @@ pub struct UpdatePackageRequest {
     pub status: Option<PackageStatus>,
     pub file_url: Option<String>,
     pub tags: Option<Vec<String>>, // 新增
+    // 置顶和精华字段
+    pub is_pinned: Option<bool>,
+    pub is_featured: Option<bool>,
     // 审核相关字段
     pub reviewer_id: Option<i32>,
     pub reviewed_at: Option<DateTime<Utc>>,

@@ -12,5 +12,7 @@ pub mod http_email_service;
 pub mod optimized_smtp_service;
 pub mod post_service; // 添加帖子服务
 pub mod tag_service; // 添加标签服务
+pub mod download_security_service; // 添加下载安全服务
+pub mod security_action_service; // 添加安全操作服务
 
  

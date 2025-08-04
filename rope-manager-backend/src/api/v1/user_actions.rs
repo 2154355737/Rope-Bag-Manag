@@ -17,6 +17,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_action_stats))
             )
             .service(
+                web::resource("/community")
+                    .route(web::get().to(get_community_activities))
+            )
+            .service(
                 web::resource("/batch")
                     .route(web::delete().to(batch_delete_actions))
             )
@@ -75,13 +79,9 @@ async fn log_user_action(
     // 打印详细日志
     println!("开始记录用户行为");
     
-    // 从JWT中提取用户ID，访客用户使用特殊ID -1
-    let user_id_result = extract_user_id(&req);
-    println!("提取用户ID结果: {:?}", user_id_result);
-    
-    // 获取用户ID，访客用户使用-1作为特殊标识
-    let user_id = user_id_result.unwrap_or(-1);
-    println!("使用的用户ID: {}", user_id);
+    // 从JWT中提取用户ID，访客用户使用None
+    let user_id = extract_user_id(&req);
+    println!("使用的用户ID: {:?}", user_id);
     
     // 打印请求内容
     println!("请求内容: {:?}", action_req);
@@ -111,7 +111,7 @@ async fn log_user_action(
         user_agent,
     };
     
-    println!("准备创建用户行为记录: user_id={}, action_type={}", create_req.user_id, create_req.action_type);
+    println!("准备创建用户行为记录: user_id={:?}, action_type={}", create_req.user_id, create_req.action_type);
     
     // 记录用户行为
     match user_action_service.log_user_action(&create_req).await {
@@ -201,5 +201,36 @@ async fn get_action_stats(
             "code": 500,
             "message": e.to_string()
         })))
+    }
+}
+
+// 获取社区动态（包含用户信息）
+async fn get_community_activities(
+    query: web::Query<UserActionQueryParams>,
+    user_action_service: web::Data<UserActionService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    println!("[DEBUG] get_community_activities called with params: {:?}", query);
+    
+    match user_action_service.get_user_actions_with_user(&query).await {
+        Ok((actions, total)) => {
+            println!("[DEBUG] get_community_activities success: {} actions, total: {}", actions.len(), total);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "actions": actions,
+                    "total": total,
+                    "page": query.page.unwrap_or(1),
+                    "pageSize": query.page_size.unwrap_or(20),
+                }
+            })))
+        },
+        Err(e) => {
+            println!("[ERROR] get_community_activities failed: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": e.to_string()
+            })))
+        }
     }
 } 

@@ -90,6 +90,38 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // 修复packages表结构，添加缺失的字段
+    match conn.execute_batch(include_str!("../fix_packages_table.sql")) {
+        Ok(_) => info!("packages表结构修复成功"),
+        Err(e) => {
+            if e.to_string().contains("duplicate column name") || e.to_string().contains("already exists") {
+                info!("packages表字段已存在，跳过修复");
+            } else {
+                eprintln!("packages表结构修复失败: {}", e);
+            }
+        }
+    }
+
+    // 创建缺失的表（tags和package_tags）
+    match conn.execute_batch(include_str!("../create_missing_tables.sql")) {
+        Ok(_) => info!("缺失表创建成功"),
+        Err(e) => {
+            if e.to_string().contains("already exists") {
+                info!("所需表已存在，跳过创建");
+            } else {
+                eprintln!("缺失表创建失败: {}", e);
+            }
+        }
+    }
+
+    // 修复user_actions表结构，支持可选user_id
+    match conn.execute_batch(include_str!("../fix_user_actions_table.sql")) {
+        Ok(_) => info!("user_actions表结构修复成功"),
+        Err(e) => {
+            eprintln!("user_actions表结构修复失败: {}", e);
+        }
+    }
+
     // 检查并启用邮件服务（如果配置了有效的SMTP信息）
     match conn.prepare("SELECT username, password, enabled FROM mail_settings WHERE id = 1") {
         Ok(mut stmt) => {
@@ -169,11 +201,27 @@ async fn main() -> std::io::Result<()> {
         let user_service = services::user_service::UserService::new(
             user_repo.clone()
         );
+        // 初始化防刷量服务
+        let download_security_config = models::download_security::DownloadSecurityConfig::default();
+        let security_config = models::download_security::SecurityConfig::default();
+        
+        let security_action_service = services::security_action_service::SecurityActionService::new(
+            &db_url,
+            security_config
+        ).expect("创建安全操作服务失败");
+        
+        let download_security_service = services::download_security_service::DownloadSecurityService::new(
+            &db_url, 
+            download_security_config
+        ).expect("创建防刷量服务失败")
+        .with_security_action_service(security_action_service.clone());
+
         let package_service = services::package_service::PackageService::new(
             package_repo.clone(), upload_path.clone()
         ).with_system_repo(system_repo.clone())
         .with_notifier(subscription_repo.clone(), email_service.clone())
-        .with_user_repo(user_repo.clone());
+        .with_user_repo(user_repo.clone())
+        .with_download_security_service(&download_security_service);
         let admin_service = services::admin_service::AdminService::new(&db_url);
         let forbidden_word_service = services::forbidden_word_service::ForbiddenWordService::new(
             forbidden_word_repo.clone()
@@ -234,6 +282,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(package_repo))
             .app_data(web::Data::new(post_service))
             .app_data(web::Data::new(tag_service))
+            .app_data(web::Data::new(download_security_service))
+            .app_data(web::Data::new(security_action_service))
             .configure(api::configure_routes)  // 配置根级别API路由（包含health接口）
             .service(
                 web::scope("/uploads")

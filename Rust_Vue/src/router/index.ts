@@ -127,6 +127,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '社区设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
   },
   {
+    path: '/admin/homepage-settings',
+    component: () => import('../views/admin/HomepageSettings.vue'),
+    meta: { title: '主页设置', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
     path: '/admin/resource-review',
     component: () => import('../views/admin/ResourceReview.vue'),
     meta: { title: '资源审核', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
@@ -175,6 +180,16 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/subscriptions',
     component: () => import('../views/admin/SubscriptionManage.vue'),
     meta: { title: '订阅管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
+    path: '/admin/download-security',
+    component: () => import('../views/admin/DownloadSecurity.vue'),
+    meta: { title: '下载安全监控', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
+  },
+  {
+    path: '/admin/ip-ban',
+    component: () => import('../views/admin/IpBanManage.vue'),
+    meta: { title: 'IP封禁管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin'] }
   },
   {
     path: '/admin/tags',

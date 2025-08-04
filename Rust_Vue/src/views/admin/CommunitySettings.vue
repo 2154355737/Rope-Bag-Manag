@@ -218,6 +218,95 @@
           </div>
         </div>
       </el-card>
+
+      <!-- 主页显示配置 -->
+      <el-card shadow="never" style="margin-top: 20px;">
+        <template #header>
+          <div class="card-header">
+            <el-icon><Monitor /></el-icon>
+            <span>主页显示配置</span>
+          </div>
+        </template>
+        
+        <el-form
+          :model="settingsForm"
+          label-width="120px"
+          label-position="left"
+        >
+          <el-row :gutter="24">
+            <el-col :span="12">
+              <el-form-item label="首页主标题">
+                <el-input
+                  v-model="settingsForm.hero_title"
+                  placeholder="请输入首页主标题"
+                  clearable
+                  maxlength="50"
+                  show-word-limit
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="首页副标题">
+                <el-input
+                  v-model="settingsForm.hero_subtitle"
+                  placeholder="请输入首页副标题"
+                  clearable
+                  maxlength="100"
+                  show-word-limit
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-form-item label="主页布局选项">
+            <el-checkbox-group v-model="settingsForm.homepage_sections">
+              <el-checkbox label="hero_section">显示轮播横幅</el-checkbox>
+              <el-checkbox label="stats_section">显示统计数据</el-checkbox>
+              <el-checkbox label="popular_tags">显示热门标签</el-checkbox>
+              <el-checkbox label="recent_resources">显示最新资源</el-checkbox>
+              <el-checkbox label="community_posts">显示社区帖子</el-checkbox>
+              <el-checkbox label="announcements">显示公告栏</el-checkbox>
+            </el-checkbox-group>
+            <div class="form-tip">
+              选择在首页显示的内容模块
+            </div>
+          </el-form-item>
+
+          <el-row :gutter="24">
+            <el-col :span="12">
+              <el-form-item label="每页资源数量">
+                <el-input-number
+                  v-model="settingsForm.resources_per_page"
+                  :min="6"
+                  :max="50"
+                  :step="6"
+                  placeholder="每页显示的资源数量"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="每页帖子数量">
+                <el-input-number
+                  v-model="settingsForm.posts_per_page"
+                  :min="5"
+                  :max="30"
+                  :step="5"
+                  placeholder="每页显示的帖子数量"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-form-item label="默认排序方式">
+            <el-select v-model="settingsForm.default_sort" placeholder="选择默认排序方式">
+              <el-option label="最新上传" value="latest" />
+              <el-option label="最多下载" value="downloads" />
+              <el-option label="最多评论" value="comments" />
+              <el-option label="评分最高" value="rating" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </el-card>
     </div>
   </div>
 </template>
@@ -232,7 +321,8 @@ import {
   House, 
   Link, 
   DocumentCopy, 
-  View 
+  View,
+  Monitor
 } from '@element-plus/icons-vue'
 import { settingsApi, type CommunitySettings, type UpdateCommunitySettingsRequest } from '../../api/settings'
 
@@ -253,6 +343,13 @@ const settingsForm = reactive<CommunitySettings>({
   github_link: '',
   qq_group: '',
   wechat_group: '',
+  // 新增主页配置字段
+  hero_title: '绳包管理器',
+  hero_subtitle: '专业的资源管理与分享平台',
+  homepage_sections: ['hero_section', 'stats_section', 'popular_tags', 'recent_resources', 'community_posts', 'announcements'],
+  resources_per_page: 12,
+  posts_per_page: 10,
+  default_sort: 'latest'
 })
 
 // 原始数据（用于重置）
@@ -267,6 +364,13 @@ const originalSettings = reactive<CommunitySettings>({
   github_link: '',
   qq_group: '',
   wechat_group: '',
+  // 新增主页配置字段
+  hero_title: '',
+  hero_subtitle: '',
+  homepage_sections: [],
+  resources_per_page: 12,
+  posts_per_page: 10,
+  default_sort: 'latest'
 })
 
 // 表单验证规则
@@ -360,6 +464,24 @@ const saveSettings = async () => {
     }
     if (settingsForm.wechat_group !== originalSettings.wechat_group) {
       updateData.wechat_group = settingsForm.wechat_group || ''
+    }
+    if (settingsForm.hero_title !== originalSettings.hero_title) {
+      updateData.hero_title = settingsForm.hero_title
+    }
+    if (settingsForm.hero_subtitle !== originalSettings.hero_subtitle) {
+      updateData.hero_subtitle = settingsForm.hero_subtitle
+    }
+    if (JSON.stringify(settingsForm.homepage_sections) !== JSON.stringify(originalSettings.homepage_sections)) {
+      updateData.homepage_sections = settingsForm.homepage_sections
+    }
+    if (settingsForm.resources_per_page !== originalSettings.resources_per_page) {
+      updateData.resources_per_page = settingsForm.resources_per_page
+    }
+    if (settingsForm.posts_per_page !== originalSettings.posts_per_page) {
+      updateData.posts_per_page = settingsForm.posts_per_page
+    }
+    if (settingsForm.default_sort !== originalSettings.default_sort) {
+      updateData.default_sort = settingsForm.default_sort
     }
     
     if (Object.keys(updateData).length === 0) {

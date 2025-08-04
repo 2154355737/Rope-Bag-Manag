@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crate::repositories::user_action_repo::UserActionRepository;
 use crate::models::user_action::{
-    UserAction, CreateUserActionRequest, UserActionQueryParams, UserActionStats
+    UserAction, UserActionWithUser, CreateUserActionRequest, UserActionQueryParams, UserActionStats
 };
 
 #[derive(Clone)]
@@ -19,7 +19,12 @@ impl UserActionService {
         self.user_action_repo.create_user_action(req).await
     }
 
-    // 获取用户行为记录列表
+    // 获取用户行为记录列表（带用户信息）
+    pub async fn get_user_actions_with_user(&self, params: &UserActionQueryParams) -> Result<(Vec<UserActionWithUser>, i64)> {
+        self.user_action_repo.get_user_actions_with_user(params).await
+    }
+
+    // 获取用户行为记录列表（原方法，保持兼容性）
     pub async fn get_user_actions(&self, params: &UserActionQueryParams) -> Result<(Vec<UserAction>, i64)> {
         self.user_action_repo.get_user_actions(params).await
     }

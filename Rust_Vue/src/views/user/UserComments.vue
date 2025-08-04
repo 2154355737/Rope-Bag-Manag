@@ -83,7 +83,7 @@
                   <el-icon><Document /></el-icon>
                   <span class="resource-label">所属资源：</span>
                   <el-button 
-                    type="text" 
+                    link 
                     size="small" 
                     @click="$router.push(`/resource/${comment.target_id}`)"
                     class="resource-link"
@@ -94,7 +94,7 @@
               </div>
               <div class="comment-actions">
                 <el-button 
-                  type="text" 
+                  link 
                   size="small" 
                   icon="Edit" 
                   @click="openEditDialog(comment)"
@@ -103,7 +103,7 @@
                   编辑
                 </el-button>
                 <el-button 
-                  type="text" 
+                  link 
                   size="small" 
                   icon="Delete" 
                   @click="handleDelete(comment)"

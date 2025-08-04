@@ -105,7 +105,7 @@ async function onSubmit() {
       ElMessage.success('密码重置成功，请使用新密码登录')
       router.push('/login')
     } else {
-      ElMessage.error(response.message || '密码重置失败')
+              ElMessage.error(response.msg || response.message || '密码重置失败')
     }
   } catch (error: any) {
     console.error('密码重置失败:', error)

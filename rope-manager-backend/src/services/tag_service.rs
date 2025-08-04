@@ -22,6 +22,20 @@ impl TagService {
     pub async fn create_tag(&self, req: CreateTagRequest) -> SqliteResult<i32> {
         let conn = Connection::open(&self.db_path)?;
         
+        // 先检查标签名是否已存在
+        let existing_tag = conn.query_row(
+            "SELECT id FROM tags WHERE name = ?",
+            params![req.name],
+            |row| row.get::<_, i32>(0)
+        );
+        
+        if existing_tag.is_ok() {
+            return Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CONSTRAINT),
+                Some(format!("标签名称 '{}' 已存在", req.name))
+            ));
+        }
+        
         let now_str = Utc::now().to_rfc3339();
 
         conn.execute(
@@ -223,7 +237,8 @@ impl TagService {
         let conn = Connection::open(&self.db_path)?;
         
         let limit = limit.unwrap_or(10);
-        let sql = "SELECT id, name, description, color, use_count, created_at, updated_at FROM tags WHERE use_count > 0 ORDER BY use_count DESC LIMIT ?";
+        // 修改查询：如果没有使用次数大于0的标签，则返回所有标签
+        let sql = "SELECT id, name, description, color, use_count, created_at, updated_at FROM tags ORDER BY use_count DESC, created_at DESC LIMIT ?";
         
         let tags = conn.prepare(sql)?
             .query_map(params![limit], |row| {
@@ -264,4 +279,86 @@ impl TagService {
         
         Ok(tags)
     }
+
+    // 更新所有标签的使用次数 - 基于真实关联数据统计
+    pub async fn update_all_tag_counts(&self) -> SqliteResult<()> {
+        let conn = Connection::open(&self.db_path)?;
+        
+        // 检查 package_tags 表是否存在
+        let package_tags_exists = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='package_tags'")
+            .and_then(|mut stmt| stmt.exists([]))
+            .unwrap_or(false);
+        
+        // 根据表是否存在来构建不同的SQL
+        let sql = if package_tags_exists {
+            "UPDATE tags 
+             SET use_count = (
+                 COALESCE((
+                     SELECT COUNT(*) FROM post_tags WHERE tag_id = tags.id
+                 ), 0) + 
+                 COALESCE((
+                     SELECT COUNT(*) FROM package_tags WHERE tag_id = tags.id
+                 ), 0)
+             ),
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+        } else {
+            "UPDATE tags 
+             SET use_count = (
+                 COALESCE((
+                     SELECT COUNT(*) FROM post_tags WHERE tag_id = tags.id
+                 ), 0)
+             ),
+             updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+        };
+        
+        conn.execute(sql, [])?;
+        log::info!("已更新所有标签的使用次数");
+        
+        Ok(())
+    }
+
+    // 获取标签使用统计信息
+    pub async fn get_tag_usage_stats(&self) -> SqliteResult<TagUsageStats> {
+        let conn = Connection::open(&self.db_path)?;
+        
+        // 检查 package_tags 表是否存在
+        let package_tags_exists = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='package_tags'")
+            .and_then(|mut stmt| stmt.exists([]))
+            .unwrap_or(false);
+        
+        // 统计总体信息
+        let total_tags: i32 = conn.query_row("SELECT COUNT(*) FROM tags", [], |row| row.get(0))?;
+        let used_tags: i32 = conn.query_row("SELECT COUNT(*) FROM tags WHERE use_count > 0", [], |row| row.get(0))?;
+        let total_usage: i32 = conn.query_row("SELECT SUM(use_count) FROM tags", [], |row| row.get(0)).unwrap_or(0);
+        
+        // 统计帖子标签使用情况
+        let post_tag_usage: i32 = conn.query_row("SELECT COUNT(*) FROM post_tags", [], |row| row.get(0))?;
+        
+        // 统计资源包标签使用情况（如果表存在）
+        let package_tag_usage: i32 = if package_tags_exists {
+            conn.query_row("SELECT COUNT(*) FROM package_tags", [], |row| row.get(0)).unwrap_or(0)
+        } else {
+            0
+        };
+        
+        Ok(TagUsageStats {
+            total_tags,
+            used_tags,
+            unused_tags: total_tags - used_tags,
+            total_usage,
+            post_tag_usage,
+            package_tag_usage,
+        })
+    }
+}
+
+// 标签使用统计信息
+#[derive(Debug, serde::Serialize)]
+pub struct TagUsageStats {
+    pub total_tags: i32,        // 总标签数
+    pub used_tags: i32,         // 已使用标签数
+    pub unused_tags: i32,       // 未使用标签数
+    pub total_usage: i32,       // 总使用次数
+    pub post_tag_usage: i32,    // 帖子标签使用次数
+    pub package_tag_usage: i32, // 资源包标签使用次数
 } 

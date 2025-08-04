@@ -203,6 +203,120 @@
           </el-form>
         </div>
 
+        <!-- 首页配置 -->
+        <div class="setting-section">
+          <h3>首页显示配置</h3>
+          <el-form :model="settings.homepage_config" label-width="120px">
+            <el-form-item label="首页标题">
+              <el-input 
+                v-model="settings.homepage_config.hero_title" 
+                placeholder="请输入首页主标题"
+                maxlength="50"
+                show-word-limit
+              />
+            </el-form-item>
+            <el-form-item label="首页副标题">
+              <el-input 
+                v-model="settings.homepage_config.hero_subtitle" 
+                type="textarea"
+                :rows="2"
+                placeholder="请输入首页副标题"
+                maxlength="200"
+                show-word-limit
+              />
+            </el-form-item>
+            <el-form-item label="显示统计数据">
+              <el-switch v-model="settings.homepage_config.show_stats" />
+              <span class="config-desc">在首页显示用户、资源等统计数据</span>
+            </el-form-item>
+            <el-form-item label="显示热门标签">
+              <el-switch v-model="settings.homepage_config.show_popular_tags" />
+              <span class="config-desc">在首页显示热门标签</span>
+            </el-form-item>
+            <el-form-item label="显示最新资源">
+              <el-switch v-model="settings.homepage_config.show_recent_resources" />
+              <span class="config-desc">在首页显示最新上传的资源</span>
+            </el-form-item>
+            <el-form-item label="显示社区帖子">
+              <el-switch v-model="settings.homepage_config.show_community_posts" />
+              <span class="config-desc">在首页显示社区讨论帖子</span>
+            </el-form-item>
+            <el-form-item label="每页显示数量">
+              <el-input-number 
+                v-model="settings.homepage_config.items_per_page" 
+                :min="6" 
+                :max="50" 
+                placeholder="每页显示的资源数量"
+              />
+              <span class="config-desc">首页每页显示的资源数量</span>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 页脚配置 -->
+        <div class="setting-section">
+          <h3>页脚配置</h3>
+          <el-form :model="settings.footer_config" label-width="120px">
+            <el-form-item label="版权信息">
+              <el-input 
+                v-model="settings.footer_config.copyright_text" 
+                placeholder="© 2024 绳包管理器. All rights reserved."
+                maxlength="100"
+                show-word-limit
+              />
+            </el-form-item>
+            <el-form-item label="备案号">
+              <el-input 
+                v-model="settings.footer_config.icp_number" 
+                placeholder="请输入ICP备案号"
+                maxlength="50"
+              />
+            </el-form-item>
+            <el-form-item label="显示友情链接">
+              <el-switch v-model="settings.footer_config.show_links" />
+              <span class="config-desc">在页脚显示友情链接</span>
+            </el-form-item>
+            <el-form-item label="显示统计信息">
+              <el-switch v-model="settings.footer_config.show_stats" />
+              <span class="config-desc">在页脚显示网站统计信息</span>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- SEO配置 -->
+        <div class="setting-section">
+          <h3>SEO配置</h3>
+          <el-form :model="settings.seo_config" label-width="120px">
+            <el-form-item label="网站关键词">
+              <el-input 
+                v-model="settings.seo_config.keywords" 
+                type="textarea"
+                :rows="2"
+                placeholder="请输入网站关键词，用逗号分隔"
+                maxlength="200"
+                show-word-limit
+              />
+            </el-form-item>
+            <el-form-item label="网站描述">
+              <el-input 
+                v-model="settings.seo_config.description" 
+                type="textarea"
+                :rows="3"
+                placeholder="请输入网站描述"
+                maxlength="300"
+                show-word-limit
+              />
+            </el-form-item>
+            <el-form-item label="作者信息">
+              <el-input 
+                v-model="settings.seo_config.author" 
+                placeholder="请输入网站作者"
+                maxlength="50"
+              />
+            </el-form-item>
+          </el-form>
+        </div>
+
         <!-- 操作按钮 -->
         <div class="setting-actions">
           <el-button type="primary" @click="saveSettings" :loading="saving">
@@ -248,6 +362,26 @@ const settings = reactive({
     start_time: '',
     end_time: '',
     priority: 5
+  },
+  homepage_config: {
+    hero_title: '绳包管理器',
+    hero_subtitle: '专业的资源管理与分享平台',
+    show_stats: true,
+    show_popular_tags: true,
+    show_recent_resources: true,
+    show_community_posts: true,
+    items_per_page: 12
+  },
+  footer_config: {
+    copyright_text: '© 2024 绳包管理器. All rights reserved.',
+    icp_number: '',
+    show_links: true,
+    show_stats: true
+  },
+  seo_config: {
+    keywords: '绳包管理器,资源管理,文件分享,社区',
+    description: '绳包管理器是一个专业的资源管理与分享平台，提供便捷的文件管理和社区交流功能。',
+    author: '绳包管理器团队'
   }
 })
 
@@ -291,6 +425,94 @@ async function loadSettings() {
         }
       }
     })
+
+    // 加载首页配置
+    const homepagePromises = [
+      settingsApi.getSetting('hero_title'),
+      settingsApi.getSetting('hero_subtitle'),
+      settingsApi.getSetting('show_stats'),
+      settingsApi.getSetting('show_popular_tags'),
+      settingsApi.getSetting('show_recent_resources'),
+      settingsApi.getSetting('show_community_posts'),
+      settingsApi.getSetting('items_per_page')
+    ]
+    
+    const homepageResults = await Promise.all(homepagePromises)
+    
+    homepageResults.forEach(result => {
+      if (result.code === 0 && result.data) {
+        const key = result.data.key
+        const value = result.data.value
+        
+        // 处理不同类型的值
+        if (key === 'hero_title') {
+          settings.homepage_config.hero_title = value
+        } else if (key === 'hero_subtitle') {
+          settings.homepage_config.hero_subtitle = value
+        } else if (key === 'show_stats') {
+          settings.homepage_config.show_stats = value === 'true'
+        } else if (key === 'show_popular_tags') {
+          settings.homepage_config.show_popular_tags = value === 'true'
+        } else if (key === 'show_recent_resources') {
+          settings.homepage_config.show_recent_resources = value === 'true'
+        } else if (key === 'show_community_posts') {
+          settings.homepage_config.show_community_posts = value === 'true'
+        } else if (key === 'items_per_page') {
+          settings.homepage_config.items_per_page = parseInt(value) || 12
+        }
+      }
+    })
+
+    // 加载页脚配置
+    const footerPromises = [
+      settingsApi.getSetting('copyright_text'),
+      settingsApi.getSetting('icp_number'),
+      settingsApi.getSetting('footer_show_links'),
+      settingsApi.getSetting('footer_show_stats')
+    ]
+    
+    const footerResults = await Promise.all(footerPromises)
+    
+    footerResults.forEach(result => {
+      if (result.code === 0 && result.data) {
+        const key = result.data.key
+        const value = result.data.value
+        
+        if (key === 'copyright_text') {
+          settings.footer_config.copyright_text = value
+        } else if (key === 'icp_number') {
+          settings.footer_config.icp_number = value
+        } else if (key === 'footer_show_links') {
+          settings.footer_config.show_links = value === 'true'
+        } else if (key === 'footer_show_stats') {
+          settings.footer_config.show_stats = value === 'true'
+        }
+      }
+    })
+
+    // 加载SEO配置
+    const seoPromises = [
+      settingsApi.getSetting('seo_keywords'),
+      settingsApi.getSetting('seo_description'),
+      settingsApi.getSetting('seo_author')
+    ]
+    
+    const seoResults = await Promise.all(seoPromises)
+    
+    seoResults.forEach(result => {
+      if (result.code === 0 && result.data) {
+        const key = result.data.key
+        const value = result.data.value
+        
+        if (key === 'seo_keywords') {
+          settings.seo_config.keywords = value
+        } else if (key === 'seo_description') {
+          settings.seo_config.description = value
+        } else if (key === 'seo_author') {
+          settings.seo_config.author = value
+        }
+      }
+    })
   } catch (error) {
     console.error('加载设置失败:', error)
     ElMessage.error('加载设置失败')
@@ -316,13 +538,33 @@ async function saveSettings() {
         settingsApi.updateSetting('enable_registration', settings.feature_flags.enable_registration),
         settingsApi.updateSetting('enable_community', settings.feature_flags.enable_community),
         settingsApi.updateSetting('enable_upload', settings.feature_flags.enable_upload),
-        settingsApi.updateSetting('enable_comments', settings.feature_flags.enable_comments)
+        settingsApi.updateSetting('enable_comments', settings.feature_flags.enable_comments),
+        
+        // 首页配置
+        settingsApi.updateSetting('hero_title', settings.homepage_config.hero_title),
+        settingsApi.updateSetting('hero_subtitle', settings.homepage_config.hero_subtitle),
+        settingsApi.updateSetting('show_stats', settings.homepage_config.show_stats),
+        settingsApi.updateSetting('show_popular_tags', settings.homepage_config.show_popular_tags),
+        settingsApi.updateSetting('show_recent_resources', settings.homepage_config.show_recent_resources),
+        settingsApi.updateSetting('show_community_posts', settings.homepage_config.show_community_posts),
+        settingsApi.updateSetting('items_per_page', settings.homepage_config.items_per_page),
+        
+        // 页脚配置
+        settingsApi.updateSetting('copyright_text', settings.footer_config.copyright_text),
+        settingsApi.updateSetting('icp_number', settings.footer_config.icp_number),
+        settingsApi.updateSetting('footer_show_links', settings.footer_config.show_links),
+        settingsApi.updateSetting('footer_show_stats', settings.footer_config.show_stats),
+        
+        // SEO配置
+        settingsApi.updateSetting('seo_keywords', settings.seo_config.keywords),
+        settingsApi.updateSetting('seo_description', settings.seo_config.description),
+        settingsApi.updateSetting('seo_author', settings.seo_config.author)
       ]
       
       await Promise.all(promises)
       ElMessage.success('设置保存成功')
     } else {
-      ElMessage.error(themeResponse.message || '保存失败')
+              ElMessage.error(themeResponse.msg || themeResponse.message || '保存失败')
     }
   } catch (error) {
     console.error('保存设置失败:', error)
@@ -349,7 +591,7 @@ function resetSettings() {
         // 重新加载设置
         loadSettings()
       } else {
-        ElMessage.error(response.message || '重置失败')
+        ElMessage.error(response.msg || response.message || '重置失败')
       }
     } catch (error) {
       console.error('重置设置失败:', error)

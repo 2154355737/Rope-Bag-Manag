@@ -1641,3 +1641,8 @@
 2025/08/02 01:09:14 [error] 21828#5672: *160 CreateFile() "D:\vue\zhiyuanshequ\rust\nginx-1.28.0/html/50x.html" failed (2: The system cannot find the file specified), client: 127.0.0.1, server: localhost, request: "POST /api/v1/auth/login HTTP/1.1", upstream: "http://127.0.0.1:15201/api/v1/auth/login", host: "localhost", referrer: "http://localhost/login"
 2025/08/02 13:08:31 [notice] 20840#27876: signal process started
 2025/08/02 13:08:31 [error] 20840#27876: OpenEvent("Global\ngx_quit_1596") failed (2: The system cannot find the file specified)
+2025/08/02 13:55:38 [notice] 30024#11792: signal process started
+2025/08/02 14:11:54 [notice] 30540#3636: signal process started
+2025/08/02 14:17:39 [notice] 27772#28604: signal process started
+2025/08/02 14:53:18 [notice] 29400#6532: signal process started
+2025/08/02 14:53:18 [error] 29400#6532: OpenEvent("Global\ngx_quit_30728") failed (2: The system cannot find the file specified)

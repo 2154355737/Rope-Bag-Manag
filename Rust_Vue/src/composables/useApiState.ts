@@ -1,5 +1,5 @@
-import { reactive, ref } from 'vue'
-import type { ApiResponse } from '../types'
+import { reactive } from 'vue'
+import type { ApiResponse } from '../api/types'
 
 export interface ApiState<T> {
   data: T | null
@@ -23,7 +23,8 @@ export function useApiState<T>() {
       if (response.code === 0) {
         state.data = (response.data || null) as any
       } else {
-        state.error = response.msg || '请求失败'
+        // 兼容处理：优先使用msg，fallback到message
+        state.error = response.msg || response.message || '请求失败'
       }
     } catch (error) {
       state.error = error instanceof Error ? error.message : '未知错误'
@@ -65,12 +66,8 @@ export function useCache() {
     })
   }
 
-  const clear = (key?: string) => {
-    if (key) {
-      cache.delete(key)
-    } else {
-      cache.clear()
-    }
+  const clear = () => {
+    cache.clear()
   }
 
   return { get, set, clear }
@@ -88,10 +85,9 @@ export function useErrorHandler() {
       message = error
     } else if (error?.message) {
       message = error.message
+    } else if (error?.msg) {
+      message = error.msg
     }
-    
-    // 这里可以集成Element Plus的消息提示
-    // ElMessage.error(message)
     
     return message
   }
@@ -104,7 +100,7 @@ export interface PaginationState {
   currentPage: number
   pageSize: number
   total: number
-  loading: boolean
+  totalPages: number
 }
 
 export function usePagination(initialPageSize: number = 10) {

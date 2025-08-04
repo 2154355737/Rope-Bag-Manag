@@ -356,9 +356,9 @@ function handleLoginSuccess(response: any, identifier: string) {
       
       // 延迟跳转，确保认证状态完全更新且避免路由守卫时序问题
       setTimeout(() => {
-        // 记录用户登录行为（暂时禁用，避免401错误）
-        // userActionService.logLogin(identifier, true)
-        //   .catch(err => console.error('记录登录行为失败:', err))
+        // 记录用户登录行为
+        userActionService.logLogin(identifier, true)
+          .catch(err => console.error('记录登录行为失败:', err))
         
         // 跳转到对应后台
       if (user?.role === 'admin') {
@@ -392,11 +392,11 @@ async function handleLogin() {
       handleLoginSuccess(response, loginForm.username)
       return
     } else {
-      // 记录登录失败行为（暂时禁用，避免401错误）
-      // userActionService.logLogin(loginForm.username, false, response.message)
-      //   .catch(err => console.error('记录登录失败行为失败:', err))
+      // 记录登录失败行为
+      userActionService.logLogin(loginForm.username, false, response.message)
+        .catch(err => console.error('记录登录失败行为失败:', err))
         
-      ElMessage.error(response.message || '登录失败，请检查用户名和密码')
+      ElMessage.error(response.msg || response.message || '登录失败，请检查用户名和密码')
     }
   } catch (error: any) {
     console.error('登录失败:', error)

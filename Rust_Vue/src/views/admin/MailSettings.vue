@@ -153,7 +153,7 @@ async function saveSettings() {
     if (response.code === 0) {
       ElMessage.success('邮件配置保存成功')
     } else {
-      ElMessage.error(response.message || '保存失败')
+              ElMessage.error(response.msg || response.message || '保存失败')
     }
   } catch (error: any) {
     ElMessage.error('保存失败：' + (error.message || '未知错误'))
@@ -180,7 +180,7 @@ async function sendTestEmail() {
     if (response.code === 0) {
       ElMessage.success('测试邮件发送成功，请检查邮箱')
     } else {
-      ElMessage.error(response.message || '发送失败')
+              ElMessage.error(response.msg || response.message || '发送失败')
     }
   } catch (error: any) {
     ElMessage.error('发送失败：' + (error.message || '未知错误'))

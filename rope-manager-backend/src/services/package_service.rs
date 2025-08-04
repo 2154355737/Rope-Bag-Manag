@@ -6,6 +6,8 @@ use crate::utils::file::FileUtils;
 use chrono::Utc;
 use crate::repositories::subscription_repo::SubscriptionRepository;
 use crate::services::email_service::EmailService;
+use crate::services::download_security_service::DownloadSecurityService;
+use crate::models::download_security::DownloadSecurityConfig;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -17,6 +19,7 @@ pub struct PackageService {
     subscription_repo: Option<SubscriptionRepository>,
     email_service: Option<Arc<RwLock<EmailService>>>,
     user_repo: Option<crate::repositories::UserRepository>,
+    download_security_service: Option<DownloadSecurityService>,
 }
 
 impl PackageService {
@@ -28,6 +31,7 @@ impl PackageService {
             subscription_repo: None,
             email_service: None,
             user_repo: None,
+            download_security_service: None,
         }
     }
 
@@ -45,6 +49,11 @@ impl PackageService {
 
     pub fn with_user_repo(mut self, user_repo: crate::repositories::UserRepository) -> Self {
         self.user_repo = Some(user_repo);
+        self
+    }
+
+    pub fn with_download_security_service(mut self, security_service: &DownloadSecurityService) -> Self {
+        self.download_security_service = Some(security_service.clone());
         self
     }
 
@@ -81,6 +90,8 @@ impl PackageService {
             reviewer_id: None,
             reviewed_at: None,
             review_comment: None,
+            is_pinned: req.is_pinned.unwrap_or(false),
+            is_featured: req.is_featured.unwrap_or(false),
             tags: req.tags.clone(),
         };
 
@@ -157,6 +168,8 @@ impl PackageService {
             reviewer_id: req.reviewer_id.or(package.reviewer_id),
             reviewed_at: req.reviewed_at.or(package.reviewed_at),
             review_comment: req.review_comment.clone().or(package.review_comment),
+            is_pinned: req.is_pinned.unwrap_or(package.is_pinned),
+            is_featured: req.is_featured.unwrap_or(package.is_featured),
             tags: req.tags.clone().or(package.tags),
         };
 
@@ -247,6 +260,70 @@ impl PackageService {
         let exists = self.package_repo.check_package_exists(package_id).await?;
         if !exists {
             return Err(anyhow::anyhow!("绳包不存在"));
+        }
+        
+        // 获取文件URL
+        let file_url = self.package_repo.get_package_file_url(package_id).await?;
+        
+        // 增加下载次数
+        self.package_repo.increment_download_count(package_id).await?;
+        
+        // 记录资源下载操作
+        if let Some(system_repo) = &self.system_repo {
+            // 创建资源记录请求
+            let record = CreateResourceRecordRequest {
+                resource_id: package_id,
+                resource_type: "Package".to_string(),
+                action: "Download".to_string(),
+                old_data: None,
+                new_data: None,
+            };
+            
+            // 使用系统仓库记录操作
+            if let Err(e) = system_repo.log_resource_action(&record, 1).await {
+                log::error!("记录资源下载操作失败: {}", e);
+            } else {
+                log::info!("成功记录资源下载操作: Package ID={}", package_id);
+            }
+        }
+
+        Ok(file_url)
+    }
+
+    // 新增方法：带安全检测的下载
+    pub async fn download_package_with_security(
+        &self, 
+        package_id: i32, 
+        user_id: Option<i32>, 
+        ip_address: &str, 
+        user_agent: Option<&str>
+    ) -> Result<String> {
+        // 首先检查包是否存在
+        let exists = self.package_repo.check_package_exists(package_id).await?;
+        if !exists {
+            return Err(anyhow::anyhow!("绳包不存在"));
+        }
+
+        // 防刷量检测
+        if let Some(security_service) = &self.download_security_service {
+            let check_result = security_service.check_download_allowed(
+                user_id, 
+                package_id, 
+                ip_address, 
+                user_agent
+            ).await?;
+
+            if !check_result.is_allowed {
+                return Err(anyhow::anyhow!(
+                    "下载被阻止: {}", 
+                    check_result.reason.unwrap_or_else(|| "安全检测未通过".to_string())
+                ));
+            }
+
+            // 记录下载行为
+            if let Err(e) = security_service.record_download(user_id, package_id, ip_address, user_agent).await {
+                log::error!("记录下载行为失败: {}", e);
+            }
         }
         
         // 获取文件URL

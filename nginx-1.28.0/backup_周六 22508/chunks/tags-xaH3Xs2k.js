@@ -1,0 +1,1 @@
+import{a}from"../assets/index-BYq8Q9FJ.js";const g=t=>a.get("/v1/tags",{params:t}),r=t=>a.post("/v1/tags",t),n=(t,s)=>a.put(`/v1/tags/${t}`,s),o=t=>a.delete(`/v1/tags/${t}`),u=()=>a.get("/v1/tags/popular"),p=()=>a.get("/v1/tags/all");export{p as a,g as b,r as c,o as d,u as g,n as u};

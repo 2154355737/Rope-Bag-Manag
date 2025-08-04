@@ -51,7 +51,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="addDialogVisible = false">取消</el-button>
+        <el-button @click="cancelAdd">取消</el-button>
         <el-button type="primary" @click="handleAdd">确定</el-button>
       </template>
     </el-dialog>
@@ -70,7 +70,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button @click="cancelEdit">取消</el-button>
         <el-button type="primary" @click="handleUpdate">保存</el-button>
       </template>
     </el-dialog>
@@ -99,12 +99,8 @@ const loadTags = async () => {
 
     console.log('🔍 [TagManage] API响应:', res)
 
-    // 检查是否有嵌套的data结构（axios包装的响应）
-    const apiData = (res as any).data || res
-    console.log('🔍 [TagManage] 实际API数据:', apiData)
-
-    if ((apiData as any).code === 0 && (apiData as any).data) {
-      const tagsList = Array.isArray((apiData as any).data) ? (apiData as any).data : (apiData as any).data.list || []
+    if (res.code === 0 && res.data) {
+      const tagsList = Array.isArray(res.data) ? res.data : res.data.list || []
       console.log('🔍 [TagManage] 解析后的标签列表:', tagsList)
       tags.value = tagsList
       
@@ -112,8 +108,8 @@ const loadTags = async () => {
         console.warn('⚠️ [TagManage] 标签列表为空')
       }
     } else {
-      console.error('❌ [TagManage] API返回错误:', apiData)
-      ElMessage.error((apiData as any).msg || '获取标签失败')
+      console.error('❌ [TagManage] API返回错误:', res)
+      ElMessage.error(res.msg || res.message || '获取标签失败')
     }
   } catch (error) {
     console.error('❌ [TagManage] 请求异常:', error)
@@ -139,29 +135,88 @@ const newTag = ref<CreateTagRequest>({ name: '', description: '', color: '' })
 const addFormRef = ref()
 
 const rules = {
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }]
+  name: [
+    { required: true, message: '请输入名称', trigger: 'blur' },
+    { min: 2, max: 20, message: '标签名称长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
+  color: [
+    { 
+      validator: (rule: any, value: string, callback: Function) => {
+        if (!value || value.trim() === '') {
+          // 空值允许
+          callback()
+        } else if (!/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(value)) {
+          callback(new Error('请输入有效的颜色值，如 #409EFF'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur' 
+    }
+  ]
 }
 
 const showAddDialog = () => {
   newTag.value = { name: '', description: '', color: '' }
   addDialogVisible.value = true
+  // 重置表单验证状态
+  if (addFormRef.value) {
+    addFormRef.value.clearValidate()
+  }
+}
+
+const cancelAdd = () => {
+  addDialogVisible.value = false
+  // 重置表单数据和验证状态
+  newTag.value = { name: '', description: '', color: '' }
+  if (addFormRef.value) {
+    addFormRef.value.resetFields()
+    addFormRef.value.clearValidate()
+  }
 }
 
 const handleAdd = async () => {
   if (!addFormRef.value) return
-  await addFormRef.value.validate()
+  
   try {
-    const res = await tagApi.createTag(newTag.value)
+    // 表单验证
+    await addFormRef.value.validate()
+  } catch (error) {
+    // 验证失败，直接返回
+    return
+  }
+  
+  try {
+    // 处理空颜色值
+    const tagData = { ...newTag.value }
+    if (!tagData.color || tagData.color.trim() === '') {
+      tagData.color = undefined
+    }
+    
+    const res = await tagApi.createTag(tagData)
+    console.log('🚀 [TagManage] 创建标签API响应:', res)
+    
     if (res.code === 0) {
       ElMessage.success('创建成功')
       addDialogVisible.value = false
-      loadTags()
+      await loadTags() // 确保等待加载完成
+      // 重置表单
+      newTag.value = { name: '', description: '', color: '' }
+      addFormRef.value.resetFields()
     } else {
-      ElMessage.error(res.msg || '创建失败')
+      ElMessage.error(res.msg || res.message || '创建失败')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('创建标签失败', error)
-    ElMessage.error('创建失败')
+    
+    // 检查是否是400错误（重复名称等业务错误）
+    if (error.response?.status === 400 && error.response?.data?.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.response?.data?.msg) {
+      ElMessage.error(error.response.data.msg)  
+    } else {
+      ElMessage.error('创建失败')
+    }
   }
 }
 
@@ -173,24 +228,59 @@ const editFormRef = ref()
 const editTag = (row: Tag) => {
   editTagData.value = { ...row }
   editDialogVisible.value = true
+  // 重置表单验证状态
+  if (editFormRef.value) {
+    editFormRef.value.clearValidate()
+  }
+}
+
+const cancelEdit = () => {
+  editDialogVisible.value = false
+  // 重置表单验证状态
+  if (editFormRef.value) {
+    editFormRef.value.clearValidate()
+  }
 }
 
 const handleUpdate = async () => {
   if (!editFormRef.value) return
-  await editFormRef.value.validate()
+  
+  try {
+    // 表单验证
+    await editFormRef.value.validate()
+  } catch (error) {
+    // 验证失败，直接返回
+    return
+  }
+  
   try {
     const { id, ...data } = editTagData.value
+    // 处理空颜色值
+    if (!data.color || data.color.trim() === '') {
+      data.color = undefined
+    }
+    
     const res = await tagApi.updateTag(id, data)
+    console.log('🚀 [TagManage] 更新标签API响应:', res)
+    
     if (res.code === 0) {
       ElMessage.success('更新成功')
       editDialogVisible.value = false
-      loadTags()
+      await loadTags() // 确保等待加载完成
     } else {
-      ElMessage.error(res.msg || '更新失败')
+      ElMessage.error(res.msg || res.message || '更新失败')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('更新标签失败', error)
-    ElMessage.error('更新失败')
+    
+    // 检查是否是400错误（重复名称等业务错误）
+    if (error.response?.status === 400 && error.response?.data?.msg) {
+      ElMessage.error(error.response.data.msg)
+    } else if (error.response?.data?.msg) {
+      ElMessage.error(error.response.data.msg)  
+    } else {
+      ElMessage.error('更新失败')
+    }
   }
 }
 
@@ -198,15 +288,30 @@ const handleUpdate = async () => {
 const deleteTag = (row: Tag) => {
   ElMessageBox.confirm(`确定删除标签 "${row.name}" ?`, '提示', { type: 'warning' })
     .then(async () => {
-      const res = await tagApi.deleteTag(row.id)
-      if (res.code === 0) {
-        ElMessage.success('删除成功')
-        loadTags()
-      } else {
-        ElMessage.error(res.msg || '删除失败')
+      try {
+        const res = await tagApi.deleteTag(row.id)
+        console.log('🚀 [TagManage] 删除标签API响应:', res)
+        
+        if (res.code === 0) {
+          ElMessage.success('删除成功')
+          await loadTags() // 确保等待加载完成
+        } else {
+          ElMessage.error(res.msg || res.message || '删除失败')
+        }
+      } catch (error: any) {
+        console.error('删除标签失败', error)
+        
+        // 检查是否是400错误（业务错误）
+        if (error.response?.status === 400 && error.response?.data?.msg) {
+          ElMessage.error(error.response.data.msg)
+        } else if (error.response?.data?.msg) {
+          ElMessage.error(error.response.data.msg)  
+        } else {
+          ElMessage.error('删除失败')
+        }
       }
     })
-    .catch(() => {})
+    .catch(() => {}) // 用户取消删除
 }
 </script>
 

@@ -60,7 +60,8 @@ import {
   UserFilled,
   DocumentChecked,
   Message, // 新增订阅管理图标
-  Tickets // 新增标签图标
+  Tickets, // 新增标签图标
+  Lock // 新增IP封禁图标
 } from '@element-plus/icons-vue'
 import { databaseExport } from '../../utils/sqliteExport'
 
@@ -96,12 +97,13 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin/announcements', title: '公告管理', icon: 'Bell', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0, roles: ['admin'] },
   { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
-  { path: '/admin/theme-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] },
-  { path: '/admin/community-settings', title: '社区设置', icon: 'House', badge: 0, roles: ['admin'] },
+  { path: '/admin/homepage-settings', title: '主页设置', icon: 'Setting', badge: 0, roles: ['admin'] },
   { path: '/admin/posts', title: '帖子管理', icon: 'ChatDotRound', badge: 0, roles: ['admin', 'elder'] },
   { path: '/admin/tags', title: '标签管理', icon: 'Tickets', badge: 0, roles: ['admin', 'elder'] },
   { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] },
-  { path: '/admin/subscriptions', title: '订阅管理', icon: 'Message', badge: 0, roles: ['admin'] }
+  { path: '/admin/subscriptions', title: '订阅管理', icon: 'Message', badge: 0, roles: ['admin'] },
+  { path: '/admin/download-security', title: '下载安全监控', icon: 'Monitor', badge: 0, roles: ['admin'] },
+  { path: '/admin/ip-ban', title: 'IP封禁管理', icon: 'Lock', badge: 0, roles: ['admin'] }
 ]
 const menuItems = ref<MenuItem[]>([])
 
@@ -121,7 +123,8 @@ const iconComponents: Record<string, any> = {
   UserFilled,
   DocumentChecked,
   Message,
-  Tickets
+  Tickets,
+  Lock
 }
 
 // 例如在按钮点击事件中调用

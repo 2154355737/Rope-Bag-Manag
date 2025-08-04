@@ -354,7 +354,8 @@ impl UserRepository {
         let mut stmt = conn.prepare(
             "SELECT id, name, author, version, description, file_url, file_size, 
                     download_count, like_count, favorite_count, category_id, status, 
-                    created_at, updated_at, reviewer_id, reviewed_at, review_comment 
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment,
+                    is_pinned, is_featured 
              FROM packages WHERE author = ? ORDER BY created_at DESC"
         )?;
 
@@ -384,6 +385,8 @@ impl UserRepository {
                 reviewer_id: row.get(14)?,
                 reviewed_at: row.get(15)?,
                 review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
                 tags: None, // 用户仓库中暂时不处理标签
             })
         })?

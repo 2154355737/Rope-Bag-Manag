@@ -1,8 +1,9 @@
-// API响应类型定义
+// API响应类型定义 - 统一类型，兼容后端返回的message字段和前端期望的msg字段
 export interface ApiResponse<T = any> {
   code: number
-  msg: string
-  data: T
+  message?: string  // 后端返回的字段
+  msg?: string      // 前端期望的字段，会在拦截器中自动映射
+  data?: T
 }
 
 // 分页响应类型

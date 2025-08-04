@@ -8,6 +8,18 @@ default-run = "rope-manager-backend"
 name = "check_db_schema"
 path = "check_db_schema.rs"
 
+[[bin]]
+name = "update_tag_counts"
+path = "update_tag_counts.rs"
+
+[[bin]]
+name = "patch_database"
+path = "patch_database.rs"
+
+[[bin]]
+name = "check_db_structure"
+path = "check_db_structure.rs"
+
 [dependencies]
 # Web框架
 actix-web = "4.4"
@@ -87,8 +99,12 @@ name = "fix_tags_table"
 path = "fix_tags_table.rs"
 
 [[bin]]
-name = "test_tags_api"
-path = "test_tags_api.rs"
+name = "test_ip_bans"
+path = "test_ip_bans.rs"
+
+
+
+
 
 
 

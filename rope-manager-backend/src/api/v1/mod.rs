@@ -13,6 +13,8 @@ pub mod subscription;
 pub mod post;
 pub mod feed;
 pub mod tag;
+pub mod download_security;
+pub mod security_management;
 
 use actix_web::web;
 
@@ -32,5 +34,7 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(subscription::configure_routes)
         .configure(post::configure_routes)
         .configure(feed::configure_routes)
-        .configure(tag::configure_routes);
+        .configure(tag::configure_routes)
+        .configure(download_security::configure_routes)
+        .configure(security_management::configure_routes);
 } 

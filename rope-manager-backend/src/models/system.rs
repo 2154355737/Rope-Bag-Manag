@@ -109,6 +109,13 @@ pub struct CommunitySettings {
     pub github_link: Option<String>,
     pub qq_group: Option<String>,
     pub wechat_group: Option<String>,
+    // 新增主页配置字段
+    pub hero_title: Option<String>,
+    pub hero_subtitle: Option<String>,
+    pub homepage_sections: Option<Vec<String>>,
+    pub resources_per_page: Option<i32>,
+    pub posts_per_page: Option<i32>,
+    pub default_sort: Option<String>,
 }
 
 impl Default for CommunitySettings {
@@ -124,6 +131,20 @@ impl Default for CommunitySettings {
             github_link: None,
             qq_group: None,
             wechat_group: None,
+            // 新增主页配置字段的默认值
+            hero_title: Some("绳包管理器".to_string()),
+            hero_subtitle: Some("专业的资源管理与分享平台".to_string()),
+            homepage_sections: Some(vec![
+                "hero_section".to_string(),
+                "stats_section".to_string(),
+                "popular_tags".to_string(),
+                "recent_resources".to_string(),
+                "community_posts".to_string(),
+                "announcements".to_string()
+            ]),
+            resources_per_page: Some(12),
+            posts_per_page: Some(10),
+            default_sort: Some("latest".to_string()),
         }
     }
 }
@@ -140,4 +161,11 @@ pub struct UpdateCommunitySettingsRequest {
     pub github_link: Option<String>,
     pub qq_group: Option<String>,
     pub wechat_group: Option<String>,
+    // 新增主页配置字段
+    pub hero_title: Option<String>,
+    pub hero_subtitle: Option<String>,
+    pub homepage_sections: Option<Vec<String>>,
+    pub resources_per_page: Option<i32>,
+    pub posts_per_page: Option<i32>,
+    pub default_sort: Option<String>,
 } 

@@ -50,7 +50,7 @@
       <template #header>
         <div class="card-header">
           <h3>资源订阅</h3>
-          <el-button type="text" size="small" @click="loadCategories">刷新</el-button>
+          <el-button link size="small" @click="loadCategories">刷新</el-button>
         </div>
       </template>
       

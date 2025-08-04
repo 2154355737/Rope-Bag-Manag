@@ -6,11 +6,10 @@ if (typeof window !== 'undefined') {
   (window as any).lastUserInfoValid = false
 }
 
-function isReallyAuthenticated(): boolean {
-  const token = getToken()
-  const userInfo = getUserInfo()
-  // 只有token存在、userInfo存在且lastUserInfoValid为true才算真正认证
-  return !!token && !!userInfo && !!userInfo.username && (typeof window !== 'undefined' ? (window as any).lastUserInfoValid : false)
+function shouldLogAction(): boolean {
+  // 总是允许记录用户行为，包括访客用户
+  // 后端会根据JWT token判断用户身份，没有token的会作为访客处理
+  return true
 }
 
 /**
@@ -25,9 +24,9 @@ export const userActionService = {
    * @param details 额外详情信息
    */
   logLogin: (username: string, success: boolean, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过登录行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过登录行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Login',
@@ -42,9 +41,9 @@ export const userActionService = {
    * @param username 用户名
    */
   logLogout: (username: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过登出行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过登出行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Logout',
@@ -61,9 +60,9 @@ export const userActionService = {
    * @param details 额外详情信息
    */
   logRegister: (username: string, success: boolean, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过注册行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过注册行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Register',
@@ -80,9 +79,9 @@ export const userActionService = {
    * @param details 额外详情
    */
   logView: (resourceType: string, resourceId: number, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过资源查看行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过资源查看行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'View',
@@ -99,9 +98,9 @@ export const userActionService = {
    * @param details 额外详情
    */
   logDownload: (resourceType: string, resourceId: number, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过资源下载行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过资源下载行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Download',
@@ -118,9 +117,9 @@ export const userActionService = {
    * @param details 额外详情
    */
   logUpload: (resourceType: string, resourceId: number, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过资源上传行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过资源上传行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Upload',
@@ -137,9 +136,9 @@ export const userActionService = {
    * @param details 额外详情
    */
   logComment: (targetType: string, targetId: number, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过评论行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过评论行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Comment',
@@ -156,9 +155,9 @@ export const userActionService = {
    * @param details 额外详情
    */
   logSearch: (keyword: string, category?: string, details?: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过搜索行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过搜索行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Search',
@@ -174,9 +173,9 @@ export const userActionService = {
    * @param details 操作详情
    */
   logAdminAction: (actionType: string, details: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过管理员操作记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过管理员操作记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       'Admin',
@@ -191,9 +190,9 @@ export const userActionService = {
    * @param page 页面路径
    */
   logPageView: (page: string) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过页面访问记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过页面访问记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     
     return userActionApi.logUserAction(
@@ -212,9 +211,9 @@ export const userActionService = {
    * @param targetId 目标ID
    */
   logAction: (actionType: string, details: string, targetType?: string, targetId?: number) => {
-    if (!isReallyAuthenticated()) {
-      console.log('跳过行为记录：未真正认证')
-      return Promise.resolve({ code: 0, message: '未认证', data: null })
+    if (!shouldLogAction()) {
+      console.log('跳过行为记录')
+      return Promise.resolve({ code: 0, message: '跳过', data: null })
     }
     return userActionApi.logUserAction(
       actionType,

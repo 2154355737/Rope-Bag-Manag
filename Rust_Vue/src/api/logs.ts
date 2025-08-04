@@ -1,65 +1,57 @@
 import { api, ApiResponse } from '../utils/apiClient'
 
-// 系统日志类型
-export interface SystemLog {
-  id: number
+// 日志相关类型
+export interface LogEntry {
+  id: string
   level: string
   message: string
   timestamp: string
-  details?: any
+  source: string
+  details?: Record<string, any>
+}
+
+export interface LogQueryParams {
+  page?: number
+  pageSize?: number
+  level?: string
+}
+
+export interface LogListResponse {
+  list: LogEntry[]
+  total: number
+  page: number
+  page_size: number
 }
 
 // 日志API
 export const logsApi = {
-  // 获取系统日志
-  getLogs: (params?: {
-    page?: number
-    pageSize?: number
-    level?: string
-    search?: string
-  }): Promise<ApiResponse<{
-    list: SystemLog[]
-    total: number
-    page: number
-    page_size: number
-  }>> => {
-    // 构建查询参数
+  // 获取日志列表
+  getLogs: (params?: LogQueryParams): Promise<ApiResponse<LogListResponse>> => {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append('page', params.page.toString())
-    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())  // 使用page_size
     if (params?.level) queryParams.append('level', params.level)
-    if (params?.search) queryParams.append('search', params.search)
 
     return api.get(`/v1/admin/logs?${queryParams.toString()}`)
   },
-  
-  // 导出日志（可选实现）
-  exportLogs: (params?: {
-    level?: string
-    search?: string
-    start_date?: string
-    end_date?: string
-  }): Promise<Blob> => {
-    // 构建查询参数
-    const queryParams = new URLSearchParams()
-    if (params?.level) queryParams.append('level', params.level)
-    if (params?.search) queryParams.append('search', params.search)
-    if (params?.start_date) queryParams.append('start_date', params.start_date)
-    if (params?.end_date) queryParams.append('end_date', params.end_date)
 
-    return api.get(`/v1/admin/logs/export?${queryParams.toString()}`, { responseType: 'blob' }) as unknown as Promise<Blob>;
-  },
-  
-  // 清除日志（可选实现）
-  clearLogs: (params?: {
-    level?: string
-    before_date?: string
-  }): Promise<ApiResponse<{ deleted_count: number }>> => {
-    return api.post('/v1/admin/logs/clear', params || {})
+  // 清除日志
+  clearLogs: (level?: string): Promise<ApiResponse<null>> => {
+    const data = level ? { level } : {}
+    return api.post('/v1/admin/logs/clear', data)
   },
 
-  // 删除单条日志（补充实现，防止类型报错）
-  deleteLog: (id: number): Promise<ApiResponse<any>> => {
+  // 删除日志
+  deleteLog: (id: string): Promise<ApiResponse<null>> => {
     return api.delete(`/v1/admin/logs/${id}`)
+  },
+
+  // 获取日志统计
+  getLogStats: (): Promise<ApiResponse<{
+    total: number
+    by_level: Record<string, number>
+    recent_errors: number
+  }>> => {
+    return api.get('/v1/admin/logs/stats')
   }
 } 

@@ -240,10 +240,10 @@
     >
       <el-form :model="newPackage" label-width="100px">
         <el-form-item label="内容类型">
-          <el-radio-group v-model="newPackage.type">
-            <el-radio label="package">资源</el-radio>
-            <el-radio label="post">帖子</el-radio>
-          </el-radio-group>
+                  <el-radio-group v-model="newPackage.type">
+          <el-radio value="package">资源</el-radio>
+          <el-radio value="post">帖子</el-radio>
+        </el-radio-group>
         </el-form-item>
         
         <el-form-item :label="newPackage.type === 'package' ? '资源名称' : '帖子标题'">
@@ -301,7 +301,7 @@
               v-for="tag in newPackage.tags"
               :key="tag"
               closable
-              @close="removeTag(tag)"
+              @close="removeNewPackageTag(tag)"
               effect="light"
             >
               {{ tag }}
@@ -368,6 +368,29 @@
         </el-form-item>
         <el-form-item label="项目链接">
           <el-input v-model="editingPackage.url" placeholder="请输入项目链接" />
+        </el-form-item>
+        <el-form-item label="标签">
+          <el-input 
+            v-model="editingPackage.tagsInput" 
+            placeholder="请输入标签，用逗号分隔"
+            @input="handleTagsInput"
+            @keyup.enter="addEditingTag"
+          />
+          <div class="tags-display" v-if="editingPackage.tags && editingPackage.tags.length > 0">
+            <el-tag 
+              v-for="tag in editingPackage.tags" 
+              :key="tag" 
+              closable 
+              @close="removeTag(tag)"
+              style="margin: 4px 4px 0 0;"
+            >
+              {{ tag }}
+            </el-tag>
+          </div>
+        </el-form-item>
+        <el-form-item label="状态设置">
+          <el-checkbox v-model="editingPackage.is_pinned">置顶</el-checkbox>
+          <el-checkbox v-model="editingPackage.is_featured">精华</el-checkbox>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -566,7 +589,11 @@ const editingPackage = ref({
   category_id: undefined as number | undefined,
   status: '',
   description: '',
-  url: ''
+  url: '',
+  tags: [] as string[],
+  tagsInput: '',
+  is_pinned: false,
+  is_featured: false
 })
 
 // 编辑分类表单
@@ -817,7 +844,11 @@ function editPackage(pkg: any) {
     category_id: pkg.category_id ? Number(pkg.category_id) : undefined,
     status: pkg.status || 'Active',
     description: pkg.description,
-    url: pkg.url
+    url: pkg.url,
+    tags: pkg.tags || [],
+    tagsInput: (pkg.tags || []).join(', '),
+    is_pinned: pkg.is_pinned || false,
+    is_featured: pkg.is_featured || false
   }
   editDialogVisible.value = true
   
@@ -868,7 +899,10 @@ async function updatePackage() {
       description: editingPackage.value.description,
       category_id: editingPackage.value.category_id,
       status: statusEnum,
-      file_url: editingPackage.value.url // 添加file_url字段
+      file_url: editingPackage.value.url, // 添加file_url字段
+      tags: editingPackage.value.tags,
+      is_pinned: editingPackage.value.is_pinned,
+      is_featured: editingPackage.value.is_featured
     }
     
     console.log('更新绳包数据:', updateData)
@@ -891,6 +925,24 @@ async function updatePackage() {
   } catch (error) {
     console.error('更新绳包错误:', error)
     ElMessage.error('更新失败')
+  }
+}
+
+// 处理标签输入
+const handleTagsInput = () => {
+  if (editingPackage.value.tagsInput) {
+    const tags = editingPackage.value.tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
+    editingPackage.value.tags = tags
+  } else {
+    editingPackage.value.tags = []
+  }
+}
+
+// 移除标签
+const removeTag = (tagToRemove: string) => {
+  if (editingPackage.value.tags) {
+    editingPackage.value.tags = editingPackage.value.tags.filter(tag => tag !== tagToRemove)
+    editingPackage.value.tagsInput = editingPackage.value.tags.join(', ')
   }
 }
 
@@ -967,7 +1019,15 @@ function addTag() {
   }
 }
 
-function removeTag(tag: string) {
+function addEditingTag() {
+  const tag = editingPackage.value.tagsInput?.trim()
+  if (tag && tag.length > 0 && !editingPackage.value.tags.includes(tag)) {
+    editingPackage.value.tags.push(tag)
+    editingPackage.value.tagsInput = ''
+  }
+}
+
+function removeNewPackageTag(tag: string) {
   const index = newPackage.value.tags.indexOf(tag)
   if (index > -1) {
     newPackage.value.tags.splice(index, 1)
@@ -1004,7 +1064,9 @@ async function addPackage() {
         description: newPackage.value.description,
         category_id: newPackage.value.category_id,
         file_url: newPackage.value.url,
-        tags: newPackage.value.tags
+        tags: newPackage.value.tags,
+        is_pinned: false,
+        is_featured: false
       }
       
       console.log('创建资源数据:', packageData)
@@ -1012,6 +1074,9 @@ async function addPackage() {
       const res = await packageApi.adminCreatePackage(packageData)
       if (res.code === 0) {
         ElMessage.success('资源添加成功')
+        
+        // 记录用户行为
+        userActionService.logUpload('Package', res.data?.id || 0, `管理员创建资源: ${packageData.name}`)
         
         addDialogVisible.value = false
         // 清空表单
@@ -1759,5 +1824,14 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.tags-display {
+  margin-top: 8px;
+  min-height: 32px;
+  padding: 4px;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  background-color: var(--el-fill-color-lighter);
 }
 </style> 

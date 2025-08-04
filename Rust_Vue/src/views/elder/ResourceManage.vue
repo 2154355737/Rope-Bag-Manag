@@ -174,7 +174,7 @@
           <template #default="{ row }">
             <div class="table-actions">
               <el-button 
-                type="text" 
+                link 
                 size="small" 
                 @click="viewResource(row)"
                 icon="View"
@@ -183,7 +183,7 @@
               </el-button>
               <el-button 
                 v-if="row.status === 'Pending'"
-                type="text" 
+                link 
                 size="small" 
                 @click="openReviewDialog(row)"
                 icon="Edit"
@@ -192,7 +192,7 @@
               </el-button>
               <el-button 
                 v-if="row.status === 'Pending'"
-                type="text" 
+                link 
                 size="small" 
                 @click="quickReview(row, 'approved')"
                 class="approve-btn"
@@ -201,7 +201,7 @@
               </el-button>
               <el-button 
                 v-if="row.status === 'Pending'"
-                type="text" 
+                link 
                 size="small" 
                 @click="quickReview(row, 'rejected')"
                 class="reject-btn"

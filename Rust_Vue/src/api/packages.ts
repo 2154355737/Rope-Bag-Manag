@@ -21,6 +21,12 @@ export interface Package {
   reviewer_id?: number | null
   reviewed_at?: string | null
   review_comment?: string | null
+  // 前端展示需要的额外字段
+  tags?: string[]
+  category?: string
+  cover?: string
+  is_featured?: boolean
+  is_pinned?: boolean
 }
 
 // 创建绳包请求
@@ -32,6 +38,8 @@ export interface CreatePackageRequest {
   category_id?: number
   file_url?: string
   tags?: string[]
+  is_pinned?: boolean
+  is_featured?: boolean
 }
 
 // 更新绳包请求
@@ -42,6 +50,9 @@ export interface UpdatePackageRequest {
   category_id?: number
   status?: 'Pending' | 'Active' | 'Rejected' | 'Inactive' | 'Deleted'
   file_url?: string
+  tags?: string[]
+  is_pinned?: boolean
+  is_featured?: boolean
   // 审核相关字段
   reviewer_id?: number
   reviewed_at?: string
@@ -57,7 +68,7 @@ export interface ReviewResourceRequest {
 // 绳包列表查询参数
 export interface PackageQueryParams {
   page?: number
-  pageSize?: number
+  pageSize?: number  // 前端使用pageSize，但会转换为page_size发送给后端
   category_id?: number
   status?: string
   search?: string
@@ -78,7 +89,7 @@ export const packageApi = {
   getPackages: (params?: PackageQueryParams): Promise<ApiResponse<PackageListResponse>> => {
     const queryParams = new URLSearchParams()
     
-    // 添加分页参数
+    // 添加分页参数 - 注意：后端期望page_size，前端传入pageSize
     if (params?.page) queryParams.append('page', params.page.toString())
     if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
     
@@ -93,9 +104,11 @@ export const packageApi = {
     
     // 添加搜索过滤
     if (params?.search) queryParams.append('search', params.search)
-
-    console.log("请求参数:", queryParams.toString())
-    return api.get(`/v1/packages?${queryParams.toString()}`)
+    
+    const queryString = queryParams.toString()
+    const url = queryString ? `/v1/packages?${queryString}` : '/v1/packages'
+    
+    return api.get(url)
   },
 
   // 获取单个绳包
@@ -105,106 +118,75 @@ export const packageApi = {
 
   // 创建绳包
   createPackage: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.post('/v1/packages', data).then(response => {
-      // 如果创建成功，记录资源操作
-      if (response.code === 0 && response.data && response.data.id) {
-        console.log('自动记录创建绳包操作:', response.data.id)
-        resourceLogger.logCreate(response.data.id, 'Package', response.data)
-          .catch(err => console.error('记录创建操作失败:', err))
-      }
-      return response
-    })
+    return api.post('/v1/packages', data)
   },
 
-  // 普通用户提交资源（自动设置作者为当前用户，状态为待审核）
-  userSubmitResource: (data: {
-    title: string
-    description?: string
-    category?: string
-    file_url: string
-  }): Promise<ApiResponse<Package>> => {
+  // 用户提交资源（普通用户使用）
+  userSubmitResource: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
     return api.post('/v1/packages/user-submit', data)
   },
 
-  // 管理员创建资源（可设置任意作者和状态）
+  // 管理员创建资源（管理员/元老使用）
   adminCreatePackage: (data: CreatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.post('/v1/packages/admin-create', data).then(response => {
-      // 如果创建成功，记录资源操作
-      if (response.code === 0 && response.data && response.data.id) {
-        console.log('自动记录管理员创建绳包操作:', response.data.id)
-        resourceLogger.logCreate(response.data.id, 'Package', response.data)
-          .catch(err => console.error('记录创建操作失败:', err))
-      }
-      return response
-    })
+    return api.post('/v1/packages/admin-create', data)
   },
 
   // 更新绳包
   updatePackage: (id: number, data: UpdatePackageRequest): Promise<ApiResponse<Package>> => {
-    return api.put(`/v1/packages/${id}`, data).then(response => {
-      // 如果更新成功，记录资源操作
-      if (response.code === 0) {
-        console.log('自动记录更新绳包操作:', id)
-        resourceLogger.logUpdate(id, 'Package', null, response.data)
-          .catch(err => console.error('记录更新操作失败:', err))
-      }
-      return response
-    })
+    return api.put(`/v1/packages/${id}`, data)
   },
 
   // 删除绳包
   deletePackage: (id: number): Promise<ApiResponse<null>> => {
-    return api.delete(`/v1/packages/${id}`).then(response => {
-      // 如果删除成功，记录资源操作
-      if (response.code === 0) {
-        console.log('自动记录删除绳包操作:', id)
-        resourceLogger.logDelete(id, 'Package')
-          .catch(err => console.error('记录删除操作失败:', err))
-      }
-      return response
-    })
+    return api.delete(`/v1/packages/${id}`)
+  },
+
+  // 批量删除绳包
+  batchDeletePackages: (ids: number[]): Promise<ApiResponse<null>> => {
+    return api.post('/v1/packages/batch-delete', { ids })
   },
 
   // 下载绳包
-  downloadPackage: (id: number): Promise<ApiResponse<string>> => {
-    return api.get(`/v1/packages/${id}/download`).then(response => {
-      // 如果下载成功，记录资源操作
-      if (response.code === 0) {
-        console.log('自动记录下载绳包操作:', id)
-        resourceLogger.logDownload(id, 'Package')
-          .catch(err => console.error('记录下载操作失败:', err))
-      }
-      return response
-    })
+  downloadPackage: (id: number): Promise<ApiResponse<{ url: string }>> => {
+    return api.get(`/v1/packages/${id}/download`)
   },
 
   // 上传绳包文件
-  uploadPackageFile: (id: number, file: File): Promise<ApiResponse<Package>> => {
-    const formData = new FormData()
-    formData.append('file', file)
-    return api.upload(`/v1/packages/${id}/upload`, formData).then(response => {
-      // 如果上传成功，记录资源操作
-      if (response.code === 0) {
-        console.log('自动记录上传绳包操作:', id)
-        resourceLogger.logUpload(id, 'Package', { filename: file.name, size: file.size })
-          .catch(err => console.error('记录上传操作失败:', err))
-      }
-      return response
-    })
+  uploadPackageFile: (id: number, formData: FormData): Promise<ApiResponse<{ file_url: string }>> => {
+    return api.upload(`/v1/packages/${id}/upload`, formData)
   },
 
-  // 获取待审核资源列表（管理员和元老可用）
-  getPendingResources: (params?: PackageQueryParams): Promise<ApiResponse<{
-    list: Package[]
-    total: number
-    page: number
-    pageSize: number
-  }>> => {
-    return api.get('/v1/packages/pending', { params })
+  // 获取绳包评论
+  getPackageComments: (id: number): Promise<ApiResponse<any[]>> => {
+    return api.get(`/v1/packages/${id}/comments`)
   },
 
-  // 审核资源（管理员和元老可用）
+  // 审核资源
   reviewResource: (id: number, data: ReviewResourceRequest): Promise<ApiResponse<Package>> => {
     return api.post(`/v1/packages/${id}/review`, data)
+  },
+
+  // 获取待审核资源列表
+  getPendingResources: (params?: PackageQueryParams): Promise<ApiResponse<PackageListResponse>> => {
+    const queryParams = new URLSearchParams()
+    
+    if (params?.page) queryParams.append('page', params.page.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.search) queryParams.append('search', params.search)
+    
+    const queryString = queryParams.toString()
+    const url = queryString ? `/v1/packages/pending?${queryString}` : '/v1/packages/pending'
+    
+    return api.get(url)
+  },
+
+  // 获取包分类
+  getPackageCategories: (): Promise<ApiResponse<any[]>> => {
+    return api.get('/v1/packages/categories')
+  },
+
+  // 批量更新状态
+  batchUpdateStatus: (ids: number[], status: string): Promise<ApiResponse<null>> => {
+    return api.post('/v1/packages/batch-update-status', { ids, status })
   },
 } 

@@ -153,11 +153,9 @@ async function handleRegister() {
     if (result.code === 0) {
       ElMessage.success('注册成功！')
       
-      // 记录用户行为（暂时禁用，避免401错误）
-      // await userActionService.logAction('Register', '用户注册', {
-      //   username: registerForm.username,
-      //   email: registerForm.email
-      // })
+      // 记录用户行为
+      await userActionService.logRegister(registerForm.username, true, `用户注册成功: ${registerForm.email}`)
+        .catch(err => console.error('记录注册行为失败:', err))
       
       // 跳转到登录页面
       router.push('/login')

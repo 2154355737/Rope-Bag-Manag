@@ -21,6 +21,14 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_all_tags))
             )
             .service(
+                web::resource("/update-counts")
+                    .route(web::post().to(update_tag_counts))
+            )
+            .service(
+                web::resource("/stats")
+                    .route(web::get().to(get_tag_stats))
+            )
+            .service(
                 web::resource("/{id}")
                     .route(web::get().to(get_tag))
                     .route(web::put().to(update_tag))
@@ -80,15 +88,31 @@ async fn create_tag(
         Ok(tag_id) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "标签创建成功",
+            "msg": "标签创建成功",
             "data": {
                 "tag_id": tag_id
             }
         }))),
         Err(e) => {
             log::error!("创建标签失败: {}", e);
-            Ok(HttpResponse::InternalServerError().json(json!({
-                "code": 500,
-                "message": "创建标签失败"
+            
+            // 检查是否是唯一约束错误
+            let error_message = if let rusqlite::Error::SqliteFailure(_, Some(msg)) = &e {
+                if msg.contains("已存在") {
+                    msg.clone()
+                } else {
+                    "创建标签失败".to_string()
+                }
+            } else if e.to_string().contains("UNIQUE constraint failed") {
+                "标签名称已存在，请使用其他名称".to_string()
+            } else {
+                "创建标签失败".to_string()
+            };
+            
+            Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": error_message,
+                "msg": error_message
             })))
         }
     }
@@ -152,13 +176,15 @@ async fn update_tag(
     match tag_service.update_tag(tag_id, req.into_inner()).await {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "标签更新成功"
+            "message": "标签更新成功",
+            "msg": "标签更新成功"
         }))),
         Err(e) => {
             log::error!("更新标签失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
-                "message": "更新标签失败"
+                "message": "更新标签失败",
+                "msg": "更新标签失败"
             })))
         }
     }
@@ -193,17 +219,20 @@ async fn delete_tag(
     match tag_service.delete_tag(tag_id).await {
         Ok(true) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "标签删除成功"
+            "message": "标签删除成功",
+            "msg": "标签删除成功"
         }))),
         Ok(false) => Ok(HttpResponse::NotFound().json(json!({
             "code": 404,
-            "message": "标签不存在"
+            "message": "标签不存在",
+            "msg": "标签不存在"
         }))),
         Err(e) => {
             log::error!("删除标签失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
-                "message": "删除标签失败"
+                "message": "删除标签失败",
+                "msg": "删除标签失败"
             })))
         }
     }
@@ -246,6 +275,54 @@ async fn get_all_tags(
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
                 "message": "获取所有标签失败"
+            })))
+        }
+    }
+}
+
+// 更新标签使用次数
+async fn update_tag_counts(
+    http_req: HttpRequest,
+    tag_service: web::Data<TagService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 验证管理员权限
+    let _user = match AuthHelper::require_admin(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
+
+    match tag_service.update_all_tag_counts().await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "标签使用次数更新成功",
+            "msg": "标签使用次数更新成功"
+        }))),
+        Err(e) => {
+            log::error!("更新标签使用次数失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "更新标签使用次数失败"
+            })))
+        }
+    }
+}
+
+// 获取标签使用统计
+async fn get_tag_stats(
+    tag_service: web::Data<TagService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match tag_service.get_tag_usage_stats().await {
+        Ok(stats) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "msg": "success",
+            "data": stats
+        }))),
+        Err(e) => {
+            log::error!("获取标签统计失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "获取标签统计失败"
             })))
         }
     }

@@ -341,8 +341,8 @@ async function loadRecords() {
       updateStats()
       console.log('加载到资源记录:', recordList.value.length)
     } else {
-      console.error('加载资源记录返回错误:', response.message)
-      ElMessage.error(response.message || '加载资源记录失败')
+              console.error('加载资源记录返回错误:', response.msg || response.message)
+        ElMessage.error(response.msg || response.message || '加载资源记录失败')
     }
   } catch (error) {
     console.error('加载资源记录失败:', error)
