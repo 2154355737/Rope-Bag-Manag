@@ -1,1 +1,0 @@
-import{a as s}from"../assets/index-C1pGffEW.js";const r=t=>s.get("/v1/posts",{params:t}),a=t=>s.post("/v1/posts",t),n=t=>s.get(`/v1/posts/${t}`),p=(t,e)=>s.put(`/v1/posts/${t}`,e),g=t=>s.delete(`/v1/posts/${t}`),u=t=>s.get(`/v1/posts/${t}/tags`);export{n as a,u as b,a as c,g as d,r as g,p as u};

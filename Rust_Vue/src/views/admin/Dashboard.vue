@@ -506,8 +506,8 @@ async function loadDashboardData() {
         pageSize: 100
       })
       
-      if (todayLogsRes.code === 0 && todayLogsRes.data && todayLogsRes.data.list) {
-        todayLogs.value = todayLogsRes.data.list.filter(log => {
+      if (todayLogsRes.code === 0 && todayLogsRes.data && todayLogsRes.data.logs) {
+        todayLogs.value = todayLogsRes.data.logs.filter((log: any) => {
           const logTime = new Date(log.timestamp)
           return logTime >= today
         }).length

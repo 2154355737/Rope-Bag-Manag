@@ -1596,52 +1596,52 @@ onMounted(async () => {
 }
 
 /* 深色模式适配 */
-.dark .package-manage-desktop {
+:global(html.dark) .package-manage-desktop {
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 }
 
-.dark .page-header,
-.dark .stat-card,
-.dark .search-section,
-.dark .table-section,
-.dark .pagination-section {
+:global(html.dark) .page-header,
+:global(html.dark) .stat-card,
+:global(html.dark) .search-section,
+:global(html.dark) .table-section,
+:global(html.dark) .pagination-section {
   background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
   border-color: var(--border-color);
 }
 
 /* 主题适配 */
-.blue .stat-card::before,
-.blue .package-card::before {
+:global(html.blue) .stat-card::before,
+:global(html.blue) .package-card::before {
   background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
 }
 
-.green .stat-card::before,
-.green .package-card::before {
+:global(html.green) .stat-card::before,
+:global(html.green) .package-card::before {
   background: linear-gradient(90deg, var(--success-color) 0%, var(--success-color-light) 100%);
 }
 
-.orange .stat-card::before,
-.orange .package-card::before {
+:global(html.orange) .stat-card::before,
+:global(html.orange) .package-card::before {
   background: linear-gradient(90deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
 }
 
-.purple .stat-card::before,
-.purple .package-card::before {
+:global(html.purple) .stat-card::before,
+:global(html.purple) .package-card::before {
   background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 
-.blue .stat-icon,
-.blue .header-icon {
+:global(html.blue) .stat-icon,
+:global(html.blue) .header-icon {
   background: linear-gradient(135deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
 }
 
-.green .stat-icon,
-.green .header-icon {
+:global(html.green) .stat-icon,
+:global(html.green) .header-icon {
   background: linear-gradient(135deg, var(--success-color) 0%, var(--success-color-light) 100%);
 }
 
-.purple .stat-icon,
-.purple .header-icon {
+:global(html.purple) .stat-icon,
+:global(html.purple) .header-icon {
   background: linear-gradient(135deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 

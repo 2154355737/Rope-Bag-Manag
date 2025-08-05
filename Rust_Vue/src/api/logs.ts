@@ -14,13 +14,14 @@ export interface LogQueryParams {
   page?: number
   pageSize?: number
   level?: string
+  search?: string
 }
 
 export interface LogListResponse {
-  list: LogEntry[]
+  logs: LogEntry[]
   total: number
   page: number
-  page_size: number
+  pageSize: number
 }
 
 // 日志API
@@ -36,7 +37,7 @@ export const logsApi = {
   },
 
   // 清除日志
-  clearLogs: (level?: string): Promise<ApiResponse<null>> => {
+  clearLogs: (level?: string): Promise<ApiResponse<{ deleted_count: number }>> => {
     const data = level ? { level } : {}
     return api.post('/v1/admin/logs/clear', data)
   },
@@ -44,6 +45,17 @@ export const logsApi = {
   // 删除日志
   deleteLog: (id: string): Promise<ApiResponse<null>> => {
     return api.delete(`/v1/admin/logs/${id}`)
+  },
+
+  // 导出日志
+  exportLogs: (params?: LogQueryParams): Promise<ApiResponse<{ url: string }>> => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append('page', params.page.toString())
+    if (params?.pageSize) queryParams.append('page_size', params.pageSize.toString())
+    if (params?.level) queryParams.append('level', params.level)
+    if (params?.search) queryParams.append('search', params.search)
+
+    return api.get(`/v1/admin/logs/export?${queryParams.toString()}`)
   },
 
   // 获取日志统计

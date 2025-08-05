@@ -33,95 +33,160 @@ provide('setGlobalLoading', (loading: boolean) => {
 <style scoped>
 .desktop-layout {
   height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-areas: 
+    "navbar navbar"
+    "sidebar main";
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: 72px 1fr;
   background-color: var(--bg-primary);
   overflow: hidden;
+  transition: var(--transition-normal);
 }
 
 .desktop-main {
-  margin-left: 240px;
-  margin-top: 64px;
-  flex: 1;
+  grid-area: main;
   overflow-y: auto;
   background-color: var(--bg-primary);
-  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .content-wrapper {
-  padding: 24px;
-  max-width: 1400px;
+  flex: 1;
+  padding: var(--space-3xl);
+  max-width: 1440px;
+  width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
-
-
-/* 响应式设计 */
-@media (max-width: 1200px) {
+/* 响应式设计 - 大屏幕 */
+@media (min-width: 1400px) {
+  .desktop-layout {
+    grid-template-columns: 320px 1fr;
+  }
+  
   .content-wrapper {
-    padding: 20px;
+    max-width: 1600px;
+    padding: var(--space-4xl);
   }
 }
 
+/* 响应式设计 - 中等屏幕 */
+@media (max-width: 1200px) {
+  .desktop-layout {
+    grid-template-columns: 240px 1fr;
+  }
+  
+  .content-wrapper {
+    padding: var(--space-2xl);
+    max-width: 1200px;
+  }
+}
+
+/* 响应式设计 - 小屏幕 */
+@media (max-width: 1024px) {
+  .desktop-layout {
+    grid-template-columns: 200px 1fr;
+  }
+  
+  .content-wrapper {
+    padding: var(--space-xl);
+    max-width: 100%;
+  }
+}
+
+/* 响应式设计 - 平板 */
 @media (max-width: 768px) {
   .desktop-layout {
-    display: none;
+    grid-template-areas: 
+      "navbar navbar"
+      "main main";
+    grid-template-columns: 1fr;
+    grid-template-rows: 72px 1fr;
   }
+  
   .content-wrapper {
-    max-width: 100% !important;
-    padding: 8px !important;
-    margin: 0 !important;
+    padding: var(--space-lg);
+    max-width: 100%;
   }
 }
 
-/* 滚动条样式 */
+/* 响应式设计 - 手机 */
+@media (max-width: 480px) {
+  .content-wrapper {
+    padding: var(--space-md);
+  }
+}
+
+/* 滚动条样式优化 */
 .desktop-main::-webkit-scrollbar {
   width: 8px;
 }
 
 .desktop-main::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
 }
 
 .desktop-main::-webkit-scrollbar-thumb {
-  background-color: var(--border-color);
-  border-radius: 4px;
+  background: var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
 }
 
 .desktop-main::-webkit-scrollbar-thumb:hover {
-  background-color: var(--text-secondary);
+  background: var(--brand-color);
 }
 
 /* 深色模式适配 */
-.dark .desktop-layout {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+html.dark .desktop-layout {
+  background: var(--bg-primary);
 }
 
-.dark .desktop-main {
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+html.dark .desktop-main {
+  background: var(--bg-primary);
 }
 
-/* 主题适配 */
-.blue .desktop-layout::before {
-  background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
+html.dark .desktop-main::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
 }
 
-.green .desktop-layout::before {
-  background: linear-gradient(90deg, var(--success-color) 0%, var(--success-color-light) 100%);
+html.dark .desktop-main::-webkit-scrollbar-thumb {
+  background: var(--border-color);
 }
 
-.orange .desktop-layout::before {
-  background: linear-gradient(90deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
+html.dark .desktop-main::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-color);
 }
 
-.purple .desktop-layout::before {
-  background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
+/* 加载状态优化 */
+.content-wrapper .el-loading-mask {
+  background-color: var(--bg-glass-strong) !important;
+  backdrop-filter: blur(20px) !important;
 }
 
-/* 减少动画模式 */
+.content-wrapper .el-loading-spinner {
+  color: var(--brand-color) !important;
+}
+
+.content-wrapper .el-loading-text {
+  color: var(--text-primary) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+/* 平滑过渡效果 */
+.desktop-layout * {
+  box-sizing: border-box;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .desktop-main {
-    transition: none;
+  .desktop-layout,
+  .desktop-main,
+  .content-wrapper {
+    transition: none !important;
   }
 }
 </style> 

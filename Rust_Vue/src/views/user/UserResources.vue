@@ -235,7 +235,7 @@
               v-for="tag in uploadForm.tags"
               :key="tag"
               closable
-              @close="removeTag(tag)"
+              @close="removeUploadTag(tag)"
               effect="light"
             >
               {{ tag }}
@@ -298,7 +298,7 @@
               v-for="tag in editForm.tags" 
               :key="tag" 
               closable 
-              @close="removeTag(tag)"
+              @close="removeEditTag(tag)"
               style="margin: 4px 4px 0 0;"
             >
               {{ tag }}
@@ -490,8 +490,8 @@ const handleTagsInput = () => {
   }
 }
 
-// 移除标签
-const removeTag = (tagToRemove: string) => {
+// 移除编辑表单标签
+const removeEditTag = (tagToRemove: string) => {
   if (editForm.tags) {
     editForm.tags = editForm.tags.filter(tag => tag !== tagToRemove)
     editForm.tagsInput = editForm.tags.join(', ')
@@ -507,7 +507,8 @@ const addTag = () => {
   }
 }
 
-const removeTag = (tag: string) => {
+// 移除上传表单标签
+const removeUploadTag = (tag: string) => {
   const index = uploadForm.tags.indexOf(tag)
   if (index > -1) {
     uploadForm.tags.splice(index, 1)
@@ -534,9 +535,10 @@ const handleUpload = async () => {
         undefined
 
       const submitData = {
-        title: uploadForm.name,
+        name: uploadForm.name,
+        author: 'User', // 或者从用户信息中获取
         description: uploadForm.description,
-        category: categoryName,
+        category_id: uploadForm.category_id,
         tags: uploadForm.tags,
         file_url: uploadForm.file_url || ''
       }
@@ -570,7 +572,7 @@ const handleUpload = async () => {
         ElMessage.success('帖子发布成功')
         
         // 记录用户行为
-        userActionService.logAction('Create', `创建帖子: ${uploadForm.name}`, 'Post', res.data?.id || 0)
+        userActionService.logAction('Create', `创建帖子: ${uploadForm.name}`, 'Post', res.data?.post_id || 0)
           .catch(err => console.error('记录创建帖子行为失败:', err))
         
         showUploadDialog.value = false

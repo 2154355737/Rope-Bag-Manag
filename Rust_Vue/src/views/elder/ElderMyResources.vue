@@ -298,7 +298,7 @@
               v-for="tag in uploadForm.tags"
               :key="tag"
               closable
-              @close="removeTag(tag)"
+              @close="removeUploadTag(tag)"
               effect="light"
             >
               {{ tag }}
@@ -401,7 +401,7 @@
               v-for="tag in editForm.tags" 
               :key="tag" 
               closable 
-              @close="removeTag(tag)"
+              @close="removeEditTag(tag)"
               style="margin: 4px 4px 0 0;"
             >
               {{ tag }}
@@ -634,8 +634,8 @@ const handleTagsInput = () => {
   }
 }
 
-// 移除标签
-const removeTag = (tagToRemove: string) => {
+// 移除编辑表单标签
+const removeEditTag = (tagToRemove: string) => {
   if (editForm.tags) {
     editForm.tags = editForm.tags.filter(tag => tag !== tagToRemove)
     editForm.tagsInput = editForm.tags.join(', ')
@@ -670,7 +670,8 @@ const addTag = () => {
   }
 }
 
-const removeTag = (tag: string) => {
+// 移除上传表单标签
+const removeUploadTag = (tag: string) => {
   const index = uploadForm.tags.indexOf(tag)
   if (index > -1) {
     uploadForm.tags.splice(index, 1)

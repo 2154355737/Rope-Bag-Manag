@@ -6,7 +6,7 @@ import UserLayout from './layouts/UserLayout.vue'
 import ElderLayout from './layouts/ElderLayout.vue'
 
 // Stagewise 工具栏集成
-import { StagewiseToolbar } from '@stagewise/toolbar-vue'
+import { initToolbar } from '@stagewise/toolbar'
 
 const route = useRoute()
 const layoutComponent = computed(() => {
@@ -20,21 +20,18 @@ const layoutComponent = computed(() => {
   return null
 })
 
-// 只在开发模式下启用 stagewise
+// 初始化 Stagewise 工具栏
 const isDev = import.meta.env.DEV
+if (isDev) {
+  initToolbar({
+    plugins: []
+  })
+}
 </script>
 
 <template>
   <component v-if="layoutComponent" :is="layoutComponent" :key="route.fullPath" />
   <router-view v-else />
-  
-  <!-- Stagewise 工具栏 - 仅在开发模式下显示 -->
-  <StagewiseToolbar 
-    v-if="isDev"
-    :config="{
-      plugins: []
-    }"
-  />
 </template>
 
 <style scoped>

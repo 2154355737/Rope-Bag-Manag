@@ -56,6 +56,69 @@
 
       <el-card style="margin-top: 20px;">
         <template #header>
+          <span>轮播图设置</span>
+        </template>
+        <el-form :model="settings" label-width="120px">
+          <el-form-item label="轮播图开关">
+            <el-switch 
+              v-model="carouselSettings.enabled" 
+              active-text="启用"
+              inactive-text="禁用"
+            />
+            <div class="form-tip">控制是否在主页显示轮播图</div>
+          </el-form-item>
+          
+          <el-form-item label="轮播图数据" v-if="carouselSettings.enabled">
+            <div class="carousel-items-editor">
+              <div v-for="(item, index) in carouselSettings.items" :key="index" class="carousel-item-editor">
+                <el-card shadow="never" style="margin-bottom: 15px;">
+                  <template #header>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <span>轮播图 {{ index + 1 }}</span>
+                      <el-button type="danger" size="small" @click="removeCarouselItem(index)">
+                        删除
+                      </el-button>
+                    </div>
+                  </template>
+                  
+                  <el-form-item label="标题">
+                    <el-input v-model="item.title" placeholder="请输入轮播图标题" />
+                  </el-form-item>
+                  
+                  <el-form-item label="描述">
+                    <el-input 
+                      v-model="item.description" 
+                      type="textarea" 
+                      :rows="2"
+                      placeholder="请输入轮播图描述"
+                    />
+                  </el-form-item>
+                  
+                  <el-form-item label="图片链接">
+                    <el-input v-model="item.image" placeholder="请输入图片链接地址" />
+                  </el-form-item>
+                  
+                  <el-form-item label="跳转链接">
+                    <el-input v-model="item.link" placeholder="请输入点击跳转的链接（可选）" />
+                  </el-form-item>
+                  
+                  <el-form-item label="排序">
+                    <el-input-number v-model="item.order" :min="1" :max="10" />
+                  </el-form-item>
+                </el-card>
+              </div>
+              
+              <el-button type="success" @click="addCarouselItem">
+                添加轮播图
+              </el-button>
+            </div>
+            <div class="form-tip">配置主页轮播图的内容和链接</div>
+          </el-form-item>
+        </el-form>
+      </el-card>
+
+      <el-card style="margin-top: 20px;">
+        <template #header>
           <span>页脚设置</span>
         </template>
         <el-form :model="settings" label-width="120px">
@@ -157,21 +220,69 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { House, Check, RefreshRight } from '@element-plus/icons-vue'
 import { settingsApi } from '../../api/settings'
 
+// 类型定义
+interface LinkItem {
+  text: string
+  url: string
+}
+
+interface LinkGroup {
+  title: string
+  links: LinkItem[]
+}
+
+interface FooterLinksData {
+  [key: string]: LinkGroup
+}
+
+interface Settings {
+  hero_title: string
+  hero_subtitle: string
+  copyright_text: string
+  footer_links: string
+  seo_keywords: string
+  seo_description: string
+  seo_author: string
+  carousel_settings?: string
+}
+
 // 响应式数据
 const saving = ref(false)
 
-const settings = reactive({
+const settings = reactive<Settings>({
   hero_title: '绳包管理器',
   hero_subtitle: '专业的资源管理与分享平台',
   copyright_text: '© 2024 绳包管理器. All rights reserved.',
   footer_links: '{}',
   seo_keywords: '绳包管理器,资源管理,文件分享,社区',
   seo_description: '绳包管理器是一个专业的资源管理与分享平台，提供便捷的文件管理和社区交流功能。',
-  seo_author: '绳包管理器团队'
+  seo_author: '绳包管理器团队',
+  carousel_settings: '{}'
 })
 
 // 页脚链接数据
-const footerLinksData = reactive({})
+const footerLinksData = reactive<FooterLinksData>({})
+
+// 轮播图设置数据
+const carouselSettings = reactive({
+  enabled: true,
+  items: [
+    {
+      title: '欢迎使用绳包管理器',
+      description: '专业的资源管理与分享平台，为您提供便捷的文件管理和社区交流功能。',
+      image: 'https://via.placeholder.com/800x400/667eea/ffffff?text=轮播图1',
+      link: '/about',
+      order: 1
+    },
+    {
+      title: '丰富的资源库',
+      description: '海量优质资源，涵盖各种类型，满足您的不同需求。',
+      image: 'https://via.placeholder.com/800x400/764ba2/ffffff?text=轮播图2',
+      link: '/resources',
+      order: 2
+    }
+  ]
+})
 
 // 解析页脚链接数据
 const parseFooterLinks = () => {
@@ -188,9 +299,45 @@ const parseFooterLinks = () => {
   }
 }
 
+// 解析轮播图设置数据
+const parseCarouselSettings = () => {
+  try {
+    const parsed = JSON.parse(settings.carousel_settings || '{}')
+    if (parsed.enabled !== undefined) carouselSettings.enabled = parsed.enabled
+    if (parsed.items) carouselSettings.items = parsed.items
+  } catch {
+    // 使用默认值
+  }
+}
+
 // 序列化页脚链接数据
 const serializeFooterLinks = () => {
   settings.footer_links = JSON.stringify(footerLinksData)
+}
+
+// 序列化轮播图设置数据
+const serializeCarouselSettings = () => {
+  settings.carousel_settings = JSON.stringify(carouselSettings)
+}
+
+// 添加轮播图项目
+const addCarouselItem = () => {
+  carouselSettings.items.push({
+    title: '新轮播图',
+    description: '请输入描述',
+    image: 'https://via.placeholder.com/800x400/667eea/ffffff?text=新轮播图',
+    link: '',
+    order: carouselSettings.items.length + 1
+  })
+}
+
+// 删除轮播图项目
+const removeCarouselItem = (index: number) => {
+  carouselSettings.items.splice(index, 1)
+  // 重新排序
+  carouselSettings.items.forEach((item, idx) => {
+    item.order = idx + 1
+  })
 }
 
 // 添加新的链接分组
@@ -203,8 +350,8 @@ const addGroup = () => {
 }
 
 // 移除链接分组
-const removeGroup = (groupKey: string) => {
-  delete footerLinksData[groupKey]
+const removeGroup = (groupKey: string | number) => {
+  delete footerLinksData[String(groupKey)]
 }
 
 // 添加新链接
@@ -220,13 +367,13 @@ const removeLink = (group: any, linkIndex: number) => {
 // 加载设置
 const loadSettings = async () => {
   try {
-    const keys = ['hero_title', 'hero_subtitle', 'copyright_text', 'footer_links', 'seo_keywords', 'seo_description', 'seo_author']
+    const keys = ['hero_title', 'hero_subtitle', 'copyright_text', 'footer_links', 'seo_keywords', 'seo_description', 'seo_author', 'carousel_settings']
     
     for (const key of keys) {
       try {
         const response = await settingsApi.getSetting(key)
         if (response.code === 0 && response.data) {
-          settings[key] = response.data.value
+          (settings as any)[key] = response.data.value
         }
       } catch (error) {
         console.warn(`加载配置项 ${key} 失败:`, error)
@@ -234,6 +381,7 @@ const loadSettings = async () => {
     }
     
     parseFooterLinks()
+    parseCarouselSettings()
   } catch (error) {
     console.error('加载设置失败:', error)
     ElMessage.error('加载设置失败')
@@ -247,6 +395,8 @@ const saveSettings = async () => {
     
     // 序列化页脚链接数据
     serializeFooterLinks()
+    // 序列化轮播图设置数据
+    serializeCarouselSettings()
     
     // 保存每个配置项
     const promises = Object.entries(settings).map(([key, value]) =>

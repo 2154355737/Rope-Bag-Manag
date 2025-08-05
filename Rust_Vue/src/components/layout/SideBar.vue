@@ -13,7 +13,7 @@
         >
           <div class="nav-icon">
             <el-icon :size="20">
-              <component :is="iconComponents[item.icon]" />
+              <component :is="iconComponents[item.icon as keyof typeof iconComponents]" />
             </el-icon>
           </div>
           <span class="nav-text">{{ item.title }}</span>
@@ -98,17 +98,14 @@ const allMenuItems: MenuItem[] = [
   { path: '/admin/logs', title: '日志查看', icon: 'Document', badge: 0, roles: ['admin'] },
   { path: '/admin/stats', title: '统计信息', icon: 'DataAnalysis', badge: 0, roles: ['admin', 'moderator'] },
   { path: '/admin/homepage-settings', title: '主页设置', icon: 'Setting', badge: 0, roles: ['admin'] },
-  { path: '/admin/posts', title: '帖子管理', icon: 'ChatDotRound', badge: 0, roles: ['admin', 'elder'] },
-  { path: '/admin/tags', title: '标签管理', icon: 'Tickets', badge: 0, roles: ['admin', 'elder'] },
-  { path: '/admin/mail-settings', title: '邮件设置', icon: 'Setting', badge: 0, roles: ['admin'] },
-  { path: '/admin/subscriptions', title: '订阅管理', icon: 'Message', badge: 0, roles: ['admin'] },
-  { path: '/admin/download-security', title: '下载安全监控', icon: 'Monitor', badge: 0, roles: ['admin'] },
-  { path: '/admin/ip-ban', title: 'IP封禁管理', icon: 'Lock', badge: 0, roles: ['admin'] }
+  { path: '/admin/system-settings', title: '系统设置', icon: 'Setting', badge: 0, roles: ['admin'] }
 ]
+
+// 响应式菜单项
 const menuItems = ref<MenuItem[]>([])
 
-// 图标组件映射
-const iconComponents: Record<string, any> = {
+// Element Plus 图标组件映射
+const iconComponents = {
   House,
   User,
   Box,
@@ -127,60 +124,74 @@ const iconComponents: Record<string, any> = {
   Lock
 }
 
-// 例如在按钮点击事件中调用
-// databaseExport.exportToFile('database.sqlite')
+// 数据库导出功能
+const handleExportDatabase = async () => {
+  try {
+    await databaseExport.exportToFile()
+  } catch (error) {
+    console.error('数据库导出失败:', error)
+  }
+}
 </script>
 
 <style scoped>
 .desktop-sidebar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 240px;
-  height: 100vh;
-  background-color: var(--bg-card);
-  border-right: 1px solid var(--border-color);
-  z-index: 999;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  grid-area: sidebar;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color-light);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 100;
+  transition: var(--transition-normal);
 }
 
 .sidebar-content {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding-top: 64px;
+  overflow: hidden;
 }
 
 .sidebar-nav {
   flex: 1;
-  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-lg) var(--space-md);
+  gap: var(--space-xs);
   overflow-y: auto;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
+  gap: var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  border-radius: var(--radius-lg);
   color: var(--text-secondary);
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: var(--transition-fast);
   position: relative;
-  margin: 4px 8px;
-  border-radius: 8px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  min-height: 48px;
+  box-sizing: border-box;
 }
 
 .nav-item:hover {
-  color: var(--brand-color);
-  background-color: var(--bg-primary);
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
-  color: var(--brand-color);
-  background-color: var(--bg-primary);
-  font-weight: 500;
+  background: var(--bg-selected);
+  color: var(--text-brand);
+  font-weight: var(--font-weight-semibold);
+  border-left: 4px solid var(--brand-color);
+  padding-left: calc(var(--space-xl) - 4px);
 }
 
 .nav-item.active::before {
@@ -189,51 +200,49 @@ const iconComponents: Record<string, any> = {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  background-color: var(--brand-color);
-  border-radius: 0 2px 2px 0;
+  width: 4px;
+  height: 24px;
+  background: var(--brand-color);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .nav-icon {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
-  flex-shrink: 0;
-  transition: transform 0.2s ease;
-}
-
-.nav-item:hover .nav-icon,
-.nav-item.active .nav-icon {
-  transform: scale(1.1);
+  color: inherit;
 }
 
 .nav-text {
   flex: 1;
-  font-size: 14px;
-  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: inherit;
+  line-height: var(--line-height-tight);
 }
 
 .nav-badge {
   flex-shrink: 0;
-  transform: scale(0.8);
+}
+
+.nav-badge .el-badge {
+  line-height: 1;
 }
 
 .sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-color);
-  background-color: var(--bg-secondary);
+  padding: var(--space-xl);
+  border-top: 1px solid var(--border-color-light);
+  background: var(--bg-tertiary);
 }
 
 .footer-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-lg);
 }
 
 .version-info {
@@ -241,9 +250,13 @@ const iconComponents: Record<string, any> = {
 }
 
 .version-text {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-medium);
+  background: var(--bg-secondary);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color-light);
 }
 
 .status-info {
@@ -254,7 +267,9 @@ const iconComponents: Record<string, any> = {
 .status-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
 }
 
 .status-dot {
@@ -265,16 +280,22 @@ const iconComponents: Record<string, any> = {
 }
 
 .status-dot.online {
-  background-color: var(--success-color);
-  box-shadow: 0 0 6px var(--success-color);
+  background: var(--success-color);
+  box-shadow: 0 0 6px rgba(82, 196, 26, 0.4);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 6px rgba(82, 196, 26, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(82, 196, 26, 0.6); }
+  100% { box-shadow: 0 0 6px rgba(82, 196, 26, 0.4); }
 }
 
 .status-text {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
-/* 滚动条样式 */
+/* 滚动条优化 */
 .sidebar-nav::-webkit-scrollbar {
   width: 4px;
 }
@@ -285,10 +306,112 @@ const iconComponents: Record<string, any> = {
 
 .sidebar-nav::-webkit-scrollbar-thumb {
   background: var(--border-color);
-  border-radius: 2px;
+  border-radius: var(--radius-full);
 }
 
 .sidebar-nav::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--brand-color);
+}
+
+/* 深色模式适配 */
+html.dark .desktop-sidebar {
+  background: var(--bg-secondary);
+  border-right-color: var(--border-color);
+}
+
+html.dark .sidebar-footer {
+  background: var(--bg-tertiary);
+  border-top-color: var(--border-color);
+}
+
+html.dark .version-text {
+  background: var(--bg-elevated);
+  border-color: var(--border-color);
+}
+
+html.dark .nav-item:hover {
+  background: var(--bg-hover);
+}
+
+html.dark .nav-item.active {
+  background: var(--bg-selected);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .sidebar-nav {
+    padding: var(--space-md) var(--space-sm);
+  }
+  
+  .nav-item {
+    padding: var(--space-md) var(--space-lg);
+    gap: var(--space-md);
+  }
+  
+  .nav-item.active {
+    padding-left: calc(var(--space-lg) - 4px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .nav-item {
+    padding: var(--space-sm) var(--space-md);
+    min-height: 40px;
+  }
+  
+  .nav-item.active {
+    padding-left: calc(var(--space-md) - 4px);
+  }
+  
+  .sidebar-footer {
+    padding: var(--space-lg);
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-sidebar {
+    display: none;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  .nav-item:hover {
+    transform: none;
+  }
+  
+  .nav-item:active {
+    background: var(--bg-selected);
+    transform: scale(0.98);
+  }
+}
+
+/* 减少动画模式支持 */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item,
+  .status-dot.online {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .nav-item:hover {
+    transform: none !important;
+  }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .nav-item {
+    border: 1px solid transparent;
+  }
+  
+  .nav-item:hover,
+  .nav-item.active {
+    border-color: var(--brand-color);
+  }
+  
+  .sidebar-footer {
+    border-top-width: 2px;
+  }
 }
 </style> 

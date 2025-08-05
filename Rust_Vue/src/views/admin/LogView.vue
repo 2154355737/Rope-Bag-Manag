@@ -347,7 +347,7 @@ async function loadLogs(val = 1) {
   loading.value = true
   try {
     // 使用后端API获取日志
-    const response = await adminApi.getLogs({
+    const response = await logsApi.getLogs({
       page: page.value,
       pageSize: pageSize.value,
       level: level.value || undefined,
@@ -356,7 +356,7 @@ async function loadLogs(val = 1) {
     
     if (response.code === 0 && response.data) {
       // 设置日志数据
-      logs.value = response.data.list || []
+      logs.value = response.data.logs || []
       total.value = response.data.total || 0
     
     // 更新统计数据
@@ -396,15 +396,16 @@ async function exportLogs() {
     
     const response = await logsApi.exportLogs(params)
     
-    // 创建下载链接
-    const blob = new Blob([response], { type: 'text/plain' })
-      const url = URL.createObjectURL(blob)
+    if (response.code === 0 && response.data) {
+      // 直接使用返回的下载URL
       const a = document.createElement('a')
-      a.href = url
-    a.download = `system_logs_${new Date().toISOString().split('T')[0]}.txt`
+      a.href = response.data.url
+      a.download = `system_logs_${new Date().toISOString().split('T')[0]}.txt`
       a.click()
-      URL.revokeObjectURL(url)
       ElMessage.success('日志导出成功')
+    } else {
+      ElMessage.error('导出日志失败')
+    }
   } catch (e) {
     console.error('导出日志失败:', e)
     ElMessage.error('导出失败，请稍后重试')

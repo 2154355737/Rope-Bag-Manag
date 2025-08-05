@@ -1,18 +1,19 @@
 import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
-import 'element-plus/theme-chalk/dark/css-vars.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 // 导入字体
 import './assets/fonts.css'
 
-// 导入主题样式
-import './assets/base.css'
-import './assets/global.css'
-import './assets/element-plus-dark.css'
-import './assets/theme-variables.css'
-import './assets/admin-common.css' // 导入管理页面通用样式
+// 导入主题样式 - 按优先级顺序引入
+import './assets/base.css'              // 基础样式
+import './assets/global.css'            // 全局样式
+import './assets/theme-variables.css'   // 主题变量系统（优先级最高）
+import './assets/quick-fixes.css'       // 快速修复样式
+import './assets/element-plus-dark.css' // Element Plus深色主题
+import './assets/admin-common.css'      // 管理页面通用样式
+import './assets/home-styles.css'       // 首页样式
 
 // 导入主应用组件
 import App from './App.vue'

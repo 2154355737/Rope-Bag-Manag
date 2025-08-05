@@ -115,14 +115,14 @@ export function applyTheme(theme: ThemeType) {
     isAutoTheme.value = true
     const actualTheme = systemTheme.value
     console.log('自动主题，实际应用:', actualTheme)
+    // 统一只给 HTML 元素添加主题类
     html.classList.add(actualTheme)
-    body.classList.add(actualTheme)
     currentTheme.value = actualTheme
   } else {
     isAutoTheme.value = false
     console.log('应用固定主题:', theme)
+    // 统一只给 HTML 元素添加主题类
     html.classList.add(theme)
-    body.classList.add(theme)
     currentTheme.value = theme
   }
   
@@ -134,9 +134,10 @@ export function applyTheme(theme: ThemeType) {
   
   // 验证主题是否应用成功
   setTimeout(() => {
-    const appliedTheme = html.classList.contains(theme) || body.classList.contains(theme)
+    const appliedTheme = html.classList.contains(currentTheme.value)
     console.log('主题应用验证:', {
       requested: theme,
+      current: currentTheme.value,
       applied: appliedTheme,
       htmlClasses: html.className,
       bodyClasses: body.className

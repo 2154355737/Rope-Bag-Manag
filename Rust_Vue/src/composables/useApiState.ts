@@ -101,6 +101,7 @@ export interface PaginationState {
   pageSize: number
   total: number
   totalPages: number
+  loading: boolean
 }
 
 export function usePagination(initialPageSize: number = 10) {
@@ -108,6 +109,7 @@ export function usePagination(initialPageSize: number = 10) {
     currentPage: 1,
     pageSize: initialPageSize,
     total: 0,
+    totalPages: 0,
     loading: false
   })
 

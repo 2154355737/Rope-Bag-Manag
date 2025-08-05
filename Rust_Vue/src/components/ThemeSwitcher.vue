@@ -66,22 +66,23 @@ const handleThemeChange = (theme: string) => {
 }
 
 .theme-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  backdrop-filter: blur(12px);
-  border: none;
-  color: #fff;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.4);
-  position: relative;
-  overflow: hidden;
-  width: 40px;
-  height: 40px;
+  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark)) !important;
+  backdrop-filter: blur(12px) !important;
+  border: none !important;
+  color: var(--text-inverse) !important;
+  transition: var(--transition-normal) !important;
+  box-shadow: var(--shadow-md) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  width: 40px !important;
+  height: 40px !important;
 }
 
-.theme-btn:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 8px 25px 0 rgba(102, 126, 234, 0.6);
+.theme-btn:hover,
+.theme-btn:focus {
+  background: linear-gradient(135deg, var(--brand-color-light), var(--brand-color)) !important;
+  transform: translateY(-2px) scale(1.05) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 .theme-btn::before {
@@ -92,127 +93,187 @@ const handleThemeChange = (theme: string) => {
   width: 100%;
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
+  transition: left 0.5s ease;
 }
 
 .theme-btn:hover::before {
   left: 100%;
 }
 
+.theme-icon {
+  font-size: 1.2rem !important;
+  position: relative !important;
+  z-index: 1 !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
+}
+
 .theme-menu {
-  min-width: 280px;
-  padding: var(--spacing-sm);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--border-radius-large);
-  box-shadow: var(--shadow-dark);
+  min-width: 280px !important;
+  padding: var(--space-lg) !important;
+  background: var(--bg-glass-strong) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-xl) !important;
 }
 
 .theme-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-sm);
-  border-radius: var(--border-radius-base);
-  transition: all var(--transition-base);
-  cursor: pointer;
+  display: flex !important;
+  align-items: center !important;
+  gap: var(--space-lg) !important;
+  padding: var(--space-lg) !important;
+  border-radius: var(--radius-md) !important;
+  transition: var(--transition-fast) !important;
+  cursor: pointer !important;
 }
 
 .theme-item:hover {
-  background: var(--bg-secondary);
+  background: var(--bg-hover) !important;
+  transform: translateX(4px) !important;
 }
 
-.theme-icon {
-  font-size: 1.2rem;
-  width: 20px;
-  text-align: center;
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+.theme-item.active {
+  background: var(--bg-selected) !important;
+  border-left: 3px solid var(--brand-color) !important;
+  padding-left: calc(var(--space-lg) - 3px) !important;
+}
+
+.theme-item .theme-icon {
+  font-size: 1.2rem !important;
+  width: 24px !important;
+  text-align: center !important;
+  position: relative !important;
+  z-index: 1 !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
 }
 
 .theme-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-xs) !important;
 }
 
 .theme-label {
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium) !important;
+  color: var(--text-primary) !important;
+  font-size: var(--font-size-sm) !important;
+  line-height: var(--line-height-tight) !important;
 }
 
 .theme-desc {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  line-height: 1.3;
+  font-size: var(--font-size-xs) !important;
+  color: var(--text-tertiary) !important;
+  line-height: var(--line-height-tight) !important;
 }
 
 .check-icon {
-  color: var(--brand-color);
-  font-weight: var(--font-weight-bold);
+  color: var(--brand-color) !important;
+  font-weight: var(--font-weight-bold) !important;
+  font-size: 1.2rem !important;
+  animation: checkPulse 0.3s ease-out !important;
+}
+
+@keyframes checkPulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* 深色模式适配 */
-.dark .theme-btn {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  box-shadow: 0 4px 15px 0 rgba(79, 70, 229, 0.4);
+html.dark .theme-btn {
+  background: linear-gradient(135deg, var(--brand-color), var(--brand-color-dark)) !important;
+  box-shadow: var(--shadow-md) !important;
 }
 
-.dark .theme-btn:hover {
-  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
-  box-shadow: 0 8px 25px 0 rgba(79, 70, 229, 0.6);
+html.dark .theme-btn:hover,
+html.dark .theme-btn:focus {
+  background: linear-gradient(135deg, var(--brand-color-light), var(--brand-color)) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
-.dark .theme-menu {
-  background: rgba(44, 44, 44, 0.95);
-  border-color: rgba(255, 255, 255, 0.1);
+html.dark .theme-menu {
+  background: var(--bg-glass-strong) !important;
+  border-color: var(--border-color) !important;
 }
 
-.dark .theme-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+html.dark .theme-item:hover {
+  background: var(--bg-hover) !important;
+}
+
+html.dark .theme-item.active {
+  background: var(--bg-selected) !important;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
   .theme-menu {
-    min-width: 240px;
+    min-width: 240px !important;
+    padding: var(--space-md) !important;
   }
   
   .theme-item {
-    padding: var(--spacing-xs);
+    padding: var(--space-md) !important;
   }
   
-  .theme-icon {
-    font-size: 1.2rem;
-    width: 20px;
+  .theme-item .theme-icon {
+    font-size: 1.2rem !important;
+    width: 20px !important;
   }
   
   .theme-label {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-xs) !important;
   }
   
   .theme-desc {
-    font-size: 10px;
+    font-size: 10px !important;
   }
 }
 
 /* 触摸设备优化 */
 @media (hover: none) and (pointer: coarse) {
   .theme-btn:hover {
-    transform: none;
+    transform: none !important;
   }
   
   .theme-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.95) !important;
+  }
+  
+  .theme-item:hover {
+    transform: none !important;
   }
   
   .theme-item:active {
-    background: var(--brand-color-light);
-    color: white;
+    background: var(--bg-selected) !important;
+    color: var(--text-brand) !important;
+  }
+}
+
+/* 减少动画模式支持 */
+@media (prefers-reduced-motion: reduce) {
+  .theme-btn,
+  .theme-item,
+  .check-icon {
+    transition: none !important;
+    animation: none !important;
+  }
+  
+  .theme-btn:hover,
+  .theme-item:hover {
+    transform: none !important;
+  }
+  
+  .theme-btn::before {
+    display: none !important;
   }
 }
 </style> 

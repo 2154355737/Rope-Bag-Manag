@@ -1,0 +1,5544 @@
+openapi: 3.0.3
+info:
+  title: 绳包管理器后端 API
+  description: |
+    绳包管理器后端服务的完整API文档
+    
+    ## 认证方式
+    系统支持两种认证方式，按优先级顺序：
+    1. **Authorization 头部认证（推荐）**: `Authorization: Bearer <token>`
+    2. **Cookie 认证**: `Cookie: auth_token=<token>`
+    
+    ## 权限等级
+    - **普通用户 (user)**: 基础功能使用权限
+    - **元老 (elder)**: 拥有部分管理权限，可审核资源
+    - **版主 (moderator)**: 拥有内容管理权限
+    - **管理员 (admin)**: 拥有所有系统权限
+    
+    ## API 响应格式
+    所有API统一返回格式：
+    ```json
+    {
+      "code": 0,
+      "message": "success",
+      "data": {}
+    }
+    ```
+    - code: 状态码，0表示成功，其他表示错误
+    - message: 响应消息
+    - data: 响应数据（可选）
+    
+  version: 1.0.0
+  contact:
+    name: 绳包管理器API支持
+  license:
+    name: MIT
+
+servers:
+  - url: http://127.0.0.1:15201/api/v1
+    description: 开发服务器 - API端点
+  - url: http://127.0.0.1:15201
+    description: 开发服务器 - 健康检查端点
+
+security:
+  - BearerAuth: []
+  - CookieAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 状态码，0表示成功
+        message:
+          type: string
+          description: 响应消息
+        data:
+          description: 响应数据（可选）
+      required:
+        - code
+        - message
+
+    # 用户相关模型
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        password_hash:
+          type: string
+          writeOnly: true
+        nickname:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, moderator, elder, user]
+        star:
+          type: integer
+          description: 用户星级
+        ban_status:
+          type: string
+          enum: [normal, suspended, banned]
+        ban_reason:
+          type: string
+          nullable: true
+        qq_number:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        login_count:
+          type: integer
+        upload_count:
+          type: integer
+        download_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        is_admin:
+          type: boolean
+
+    CreateUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        nickname:
+          type: string
+          nullable: true
+        qq_number:
+          type: string
+          nullable: true
+        verification_code:
+          type: string
+          description: 邮箱验证码
+      required:
+        - username
+        - email
+        - password
+        - verification_code
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    EmailLoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+      required:
+        - email
+        - code
+
+    SendCodeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+      required:
+        - user
+        - token
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        nickname:
+          type: string
+        star:
+          type: integer
+        ban_status:
+          type: string
+          enum: [normal, suspended, banned]
+        ban_reason:
+          type: string
+        role:
+          type: string
+          enum: [admin, moderator, elder, user]
+        qq_number:
+          type: string
+        avatar_url:
+          type: string
+
+    # 绳包相关模型
+    Package:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        author:
+          type: string
+        version:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        file_url:
+          type: string
+        file_size:
+          type: integer
+          format: int64
+          nullable: true
+        download_count:
+          type: integer
+        like_count:
+          type: integer
+        favorite_count:
+          type: integer
+        category_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [Pending, Active, Rejected, Inactive, Deleted]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        reviewer_id:
+          type: integer
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_comment:
+          type: string
+          nullable: true
+        is_pinned:
+          type: boolean
+        is_featured:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    CreatePackageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        author:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: integer
+        file_url:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        is_pinned:
+          type: boolean
+        is_featured:
+          type: boolean
+      required:
+        - name
+        - author
+
+    UpdatePackageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: integer
+        status:
+          type: string
+          enum: [Pending, Active, Rejected, Inactive, Deleted]
+        file_url:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        is_pinned:
+          type: boolean
+        is_featured:
+          type: boolean
+        reviewer_id:
+          type: integer
+        reviewed_at:
+          type: string
+          format: date-time
+        review_comment:
+          type: string
+
+    ReviewResourceRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        comment:
+          type: string
+          nullable: true
+      required:
+        - status
+
+    CreateResourceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        file_url:
+          type: string
+        cover_url:
+          type: string
+      required:
+        - title
+        - file_url
+
+    PackageListResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Package'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        size:
+          type: integer
+
+    # 评论相关模型
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        target_type:
+          type: string
+          enum: [Package, User, System]
+        target_id:
+          type: integer
+        content:
+          type: string
+        status:
+          type: string
+          enum: [Active, Hidden, Deleted]
+        parent_id:
+          type: integer
+          nullable: true
+        likes:
+          type: integer
+        dislikes:
+          type: integer
+        pinned:
+          type: boolean
+        author_name:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        author_role:
+          type: string
+          nullable: true
+        author_avatar:
+          type: string
+          nullable: true
+        author_qq:
+          type: string
+          nullable: true
+        target_title:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        target_type:
+          type: string
+          enum: [Package, User, System]
+        target_id:
+          type: integer
+        parent_id:
+          type: integer
+          nullable: true
+      required:
+        - content
+        - target_type
+        - target_id
+
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        status:
+          type: string
+          enum: [Active, Hidden, Deleted]
+
+    CommentListResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        size:
+          type: integer
+
+    # 帖子相关模型
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        author_id:
+          type: integer
+        author_name:
+          type: string
+          nullable: true
+        category_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [Draft, Published, Archived, Deleted]
+        view_count:
+          type: integer
+        like_count:
+          type: integer
+        comment_count:
+          type: integer
+        is_pinned:
+          type: boolean
+        is_featured:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        category_id:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [Draft, Published, Archived, Deleted]
+      required:
+        - title
+        - content
+
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        category_id:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [Draft, Published, Archived, Deleted]
+        is_pinned:
+          type: boolean
+        is_featured:
+          type: boolean
+
+    PostListResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        size:
+          type: integer
+
+    # 标签相关模型
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        use_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+      required:
+        - name
+
+    UpdateTagRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+
+    TagListResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        total:
+          type: integer
+          format: int64
+        page:
+          type: integer
+        size:
+          type: integer
+
+    # 批量操作相关模型
+    BatchStatusRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+        status:
+          type: string
+      required:
+        - ids
+        - status
+
+    BatchIdsRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+      required:
+        - ids
+
+    LikeRequest:
+      type: object
+      properties:
+        like:
+          type: boolean
+      required:
+        - like
+
+    DislikeRequest:
+      type: object
+      properties:
+        dislike:
+          type: boolean
+      required:
+        - dislike
+
+    PinRequest:
+      type: object
+      properties:
+        pinned:
+          type: boolean
+      required:
+        - pinned
+
+    # 系统统计相关模型
+    Stats:
+      type: object
+      properties:
+        total_users:
+          type: integer
+        total_packages:
+          type: integer
+        total_comments:
+          type: integer
+        active_users:
+          type: integer
+        new_users_today:
+          type: integer
+        new_packages_today:
+          type: integer
+        system_status:
+          type: string
+        uptime:
+          type: integer
+
+    # 健康检查响应
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        message:
+          type: string
+          example: 绳包管理器后端服务运行正常
+        timestamp:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+paths:
+  # 健康检查
+  /health:
+    get:
+      tags:
+        - Health
+      summary: 系统健康检查
+      description: 检查系统运行状态
+      responses:
+        '200':
+          description: 系统正常运行
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+                message: 绳包管理器后端服务运行正常
+                timestamp: "2024-01-01T12:00:00Z"
+
+  # 认证相关接口
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: 用户登录
+      description: 使用用户名和密码登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: "testuser"
+              password: "password123"
+      responses:
+        '200':
+          description: 登录成功
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: auth_token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...; Path=/; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+              example:
+                code: 0
+                message: 登录成功
+                data:
+                  user:
+                    id: 1
+                    username: testuser
+                    email: test@example.com
+                    role: user
+                  token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        '400':
+          description: 登录失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                code: 1
+                message: 用户名或密码错误
+
+  /auth/login-by-email:
+    post:
+      tags:
+        - Auth
+      summary: 邮箱验证码登录
+      description: 使用邮箱和验证码登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailLoginRequest'
+            example:
+              email: "test@example.com"
+              code: "123456"
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 登录失败
+
+  /auth/register:
+    post:
+      tags:
+        - Auth
+      summary: 用户注册
+      description: 注册新用户账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            example:
+              username: "newuser"
+              email: "newuser@example.com"
+              password: "password123"
+              nickname: "新用户"
+              verification_code: "123456"
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 注册失败
+
+  /auth/user-info:
+    get:
+      tags:
+        - Auth
+      summary: 获取当前用户信息
+      description: 获取当前登录用户的详细信息
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+
+  /auth/verify:
+    get:
+      tags:
+        - Auth
+      summary: 验证认证状态
+      description: 验证当前token是否有效
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 认证有效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: 认证有效
+        '401':
+          description: 认证无效
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: 退出登录
+      description: 清除用户登录状态
+      responses:
+        '200':
+          description: 退出成功
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: 退出登录成功
+
+  /auth/send-register-code:
+    post:
+      tags:
+        - Auth
+      summary: 发送注册验证码
+      description: 向指定邮箱发送注册验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendCodeRequest'
+            example:
+              email: "test@example.com"
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: 验证码已发送
+        '500':
+          description: 发送失败
+
+  /auth/send-login-code:
+    post:
+      tags:
+        - Auth
+      summary: 发送登录验证码
+      description: 向指定邮箱发送登录验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendCodeRequest'
+      responses:
+        '200':
+          description: 验证码发送成功
+        '400':
+          description: 发送失败
+
+  /auth/verify-code:
+    post:
+      tags:
+        - Auth
+      summary: 验证邮箱验证码
+      description: 验证邮箱验证码是否正确
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+              required:
+                - email
+                - code
+      responses:
+        '200':
+          description: 验证码正确
+        '400':
+          description: 验证码错误或已过期
+
+  /auth/reset-request:
+    post:
+      tags:
+        - Auth
+      summary: 请求密码重置
+      description: 发送密码重置邮件
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required:
+                - email
+      responses:
+        '200':
+          description: 重置邮件已发送
+        '500':
+          description: 发送失败
+
+  /auth/reset-password:
+    post:
+      tags:
+        - Auth
+      summary: 重置密码
+      description: 使用重置token重置密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                token:
+                  type: string
+                new_password:
+                  type: string
+              required:
+                - email
+                - token
+                - new_password
+      responses:
+        '200':
+          description: 密码重置成功
+        '400':
+          description: 重置失败
+
+  # 用户管理接口
+  /users:
+    get:
+      tags:
+        - Users
+      summary: 获取用户列表
+      description: 获取所有用户列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/User'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          pageSize:
+                            type: integer
+                          totalPages:
+                            type: integer
+        '403':
+          description: 权限不足
+
+    post:
+      tags:
+        - Users
+      summary: 创建用户
+      description: 创建新用户（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '200':
+          description: 创建成功
+        '403':
+          description: 权限不足
+
+  /users/batch:
+    delete:
+      tags:
+        - Users
+      summary: 批量删除用户
+      description: 批量删除用户（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchIdsRequest'
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+
+  /users/profile:
+    get:
+      tags:
+        - Users
+      summary: 获取当前用户资料
+      description: 获取当前登录用户的个人资料
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+
+    put:
+      tags:
+        - Users
+      summary: 更新当前用户资料
+      description: 更新当前登录用户的个人资料
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '401':
+          description: 未授权
+
+  /users/my-resources:
+    get:
+      tags:
+        - Users
+      summary: 获取我的资源
+      description: 获取当前用户上传的所有资源
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageListResponse'
+        '401':
+          description: 未授权
+
+  /users/my-comments:
+    get:
+      tags:
+        - Users
+      summary: 获取我的评论
+      description: 获取当前用户的所有评论
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentListResponse'
+        '401':
+          description: 未授权
+
+  /users/change-password:
+    post:
+      tags:
+        - Users
+      summary: 修改密码
+      description: 修改当前用户密码
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                old_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 6
+              required:
+                - old_password
+                - new_password
+      responses:
+        '200':
+          description: 修改成功
+        '400':
+          description: 修改失败
+        '401':
+          description: 未授权
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: 获取用户信息
+      description: 根据ID获取用户信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+        '404':
+          description: 用户不存在
+
+    put:
+      tags:
+        - Users
+      summary: 更新用户信息
+      description: 更新指定用户信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 用户不存在
+
+    delete:
+      tags:
+        - Users
+      summary: 删除用户
+      description: 删除指定用户（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 用户不存在
+
+  /users/{id}/comments:
+    get:
+      tags:
+        - Users
+      summary: 获取用户评论
+      description: 获取指定用户的所有评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentListResponse'
+
+  # 绳包管理接口
+  /packages:
+    get:
+      tags:
+        - Packages
+      summary: 获取绳包列表
+      description: 获取绳包列表，支持分页和筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Pending, Active, Rejected, Inactive, Deleted]
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageListResponse'
+
+  /packages/pending:
+    get:
+      tags:
+        - Packages
+      summary: 获取待审核资源
+      description: 获取待审核的资源列表（管理员和元老权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PackageListResponse'
+        '403':
+          description: 权限不足
+
+  /packages/categories:
+    get:
+      tags:
+        - Packages
+      summary: 获取绳包分类
+      description: 获取所有绳包分类
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            description:
+                              type: string
+
+  /packages/user-submit:
+    post:
+      tags:
+        - Packages
+      summary: 用户提交资源
+      description: 普通用户提交资源，自动设置为待审核状态
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResourceRequest'
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          package_id:
+                            type: integer
+        '401':
+          description: 未授权
+
+  /packages/admin-create:
+    post:
+      tags:
+        - Packages
+      summary: 管理员创建资源
+      description: 管理员或元老创建资源，可设置任意状态
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePackageRequest'
+      responses:
+        '200':
+          description: 创建成功
+        '403':
+          description: 权限不足
+
+  /packages/{id}:
+    get:
+      tags:
+        - Packages
+      summary: 获取绳包详情
+      description: 根据ID获取绳包详细信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Package'
+        '404':
+          description: 绳包不存在
+
+    put:
+      tags:
+        - Packages
+      summary: 更新绳包信息
+      description: 更新绳包信息（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePackageRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 绳包不存在
+
+    delete:
+      tags:
+        - Packages
+      summary: 删除绳包
+      description: 删除绳包（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 绳包不存在
+
+  /packages/{id}/download:
+    get:
+      tags:
+        - Packages
+      summary: 下载绳包
+      description: 下载绳包文件
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 开始下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: 文件不存在
+        '429':
+          description: 下载频率限制
+
+  /packages/{id}/upload:
+    post:
+      tags:
+        - Packages
+      summary: 上传绳包文件
+      description: 上传绳包文件（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        '200':
+          description: 上传成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 绳包不存在
+
+  /packages/{id}/comments:
+    get:
+      tags:
+        - Packages
+      summary: 获取绳包评论
+      description: 获取指定绳包的评论列表
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentListResponse'
+
+  /packages/{id}/review:
+    post:
+      tags:
+        - Packages
+      summary: 审核资源
+      description: 审核资源（管理员和元老权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewResourceRequest'
+      responses:
+        '200':
+          description: 审核成功
+        '400':
+          description: 审核失败
+        '403':
+          description: 权限不足
+        '404':
+          description: 资源不存在
+
+  # 评论管理接口
+  /comments:
+    get:
+      tags:
+        - Comments
+      summary: 获取评论列表
+      description: 获取评论列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Active, Hidden, Deleted]
+        - name: target_type
+          in: query
+          schema:
+            type: string
+            enum: [Package, User, System]
+        - name: target_id
+          in: query
+          schema:
+            type: integer
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentListResponse'
+        '403':
+          description: 权限不足
+
+    post:
+      tags:
+        - Comments
+      summary: 创建评论
+      description: 创建新评论
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          comment_id:
+                            type: integer
+        '401':
+          description: 未授权
+
+  /comments/batch-status:
+    put:
+      tags:
+        - Comments
+      summary: 批量更新评论状态
+      description: 批量更新评论状态（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchStatusRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+
+  /comments/batch-delete:
+    delete:
+      tags:
+        - Comments
+      summary: 批量删除评论
+      description: 批量删除评论（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchIdsRequest'
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+
+  /comments/{id}:
+    get:
+      tags:
+        - Comments
+      summary: 获取评论详情
+      description: 根据ID获取评论详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Comment'
+        '404':
+          description: 评论不存在
+
+    put:
+      tags:
+        - Comments
+      summary: 更新评论
+      description: 更新评论内容（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCommentRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 评论不存在
+
+    delete:
+      tags:
+        - Comments
+      summary: 删除评论
+      description: 删除评论（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 评论不存在
+
+  /comments/{id}/replies:
+    get:
+      tags:
+        - Comments
+      summary: 获取评论回复
+      description: 获取指定评论的回复列表
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommentListResponse'
+
+    post:
+      tags:
+        - Comments
+      summary: 回复评论
+      description: 回复指定评论
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+              required:
+                - content
+      responses:
+        '200':
+          description: 回复成功
+        '401':
+          description: 未授权
+        '404':
+          description: 原评论不存在
+
+  /comments/{id}/like:
+    post:
+      tags:
+        - Comments
+      summary: 点赞/取消点赞评论
+      description: 点赞或取消点赞评论
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LikeRequest'
+      responses:
+        '200':
+          description: 操作成功
+        '401':
+          description: 未授权
+        '404':
+          description: 评论不存在
+
+  /comments/{id}/dislike:
+    post:
+      tags:
+        - Comments
+      summary: 点踩/取消点踩评论
+      description: 点踩或取消点踩评论
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DislikeRequest'
+      responses:
+        '200':
+          description: 操作成功
+        '401':
+          description: 未授权
+        '404':
+          description: 评论不存在
+
+  /comments/{id}/pin:
+    post:
+      tags:
+        - Comments
+      summary: 置顶/取消置顶评论
+      description: 置顶或取消置顶评论（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PinRequest'
+      responses:
+        '200':
+          description: 操作成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 评论不存在
+
+  # 帖子管理接口
+  /posts:
+    get:
+      tags:
+        - Posts
+      summary: 获取帖子列表
+      description: 获取帖子列表，支持分页和筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: author_id
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Draft, Published, Archived, Deleted]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: is_pinned
+          in: query
+          schema:
+            type: boolean
+        - name: is_featured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PostListResponse'
+
+    post:
+      tags:
+        - Posts
+      summary: 创建帖子
+      description: 创建新帖子
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          post_id:
+                            type: integer
+        '401':
+          description: 未授权
+
+  /posts/featured:
+    get:
+      tags:
+        - Posts
+      summary: 获取精华帖子
+      description: 获取精华帖子列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PostListResponse'
+
+  /posts/popular:
+    get:
+      tags:
+        - Posts
+      summary: 获取热门帖子
+      description: 获取热门帖子列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PostListResponse'
+
+  /posts/{id}:
+    get:
+      tags:
+        - Posts
+      summary: 获取帖子详情
+      description: 根据ID获取帖子详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Post'
+        '404':
+          description: 帖子不存在
+
+    put:
+      tags:
+        - Posts
+      summary: 更新帖子
+      description: 更新帖子信息（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePostRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 帖子不存在
+
+    delete:
+      tags:
+        - Posts
+      summary: 删除帖子
+      description: 删除帖子（作者或管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 帖子不存在
+
+  /posts/{id}/tags:
+    get:
+      tags:
+        - Posts
+      summary: 获取帖子标签
+      description: 获取指定帖子的标签列表
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tag'
+
+  /posts/{id}/view:
+    post:
+      tags:
+        - Posts
+      summary: 增加浏览量
+      description: 增加帖子浏览量
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 操作成功
+        '404':
+          description: 帖子不存在
+
+  # 标签管理接口
+  /tags:
+    get:
+      tags:
+        - Tags
+      summary: 获取标签列表
+      description: 获取标签列表，支持分页和筛选
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [name, use_count, created_at]
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TagListResponse'
+
+    post:
+      tags:
+        - Tags
+      summary: 创建标签
+      description: 创建新标签（管理员和元老权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTagRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tag_id:
+                            type: integer
+        '403':
+          description: 权限不足
+
+  /tags/popular:
+    get:
+      tags:
+        - Tags
+      summary: 获取热门标签
+      description: 获取使用频率最高的标签
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tag'
+
+  /tags/all:
+    get:
+      tags:
+        - Tags
+      summary: 获取所有标签
+      description: 获取所有标签（不分页）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Tag'
+
+  /tags/update-counts:
+    post:
+      tags:
+        - Tags
+      summary: 更新标签计数
+      description: 更新所有标签的使用计数（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+
+  /tags/stats:
+    get:
+      tags:
+        - Tags
+      summary: 获取标签统计
+      description: 获取标签使用统计信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_tags:
+                            type: integer
+                          most_used_tag:
+                            $ref: '#/components/schemas/Tag'
+                          least_used_tag:
+                            $ref: '#/components/schemas/Tag'
+
+  /tags/{id}:
+    get:
+      tags:
+        - Tags
+      summary: 获取标签详情
+      description: 根据ID获取标签详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Tag'
+        '404':
+          description: 标签不存在
+
+    put:
+      tags:
+        - Tags
+      summary: 更新标签
+      description: 更新标签信息（管理员和元老权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTagRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 标签不存在
+
+    delete:
+      tags:
+        - Tags
+      summary: 删除标签
+      description: 删除标签（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 标签不存在
+
+  # 下载安全接口
+  /download-security/stats:
+    get:
+      tags:
+        - Download Security
+      summary: 获取安全统计
+      description: 获取下载安全统计信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          anomaly_count:
+                            type: integer
+                          blocked_ips:
+                            type: integer
+                          security_events:
+                            type: integer
+        '403':
+          description: 权限不足
+
+  /download-security/config:
+    get:
+      tags:
+        - Download Security
+      summary: 获取安全配置
+      description: 获取下载安全配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          max_downloads_per_hour:
+                            type: integer
+                          max_downloads_per_day:
+                            type: integer
+                          anomaly_threshold:
+                            type: number
+        '403':
+          description: 权限不足
+
+    put:
+      tags:
+        - Download Security
+      summary: 更新安全配置
+      description: 更新下载安全配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_downloads_per_hour:
+                  type: integer
+                max_downloads_per_day:
+                  type: integer
+                anomaly_threshold:
+                  type: number
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+
+  /download-security/anomalies:
+    get:
+      tags:
+        - Download Security
+      summary: 获取异常记录
+      description: 获取下载异常记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                ip_address:
+                                  type: string
+                                user_id:
+                                  type: integer
+                                anomaly_type:
+                                  type: string
+                                severity:
+                                  type: string
+                                created_at:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          size:
+                            type: integer
+        '403':
+          description: 权限不足
+
+  # 管理员接口（部分示例）
+  /admin/stats:
+    get:
+      tags:
+        - Admin
+      summary: 获取系统统计
+      description: 获取系统整体统计信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Stats'
+        '403':
+          description: 权限不足
+
+  /admin/user-stats:
+    get:
+      tags:
+        - Admin
+      summary: 获取用户统计
+      description: 获取用户相关统计信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_users:
+                            type: integer
+                          active_users:
+                            type: integer
+                          new_users_today:
+                            type: integer
+                          banned_users:
+                            type: integer
+        '403':
+          description: 权限不足
+
+  # 分类管理接口
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: 获取分类列表
+      description: 获取所有分类列表，包含每个分类的资源数量
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                name:
+                                  type: string
+                                description:
+                                  type: string
+                                enabled:
+                                  type: boolean
+                                subscription_locked:
+                                  type: boolean
+                                created_at:
+                                  type: string
+                                  format: date-time
+                                updated_at:
+                                  type: string
+                                  format: date-time
+                                count:
+                                  type: integer
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Categories
+      summary: 创建分类
+      description: 创建新的分类（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+                  default: true
+                subscription_locked:
+                  type: boolean
+                  default: false
+              required:
+                - name
+      responses:
+        '200':
+          description: 创建成功
+        '400':
+          description: 创建失败
+
+  /categories/{id}:
+    get:
+      tags:
+        - Categories
+      summary: 获取分类详情
+      description: 根据ID获取分类详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+        '404':
+          description: 分类不存在
+
+    put:
+      tags:
+        - Categories
+      summary: 更新分类
+      description: 更新分类信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+                subscription_locked:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 更新失败
+
+    delete:
+      tags:
+        - Categories
+      summary: 删除分类
+      description: 删除分类（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '500':
+          description: 删除失败
+
+  # 社区动态接口
+  /community/comments/{package_id}:
+    get:
+      tags:
+        - Community
+      summary: 获取资源评论
+      description: 获取指定资源的评论列表
+      parameters:
+        - name: package_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Comment'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          size:
+                            type: integer
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Community
+      summary: 创建评论
+      description: 为指定资源创建评论
+      parameters:
+        - name: package_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '200':
+          description: 评论成功
+        '400':
+          description: 评论失败
+
+  /community/activities:
+    get:
+      tags:
+        - Community
+      summary: 获取公开活动
+      description: 获取社区公开活动记录
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          actions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                action_type:
+                                  type: string
+                                details:
+                                  type: string
+                                username:
+                                  type: string
+                                  nullable: true
+                                created_at:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          pageSize:
+                            type: integer
+        '500':
+          description: 服务器错误
+
+  # Feed聚合接口
+  /community/feed:
+    get:
+      tags:
+        - Feed
+      summary: 获取社区动态流
+      description: 获取包含帖子和资源的聚合动态流
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                item_type:
+                                  type: string
+                                  enum: [post, package]
+                                title:
+                                  type: string
+                                author:
+                                  type: string
+                                download_count:
+                                  type: integer
+                                  nullable: true
+                                view_count:
+                                  type: integer
+                                  nullable: true
+                                created_at:
+                                  type: string
+                                  format: date-time
+                                tags:
+                                  type: array
+                                  items:
+                                    type: string
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          page_size:
+                            type: integer
+        '500':
+          description: 服务器错误
+
+  # 资源记录接口
+  /resource-records:
+    get:
+      tags:
+        - Resource Records
+      summary: 获取资源记录列表
+      description: 获取资源操作记录列表（支持分页和筛选）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                resource_id:
+                                  type: integer
+                                resource_type:
+                                  type: string
+                                resource_name:
+                                  type: string
+                                user_id:
+                                  type: integer
+                                user_name:
+                                  type: string
+                                action:
+                                  type: string
+                                ip_address:
+                                  type: string
+                                old_data:
+                                  type: string
+                                new_data:
+                                  type: string
+                                timestamp:
+                                  type: integer
+                                  format: int64
+                                file_size:
+                                  type: integer
+                                  format: int64
+                                download_count:
+                                  type: integer
+                                created_at:
+                                  type: string
+                                  format: date-time
+                                updated_at:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          size:
+                            type: integer
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Resource Records
+      summary: 记录资源操作
+      description: 记录资源操作行为
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resource_id:
+                  type: integer
+                resource_type:
+                  type: string
+                action:
+                  type: string
+                old_data:
+                  type: string
+                new_data:
+                  type: string
+              required:
+                - resource_id
+                - resource_type
+                - action
+      responses:
+        '200':
+          description: 记录成功
+        '500':
+          description: 记录失败
+
+  /resource-records/batch-delete:
+    post:
+      tags:
+        - Resource Records
+      summary: 批量删除记录
+      description: 批量删除资源记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+              required:
+                - ids
+      responses:
+        '200':
+          description: 删除成功
+        '500':
+          description: 删除失败
+
+  /resource-records/clear:
+    post:
+      tags:
+        - Resource Records
+      summary: 清空记录
+      description: 清空所有资源记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 清空成功
+
+  /resource-records/stats:
+    get:
+      tags:
+        - Resource Records
+      summary: 获取资源操作统计
+      description: 获取资源操作统计信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_records:
+                            type: integer
+                          today_records:
+                            type: integer
+                          action_types:
+                            type: object
+        '500':
+          description: 获取失败
+
+  /resource-records/{id}:
+    delete:
+      tags:
+        - Resource Records
+      summary: 删除单条记录
+      description: 删除指定的资源记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '500':
+          description: 删除失败
+
+  # 用户行为记录接口
+  /user-actions:
+    get:
+      tags:
+        - User Actions
+      summary: 获取用户行为记录
+      description: 获取用户行为记录列表（支持分页和筛选）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+        - name: action_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          actions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                user_id:
+                                  type: integer
+                                  nullable: true
+                                action_type:
+                                  type: string
+                                target_type:
+                                  type: string
+                                  nullable: true
+                                target_id:
+                                  type: integer
+                                  nullable: true
+                                details:
+                                  type: string
+                                  nullable: true
+                                ip_address:
+                                  type: string
+                                  nullable: true
+                                user_agent:
+                                  type: string
+                                  nullable: true
+                                created_at:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          pageSize:
+                            type: integer
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - User Actions
+      summary: 记录用户行为
+      description: 记录用户行为操作
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action_type:
+                  type: string
+                target_type:
+                  type: string
+                target_id:
+                  type: integer
+                details:
+                  type: string
+              required:
+                - action_type
+      responses:
+        '200':
+          description: 记录成功
+        '500':
+          description: 记录失败
+
+  /user-actions/stats:
+    get:
+      tags:
+        - User Actions
+      summary: 获取行为统计
+      description: 获取用户行为统计数据
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_actions:
+                            type: integer
+                          today_actions:
+                            type: integer
+                          action_distribution:
+                            type: object
+        '500':
+          description: 获取失败
+
+  /user-actions/community:
+    get:
+      tags:
+        - User Actions
+      summary: 获取社区动态
+      description: 获取包含用户信息的社区动态
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+        '500':
+          description: 获取失败
+
+  /user-actions/batch:
+    delete:
+      tags:
+        - User Actions
+      summary: 批量删除行为记录
+      description: 批量删除用户行为记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action_ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+              required:
+                - action_ids
+      responses:
+        '200':
+          description: 删除成功
+        '400':
+          description: 参数错误
+        '500':
+          description: 删除失败
+
+  /user-actions/{id}:
+    get:
+      tags:
+        - User Actions
+      summary: 获取单个行为记录
+      description: 根据ID获取用户行为记录详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+        '404':
+          description: 记录不存在
+
+    delete:
+      tags:
+        - User Actions
+      summary: 删除行为记录
+      description: 删除指定的用户行为记录（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '500':
+          description: 删除失败
+
+  # 违禁词管理接口
+  /forbidden-words:
+    get:
+      tags:
+        - Forbidden Words
+      summary: 获取违禁词列表
+      description: 获取所有违禁词列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            word:
+                              type: string
+                            created_at:
+                              type: string
+                              format: date-time
+        '403':
+          description: 权限不足
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Forbidden Words
+      summary: 添加违禁词
+      description: 添加新的违禁词（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                word:
+                  type: string
+                  minLength: 1
+              required:
+                - word
+      responses:
+        '200':
+          description: 添加成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 添加失败
+
+  /forbidden-words/{id}:
+    delete:
+      tags:
+        - Forbidden Words
+      summary: 删除违禁词
+      description: 删除指定的违禁词（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 删除失败
+
+  # 订阅管理接口
+  /subscriptions:
+    get:
+      tags:
+        - Subscriptions
+      summary: 获取用户订阅
+      description: 获取当前用户的订阅列表
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            user_id:
+                              type: integer
+                            category_id:
+                              type: integer
+                            category_name:
+                              type: string
+                            enabled:
+                              type: boolean
+                            created_at:
+                              type: string
+                              format: date-time
+                            updated_at:
+                              type: string
+                              format: date-time
+        '500':
+          description: 服务器错误
+
+  /subscriptions/set:
+    post:
+      tags:
+        - Subscriptions
+      summary: 设置订阅
+      description: 设置或取消分类订阅
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id:
+                  type: integer
+                enabled:
+                  type: boolean
+              required:
+                - category_id
+                - enabled
+      responses:
+        '200':
+          description: 设置成功
+        '500':
+          description: 设置失败
+
+  # 缓存管理接口
+  /cache/{cache_key}:
+    get:
+      tags:
+        - Cache
+      summary: 获取缓存
+      description: 获取指定键的缓存数据
+      parameters:
+        - name: cache_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+
+    delete:
+      tags:
+        - Cache
+      summary: 清除缓存
+      description: 清除指定键的缓存（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: cache_key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 清除成功
+
+  /cache:
+    post:
+      tags:
+        - Cache
+      summary: 设置缓存
+      description: 设置指定键的缓存数据（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                key:
+                  type: string
+                value:
+                  type: object
+                ttl:
+                  type: integer
+                  format: int64
+                  nullable: true
+              required:
+                - key
+                - value
+      responses:
+        '200':
+          description: 设置成功
+
+    delete:
+      tags:
+        - Cache
+      summary: 清除所有缓存
+      description: 清除所有缓存数据（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 清除成功
+
+  /cache/stats:
+    get:
+      tags:
+        - Cache
+      summary: 获取缓存统计
+      description: 获取缓存系统统计信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_keys:
+                            type: integer
+                          total_size:
+                            type: integer
+                          hit_rate:
+                            type: number
+
+  # 安全管理接口
+  /security-management/ip-bans:
+    get:
+      tags:
+        - Security Management
+      summary: 获取IP封禁列表
+      description: 获取被封禁的IP地址列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          bans:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                ip_address:
+                                  type: string
+                                reason:
+                                  type: string
+                                severity:
+                                  type: string
+                                duration_hours:
+                                  type: integer
+                                  nullable: true
+                                banned_at:
+                                  type: string
+                                  format: date-time
+                                expires_at:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+                                banned_by:
+                                  type: string
+                                is_active:
+                                  type: boolean
+        '403':
+          description: 权限不足
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Security Management
+      summary: 封禁IP
+      description: 封禁指定IP地址（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip_address:
+                  type: string
+                  format: ipv4
+                reason:
+                  type: string
+                  default: 管理员手动封禁
+                duration_hours:
+                  type: integer
+                  default: 24
+              required:
+                - ip_address
+      responses:
+        '200':
+          description: 封禁成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 封禁失败
+
+    delete:
+      tags:
+        - Security Management
+      summary: 解除IP封禁
+      description: 解除IP地址封禁（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip_address:
+                  type: string
+                  format: ipv4
+              required:
+                - ip_address
+      responses:
+        '200':
+          description: 解除成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 解除失败
+
+  /security-management/ip-whitelist:
+    get:
+      tags:
+        - Security Management
+      summary: 获取IP白名单
+      description: 获取IP白名单列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          whitelist:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                ip_address:
+                                  type: string
+                                description:
+                                  type: string
+                                added_by:
+                                  type: string
+                                created_at:
+                                  type: string
+                                  format: date-time
+        '403':
+          description: 权限不足
+        '500':
+          description: 服务器错误
+
+    post:
+      tags:
+        - Security Management
+      summary: 添加IP到白名单
+      description: 将IP地址添加到白名单（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip_address:
+                  type: string
+                  format: ipv4
+                description:
+                  type: string
+                  default: 管理员添加
+              required:
+                - ip_address
+      responses:
+        '200':
+          description: 添加成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 添加失败
+
+    delete:
+      tags:
+        - Security Management
+      summary: 从白名单移除IP
+      description: 从白名单中移除IP地址（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ip_address:
+                  type: string
+                  format: ipv4
+              required:
+                - ip_address
+      responses:
+        '200':
+          description: 移除成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 移除失败
+
+  /security-management/ban-stats:
+    get:
+      tags:
+        - Security Management
+      summary: 获取封禁统计
+      description: 获取IP封禁统计信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_bans:
+                            type: integer
+                          active_bans:
+                            type: integer
+                          expired_bans:
+                            type: integer
+                          whitelist_count:
+                            type: integer
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+  /security-management/security-config:
+    get:
+      tags:
+        - Security Management
+      summary: 获取安全配置
+      description: 获取系统安全配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          max_login_attempts:
+                            type: integer
+                          lockout_duration:
+                            type: integer
+                          enable_ip_whitelist:
+                            type: boolean
+                          enable_rate_limiting:
+                            type: boolean
+        '403':
+          description: 权限不足
+
+    put:
+      tags:
+        - Security Management
+      summary: 更新安全配置
+      description: 更新系统安全配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                max_login_attempts:
+                  type: integer
+                lockout_duration:
+                  type: integer
+                enable_ip_whitelist:
+                  type: boolean
+                enable_rate_limiting:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足 
+
+  # 管理员备份管理接口
+  /admin/backup:
+    post:
+      tags:
+        - Admin
+      summary: 创建备份
+      description: 创建数据库备份（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_type:
+                  type: string
+                  enum: [Manual, Auto, Scheduled]
+                  default: Manual
+                description:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: 备份创建成功
+        '403':
+          description: 权限不足
+
+  /admin/backups:
+    get:
+      tags:
+        - Admin
+      summary: 获取备份列表
+      description: 获取所有备份文件列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                filename:
+                                  type: string
+                                file_path:
+                                  type: string
+                                file_size:
+                                  type: integer
+                                  format: int64
+                                backup_type:
+                                  type: string
+                                  enum: [Manual, Auto, Scheduled]
+                                status:
+                                  type: string
+                                description:
+                                  type: string
+                                  nullable: true
+                                backup_time:
+                                  type: string
+                                  format: date-time
+                                created_by:
+                                  type: integer
+                                  nullable: true
+                                created_by_name:
+                                  type: string
+                                  nullable: true
+                          total:
+                            type: integer
+        '403':
+          description: 权限不足
+
+  /admin/backup/stats:
+    get:
+      tags:
+        - Admin
+      summary: 获取备份统计
+      description: 获取备份统计信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+
+  /admin/backup/batch-delete:
+    post:
+      tags:
+        - Admin
+      summary: 批量删除备份
+      description: 批量删除备份文件（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_ids:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+              required:
+                - backup_ids
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+
+  /admin/backup/{backup_id}:
+    get:
+      tags:
+        - Admin
+      summary: 获取备份详情
+      description: 获取指定备份的详细信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: backup_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 备份不存在
+
+    delete:
+      tags:
+        - Admin
+      summary: 删除备份
+      description: 删除指定备份文件（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: backup_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+
+  /admin/backup/{backup_id}/download:
+    get:
+      tags:
+        - Admin
+      summary: 下载备份文件
+      description: 下载指定备份文件（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: backup_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 开始下载
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: 权限不足
+        '404':
+          description: 备份文件不存在
+
+  /admin/backup/{backup_id}/restore:
+    post:
+      tags:
+        - Admin
+      summary: 恢复备份
+      description: 从备份文件恢复数据库（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: backup_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 恢复成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 备份文件不存在
+
+  /admin/backup-schedule:
+    get:
+      tags:
+        - Admin
+      summary: 获取备份计划
+      description: 获取自动备份计划配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+
+    post:
+      tags:
+        - Admin
+      summary: 更新备份计划
+      description: 更新自动备份计划配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                schedule:
+                  type: string
+                  description: Cron表达式
+                retention_days:
+                  type: integer
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+
+  # 公告管理接口
+  /admin/announcements:
+    get:
+      tags:
+        - Admin
+      summary: 获取公告列表
+      description: 获取所有公告列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                title:
+                                  type: string
+                                content:
+                                  type: string
+                                priority:
+                                  type: integer
+                                enabled:
+                                  type: boolean
+                                start_time:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+                                end_time:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+                                created_at:
+                                  type: string
+                                  format: date-time
+                                updated_at:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+        '403':
+          description: 权限不足
+
+    post:
+      tags:
+        - Admin
+      summary: 创建公告
+      description: 创建新公告（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                priority:
+                  type: integer
+                  default: 0
+                enabled:
+                  type: boolean
+                  default: true
+                start_time:
+                  type: string
+                  format: date-time
+                  nullable: true
+                end_time:
+                  type: string
+                  format: date-time
+                  nullable: true
+              required:
+                - title
+                - content
+      responses:
+        '200':
+          description: 创建成功
+        '400':
+          description: 创建失败
+        '403':
+          description: 权限不足
+
+  /admin/announcements/batch-status:
+    put:
+      tags:
+        - Admin
+      summary: 批量更新公告状态
+      description: 批量启用或禁用公告（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                enabled:
+                  type: boolean
+              required:
+                - ids
+                - enabled
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  /admin/announcements/batch-delete:
+    post:
+      tags:
+        - Admin
+      summary: 批量删除公告
+      description: 批量删除公告（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+              required:
+                - ids
+      responses:
+        '200':
+          description: 删除成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  /admin/announcements/{id}:
+    get:
+      tags:
+        - Admin
+      summary: 获取公告详情
+      description: 获取指定公告详情（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 公告不存在
+
+    put:
+      tags:
+        - Admin
+      summary: 更新公告
+      description: 更新公告信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                priority:
+                  type: integer
+                enabled:
+                  type: boolean
+                start_time:
+                  type: string
+                  format: date-time
+                  nullable: true
+                end_time:
+                  type: string
+                  format: date-time
+                  nullable: true
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 更新失败
+        '403':
+          description: 权限不足
+
+    delete:
+      tags:
+        - Admin
+      summary: 删除公告
+      description: 删除指定公告（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 删除失败
+
+  # 公开公告接口
+  /announcements/active:
+    get:
+      tags:
+        - Announcements
+      summary: 获取有效公告
+      description: 获取当前有效的公告列表（无需权限）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                title:
+                                  type: string
+                                content:
+                                  type: string
+                                priority:
+                                  type: integer
+                                start_time:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+                                end_time:
+                                  type: string
+                                  format: date-time
+                                  nullable: true
+                                created_at:
+                                  type: string
+                                  format: date-time
+        '500':
+          description: 获取失败
+
+  # 主题设置接口
+  /admin/theme-settings:
+    get:
+      tags:
+        - Admin
+      summary: 获取主题设置
+      description: 获取系统主题设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          primary_color:
+                            type: string
+                            pattern: '^#[0-9A-Fa-f]{6}$'
+                            example: '#409EFF'
+                          secondary_color:
+                            type: string
+                            pattern: '^#[0-9A-Fa-f]{6}$'
+                            example: '#67C23A'
+                          dark_mode:
+                            type: boolean
+                          font_size:
+                            type: string
+                            example: '14px'
+                          language:
+                            type: string
+                            enum: [zh-CN, en-US]
+                            default: zh-CN
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+    post:
+      tags:
+        - Admin
+      summary: 更新主题设置
+      description: 更新系统主题设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                primary_color:
+                  type: string
+                  pattern: '^#[0-9A-Fa-f]{6}$'
+                secondary_color:
+                  type: string
+                  pattern: '^#[0-9A-Fa-f]{6}$'
+                dark_mode:
+                  type: boolean
+                font_size:
+                  type: string
+                language:
+                  type: string
+                  enum: [zh-CN, en-US]
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  # 系统设置接口
+  /admin/settings:
+    get:
+      tags:
+        - Admin
+      summary: 获取所有设置
+      description: 获取所有系统设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties:
+                          type: string
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+    post:
+      tags:
+        - Admin
+      summary: 批量更新设置
+      description: 批量更新系统设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  /admin/settings/reset:
+    post:
+      tags:
+        - Admin
+      summary: 重置设置
+      description: 重置所有设置为默认值（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 重置成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 重置失败
+
+  /admin/settings/{key}:
+    get:
+      tags:
+        - Admin
+      summary: 获取单个设置
+      description: 获取指定键的设置值（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key:
+                            type: string
+                          value:
+                            type: string
+        '403':
+          description: 权限不足
+        '404':
+          description: 设置项不存在
+
+    post:
+      tags:
+        - Admin
+      summary: 更新单个设置
+      description: 更新指定键的设置值（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+              required:
+                - value
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 更新失败
+
+  # 邮件设置接口
+  /admin/mail-settings:
+    get:
+      tags:
+        - Admin
+      summary: 获取邮件设置
+      description: 获取邮件服务配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          smtp_server:
+                            type: string
+                          smtp_port:
+                            type: integer
+                          username:
+                            type: string
+                          password:
+                            type: string
+                            writeOnly: true
+                          from_name:
+                            type: string
+                          enabled:
+                            type: boolean
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+    post:
+      tags:
+        - Admin
+      summary: 更新邮件设置
+      description: 更新邮件服务配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                smtp_server:
+                  type: string
+                smtp_port:
+                  type: integer
+                username:
+                  type: string
+                password:
+                  type: string
+                from_name:
+                  type: string
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 更新失败
+
+  /admin/test-email:
+    post:
+      tags:
+        - Admin
+      summary: 发送测试邮件
+      description: 发送测试邮件验证配置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required:
+                - email
+      responses:
+        '200':
+          description: 发送成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '500':
+          description: 发送失败
+
+  # 社区设置接口
+  /admin/community-settings:
+    get:
+      tags:
+        - Admin
+      summary: 获取社区设置
+      description: 获取社区基本设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          site_title:
+                            type: string
+                          site_subtitle:
+                            type: string
+                          site_description:
+                            type: string
+                          welcome_message:
+                            type: string
+                          announcement:
+                            type: string
+                            nullable: true
+                          footer_text:
+                            type: string
+                          contact_email:
+                            type: string
+                            format: email
+                          github_link:
+                            type: string
+                            nullable: true
+                          qq_group:
+                            type: string
+                            nullable: true
+                          wechat_group:
+                            type: string
+                            nullable: true
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+    post:
+      tags:
+        - Admin
+      summary: 更新社区设置
+      description: 更新社区基本设置（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                site_title:
+                  type: string
+                site_subtitle:
+                  type: string
+                site_description:
+                  type: string
+                welcome_message:
+                  type: string
+                announcement:
+                  type: string
+                  nullable: true
+                footer_text:
+                  type: string
+                contact_email:
+                  type: string
+                  format: email
+                github_link:
+                  type: string
+                  nullable: true
+                qq_group:
+                  type: string
+                  nullable: true
+                wechat_group:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: 更新成功
+        '403':
+          description: 权限不足
+        '500':
+          description: 更新失败
+
+  /admin/public/community-settings:
+    get:
+      tags:
+        - Public
+      summary: 获取公开社区设置
+      description: 获取公开的社区设置信息（无需权限）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          site_title:
+                            type: string
+                          site_subtitle:
+                            type: string
+                          site_description:
+                            type: string
+                          welcome_message:
+                            type: string
+                          footer_text:
+                            type: string
+                          github_link:
+                            type: string
+                            nullable: true
+                          qq_group:
+                            type: string
+                            nullable: true
+                          wechat_group:
+                            type: string
+                            nullable: true
+        '500':
+          description: 获取失败
+
+  # 订阅管理接口（管理员）
+  /admin/subscriptions/stats:
+    get:
+      tags:
+        - Admin
+      summary: 获取全部订阅统计
+      description: 获取所有分类的订阅统计（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            category_id:
+                              type: integer
+                            category_name:
+                              type: string
+                            subscriber_count:
+                              type: integer
+        '403':
+          description: 权限不足
+
+  /admin/subscriptions/category/{id}/stats:
+    get:
+      tags:
+        - Admin
+      summary: 获取分类订阅统计
+      description: 获取指定分类的订阅统计（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+
+  /admin/subscriptions/category/{id}/subscribers:
+    get:
+      tags:
+        - Admin
+      summary: 获取分类订阅者
+      description: 获取指定分类的订阅者列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+        '403':
+          description: 权限不足
+
+  /admin/subscriptions/user/{user_id}/category/{category_id}:
+    delete:
+      tags:
+        - Admin
+      summary: 管理员取消用户订阅
+      description: 管理员为用户取消指定分类订阅（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: category_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 取消成功
+        '403':
+          description: 权限不足
+
+  /admin/subscriptions/notify:
+    post:
+      tags:
+        - Admin
+      summary: 发送分类通知
+      description: 向分类订阅者发送通知（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category_id:
+                  type: integer
+                title:
+                  type: string
+                content:
+                  type: string
+              required:
+                - category_id
+                - title
+                - content
+      responses:
+        '200':
+          description: 发送成功
+        '403':
+          description: 权限不足
+
+  /admin/subscriptions/export:
+    get:
+      tags:
+        - Admin
+      summary: 导出订阅数据
+      description: 导出所有订阅数据（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 导出成功
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: 权限不足
+
+  /admin/logs:
+    get:
+      tags:
+        - Admin
+      summary: 获取系统日志
+      description: 获取系统日志列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [DEBUG, INFO, WARN, ERROR]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: integer
+                                level:
+                                  type: string
+                                message:
+                                  type: string
+                                module:
+                                  type: string
+                                timestamp:
+                                  type: string
+                                  format: date-time
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          page_size:
+                            type: integer
+        '403':
+          description: 权限不足
+        '500':
+          description: 获取失败
+
+tags:
+  - name: Health
+    description: 系统健康检查
+  - name: Auth
+    description: 认证相关接口
+  - name: Users
+    description: 用户管理接口
+  - name: Packages
+    description: 绳包管理接口
+  - name: Comments
+    description: 评论系统接口
+  - name: Posts
+    description: 帖子系统接口
+  - name: Tags
+    description: 标签管理接口
+  - name: Categories
+    description: 分类管理接口
+  - name: Community
+    description: 社区动态接口
+  - name: Feed
+    description: 动态流接口
+  - name: Resource Records
+    description: 资源记录接口
+  - name: User Actions
+    description: 用户行为记录接口
+  - name: Forbidden Words
+    description: 违禁词管理接口
+  - name: Subscriptions
+    description: 订阅管理接口
+  - name: Cache
+    description: 缓存管理接口
+  - name: Security Management
+    description: 安全管理接口
+  - name: Download Security
+    description: 下载安全接口
+  - name: Admin
+    description: 管理员接口
+  - name: Announcements
+    description: 公告接口
+  - name: Public
+    description: 公开接口

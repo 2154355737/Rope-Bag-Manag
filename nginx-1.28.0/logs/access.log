@@ -5978,3 +5978,5 @@
 127.0.0.1 - - [02/Aug/2025:15:23:28 +0800] "GET /api/v1/community/feed?sort=latest&page=1&page_size=4 HTTP/1.1" 200 615 "http://localhost/home" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0" "-"
 127.0.0.1 - - [02/Aug/2025:15:23:28 +0800] "GET /api/v1/posts?page=1&page_size=5&status=Published HTTP/1.1" 200 957 "http://localhost/home" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0" "-"
 127.0.0.1 - - [02/Aug/2025:15:23:28 +0800] "GET /api/v1/announcements/active HTTP/1.1" 200 335 "http://localhost/home" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 Edg/138.0.0.0" "-"
+127.0.0.1 - - [05/Aug/2025:14:03:53 +0800] "GET / HTTP/1.1" 200 678 "-" "Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.26100.4652" "-"
+127.0.0.1 - - [05/Aug/2025:14:03:55 +0800] "GET / HTTP/1.1" 200 678 "-" "Mozilla/5.0 (Windows NT; Windows NT 10.0; zh-CN) WindowsPowerShell/5.1.26100.4652" "-"

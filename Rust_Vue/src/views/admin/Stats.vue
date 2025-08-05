@@ -1567,50 +1567,50 @@ onUnmounted(() => {
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 }
 
-.dark .page-header,
-.dark .stat-card,
-.dark .chart-card,
-.dark .status-section,
-.dark .activity-section {
+:global(html.dark) .page-header,
+:global(html.dark) .stat-card,
+:global(html.dark) .chart-card,
+:global(html.dark) .status-section,
+:global(html.dark) .activity-section {
   background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-secondary) 100%);
   border-color: var(--border-color);
 }
 
 /* 主题适配 */
-.blue .stat-card::before,
-.blue .chart-card::before {
+:global(html.blue) .stat-card::before,
+:global(html.blue) .chart-card::before {
   background: linear-gradient(90deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
 }
 
-.green .stat-card::before,
-.green .chart-card::before {
+:global(html.green) .stat-card::before,
+:global(html.green) .chart-card::before {
   background: linear-gradient(90deg, var(--success-color) 0%, var(--success-color-light) 100%);
 }
 
-.orange .stat-card::before,
-.orange .chart-card::before {
+:global(html.orange) .stat-card::before,
+:global(html.orange) .chart-card::before {
   background: linear-gradient(90deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
 }
 
-.purple .stat-card::before,
-.purple .chart-card::before {
+:global(html.purple) .stat-card::before,
+:global(html.purple) .chart-card::before {
   background: linear-gradient(90deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 
-.blue .stat-card.primary .stat-icon,
-.blue .header-icon {
+:global(html.blue) .stat-card.primary .stat-icon,
+:global(html.blue) .header-icon {
   background: linear-gradient(135deg, var(--brand-color) 0%, var(--brand-color-light) 100%);
 }
 
-.green .stat-card.success .stat-icon {
+:global(html.green) .stat-card.success .stat-icon {
   background: linear-gradient(135deg, var(--success-color) 0%, var(--success-color-light) 100%);
 }
 
-.orange .stat-card.warning .stat-icon {
+:global(html.orange) .stat-card.warning .stat-icon {
   background: linear-gradient(135deg, var(--warning-color) 0%, var(--warning-color-light) 100%);
 }
 
-.purple .stat-card.info .stat-icon {
+:global(html.purple) .stat-card.info .stat-icon {
   background: linear-gradient(135deg, var(--info-color) 0%, var(--info-color-light) 100%);
 }
 

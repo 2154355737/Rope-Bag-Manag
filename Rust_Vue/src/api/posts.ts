@@ -8,6 +8,7 @@ export interface Post {
   author_id: number;
   author_name?: string;
   category_id?: number;
+  category_name?: string;
   status: 'Draft' | 'Published' | 'Archived' | 'Deleted';
   view_count: number;
   like_count: number;

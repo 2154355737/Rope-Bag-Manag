@@ -49,11 +49,11 @@ importers:
         version: 4.5.1(vue@3.5.17(typescript@5.8.3))
     devDependencies:
       '@stagewise-plugins/vue':
-        specifier: ^0.5.2
-        version: 0.5.2(@stagewise/toolbar@0.5.2)
-      '@stagewise/toolbar-vue':
-        specifier: ^0.5.2
-        version: 0.5.2(vue@3.5.17(typescript@5.8.3))
+        specifier: ^0.6.3
+        version: 0.6.3(@stagewise/toolbar@0.6.3)
+      '@stagewise/toolbar':
+        specifier: ^0.6.3
+        version: 0.6.3
       '@tsconfig/node22':
         specifier: ^22.0.2
         version: 22.0.2
@@ -562,18 +562,15 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
-  '@stagewise-plugins/vue@0.5.2':
-    resolution: {integrity: sha512-5raAU1Uy2x9eOLI/3lJ8EhXRH7zC4GvBQKmRXm3vwEEQw2tye78G6AIpAcgQm13mVrl66IkjL0JmVvf5nIG4Cw==}
+  '@stagewise-plugins/vue@0.6.3':
+    resolution: {integrity: sha512-J7vg8bbqU0Vg47+YmVUtdVVyFF9EVAsT9uQJn5iOBtZKm121Qq1RGP9AeJa/+31zgLfmz3VV9pzROITyzjolQw==}
+    deprecated: 'This package is deprecated and has been replaced by the stagewise CLI. Get started with the CLI here: https://stagewise.io/docs'
     peerDependencies:
-      '@stagewise/toolbar': 0.5.2
+      '@stagewise/toolbar': workspace:*
 
-  '@stagewise/toolbar-vue@0.5.2':
-    resolution: {integrity: sha512-7VNGgNer/e9FoMdAbjkCQekTrGA3jiqHdLnv+llPDKX57P8mx4bNGNw6Duum6h7CiM5mfBsKtNgDirHYedjQOg==}
-    peerDependencies:
-      vue: '>=3.0.0'
-
-  '@stagewise/toolbar@0.5.2':
-    resolution: {integrity: sha512-QxowY55dhYJS4iD3KuYCvmLl3jA74boYziEr9lent+NZpO1rjtF0KpDyld+hClA4lWnCVLPxhMwW69Qv2+xzjg==}
+  '@stagewise/toolbar@0.6.3':
+    resolution: {integrity: sha512-Xdp4PROAE2W1niBezeLOIj98bYq1ngXG5Wisr2lPe56ENMYvEMj2bagTBcFPhpac+B/Vxwb+s3NgxX1e95f2XA==}
+    deprecated: 'This package is deprecated and has been replaced by the stagewise CLI. Get started with the CLI here: https://stagewise.io/docs'
 
   '@sxzz/popperjs-es@2.11.7':
     resolution: {integrity: sha512-Ccy0NlLkzr0Ex2FKvh2X+OyERHXJ88XJ1MXtsI9y9fGexlaXaVTPzBCRBwIxFkORuOb+uBqeu+RqnpgYTEZRUQ==}
@@ -2194,16 +2191,11 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
-  '@stagewise-plugins/vue@0.5.2(@stagewise/toolbar@0.5.2)':
+  '@stagewise-plugins/vue@0.6.3(@stagewise/toolbar@0.6.3)':
     dependencies:
-      '@stagewise/toolbar': 0.5.2
+      '@stagewise/toolbar': 0.6.3
 
-  '@stagewise/toolbar-vue@0.5.2(vue@3.5.17(typescript@5.8.3))':
-    dependencies:
-      '@stagewise/toolbar': 0.5.2
-      vue: 3.5.17(typescript@5.8.3)
-
-  '@stagewise/toolbar@0.5.2': {}
+  '@stagewise/toolbar@0.6.3': {}
 
   '@sxzz/popperjs-es@2.11.7': {}
 

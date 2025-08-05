@@ -271,7 +271,8 @@ const downloadResource = async (id: number) => {
     const res = await packageApi.downloadPackage(id)
     if (res.code === 0 && res.data) {
       // 根据API实际情况处理下载链接
-      window.open(res.data, '_blank')
+      const downloadUrl = typeof res.data === 'string' ? res.data : res.data.url
+      window.open(downloadUrl, '_blank')
       ElMessage.success('开始下载资源')
     } else {
       ElMessage.error('下载资源失败')

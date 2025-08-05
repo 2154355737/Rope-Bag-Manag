@@ -1,0 +1,3153 @@
+openapi: 3.0.3
+info:
+  title: 绳包管理器后端 API
+  description: |
+    绳包管理器后端服务的API文档
+    
+    ## 认证方式
+    系统支持两种认证方式，按优先级顺序：
+    1. **Authorization 头部认证（推荐）**: `Authorization: Bearer <token>`
+    2. **Cookie 认证**: `Cookie: auth_token=<token>`
+    
+    ## 权限等级
+    - **普通用户 (user)**: 基础功能使用权限
+    - **元老 (elder)**: 拥有部分管理权限，可审核资源
+    - **版主 (moderator)**: 拥有内容管理权限
+    - **管理员 (admin)**: 拥有所有系统权限
+  version: 1.0.0
+  contact:
+    name: 绳包管理器API支持
+  license:
+    name: MIT
+servers:
+  - url: http://127.0.0.1:15201/api/v1
+    description: 开发服务器
+  - url: http://127.0.0.1:15201
+    description: 健康检查端点
+
+security:
+  - BearerAuth: []
+  - CookieAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 状态码，0表示成功
+        message:
+          type: string
+          description: 响应消息
+        data:
+          description: 响应数据（可选）
+      required:
+        - code
+        - message
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        password_hash:
+          type: string
+          writeOnly: true
+        nickname:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [admin, moderator, elder, user]
+        star:
+          type: integer
+          description: 用户星级
+        ban_status:
+          type: string
+          enum: [normal, suspended, banned]
+        ban_reason:
+          type: string
+          nullable: true
+        qq_number:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          nullable: true
+        login_count:
+          type: integer
+        upload_count:
+          type: integer
+        download_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+        is_admin:
+          type: boolean
+
+    Package:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        author:
+          type: string
+        version:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        file_url:
+          type: string
+        file_size:
+          type: integer
+          format: int64
+          nullable: true
+        download_count:
+          type: integer
+          default: 0
+        like_count:
+          type: integer
+          default: 0
+        favorite_count:
+          type: integer
+          default: 0
+        category_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, active, rejected, inactive, deleted]
+          default: pending
+        reviewer_id:
+          type: integer
+          nullable: true
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        review_comment:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        target_type:
+          type: string
+          enum: [Package, User, System]
+          description: 评论目标类型
+        target_id:
+          type: integer
+        content:
+          type: string
+        parent_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [Active, Hidden, Deleted]
+          default: Active
+        likes:
+          type: integer
+          default: 0
+        dislikes:
+          type: integer
+          default: 0
+        pinned:
+          type: boolean
+          default: false
+        author_name:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        author_role:
+          type: string
+          nullable: true
+        author_avatar:
+          type: string
+          nullable: true
+        author_qq:
+          type: string
+          nullable: true
+        target_title:
+          type: string
+          nullable: true
+          description: 评论所属资源的标题
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        subscription_locked:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        count:
+          type: integer
+          description: 分类下的资源数量
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        code:
+          type: string
+          description: 邮箱验证码
+      required:
+        - username
+        - email
+        - password
+        - code
+
+    CreatePackageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        author:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: integer
+        file_url:
+          type: string
+      required:
+        - name
+        - author
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        target_type:
+          type: string
+          enum: [Package, User, System]
+        target_id:
+          type: integer
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        parent_id:
+          type: integer
+          nullable: true
+      required:
+        - target_type
+        - target_id
+        - content
+
+    # 新增模型定义
+    Announcement:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        type_:
+          type: string
+          enum: [Info, Warning, Error, Success]
+          description: 公告类型
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateAnnouncementRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        type_:
+          type: string
+          enum: [Info, Warning, Error, Success]
+          default: Info
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        enabled:
+          type: boolean
+          default: true
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - title
+        - content
+
+    UpdateAnnouncementRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        content:
+          type: string
+          minLength: 1
+        type_:
+          type: string
+          enum: [Info, Warning, Error, Success]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    MailSettings:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        smtp_server:
+          type: string
+          example: smtp.qq.com
+        smtp_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          example: 465
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+        from_name:
+          type: string
+          example: 绳包管理器
+        enabled:
+          type: boolean
+        use_ssl:
+          type: boolean
+        auth_required:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateMailSettingsRequest:
+      type: object
+      properties:
+        smtp_server:
+          type: string
+        smtp_port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        username:
+          type: string
+        password:
+          type: string
+        from_name:
+          type: string
+        enabled:
+          type: boolean
+        use_ssl:
+          type: boolean
+        auth_required:
+          type: boolean
+
+    UserAction:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        action_type:
+          type: string
+          description: 行为类型
+        target_type:
+          type: string
+          nullable: true
+        target_id:
+          type: integer
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    CreateUserActionRequest:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        action_type:
+          type: string
+        target_type:
+          type: string
+          nullable: true
+        target_id:
+          type: integer
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        ip_address:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+      required:
+        - user_id
+        - action_type
+
+    ResourceRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        resource_id:
+          type: integer
+        resource_type:
+          type: string
+        resource_name:
+          type: string
+          nullable: true
+        user_id:
+          type: integer
+        user_name:
+          type: string
+          nullable: true
+        action:
+          type: string
+        ip_address:
+          type: string
+          nullable: true
+        old_data:
+          type: string
+          nullable: true
+        new_data:
+          type: string
+          nullable: true
+        timestamp:
+          type: integer
+          format: int64
+        file_size:
+          type: integer
+          format: int64
+          nullable: true
+        download_count:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+        updated_at:
+          type: string
+          nullable: true
+
+    BackupInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        file_path:
+          type: string
+        file_size:
+          type: integer
+          format: int64
+        backup_type:
+          type: string
+          enum: [Manual, Auto, Scheduled]
+        status:
+          type: string
+        description:
+          type: string
+          nullable: true
+        backup_time:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+          nullable: true
+        created_by_name:
+          type: string
+          nullable: true
+
+    CreateBackupRequest:
+      type: object
+      properties:
+        backup_type:
+          type: string
+          enum: [Manual, Auto, Scheduled]
+          default: Manual
+        description:
+          type: string
+          nullable: true
+
+    Stats:
+      type: object
+      properties:
+        total_users:
+          type: integer
+        total_packages:
+          type: integer
+        total_comments:
+          type: integer
+        active_users:
+          type: integer
+        new_users_today:
+          type: integer
+        new_packages_today:
+          type: integer
+        system_status:
+          type: string
+        uptime:
+          type: integer
+
+    CommunitySettings:
+      type: object
+      properties:
+        site_title:
+          type: string
+        site_subtitle:
+          type: string
+        site_description:
+          type: string
+        welcome_message:
+          type: string
+        announcement:
+          type: string
+          nullable: true
+        footer_text:
+          type: string
+        contact_email:
+          type: string
+          format: email
+        github_link:
+          type: string
+          nullable: true
+        qq_group:
+          type: string
+          nullable: true
+        wechat_group:
+          type: string
+          nullable: true
+
+    UpdateCommunitySettingsRequest:
+      type: object
+      properties:
+        site_title:
+          type: string
+        site_subtitle:
+          type: string
+        site_description:
+          type: string
+        welcome_message:
+          type: string
+        announcement:
+          type: string
+          nullable: true
+        footer_text:
+          type: string
+        contact_email:
+          type: string
+          format: email
+        github_link:
+          type: string
+          nullable: true
+        qq_group:
+          type: string
+          nullable: true
+        wechat_group:
+          type: string
+          nullable: true
+
+    ThemeSettings:
+      type: object
+      properties:
+        primary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#409EFF'
+        secondary_color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#67C23A'
+        dark_mode:
+          type: boolean
+        font_size:
+          type: string
+          example: '14px'
+        language:
+          type: string
+          enum: [zh-CN, en-US]
+          default: zh-CN
+
+    SubscriptionRequest:
+      type: object
+      properties:
+        category_id:
+          type: integer
+        enabled:
+          type: boolean
+      required:
+        - category_id
+        - enabled
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        category_id:
+          type: integer
+        category_name:
+          type: string
+        enabled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # 补充评论相关的请求模型
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        status:
+          type: string
+          enum: [Active, Hidden, Deleted]
+
+    ReplyCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+      required:
+        - content
+
+    BatchStatusRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+        status:
+          type: string
+      required:
+        - ids
+        - status
+
+    BatchIdsRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+          minItems: 1
+      required:
+        - ids
+
+    LikeRequest:
+      type: object
+      properties:
+        like:
+          type: boolean
+      required:
+        - like
+
+    DislikeRequest:
+      type: object
+      properties:
+        dislike:
+          type: boolean
+      required:
+        - dislike
+
+    PinRequest:
+      type: object
+      properties:
+        pinned:
+          type: boolean
+      required:
+        - pinned
+
+    # 补充资源包相关的请求模型
+    CreateResourceRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+          nullable: true
+        file_url:
+          type: string
+          format: uri
+        cover_url:
+          type: string
+          format: uri
+          nullable: true
+      required:
+        - title
+        - file_url
+
+    ReviewResourceRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        comment:
+          type: string
+          nullable: true
+      required:
+        - status
+
+    UpdatePackageRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        category_id:
+          type: integer
+        status:
+          type: string
+          enum: [pending, active, rejected, inactive, deleted]
+        file_url:
+          type: string
+          format: uri
+        reviewer_id:
+          type: integer
+        reviewed_at:
+          type: string
+          format: date-time
+        review_comment:
+          type: string
+
+    # 验证码相关请求
+    EmailResetRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    VerifyCodeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+      required:
+        - email
+        - code
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        token:
+          type: string
+        new_password:
+          type: string
+          minLength: 6
+      required:
+        - email
+        - token
+        - new_password
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        old_password:
+          type: string
+        new_password:
+          type: string
+          minLength: 6
+      required:
+        - old_password
+        - new_password
+
+    # 创建分类请求
+    CreateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+          default: true
+        subscription_locked:
+          type: boolean
+          default: false
+      required:
+        - name
+
+    UpdateCategoryRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        subscription_locked:
+          type: boolean
+
+    # 测试邮件请求
+    TestEmailRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required:
+        - email
+
+    # 通知请求
+    NotificationRequest:
+      type: object
+      properties:
+        category_id:
+          type: integer
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+      required:
+        - category_id
+        - title
+        - content
+
+    # 设置相关
+    SettingRequest:
+      type: object
+      properties:
+        value:
+          type: string
+      required:
+        - value
+
+    # 分页列表响应
+    PagedResponse:
+      type: object
+      properties:
+        list:
+          type: array
+          items: {}
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalPages:
+          type: integer
+
+    # 错误响应
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+      required:
+        - code
+        - message
+
+paths:
+  # 健康检查
+  /health:
+    get:
+      tags:
+        - 系统
+      summary: 健康检查
+      description: 检查服务器运行状态
+      security: []
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                          timestamp:
+                            type: string
+
+  # 认证相关
+  /auth/login:
+    post:
+      tags:
+        - 认证
+      summary: 用户登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                          user:
+                            $ref: '#/components/schemas/User'
+
+  /auth/login-by-email:
+    post:
+      tags:
+        - 认证
+      summary: 邮箱验证码登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                code:
+                  type: string
+              required:
+                - email
+                - code
+      responses:
+        '200':
+          description: 登录成功
+
+  /auth/register:
+    post:
+      tags:
+        - 认证
+      summary: 用户注册
+      description: 用户注册需要邮箱验证码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  pattern: '^[a-zA-Z0-9_]+$'
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                  maxLength: 128
+                nickname:
+                  type: string
+                  maxLength: 50
+                  nullable: true
+                qq_number:
+                  type: string
+                  pattern: '^[0-9]{5,11}$'
+                  nullable: true
+                verification_code:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                  description: 邮箱验证码
+              required:
+                - username
+                - email
+                - password
+                - verification_code
+            example:
+              username: "testuser"
+              email: "test@example.com"
+              password: "password123"
+              nickname: "测试用户"
+              qq_number: "123456789"
+              verification_code: "123456"
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+              example:
+                code: 0
+                message: "注册成功"
+                data:
+                  user:
+                    id: 1
+                    username: "testuser"
+                    email: "test@example.com"
+                    role: "user"
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "用户名已存在"
+
+  /auth/user-info:
+    get:
+      tags:
+        - 认证
+      summary: 获取当前用户信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+  /auth/verify:
+    get:
+      tags:
+        - 认证
+      summary: 验证认证状态
+      responses:
+        '200':
+          description: 认证有效
+        '401':
+          description: 认证无效
+
+  /auth/logout:
+    post:
+      tags:
+        - 认证
+      summary: 退出登录
+      responses:
+        '200':
+          description: 退出成功
+
+  /auth/send-register-code:
+    post:
+      tags:
+        - 认证
+      summary: 发送注册验证码
+      description: 向邮箱发送6位数字验证码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: 接收验证码的邮箱地址
+              required:
+                - email
+            example:
+              email: "test@example.com"
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: "验证码已发送"
+        '400':
+          description: 邮箱格式错误或已被注册
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "邮箱已被注册"
+        '500':
+          description: 邮件发送失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 500
+                message: "邮件发送失败，请稍后重试"
+
+  /auth/send-login-code:
+    post:
+      tags:
+        - 认证
+      summary: 发送登录验证码
+      description: 向已注册邮箱发送登录验证码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: 已注册的邮箱地址
+              required:
+                - email
+            example:
+              email: "test@example.com"
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: "验证码已发送"
+        '400':
+          description: 邮箱不存在或格式错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "邮箱不存在"
+
+  /auth/verify-code:
+    post:
+      tags:
+        - 认证
+      summary: 验证验证码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                code:
+                  type: string
+              required:
+                - email
+                - code
+      responses:
+        '200':
+          description: 验证成功
+
+  /auth/reset-request:
+    post:
+      tags:
+        - 认证
+      summary: 请求密码重置
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+              required:
+                - email
+      responses:
+        '200':
+          description: 重置邮件已发送
+
+  /auth/reset-password:
+    post:
+      tags:
+        - 认证
+      summary: 重置密码
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                token:
+                  type: string
+                new_password:
+                  type: string
+              required:
+                - email
+                - token
+                - new_password
+      responses:
+        '200':
+          description: 密码重置成功
+
+  # 用户管理
+  /users:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取用户列表（管理员权限）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/User'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          pageSize:
+                            type: integer
+                          totalPages:
+                            type: integer
+
+    post:
+      tags:
+        - 用户管理
+      summary: 创建用户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                role:
+                  type: string
+                  default: user
+                star:
+                  type: integer
+                  default: 1
+                qq_number:
+                  type: string
+                avatar_url:
+                  type: string
+              required:
+                - username
+                - email
+                - password
+      responses:
+        '200':
+          description: 创建成功
+
+  /users/batch:
+    delete:
+      tags:
+        - 用户管理
+      summary: 批量删除用户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usernames:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - usernames
+      responses:
+        '200':
+          description: 删除成功
+
+  /users/profile:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取当前用户资料
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+    put:
+      tags:
+        - 用户管理
+      summary: 更新当前用户资料
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                qq_number:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+
+  /users/my-resources:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取我的资源
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+
+  /users/my-comments:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取我的评论
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+
+  /users/change-password:
+    post:
+      tags:
+        - 用户管理
+      summary: 修改密码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                old_password:
+                  type: string
+                new_password:
+                  type: string
+              required:
+                - old_password
+                - new_password
+      responses:
+        '200':
+          description: 修改成功
+
+  /users/{id}:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取指定用户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/User'
+
+    put:
+      tags:
+        - 用户管理
+      summary: 更新指定用户（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - 用户管理
+      summary: 删除指定用户（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+
+  /users/{id}/comments:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取用户评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+
+  # 资源包管理
+  /packages:
+    get:
+      tags:
+        - 资源包管理
+      summary: 获取资源包列表
+      description: |
+        获取资源包列表，支持分页、搜索、分类筛选等功能。
+        普通用户只能看到审核通过的资源，管理员和元老可以看到所有状态的资源。
+      parameters:
+        - name: page
+          in: query
+          description: 页码，从1开始
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: page_size
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: category_id
+          in: query
+          description: 分类ID筛选
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+        - name: search
+          in: query
+          description: 搜索关键词（资源名称、作者、描述）
+          schema:
+            type: string
+            maxLength: 100
+          example: "绳索"
+        - name: status
+          in: query
+          description: 资源状态筛选（管理员/元老可用）
+          schema:
+            type: string
+            enum: [pending, active, rejected, inactive, deleted]
+          example: "active"
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Package'
+                          total:
+                            type: integer
+                            description: 总记录数
+                          page:
+                            type: integer
+                            description: 当前页码
+                          pageSize:
+                            type: integer
+                            description: 每页数量
+                          totalPages:
+                            type: integer
+                            description: 总页数
+              example:
+                code: 0
+                message: "success"
+                data:
+                  list:
+                    - id: 1
+                      name: "经典绳索打包"
+                      author: "rope_master"
+                      version: "1.0.0"
+                      description: "包含多种经典绳索绑定方法"
+                      file_url: "https://example.com/packages/rope1.zip"
+                      file_size: 2048576
+                      download_count: 150
+                      like_count: 25
+                      category_id: 1
+                      status: "active"
+                      created_at: "2024-01-15T10:30:00Z"
+                  total: 100
+                  page: 1
+                  pageSize: 20
+                  totalPages: 5
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "页码参数无效"
+
+  /packages/pending:
+    get:
+      tags:
+        - 资源包管理
+      summary: 获取待审核资源（元老/管理员权限）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+
+  /packages/categories:
+    get:
+      tags:
+        - 资源包管理
+      summary: 获取资源包分类
+      responses:
+        '200':
+          description: 获取成功
+
+  /packages/user-submit:
+    post:
+      tags:
+        - 资源包管理
+      summary: 用户提交资源
+      description: |
+        普通用户提交资源进行审核。
+        提交后资源状态为"待审核"，需要管理员或元老审核通过后才能公开。
+        自动将当前用户设置为资源作者。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateResourceRequest'
+            example:
+              title: "高级绳索技巧合集"
+              description: "包含20种高级绳索绑定技巧的详细教程"
+              category: "教学视频"
+              tags: ["高级", "教程", "绳索"]
+              file_url: "https://example.com/files/rope-advanced.zip"
+              cover_url: "https://example.com/images/rope-cover.jpg"
+      responses:
+        '200':
+          description: 提交成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Package'
+              example:
+                code: 0
+                message: "资源提交成功，等待审核"
+                data:
+                  id: 123
+                  name: "高级绳索技巧合集"
+                  author: "current_user"
+                  status: "pending"
+                  created_at: "2024-01-15T14:30:00Z"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "资源文件链接必须是有效的HTTP或HTTPS地址"
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 401
+                message: "请先登录"
+
+  /packages/admin-create:
+    post:
+      tags:
+        - 资源包管理
+      summary: 管理员创建资源（元老/管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePackageRequest'
+      responses:
+        '200':
+          description: 创建成功
+
+  /packages/{id}:
+    get:
+      tags:
+        - 资源包管理
+      summary: 获取指定资源包
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Package'
+
+    put:
+      tags:
+        - 资源包管理
+      summary: 更新资源包
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                version:
+                  type: string
+                description:
+                  type: string
+                category_id:
+                  type: integer
+                status:
+                  type: string
+                file_url:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - 资源包管理
+      summary: 删除资源包
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+
+  /packages/{id}/download:
+    get:
+      tags:
+        - 资源包管理
+      summary: 下载资源包
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 下载链接
+
+  /packages/{id}/upload:
+    post:
+      tags:
+        - 资源包管理
+      summary: 上传资源包文件
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 上传成功
+
+  /packages/{id}/comments:
+    get:
+      tags:
+        - 资源包管理
+      summary: 获取资源包评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+
+  /packages/{id}/review:
+    post:
+      tags:
+        - 资源包管理
+      summary: 审核资源（元老/管理员权限）
+      description: |
+        管理员或元老对待审核的资源进行审核。
+        - approved: 审核通过，资源状态变为active
+        - rejected: 审核拒绝，资源状态变为rejected
+        只有状态为pending的资源可以被审核。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 资源ID
+          schema:
+            type: integer
+            minimum: 1
+          example: 123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewResourceRequest'
+            example:
+              status: "approved"
+              comment: "资源质量很高，审核通过"
+      responses:
+        '200':
+          description: 审核完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Package'
+              example:
+                code: 0
+                message: "资源审核通过"
+                data:
+                  id: 123
+                  name: "高级绳索技巧合集"
+                  status: "active"
+                  reviewer_id: 1
+                  reviewed_at: "2024-01-15T15:30:00Z"
+                  review_comment: "资源质量很高，审核通过"
+        '400':
+          description: 审核失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_status:
+                  summary: 资源状态不正确
+                  value:
+                    code: 400
+                    message: "该资源不是待审核状态"
+                invalid_action:
+                  summary: 审核状态无效
+                  value:
+                    code: 400
+                    message: "无效的审核状态，只能是 approved 或 rejected"
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 403
+                message: "只有管理员和元老可以审核资源"
+        '404':
+          description: 资源不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 404
+                message: "资源不存在"
+
+  # 评论管理
+  /comments:
+    get:
+      tags:
+        - 评论管理
+      summary: 获取所有评论（管理员权限）
+      description: |
+        管理员查看系统中所有评论，支持多种筛选条件。
+        支持按状态、目标类型、用户、时间范围等筛选。
+      parameters:
+        - name: page
+          in: query
+          description: 页码
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          example: 1
+        - name: size
+          in: query
+          description: 每页数量
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: status
+          in: query
+          description: 评论状态筛选
+          schema:
+            type: string
+            enum: [Active, Hidden, Deleted]
+          example: "Active"
+        - name: target_type
+          in: query
+          description: 评论目标类型
+          schema:
+            type: string
+            enum: [Package, User, System]
+          example: "Package"
+        - name: target_id
+          in: query
+          description: 评论目标ID
+          schema:
+            type: integer
+            minimum: 1
+          example: 123
+        - name: user_id
+          in: query
+          description: 评论用户ID筛选
+          schema:
+            type: integer
+            minimum: 1
+          example: 456
+        - name: start_date
+          in: query
+          description: 开始日期（YYYY-MM-DD格式）
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          example: "2024-01-01"
+        - name: end_date
+          in: query
+          description: 结束日期（YYYY-MM-DD格式）
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          example: "2024-01-31"
+        - name: search
+          in: query
+          description: 搜索关键词（评论内容）
+          schema:
+            type: string
+            maxLength: 100
+          example: "绳索"
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Comment'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          size:
+                            type: integer
+              example:
+                code: 0
+                message: "success"
+                data:
+                  list:
+                    - id: 1
+                      user_id: 123
+                      username: "user123"
+                      target_type: "Package"
+                      target_id: 456
+                      content: "这个教程很棒！"
+                      status: "Active"
+                      likes: 5
+                      dislikes: 0
+                      pinned: false
+                      created_at: "2024-01-15T10:30:00Z"
+                  total: 100
+                  page: 1
+                  size: 20
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 403
+                message: "只有管理员可以访问此接口"
+
+    post:
+      tags:
+        - 评论管理
+      summary: 创建评论
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: 创建成功
+
+  /comments/{id}:
+    get:
+      tags:
+        - 评论管理
+      summary: 获取特定评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+
+    put:
+      tags:
+        - 评论管理
+      summary: 更新评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                status:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - 评论管理
+      summary: 删除评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+
+  /comments/{id}/replies:
+    get:
+      tags:
+        - 评论管理
+      summary: 获取评论回复
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+
+  /comments/{id}/reply:
+    post:
+      tags:
+        - 评论管理
+      summary: 回复评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+              required:
+                - content
+      responses:
+        '201':
+          description: 回复成功
+
+  /comments/batch/status:
+    put:
+      tags:
+        - 评论管理
+      summary: 批量更新评论状态（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                status:
+                  type: string
+              required:
+                - ids
+                - status
+      responses:
+        '200':
+          description: 更新成功
+
+  /comments/batch:
+    delete:
+      tags:
+        - 评论管理
+      summary: 批量删除评论（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - ids
+      responses:
+        '200':
+          description: 删除成功
+
+  /comments/{id}/like:
+    post:
+      tags:
+        - 评论管理
+      summary: 点赞评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                like:
+                  type: boolean
+              required:
+                - like
+      responses:
+        '200':
+          description: 操作成功
+
+  /comments/{id}/dislike:
+    post:
+      tags:
+        - 评论管理
+      summary: 点踩评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dislike:
+                  type: boolean
+              required:
+                - dislike
+      responses:
+        '200':
+          description: 操作成功
+
+  /comments/{id}/pin:
+    put:
+      tags:
+        - 评论管理
+      summary: 置顶评论
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pinned:
+                  type: boolean
+              required:
+                - pinned
+      responses:
+        '200':
+          description: 操作成功
+
+  # 分类管理
+  /categories:
+    get:
+      tags:
+        - 分类管理
+      summary: 获取所有分类
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          list:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Category'
+
+    post:
+      tags:
+        - 分类管理
+      summary: 创建分类
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+                  default: true
+              required:
+                - name
+      responses:
+        '200':
+          description: 创建成功
+
+  /categories/{id}:
+    get:
+      tags:
+        - 分类管理
+      summary: 获取单个分类
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Category'
+
+    put:
+      tags:
+        - 分类管理
+      summary: 更新分类
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - 分类管理
+      summary: 删除分类
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+
+  # 订阅管理
+  /subscriptions:
+    get:
+      tags:
+        - 订阅管理
+      summary: 获取用户订阅
+      responses:
+        '200':
+          description: 获取成功
+
+  /subscriptions/set:
+    post:
+      tags:
+        - 订阅管理
+      summary: 设置订阅
+      description: |
+        用户设置对某个分类的订阅状态。
+        订阅后，该分类有新资源时用户会收到邮件通知。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionRequest'
+            example:
+              category_id: 1
+              enabled: true
+      responses:
+        '200':
+          description: 设置成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 0
+                message: "订阅设置成功"
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                message: "分类不存在"
+        '401':
+          description: 未登录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 401
+                message: "请先登录"
+
+  # 管理员功能
+  /admin/stats:
+    get:
+      tags:
+        - 管理员
+      summary: 获取统计信息（管理员权限）
+      description: |
+        获取系统总体统计信息，包括用户数、资源数、评论数等关键指标。
+        用于管理员仪表板展示。
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Stats'
+              example:
+                code: 0
+                message: "success"
+                data:
+                  total_users: 1250
+                  total_packages: 856
+                  total_comments: 3420
+                  active_users: 180
+                  new_users_today: 12
+                  new_packages_today: 5
+                  system_status: "正常"
+                  uptime: 720000
+        '403':
+          description: 权限不足
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 403
+                message: "需要管理员权限"
+
+  /admin/user-stats:
+    get:
+      tags:
+        - 管理员
+      summary: 获取用户统计（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/categories:
+    get:
+      tags:
+        - 管理员
+      summary: 获取分类（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/user-actions:
+    get:
+      tags:
+        - 管理员
+      summary: 获取用户行为（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/logs:
+    get:
+      tags:
+        - 管理员
+      summary: 获取系统日志（管理员权限）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+        - name: level
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/backup:
+    post:
+      tags:
+        - 管理员
+      summary: 创建备份（管理员权限）
+      description: |
+        创建数据库备份文件。
+        支持手动备份、自动备份和定时备份三种类型。
+        备份文件将保存到系统指定目录。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackupRequest'
+            example:
+              backup_type: "Manual"
+              description: "数据迁移前的手动备份"
+      responses:
+        '200':
+          description: 备份创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/BackupInfo'
+              example:
+                code: 0
+                message: "备份创建成功"
+                data:
+                  id: "backup_20240115_143000"
+                  filename: "backup_manual_20240115_143000.db"
+                  file_path: "/backups/backup_manual_20240115_143000.db"
+                  file_size: 5242880
+                  backup_type: "Manual"
+                  status: "completed"
+                  description: "数据迁移前的手动备份"
+                  backup_time: "2024-01-15T14:30:00Z"
+                  created_by: 1
+                  created_by_name: "admin"
+        '500':
+          description: 备份创建失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 500
+                message: "备份创建失败: 磁盘空间不足"
+
+  /admin/backups:
+    get:
+      tags:
+        - 管理员
+      summary: 获取备份列表（管理员权限）
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/backup/stats:
+    get:
+      tags:
+        - 管理员
+      summary: 获取备份统计（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/backup/batch-delete:
+    post:
+      tags:
+        - 管理员
+      summary: 批量删除备份（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_ids:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - backup_ids
+      responses:
+        '200':
+          description: 删除成功
+
+  /admin/backup/{id}:
+    get:
+      tags:
+        - 管理员
+      summary: 获取备份详情（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+
+    delete:
+      tags:
+        - 管理员
+      summary: 删除备份（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /admin/backup/{id}/download:
+    get:
+      tags:
+        - 管理员
+      summary: 下载备份（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 下载成功
+
+  /admin/backup/{id}/restore:
+    post:
+      tags:
+        - 管理员
+      summary: 恢复备份（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirm:
+                  type: boolean
+              required:
+                - confirm
+      responses:
+        '200':
+          description: 恢复成功
+
+  /admin/announcements:
+    get:
+      tags:
+        - 管理员
+      summary: 获取公告列表（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+    post:
+      tags:
+        - 管理员
+      summary: 创建公告（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 创建成功
+
+  /admin/announcements/{id}:
+    get:
+      tags:
+        - 管理员
+      summary: 获取单个公告（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+
+    put:
+      tags:
+        - 管理员
+      summary: 更新公告（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+    delete:
+      tags:
+        - 管理员
+      summary: 删除公告（管理员权限）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+
+  /announcements/active:
+    get:
+      tags:
+        - 公告
+      summary: 获取当前有效公告
+      security: []
+      responses:
+        '200':
+          description: 获取成功
+
+  /admin/settings:
+    get:
+      tags:
+        - 管理员
+      summary: 获取所有设置（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+    post:
+      tags:
+        - 管理员
+      summary: 更新多个设置（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+  /admin/settings/reset:
+    post:
+      tags:
+        - 管理员
+      summary: 重置所有设置（管理员权限）
+      responses:
+        '200':
+          description: 重置成功
+
+  /admin/settings/{key}:
+    get:
+      tags:
+        - 管理员
+      summary: 获取单个设置（管理员权限）
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+
+    post:
+      tags:
+        - 管理员
+      summary: 更新单个设置（管理员权限）
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+              required:
+                - value
+      responses:
+        '200':
+          description: 更新成功
+
+  /admin/mail-settings:
+    get:
+      tags:
+        - 管理员
+      summary: 获取邮件设置（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+    post:
+      tags:
+        - 管理员
+      summary: 更新邮件设置（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+  /admin/test-email:
+    post:
+      tags:
+        - 管理员
+      summary: 发送测试邮件（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+              required:
+                - email
+      responses:
+        '200':
+          description: 发送成功
+
+  /admin/community-settings:
+    get:
+      tags:
+        - 管理员
+      summary: 获取社区设置（管理员权限）
+      responses:
+        '200':
+          description: 获取成功
+
+    post:
+      tags:
+        - 管理员
+      summary: 更新社区设置（管理员权限）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: 更新成功
+
+  /admin/public/community-settings:
+    get:
+      tags:
+        - 管理员
+      summary: 获取公共社区设置
+      security: []
+      responses:
+        '200':
+          description: 获取成功
+
+tags:
+  - name: 系统
+    description: 系统相关接口
+  - name: 认证
+    description: 用户认证相关接口
+  - name: 用户管理
+    description: 用户管理相关接口
+  - name: 资源包管理
+    description: 资源包管理相关接口
+  - name: 评论管理
+    description: 评论管理相关接口
+  - name: 分类管理
+    description: 分类管理相关接口
+  - name: 订阅管理
+    description: 订阅管理相关接口
+  - name: 管理员
+    description: 管理员功能相关接口
+  - name: 公告
+    description: 公告相关接口 

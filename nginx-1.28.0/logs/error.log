@@ -1646,3 +1646,6 @@
 2025/08/02 14:17:39 [notice] 27772#28604: signal process started
 2025/08/02 14:53:18 [notice] 29400#6532: signal process started
 2025/08/02 14:53:18 [error] 29400#6532: OpenEvent("Global\ngx_quit_30728") failed (2: The system cannot find the file specified)
+2025/08/05 14:03:29 [notice] 13944#22272: signal process started
+2025/08/05 14:03:29 [error] 13944#22272: OpenEvent("Global\ngx_quit_20228") failed (2: The system cannot find the file specified)
+2025/08/05 14:05:10 [notice] 6164#15688: signal process started
