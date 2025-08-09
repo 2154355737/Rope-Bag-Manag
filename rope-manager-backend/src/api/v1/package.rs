@@ -77,6 +77,11 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/{id}/review")
                     .route(web::post().to(review_resource))
             )
+            .service(
+                web::resource("/{id}/like")
+                    .route(web::post().to(like_package))
+                    .route(web::delete().to(unlike_package))
+            )
     );
 }
 
@@ -637,5 +642,31 @@ async fn get_package_comments(
             "code": 500,
             "message": e.to_string()
         })))
+    }
+} 
+
+async fn like_package(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let package_id = path.into_inner();
+    match package_service.like_package(user.id, package_id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+async fn unlike_package(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let package_id = path.into_inner();
+    match package_service.unlike_package(user.id, package_id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
     }
 } 

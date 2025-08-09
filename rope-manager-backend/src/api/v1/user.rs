@@ -4,6 +4,9 @@ use crate::services::user_service::UserService;
 use crate::models::UpdateUserRequest;
 use crate::utils::auth_helper::AuthHelper;
 #[macro_use] use crate::utils::auth_helper;
+use crate::services::user_action_service::UserActionService;
+use crate::services::package_service::PackageService;
+use crate::services::post_service::PostService;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -29,6 +32,14 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/my-comments")
                     .route(web::get().to(get_my_comments))
+            )
+            .service(
+                web::resource("/my-likes")
+                    .route(web::get().to(get_my_likes))
+            )
+            .service(
+                web::resource("/my-likes/stats")
+                    .route(web::get().to(get_my_likes_stats))
             )
             .service(
                 web::resource("/change-password")
@@ -389,4 +400,80 @@ async fn batch_delete_users(
             "message": e.to_string()
         })))
     }
+} 
+
+#[derive(serde::Deserialize)]
+struct MyLikesQuery { target: Option<String>, page: Option<i32>, page_size: Option<i32> }
+
+// GET /users/my-likes
+async fn get_my_likes(
+    http_req: HttpRequest,
+    query: web::Query<MyLikesQuery>,
+    _ua_service: web::Data<UserActionService>,
+    package_service: web::Data<PackageService>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(10).max(1);
+    let mut target = query.target.clone().unwrap_or_default();
+    target.make_ascii_lowercase();
+
+    if target == "post" {
+        match post_service.get_user_liked_posts(user.id, page, page_size).await {
+            Ok((posts, total)) => Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": { "list": posts, "total": total, "page": page, "page_size": page_size }
+            }))),
+            Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+        }
+    } else {
+        // 默认返回资源点赞
+        // 直接查询 likes 表
+        use rusqlite::Connection;
+        let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        let total: i64 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE user_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+        let offset = (page - 1).max(0) * page_size.max(1);
+        let sql = "SELECT p.id, p.name, p.author, p.description, p.like_count, p.download_count, pl.created_at FROM packages p JOIN package_likes pl ON pl.package_id = p.id WHERE pl.user_id = ? ORDER BY pl.created_at DESC LIMIT ? OFFSET ?";
+        let mut stmt = conn.prepare(sql).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        let mut items = Vec::new();
+        let rows = stmt.query_map(rusqlite::params![user.id, page_size, offset], |row| {
+            Ok(serde_json::json!({
+                "type": "Package",
+                "id": row.get::<_, i32>(0)?,
+                "name": row.get::<_, String>(1)?,
+                "author": row.get::<_, String>(2)?,
+                "description": row.get::<_, String>(3)?,
+                "like_count": row.get::<_, i32>(4)?,
+                "download_count": row.get::<_, i32>(5)?,
+                "created_at": row.get::<_, String>(6)?,
+            }))
+        }).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        for r in rows { items.push(r.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?); }
+        Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": items, "total": total, "page": page, "page_size": page_size}})))
+    }
+}
+
+// GET /users/my-likes/stats
+async fn get_my_likes_stats(
+    http_req: HttpRequest,
+    _ua_service: web::Data<UserActionService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let like_pkg: i64 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE user_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let like_post: i64 = conn.query_row("SELECT COUNT(*) FROM post_likes WHERE user_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    // 浏览统计此处无likes表，先返回0，后续可接入posts view日志表
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": {
+            "like_total": like_pkg + like_post,
+            "like_by_type": {"package": like_pkg, "post": like_post},
+            "view_total": 0,
+            "view_by_type": {"post": 0}
+        }
+    })))
 } 

@@ -2,14 +2,23 @@ use rusqlite::{Connection, Result as SqliteResult, params};
 use crate::models::{Post, CreatePostRequest, UpdatePostRequest, PostQueryParams, PostListResponse, Tag};
 use crate::repositories::user_repo::UserRepository;
 use chrono::{DateTime, Utc};
+use crate::services::notification_service::NotificationService;
 
 pub struct PostService {
     db_path: String,
+    notifier: Option<NotificationService>,
 }
 
 impl PostService {
     pub fn new(db_path: String) -> Self {
-        Self { db_path }
+        Self { db_path, notifier: None }
+    }
+
+    pub fn db_path(&self) -> &str { &self.db_path }
+
+    pub fn with_notifier(mut self, notifier: NotificationService) -> Self {
+        self.notifier = Some(notifier);
+        self
     }
 
     // 创建帖子
@@ -29,7 +38,7 @@ impl PostService {
         let status = req.status.unwrap_or_default();
         
         let post_id = conn.execute(
-            "INSERT INTO posts (title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO posts (title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 req.title,
                 req.content,
@@ -43,7 +52,8 @@ impl PostService {
                 false, // is_pinned
                 false, // is_featured
                 now,
-                now
+                now,
+                "pending"
             ]
         )?;
 
@@ -61,6 +71,15 @@ impl PostService {
         
         let mut updates = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+
+        // 记录置顶/精华变更以便稍后发通知
+        let mut pin_changed: Option<bool> = None;
+        let mut feat_changed: Option<bool> = None;
+        // 读取现状
+        let (old_pinned, old_featured): (bool, bool) = {
+            let row: (bool, bool) = conn.query_row("SELECT is_pinned, is_featured FROM posts WHERE id = ?", params![post_id], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            row
+        };
 
         if let Some(title) = req.title {
             updates.push("title = ?");
@@ -85,11 +104,13 @@ impl PostService {
         if let Some(is_pinned) = req.is_pinned {
             updates.push("is_pinned = ?");
             params.push(Box::new(is_pinned));
+            pin_changed = Some(is_pinned != old_pinned);
         }
 
         if let Some(is_featured) = req.is_featured {
             updates.push("is_featured = ?");
             params.push(Box::new(is_featured));
+            feat_changed = Some(is_featured != old_featured);
         }
 
         if !updates.is_empty() {
@@ -106,6 +127,26 @@ impl PostService {
         // 处理标签更新
         if let Some(tags) = req.tags {
             self.update_post_tags(post_id, &tags).await?;
+        }
+
+        // 通知作者：被置顶/加精
+        if pin_changed == Some(true) || feat_changed == Some(true) {
+            if let Some(notify) = &self.notifier {
+                let user_repo = UserRepository::new(&self.db_path).map_err(|e| rusqlite::Error::InvalidPath(std::path::PathBuf::from(e.to_string())))?;
+                // 查作者ID
+                let (author_id, title): (i32, String) = conn.query_row(
+                    "SELECT author_id, title FROM posts WHERE id = ?",
+                    params![post_id],
+                    |r| Ok((r.get(0)?, r.get(1)?))
+                )?;
+                let url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                let link = format!("{}/post/{}", url, post_id);
+                let mut parts = Vec::new();
+                if pin_changed == Some(true) { parts.push("置顶"); }
+                if feat_changed == Some(true) { parts.push("加精"); }
+                let msg = format!("您的帖子《{}》已被{}", title, parts.join("、"));
+                let _ = notify.notify(author_id, "帖子状态更新", &msg, Some(&link), Some("PostFlagChanged"), Some("Post"), Some(post_id)).await;
+            }
         }
 
         Ok(true)
@@ -136,6 +177,9 @@ impl PostService {
             conditions.push("status = ?");
             params.push(Box::new(status));
         }
+
+        // 公开查询时如果未传 review_status 则默认只显示 approved
+        // 这里通过 query.status 的语义保留原有逻辑；审核过滤在 API 层控制
 
         if let Some(search) = query.search {
             conditions.push("(title LIKE ? OR content LIKE ?)");
@@ -169,9 +213,9 @@ impl PostService {
             stmt.query_row(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())), |row| row.get(0))?
         };
 
-        // 获取帖子列表
+        // 获取帖子列表（包含审核字段）
         let sql = format!(
-            "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at FROM posts {} ORDER BY is_pinned DESC, is_featured DESC, created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at FROM posts {} ORDER BY is_pinned DESC, is_featured DESC, created_at DESC LIMIT ? OFFSET ?",
             where_clause
         );
 
@@ -198,6 +242,10 @@ impl PostService {
                     is_featured: row.get(11)?,
                     created_at: parse_timestamp(row.get::<_, String>(12)?),
                     updated_at: parse_timestamp(row.get::<_, String>(13)?),
+                    review_status: row.get(14).ok(),
+                    review_comment: row.get(15).ok(),
+                    reviewer_id: row.get(16).ok(),
+                    reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
                 })
             }
         )?.collect::<Result<Vec<_>, _>>()?;
@@ -214,7 +262,7 @@ impl PostService {
     pub async fn get_post(&self, post_id: i32) -> SqliteResult<Option<Post>> {
         let conn = Connection::open(&self.db_path)?;
         
-        let sql = "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at FROM posts WHERE id = ?";
+        let sql = "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at FROM posts WHERE id = ?";
         
         let result = conn.query_row(sql, params![post_id], |row| {
             Ok(Post {
@@ -232,6 +280,10 @@ impl PostService {
                 is_featured: row.get(11)?,
                 created_at: parse_timestamp(row.get::<_, String>(12)?),
                 updated_at: parse_timestamp(row.get::<_, String>(13)?),
+                review_status: row.get(14).ok(),
+                review_comment: row.get(15).ok(),
+                reviewer_id: row.get(16).ok(),
+                reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
             })
         });
 
@@ -349,6 +401,72 @@ impl PostService {
             "Deleted" => crate::models::PostStatus::Deleted,
             _ => crate::models::PostStatus::Draft,
         }
+    }
+
+    pub async fn like_post(&self, user_id: i32, post_id: i32) -> SqliteResult<i32> {
+        let conn = Connection::open(&self.db_path)?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS post_likes (user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, post_id))",
+            [],
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO post_likes (user_id, post_id) VALUES (?, ?)",
+            params![user_id, post_id],
+        )?;
+        conn.execute(
+            "UPDATE posts SET like_count = COALESCE(like_count,0) + 1 WHERE id = ? AND EXISTS(SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ?)",
+            params![post_id, user_id, post_id],
+        )?;
+        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM post_likes WHERE post_id = ?", params![post_id], |r| r.get(0))?;
+        Ok(cnt)
+    }
+
+    pub async fn unlike_post(&self, user_id: i32, post_id: i32) -> SqliteResult<i32> {
+        let conn = Connection::open(&self.db_path)?;
+        conn.execute(
+            "DELETE FROM post_likes WHERE user_id = ? AND post_id = ?",
+            params![user_id, post_id],
+        )?;
+        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM post_likes WHERE post_id = ?", params![post_id], |r| r.get(0))?;
+        conn.execute("UPDATE posts SET like_count = ? WHERE id = ?", params![cnt, post_id])?;
+        Ok(cnt)
+    }
+
+    pub async fn get_user_liked_posts(&self, user_id: i32, page: i32, page_size: i32) -> SqliteResult<(Vec<Post>, i64)> {
+        let conn = Connection::open(&self.db_path)?;
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM post_likes WHERE user_id = ?",
+            params![user_id],
+            |r| r.get(0),
+        )?;
+        let offset = (page - 1).max(0) * page_size.max(1);
+        let sql = "SELECT p.id, p.title, p.content, p.author_id, p.author_name, p.category_id, p.status, p.view_count, p.like_count, p.comment_count, p.is_pinned, p.is_featured, p.created_at, p.updated_at, p.review_status, p.review_comment, p.reviewer_id, p.reviewed_at FROM posts p JOIN post_likes pl ON pl.post_id = p.id WHERE pl.user_id = ? ORDER BY pl.created_at DESC LIMIT ? OFFSET ?";
+        let mut stmt = conn.prepare(sql)?;
+        let posts = stmt
+            .query_map(params![user_id, page_size, offset], |row| {
+                Ok(Post {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    content: row.get(2)?,
+                    author_id: row.get(3)?,
+                    author_name: row.get(4)?,
+                    category_id: row.get(5)?,
+                    status: self.parse_post_status(&row.get::<_, String>(6)?),
+                    view_count: row.get(7)?,
+                    like_count: row.get(8)?,
+                    comment_count: row.get(9)?,
+                    is_pinned: row.get(10)?,
+                    is_featured: row.get(11)?,
+                    created_at: parse_timestamp(row.get::<_, String>(12)?),
+                    updated_at: parse_timestamp(row.get::<_, String>(13)?),
+                    review_status: row.get(14).ok(),
+                    review_comment: row.get(15).ok(),
+                    reviewer_id: row.get(16).ok(),
+                    reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok((posts, total))
     }
 } 
 

@@ -169,3 +169,43 @@ pub struct UpdateCommunitySettingsRequest {
     pub posts_per_page: Option<i32>,
     pub default_sort: Option<String>,
 } 
+
+// 添加轮播图相关结构体
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Banner {
+    pub id: i32,
+    pub title: String,
+    pub image_url: String,
+    pub link_type: String, // "resource", "category", "url", "none"
+    pub link_target: Option<String>, // 资源ID/分类ID/外部URL
+    pub priority: i32,
+    pub enabled: bool,
+    pub start_time: String,
+    pub end_time: Option<String>,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateBannerRequest {
+    pub title: String,
+    pub image_url: String,
+    pub link_type: String, // "resource", "category", "url", "none"
+    pub link_target: Option<String>,
+    pub priority: Option<i32>,
+    pub enabled: Option<bool>,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateBannerRequest {
+    pub title: Option<String>,
+    pub image_url: Option<String>,
+    pub link_type: Option<String>,
+    pub link_target: Option<String>,
+    pub priority: Option<i32>,
+    pub enabled: Option<bool>,
+    pub start_time: Option<String>,
+    pub end_time: Option<String>,
+} 

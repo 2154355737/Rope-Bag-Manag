@@ -4,6 +4,8 @@ use crate::models::{CreateCommentRequest, CommentListResponse};
 use crate::services::comment_service::CommentService;
 use crate::middleware::auth::AuthenticatedUser;
 use serde::{Deserialize};
+use actix_web::HttpRequest;
+use crate::utils::auth_helper::AuthHelper;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -89,68 +91,67 @@ pub struct PinRequest {
     pub pinned: bool,
 }
 
-// 获取所有评论（管理员接口）
+// 获取所有评论（管理员接口 + 公开只读）
 #[get("")]
 async fn get_all_comments(
+    http_req: HttpRequest,
     query: web::Query<CommentQueryParams>,
     comment_service: web::Data<CommentService>,
-    auth_user: AuthenticatedUser,
 ) -> impl Responder {
-    if !auth_user.is_admin() {
-        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-            403, "只有管理员可以访问此接口"
-        ));
+    // 管理员：保留原有读取全部能力（通过HttpRequest可选解析）
+    let is_admin = AuthHelper::verify_user(&http_req).map(|u| matches!(u.role, crate::models::UserRole::Admin)).unwrap_or(false);
+    if is_admin {
+        let page = query.page.unwrap_or(1);
+        let size = query.size.unwrap_or(20);
+        let status = match &query.status { Some(s) if !s.is_empty() => Some(s.as_str()), _ => None };
+        let target_type = match &query.target_type { Some(t) if !t.is_empty() => Some(t.as_str()), _ => None };
+        let start_date = match &query.start_date { Some(d) if !d.is_empty() => Some(d.as_str()), _ => None };
+        let end_date = match &query.end_date { Some(d) if !d.is_empty() => Some(d.as_str()), _ => None };
+        return match comment_service.get_all_comments(
+            page, size, status, target_type, query.target_id, query.user_id, start_date, end_date,
+        ).await {
+            Ok((comments, total)) => {
+                let response = CommentListResponse { list: comments, total, page, size };
+                HttpResponse::Ok().json(ApiResponse::success(response))
+            },
+            Err(e) => {
+                log::error!("获取评论列表失败: {}", e);
+                HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("获取评论列表失败: {}", e)))
+            }
+        };
     }
 
-    // 获取分页和筛选参数
+    // 非管理员：公开读取策略（仅 Active，限定目标类型与分页大小）
     let page = query.page.unwrap_or(1);
-    let size = query.size.unwrap_or(20);
-    
-    // 处理空字符串为None
-    let status = match &query.status {
-        Some(s) if !s.is_empty() => Some(s.as_str()),
-        _ => None
+    let mut size = query.size.unwrap_or(20);
+    if size > 100 { size = 100; }
+
+    // 仅允许特定目标类型（Post/Package）
+    let ttype = match &query.target_type {
+        Some(t) if !t.is_empty() => t.to_string(),
+        _ => "".to_string(),
     };
-    
-    let target_type = match &query.target_type {
-        Some(t) if !t.is_empty() => Some(t.as_str()),
-        _ => None
-    };
-    
-    let start_date = match &query.start_date {
-        Some(d) if !d.is_empty() => Some(d.as_str()),
-        _ => None
-    };
-    
-    let end_date = match &query.end_date {
-        Some(d) if !d.is_empty() => Some(d.as_str()),
-        _ => None
-    };
-    
+    let ttype_lower = ttype.to_lowercase();
+    if !(ttype_lower == "post" || ttype_lower == "package") {
+        return HttpResponse::BadRequest().json(ApiResponse::<()>::error(400, "必须提供合法的 target_type: Post 或 Package"));
+    }
+
+    // 公开读取强制只返回 Active
+    let status = Some("Active");
+    let target_type = Some(ttype_lower.as_str());
+    let start_date = None;
+    let end_date = None;
+
     match comment_service.get_all_comments(
-        page, 
-        size,
-        status,
-        target_type,
-        query.target_id,
-        query.user_id,
-        start_date,
-        end_date,
+        page, size, status, target_type, query.target_id, None, start_date, end_date,
     ).await {
         Ok((comments, total)) => {
-            let response = CommentListResponse {
-                list: comments,
-                total,
-                page,
-                size,
-            };
+            let response = CommentListResponse { list: comments, total, page, size };
             HttpResponse::Ok().json(ApiResponse::success(response))
         },
         Err(e) => {
-            log::error!("获取评论列表失败: {}", e);
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                500, &format!("获取评论列表失败: {}", e)
-            ))
+            log::error!("公开获取评论失败: {}", e);
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("获取评论列表失败: {}", e)))
         }
     }
 }

@@ -27,12 +27,21 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete_post))
             )
             .service(
+                web::resource("/{id}/review")
+                    .route(web::post().to(review_post))
+            )
+            .service(
                 web::resource("/{id}/tags")
                     .route(web::get().to(get_post_tags))
             )
             .service(
                 web::resource("/{id}/view")
                     .route(web::post().to(increment_view_count))
+            )
+            .service(
+                web::resource("/{id}/like")
+                    .route(web::post().to(like_post))
+                    .route(web::delete().to(unlike_post))
             )
     );
 }
@@ -43,7 +52,10 @@ async fn get_posts(
     query: web::Query<PostQueryParams>,
     post_service: web::Data<PostService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    match post_service.get_posts(query.into_inner()).await {
+    let mut q = query.into_inner();
+    // 默认仅显示已发布 + 审核通过的帖子
+    if q.status.is_none() { q.status = Some("Published".to_string()); }
+    match post_service.get_posts(q).await {
         Ok(response) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
@@ -98,7 +110,7 @@ async fn create_post(
 
 // 获取单个帖子
 async fn get_post(
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
     path: web::Path<i32>,
     post_service: web::Data<PostService>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -106,6 +118,13 @@ async fn get_post(
     
     match post_service.get_post(post_id).await {
         Ok(Some(post)) => {
+            // 非管理员访问未审核通过的帖子：返回403
+            let is_admin = AuthHelper::is_admin(&http_req);
+            if !is_admin {
+                if let Some(rs) = &post.review_status { if rs != "approved" { 
+                    return Ok(HttpResponse::Forbidden().json(json!({ "code": 403, "message": "帖子未审核通过" })));
+                }}
+            }
             // 增加浏览量
             let _ = post_service.increment_view_count(post_id).await;
             
@@ -189,6 +208,37 @@ async fn update_post(
             })))
         }
     }
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewRequest { status: String, comment: Option<String> }
+
+// 审核帖子（管理员/元老）
+async fn review_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    req: web::Json<ReviewRequest>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 仅管理员/元老
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    if user.role != crate::models::UserRole::Admin && user.role != crate::models::UserRole::Elder {
+        return Ok(HttpResponse::Forbidden().json(json!({ "code": 403, "message": "权限不足" })));
+    }
+    let post_id = path.into_inner();
+    let status = req.status.to_lowercase();
+    let allowed = status == "approved" || status == "rejected";
+    if !allowed { return Ok(HttpResponse::BadRequest().json(json!({"code":400,"message":"无效状态"}))); }
+
+    // 直接执行 SQL 更新（简单实现）：
+    use rusqlite::{Connection, params};
+    let conn = Connection::open(post_service.db_path()).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute(
+        "UPDATE posts SET review_status = ?, review_comment = ?, reviewer_id = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?",
+        params![status, req.comment.clone().unwrap_or_default(), user.id, post_id]
+    ).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"审核成功"})))
 }
 
 // 删除帖子
@@ -349,5 +399,31 @@ async fn get_popular_posts(
                 "message": "获取热门帖子失败"
             })))
         }
+    }
+} 
+
+async fn like_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    match post_service.like_post(user.id, post_id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+async fn unlike_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    match post_service.unlike_post(user.id, post_id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
     }
 } 

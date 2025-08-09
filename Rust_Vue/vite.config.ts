@@ -3,12 +3,18 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import Components from 'unplugin-vue-components/vite'
+import { VantResolver } from '@vant/auto-import-resolver'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
+    // Vant 按需导入配置
+    Components({
+      resolvers: [VantResolver()],
+    }),
   ],
   server: {
     proxy: {
@@ -35,7 +41,7 @@ export default defineConfig({
     },
     // 开发服务器配置
     host: '0.0.0.0', // 允许外部访问
-    port: 5173,      // 默认端口
+    port: 15203,      // 指定端口为 15203
     // 防止网络问题
     hmr: {
       overlay: false
@@ -57,6 +63,9 @@ export default defineConfig({
           
           // Element Plus UI库
           'element-plus': ['element-plus'],
+          
+          // Vant移动端UI库
+          'vant': ['vant'],
           
           // ECharts图表库
           'echarts': ['echarts', 'vue-echarts'],
@@ -107,6 +116,7 @@ export default defineConfig({
       'vue',
       'vue-router',
       'element-plus',
+      'vant',
       'echarts',
       'axios',
       'lucide-vue-next'

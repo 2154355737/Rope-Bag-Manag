@@ -440,6 +440,35 @@ impl PackageRepository {
         Ok(count)
     }
 
+    pub async fn like_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS package_likes (user_id INTEGER NOT NULL, package_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, package_id))",
+            [],
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO package_likes (user_id, package_id) VALUES (?, ?)",
+            params![user_id, package_id],
+        )?;
+        conn.execute(
+            "UPDATE packages SET like_count = COALESCE(like_count,0) + 1 WHERE id = ? AND EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
+            params![package_id, user_id, package_id],
+        )?;
+        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE package_id = ?", params![package_id], |r| r.get(0))?;
+        Ok(cnt)
+    }
+
+    pub async fn unlike_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "DELETE FROM package_likes WHERE user_id = ? AND package_id = ?",
+            params![user_id, package_id],
+        )?;
+        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE package_id = ?", params![package_id], |r| r.get(0))?;
+        conn.execute("UPDATE packages SET like_count = ? WHERE id = ?", params![cnt, package_id])?;
+        Ok(cnt)
+    }
+
     /* ---------------- 标签关联辅助 ---------------- */
     // 获取指定包的标签名称列表
     fn get_tags_for_package_internal(conn: &Connection, package_id: i32) -> anyhow::Result<Vec<String>> {

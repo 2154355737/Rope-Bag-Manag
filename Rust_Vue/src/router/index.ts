@@ -30,9 +30,10 @@ const routes: RouteRecordRaw[] = [
   // 首页重定向
   { 
     path: '/', 
-    redirect: '/home',
+    redirect: '/admin',
     meta: { title: '首页' }
   },
+  
   // 主站相关
   {
     path: '/home',

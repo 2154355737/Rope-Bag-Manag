@@ -8,6 +8,7 @@ pub mod email_verification_repo;
 pub mod subscription_repo;
 pub mod mail_repo; // 添加邮件仓库
 pub mod download_security_repo; // 添加下载安全仓库
+pub mod notification_repo; // 新增通知仓库
 
 pub use user_repo::*;
 pub use package_repo::*;

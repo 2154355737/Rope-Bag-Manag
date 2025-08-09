@@ -3,6 +3,9 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
+// 导入Vant样式
+import 'vant/lib/index.css'
+
 // 导入字体
 import './assets/fonts.css'
 
@@ -14,6 +17,9 @@ import './assets/quick-fixes.css'       // 快速修复样式
 import './assets/element-plus-dark.css' // Element Plus深色主题
 import './assets/admin-common.css'      // 管理页面通用样式
 import './assets/home-styles.css'       // 首页样式
+
+// 导入移动端样式（临时禁用以规避 sass-embedded 问题）
+// import './styles/mobile/mobile.scss'
 
 // 导入主应用组件
 import App from './App.vue'

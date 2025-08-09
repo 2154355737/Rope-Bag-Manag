@@ -16,6 +16,11 @@ pub mod tag;
 pub mod download_security;
 pub mod security_management;
 
+// 添加public模块
+pub mod public;
+// 新增通知模块
+pub mod notification;
+
 use actix_web::web;
 
 pub fn configure_api(cfg: &mut web::ServiceConfig) {
@@ -36,5 +41,9 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(feed::configure_routes)
         .configure(tag::configure_routes)
         .configure(download_security::configure_routes)
-        .configure(security_management::configure_routes);
+        .configure(security_management::configure_routes)
+        .configure(notification::configure_routes);
+
+    // 添加公共API路由
+    public::public_routes(cfg);
 } 

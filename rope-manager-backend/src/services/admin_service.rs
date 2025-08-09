@@ -250,6 +250,46 @@ impl AdminService {
         let logs = self.mail_repo.get_mail_logs(limit, None).await?;
         Ok(serde_json::to_value(logs)?)
     }
+
+    // 获取所有轮播图
+    pub async fn get_banners(&self) -> Result<Vec<crate::models::system::Banner>> {
+        self.system_repo.get_banners(false).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 获取活动轮播图
+    pub async fn get_active_banners(&self) -> Result<Vec<crate::models::system::Banner>> {
+        self.system_repo.get_banners(true).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 获取轮播图详情
+    pub async fn get_banner_by_id(&self, id: i32) -> Result<Option<crate::models::system::Banner>> {
+        self.system_repo.get_banner_by_id(id).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 创建轮播图
+    pub async fn create_banner(&self, req: &crate::models::system::CreateBannerRequest) -> Result<crate::models::system::Banner> {
+        self.system_repo.create_banner(req).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 更新轮播图
+    pub async fn update_banner(&self, id: i32, req: &crate::models::system::UpdateBannerRequest) -> Result<()> {
+        self.system_repo.update_banner(id, req).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 删除轮播图
+    pub async fn delete_banner(&self, id: i32) -> Result<()> {
+        self.system_repo.delete_banner(id).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 批量更新轮播图状态
+    pub async fn batch_update_banner_status(&self, ids: &[i32], enabled: bool) -> Result<usize> {
+        self.system_repo.batch_update_banner_status(ids, enabled).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+    
+    // 批量删除轮播图
+    pub async fn batch_delete_banners(&self, ids: &[i32]) -> Result<usize> {
+        self.system_repo.batch_delete_banners(ids).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
 }
 
 #[derive(Serialize)]

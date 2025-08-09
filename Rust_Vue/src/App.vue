@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import DesktopLayout from './layouts/DesktopLayout.vue'
 import UserLayout from './layouts/UserLayout.vue'
 import ElderLayout from './layouts/ElderLayout.vue'
+import { getDeviceType } from './utils/device'
 
 // Stagewise 工具栏集成
 import { initToolbar } from '@stagewise/toolbar'
 
 const route = useRoute()
+const router = useRouter()
+
 const layoutComponent = computed(() => {
   // 只在明确有 layout 字段时才渲染布局
   const layout = route.meta.layout
@@ -19,6 +22,8 @@ const layoutComponent = computed(() => {
   if (layout === 'desktop') return DesktopLayout
   return null
 })
+
+// 仅桌面端布局，不进行移动端跳转
 
 // 初始化 Stagewise 工具栏
 const isDev = import.meta.env.DEV

@@ -732,6 +732,95 @@ components:
         - code
         - message
 
+    # 轮播图相关模型
+    Banner:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        image_url:
+          type: string
+        link_type:
+          type: string
+          enum: [resource, category, url, none]
+        link_target:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+          
+    CreateBannerRequest:
+      type: object
+      required:
+        - title
+        - image_url
+        - link_type
+      properties:
+        title:
+          type: string
+        image_url:
+          type: string
+        link_type:
+          type: string
+          enum: [resource, category, url, none]
+        link_target:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+
+    UpdateBannerRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        image_url:
+          type: string
+        link_type:
+          type: string
+          enum: [resource, category, url, none]
+        link_target:
+          type: string
+          nullable: true
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+          nullable: true
+
 paths:
   # 健康检查
   /health:
@@ -5500,6 +5589,257 @@ paths:
           description: 权限不足
         '500':
           description: 获取失败
+
+  # 轮播图管理接口 (管理员)
+  /admin/banners:
+    get:
+      tags:
+        - 系统管理
+      summary: 获取所有轮播图
+      description: 获取所有轮播图列表（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Banner'
+        '403':
+          description: 权限不足
+
+    post:
+      tags:
+        - 系统管理
+      summary: 创建轮播图
+      description: 创建新的轮播图（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBannerRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Banner'
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  /admin/banners/{id}:
+    get:
+      tags:
+        - 系统管理
+      summary: 获取轮播图详情
+      description: 获取指定轮播图的详细信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Banner'
+        '403':
+          description: 权限不足
+        '404':
+          description: 轮播图不存在
+
+    put:
+      tags:
+        - 系统管理
+      summary: 更新轮播图
+      description: 更新指定轮播图的信息（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBannerRequest'
+      responses:
+        '200':
+          description: 更新成功
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+        '404':
+          description: 轮播图不存在
+
+    delete:
+      tags:
+        - 系统管理
+      summary: 删除轮播图
+      description: 删除指定轮播图（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 删除成功
+        '403':
+          description: 权限不足
+        '404':
+          description: 轮播图不存在
+
+  /admin/banners/batch/status:
+    put:
+      tags:
+        - 系统管理
+      summary: 批量更新轮播图状态
+      description: 批量启用或禁用轮播图（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                enabled:
+                  type: boolean
+              required:
+                - ids
+                - enabled
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          updated_count:
+                            type: integer
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  /admin/banners/batch/delete:
+    post:
+      tags:
+        - 系统管理
+      summary: 批量删除轮播图
+      description: 批量删除轮播图（管理员权限）
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+              required:
+                - ids
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          deleted_count:
+                            type: integer
+        '400':
+          description: 参数错误
+        '403':
+          description: 权限不足
+
+  # 公共轮播图接口
+  /public/banners:
+    get:
+      tags:
+        - 公开接口
+      summary: 获取活动轮播图
+      description: 获取当前可用的轮播图列表（无需权限）
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Banner'
 
 tags:
   - name: 系统健康

@@ -142,6 +142,26 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route("/notify", web::post().to(send_category_notification))
                     .route("/export", web::get().to(export_subscriptions))
             )
+            // 添加轮播图管理路由
+            .service(
+                web::resource("/banners")
+                    .route(web::get().to(get_banners))
+                    .route(web::post().to(create_banner))
+            )
+            .service(
+                web::resource("/banners/{id}")
+                    .route(web::get().to(get_banner))
+                    .route(web::put().to(update_banner))
+                    .route(web::delete().to(delete_banner))
+            )
+            .service(
+                web::resource("/banners/batch/status")
+                    .route(web::put().to(batch_update_banner_status))
+            )
+            .service(
+                web::resource("/banners/batch/delete")
+                    .route(web::post().to(batch_delete_banners))
+            )
     );
 }
 
@@ -1275,5 +1295,206 @@ async fn export_subscriptions(
             "code": 500,
             "message": format!("导出失败: {}", e)
         }))
+    }
+} 
+
+// 获取所有轮播图
+async fn get_banners(
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.get_banners().await {
+        Ok(banners) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "获取成功",
+            "data": banners
+        }))),
+        Err(e) => {
+            log::error!("获取轮播图失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "获取轮播图失败",
+            })))
+        }
+    }
+}
+
+// 获取轮播图详情
+async fn get_banner(
+    path: web::Path<i32>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let banner_id = path.into_inner();
+    
+    match admin_service.get_banner_by_id(banner_id).await {
+        Ok(Some(banner)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "获取成功",
+            "data": banner
+        }))),
+        Ok(None) => Ok(HttpResponse::NotFound().json(json!({
+            "code": 404,
+            "message": "轮播图不存在",
+        }))),
+        Err(e) => {
+            log::error!("获取轮播图详情失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "获取轮播图详情失败",
+            })))
+        }
+    }
+}
+
+// 创建轮播图
+async fn create_banner(
+    req: web::Json<crate::models::system::CreateBannerRequest>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    match admin_service.create_banner(&req.into_inner()).await {
+        Ok(banner) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "创建成功",
+            "data": banner
+        }))),
+        Err(e) => {
+            log::error!("创建轮播图失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("创建轮播图失败: {}", e),
+            })))
+        }
+    }
+}
+
+// 更新轮播图
+async fn update_banner(
+    path: web::Path<i32>,
+    req: web::Json<crate::models::system::UpdateBannerRequest>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let banner_id = path.into_inner();
+    
+    match admin_service.update_banner(banner_id, &req.into_inner()).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "更新成功"
+        }))),
+        Err(e) => {
+            log::error!("更新轮播图失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("更新轮播图失败: {}", e),
+            })))
+        }
+    }
+}
+
+// 删除轮播图
+async fn delete_banner(
+    path: web::Path<i32>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let banner_id = path.into_inner();
+    
+    match admin_service.delete_banner(banner_id).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "删除成功"
+        }))),
+        Err(e) => {
+            log::error!("删除轮播图失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("删除轮播图失败: {}", e),
+            })))
+        }
+    }
+}
+
+// 批量更新轮播图状态
+async fn batch_update_banner_status(
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let ids = match req.get("ids") {
+        Some(ids_value) => match serde_json::from_value::<Vec<i32>>(ids_value.clone()) {
+            Ok(ids) => ids,
+            Err(_) => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的ID列表",
+            }))),
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "缺少ID列表",
+        }))),
+    };
+    
+    let enabled = match req.get("enabled") {
+        Some(enabled_value) => match enabled_value.as_bool() {
+            Some(enabled) => enabled,
+            None => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的启用状态",
+            }))),
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "缺少启用状态",
+        }))),
+    };
+    
+    match admin_service.batch_update_banner_status(&ids, enabled).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "更新成功",
+            "data": {
+                "updated_count": count
+            }
+        }))),
+        Err(e) => {
+            log::error!("批量更新轮播图状态失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "批量更新轮播图状态失败",
+            })))
+        }
+    }
+}
+
+// 批量删除轮播图
+async fn batch_delete_banners(
+    req: web::Json<serde_json::Value>,
+    admin_service: web::Data<crate::services::admin_service::AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let ids = match req.get("ids") {
+        Some(ids_value) => match serde_json::from_value::<Vec<i32>>(ids_value.clone()) {
+            Ok(ids) => ids,
+            Err(_) => return Ok(HttpResponse::BadRequest().json(json!({
+                "code": 400,
+                "message": "无效的ID列表",
+            }))),
+        },
+        None => return Ok(HttpResponse::BadRequest().json(json!({
+            "code": 400,
+            "message": "缺少ID列表",
+        }))),
+    };
+    
+    match admin_service.batch_delete_banners(&ids).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "删除成功",
+            "data": {
+                "deleted_count": count
+            }
+        }))),
+        Err(e) => {
+            log::error!("批量删除轮播图失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "批量删除轮播图失败",
+            })))
+        }
     }
 } 

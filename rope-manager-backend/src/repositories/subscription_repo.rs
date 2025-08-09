@@ -61,6 +61,15 @@ impl SubscriptionRepository {
         Ok(rows.collect::<Result<Vec<String>, _>>()?)
     }
 
+    // 新增：获取订阅某分类的用户ID列表（用于站内通知）
+    pub async fn get_subscribed_user_ids(&self, category_id: i32) -> Result<Vec<i32>> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT user_id FROM subscriptions WHERE category_id = ? AND enabled = 1";
+        let mut stmt = conn.prepare(sql)?;
+        let rows = stmt.query_map(params![category_id], |r| r.get(0))?;
+        Ok(rows.collect::<Result<Vec<i32>, _>>()?)
+    }
+
     // 管理员功能 - 统计分类订阅数量
     pub async fn count_category_subscriptions(&self, category_id: i32) -> Result<i32> {
         let conn = self.conn.lock().await;

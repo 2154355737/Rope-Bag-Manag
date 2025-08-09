@@ -90,6 +90,21 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // 迁移帖子审核字段
+    match conn.execute_batch(include_str!("../sql/migrate_post_review.sql")) {
+        Ok(_) => info!("帖子审核字段迁移成功"),
+        Err(e) => {
+            // 可能因为列已存在而报错，忽略
+            info!("帖子审核字段迁移可能已应用: {}", e);
+        }
+    }
+
+    // 创建点赞表
+    match conn.execute_batch(include_str!("../sql/migrate_likes.sql")) {
+        Ok(_) => info!("likes 表初始化成功"),
+        Err(e) => info!("likes 表迁移可能已应用: {}", e),
+    }
+
     // 修复packages表结构，添加缺失的字段
     match conn.execute_batch(include_str!("../fix_packages_table.sql")) {
         Ok(_) => info!("packages表结构修复成功"),
@@ -216,12 +231,16 @@ async fn main() -> std::io::Result<()> {
         ).expect("创建防刷量服务失败")
         .with_security_action_service(security_action_service.clone());
 
+        let notification_repo = repositories::notification_repo::NotificationRepository::new(&db_url).expect("创建通知仓库失败");
+        let notification_service = services::notification_service::NotificationService::new(notification_repo.clone());
+
         let package_service = services::package_service::PackageService::new(
             package_repo.clone(), upload_path.clone()
         ).with_system_repo(system_repo.clone())
         .with_notifier(subscription_repo.clone(), email_service.clone())
         .with_user_repo(user_repo.clone())
-        .with_download_security_service(&download_security_service);
+        .with_download_security_service(&download_security_service)
+        .with_notification_service(notification_service.clone());
         let admin_service = services::admin_service::AdminService::new(&db_url);
         let forbidden_word_service = services::forbidden_word_service::ForbiddenWordService::new(
             forbidden_word_repo.clone()
@@ -229,6 +248,7 @@ async fn main() -> std::io::Result<()> {
         let comment_service = services::comment_service::CommentService::new(
             comment_repo.clone(), user_repo.clone()
         ).with_package_repo(package_repo.clone())
+        .with_notification_service(notification_service.clone())
         .with_forbidden_service(forbidden_word_service.clone());
         let community_service = services::community_service::CommunityService::new(
             comment_repo.clone()
@@ -236,7 +256,8 @@ async fn main() -> std::io::Result<()> {
         let user_action_service = services::user_action_service::UserActionService::new(
             user_action_repo.clone()
         );
-        let post_service = services::post_service::PostService::new(db_url.clone());
+        let post_service = services::post_service::PostService::new(db_url.clone())
+            .with_notifier(notification_service.clone());
         let tag_service = services::tag_service::TagService::new(db_url.clone());
 
         let uploads_dir = &config.file.upload_path;
@@ -282,6 +303,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(package_repo))
             .app_data(web::Data::new(post_service))
             .app_data(web::Data::new(tag_service))
+            .app_data(web::Data::new(notification_service))
             .app_data(web::Data::new(download_security_service))
             .app_data(web::Data::new(security_action_service))
             .configure(api::configure_routes)  // 配置根级别API路由（包含health接口）

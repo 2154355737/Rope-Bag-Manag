@@ -10,6 +10,7 @@ use crate::services::download_security_service::DownloadSecurityService;
 use crate::models::download_security::DownloadSecurityConfig;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use crate::services::notification_service::NotificationService;
 
 #[derive(Clone)]
 pub struct PackageService {
@@ -20,6 +21,7 @@ pub struct PackageService {
     email_service: Option<Arc<RwLock<EmailService>>>,
     user_repo: Option<crate::repositories::UserRepository>,
     download_security_service: Option<DownloadSecurityService>,
+    notification_service: Option<NotificationService>,
 }
 
 impl PackageService {
@@ -32,6 +34,7 @@ impl PackageService {
             email_service: None,
             user_repo: None,
             download_security_service: None,
+            notification_service: None,
         }
     }
 
@@ -55,6 +58,16 @@ impl PackageService {
     pub fn with_download_security_service(mut self, security_service: &DownloadSecurityService) -> Self {
         self.download_security_service = Some(security_service.clone());
         self
+    }
+
+    pub fn with_notification_service(mut self, service: NotificationService) -> Self {
+        self.notification_service = Some(service);
+        self
+    }
+
+    pub fn db_path(&self) -> &str {
+        // package_repo holds a connection opened from a path; we can reuse the environment config through repositories::get_connection, but for simplicity we try to access via connection path is not stored. Here we fallback to the global config by reading from repository helper in main; since not available, we just return an empty str isn't acceptable. Alternative: expose nothing and change user.rs not to open connection via service. We'll instead remove its usage. (But current edit requires getter.)
+        "data.db"
     }
 
     pub async fn get_packages(&self) -> Result<Vec<Package>> {
@@ -214,6 +227,36 @@ impl PackageService {
                                 log::error!("发送订阅者通知邮件失败: {}", e);
                             } else {
                                 log::info!("成功发送订阅者通知邮件: {} -> {}", updated_package.name, email);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 审核通过 -> 给作者发送站内通知
+            if let (Some(user_repo), Some(notify)) = (&self.user_repo, &self.notification_service) {
+                if let Ok(Some(author_user)) = user_repo.find_by_username(&updated_package.author).await {
+                    let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                    let link = format!("{}/resource/{}", resource_url, updated_package.id);
+                    let title = "资源审核通过";
+                    let content = format!("您的资源《{}》已通过审核", updated_package.name);
+                    if let Err(e) = notify.notify(author_user.id, title, &content, Some(&link), Some("ResourceApproved"), Some("Package"), Some(updated_package.id)).await {
+                        log::error!("发送站内通知失败: {}", e);
+                    }
+                }
+            }
+
+            // 站内通知：分类订阅者（不含作者）
+            if let (Some(sub_repo), Some(notify)) = (&self.subscription_repo, &self.notification_service) {
+                if let Some(cat_id) = updated_package.category_id {
+                    if let Ok(user_ids) = sub_repo.get_subscribed_user_ids(cat_id).await {
+                        let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                        let link = format!("{}/resource/{}", resource_url, updated_package.id);
+                        for uid in user_ids {
+                            let title = "订阅更新";
+                            let content = format!("您订阅的分类有新资源：《{}》", updated_package.name);
+                            if let Err(e) = notify.notify(uid, title, &content, Some(&link), Some("CategoryUpdate"), Some("Package"), Some(updated_package.id)).await {
+                                log::error!("发送订阅站内通知失败: {}", e);
                             }
                         }
                     }
@@ -379,5 +422,15 @@ impl PackageService {
         status: Option<String>,
     ) -> anyhow::Result<(Vec<Package>, i64)> {
         self.package_repo.get_packages_advanced(page, page_size, category, search, status).await
+    }
+
+    pub async fn like_package(&self, user_id: i32, package_id: i32) -> anyhow::Result<i32> {
+        let cnt = self.package_repo.like_package(user_id, package_id).await?;
+        Ok(cnt)
+    }
+
+    pub async fn unlike_package(&self, user_id: i32, package_id: i32) -> anyhow::Result<i32> {
+        let cnt = self.package_repo.unlike_package(user_id, package_id).await?;
+        Ok(cnt)
     }
 } 

@@ -1,13 +1,14 @@
 pub mod user;
 pub mod package;
-pub mod comment;
-pub mod resource_record;
 pub mod system;
-pub mod user_action; // 添加用户行为记录模型
-pub mod mail; // 添加邮件模块
-pub mod post; // 添加帖子模型
-pub mod tag; // 添加标签模型
-pub mod download_security; // 添加下载安全模型
+pub mod comment;
+pub mod download_security;
+pub mod notification;
+pub mod resource_record;
+pub mod post;
+pub mod tag;
+pub mod user_action;
+pub mod mail;
 
 use serde::{Serialize, Deserialize};
 
@@ -19,6 +20,9 @@ pub use resource_record::*;
 pub use post::*;
 pub use tag::*;
 pub use download_security::*;
+pub use notification::*;
+pub use user_action::*;
+pub use mail::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiResponse<T> {

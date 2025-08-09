@@ -17,6 +17,11 @@ pub struct Post {
     pub is_featured: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    // 审核相关
+    pub review_status: Option<String>,
+    pub review_comment: Option<String>,
+    pub reviewer_id: Option<i32>,
+    pub reviewed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

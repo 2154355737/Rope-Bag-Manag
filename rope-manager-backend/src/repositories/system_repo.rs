@@ -1638,4 +1638,246 @@ impl SystemRepository {
 
         Ok(())
     }
+
+    // 获取轮播图列表
+    pub async fn get_banners(&self, enabled_only: bool) -> Result<Vec<crate::models::system::Banner>> {
+        let conn = self.conn.lock().await;
+        
+        let mut sql = "SELECT id, title, image_url, link_type, link_target, priority, enabled, 
+                      start_time, end_time, created_at, updated_at
+                      FROM banners".to_string();
+                      
+        if enabled_only {
+            sql.push_str(" WHERE enabled = 1 
+                          AND (start_time <= datetime('now', 'localtime'))
+                          AND (end_time IS NULL OR end_time >= datetime('now', 'localtime'))");
+        }
+        
+        sql.push_str(" ORDER BY priority DESC, id DESC");
+        
+        let mut stmt = conn.prepare(&sql)?;
+        let banner_iter = stmt.query_map([], |row| {
+            Ok(crate::models::system::Banner {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                image_url: row.get(2)?,
+                link_type: row.get(3)?,
+                link_target: row.get(4)?,
+                priority: row.get(5)?,
+                enabled: row.get(6)?,
+                start_time: row.get(7)?,
+                end_time: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        })?;
+
+        let mut banners = Vec::new();
+        for banner in banner_iter {
+            banners.push(banner?);
+        }
+        
+        Ok(banners)
+    }
+    
+    // 获取轮播图详情
+    pub async fn get_banner_by_id(&self, id: i32) -> Result<Option<crate::models::system::Banner>> {
+        let conn = self.conn.lock().await;
+        
+        let sql = "SELECT id, title, image_url, link_type, link_target, priority, enabled, 
+                  start_time, end_time, created_at, updated_at
+                  FROM banners WHERE id = ?";
+                  
+        let mut stmt = conn.prepare(sql)?;
+        let banner = stmt.query_row(params![id], |row| {
+            Ok(crate::models::system::Banner {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                image_url: row.get(2)?,
+                link_type: row.get(3)?,
+                link_target: row.get(4)?,
+                priority: row.get(5)?,
+                enabled: row.get(6)?,
+                start_time: row.get(7)?,
+                end_time: row.get(8)?,
+                created_at: row.get(9)?,
+                updated_at: row.get(10)?,
+            })
+        }).optional()?;
+        
+        Ok(banner)
+    }
+    
+    // 创建轮播图
+    pub async fn create_banner(&self, req: &crate::models::system::CreateBannerRequest) -> Result<crate::models::system::Banner> {
+        let conn = self.conn.lock().await;
+        
+        // 确保表存在
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS banners (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                image_url TEXT NOT NULL,
+                link_type TEXT NOT NULL,
+                link_target TEXT,
+                priority INTEGER NOT NULL DEFAULT 0,
+                enabled BOOLEAN NOT NULL DEFAULT 1,
+                start_time TEXT NOT NULL,
+                end_time TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT
+            )",
+            []
+        )?;
+        
+        let priority = req.priority.unwrap_or(0);
+        let enabled = req.enabled.unwrap_or(true);
+        let now = chrono::Local::now().to_rfc3339();
+        let start_time = req.start_time.as_deref().unwrap_or(&now);
+        
+        let id = conn.query_row(
+            "INSERT INTO banners (title, image_url, link_type, link_target, priority, enabled, start_time, end_time, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             RETURNING id",
+            params![
+                req.title,
+                req.image_url,
+                req.link_type,
+                req.link_target,
+                priority,
+                enabled,
+                start_time,
+                req.end_time,
+                now
+            ],
+            |row| row.get(0)
+        )?;
+        
+        // 获取创建的轮播图
+        match self.get_banner_by_id(id).await? {
+            Some(banner) => Ok(banner),
+            None => Err(anyhow::anyhow!("创建轮播图失败"))
+        }
+    }
+    
+    // 更新轮播图
+    pub async fn update_banner(&self, id: i32, req: &crate::models::system::UpdateBannerRequest) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        let mut updates = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        
+        if let Some(ref title) = req.title {
+            updates.push("title = ?");
+            params.push(Box::new(title.clone()));
+        }
+        
+        if let Some(ref image_url) = req.image_url {
+            updates.push("image_url = ?");
+            params.push(Box::new(image_url.clone()));
+        }
+        
+        if let Some(ref link_type) = req.link_type {
+            updates.push("link_type = ?");
+            params.push(Box::new(link_type.clone()));
+        }
+        
+        if let Some(ref link_target) = req.link_target {
+            updates.push("link_target = ?");
+            params.push(Box::new(link_target.clone()));
+        }
+        
+        if let Some(priority) = req.priority {
+            updates.push("priority = ?");
+            params.push(Box::new(priority));
+        }
+        
+        if let Some(enabled) = req.enabled {
+            updates.push("enabled = ?");
+            params.push(Box::new(enabled));
+        }
+        
+        if let Some(ref start_time) = req.start_time {
+            updates.push("start_time = ?");
+            params.push(Box::new(start_time.clone()));
+        }
+        
+        if let Some(ref end_time) = req.end_time {
+            updates.push("end_time = ?");
+            params.push(Box::new(end_time.clone()));
+        }
+        
+        if !updates.is_empty() {
+            let now = chrono::Local::now().to_rfc3339();
+            updates.push("updated_at = ?");
+            params.push(Box::new(now));
+            
+            let update_clause = updates.join(", ");
+            
+            let mut param_refs: Vec<&dyn rusqlite::ToSql> = params.iter()
+                .map(|p| p.as_ref())
+                .collect();
+            
+            param_refs.push(&id);
+            
+            conn.execute(
+                &format!("UPDATE banners SET {} WHERE id = ?", update_clause),
+                param_refs.as_slice()
+            )?;
+        }
+        
+        Ok(())
+    }
+    
+    // 删除轮播图
+    pub async fn delete_banner(&self, id: i32) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        conn.execute("DELETE FROM banners WHERE id = ?", params![id])?;
+        
+        Ok(())
+    }
+    
+    // 批量更新轮播图状态
+    pub async fn batch_update_banner_status(&self, ids: &[i32], enabled: bool) -> Result<usize> {
+        let conn = self.conn.lock().await;
+        
+        let now = chrono::Local::now().to_rfc3339();
+        
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        params.push(&enabled);
+        params.push(&now);
+        for id in ids {
+            params.push(id);
+        }
+        
+        let count = conn.execute(
+            &format!(
+                "UPDATE banners SET enabled = ?, updated_at = ? WHERE id IN ({})",
+                placeholders
+            ),
+            params.as_slice()
+        )?;
+        
+        Ok(count)
+    }
+    
+    // 批量删除轮播图
+    pub async fn batch_delete_banners(&self, ids: &[i32]) -> Result<usize> {
+        let conn = self.conn.lock().await;
+        
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        for id in ids {
+            params.push(id);
+        }
+        
+        let count = conn.execute(
+            &format!("DELETE FROM banners WHERE id IN ({})", placeholders),
+            params.as_slice()
+        )?;
+        
+        Ok(count)
+    }
 } 

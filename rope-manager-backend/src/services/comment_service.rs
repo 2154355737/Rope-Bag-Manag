@@ -6,6 +6,7 @@ use crate::repositories::comment_repo::CommentRepository;
 use crate::repositories::user_repo::UserRepository;
 use crate::repositories::package_repo::PackageRepository;
 use crate::services::forbidden_word_service::ForbiddenWordService;
+use crate::services::notification_service::NotificationService;
 
 #[derive(Clone)]
 pub struct CommentService {
@@ -13,11 +14,12 @@ pub struct CommentService {
     user_repo: UserRepository,
     package_repo: Option<PackageRepository>,
     forbidden_service: Option<ForbiddenWordService>,
+    notification_service: Option<NotificationService>,
 }
 
 impl CommentService {
     pub fn new(comment_repo: CommentRepository, user_repo: UserRepository) -> Self {
-        Self { comment_repo, user_repo, package_repo: None, forbidden_service: None }
+        Self { comment_repo, user_repo, package_repo: None, forbidden_service: None, notification_service: None }
     }
 
     pub fn with_package_repo(mut self, package_repo: PackageRepository) -> Self {
@@ -27,6 +29,11 @@ impl CommentService {
 
     pub fn with_forbidden_service(mut self, service: ForbiddenWordService) -> Self {
         self.forbidden_service = Some(service);
+        self
+    }
+
+    pub fn with_notification_service(mut self, service: NotificationService) -> Self {
+        self.notification_service = Some(service);
         self
     }
 
@@ -109,6 +116,25 @@ impl CommentService {
             comment.author_role = Some(user.role.to_string());
             comment.author_avatar = user.avatar_url.clone();
             comment.author_qq = user.qq_number.clone();
+        }
+
+        // 给资源作者发送站内通知（仅当评论目标为 Package）
+        if comment.target_type.eq_ignore_ascii_case("Package") {
+            if let (Some(pkg_repo), Some(notify)) = (&self.package_repo, &self.notification_service) {
+                if let Ok(Some(pkg)) = pkg_repo.find_by_id(comment.target_id).await {
+                    if let Ok(Some(author_user)) = self.user_repo.find_by_username(&pkg.author).await {
+                        if author_user.id != user_id {
+                            let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
+                            let link = format!("{}/resource/{}", resource_url, pkg.id);
+                            let title = "资源收到新评论";
+                            let content = format!("您的资源《{}》有一条新评论", pkg.name);
+                            if let Err(e) = notify.notify(author_user.id, title, &content, Some(&link), Some("CommentReceived"), Some("Package"), Some(pkg.id)).await {
+                                log::error!("发送评论通知失败: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Ok(comment)
