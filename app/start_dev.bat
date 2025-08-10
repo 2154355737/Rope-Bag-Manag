@@ -31,6 +31,7 @@ timeout /t 3 /nobreak >nul
 REM 启动前端服务
 echo 启动前端开发服务器...
 cd app
+set VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1
 start cmd /k "npm run dev"
 
 echo.

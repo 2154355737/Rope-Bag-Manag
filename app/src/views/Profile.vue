@@ -72,7 +72,7 @@
         <div class="menu-title">其他</div>
         <van-cell-group inset>
           <van-cell title="意见反馈" icon="smile-comment-o" is-link />
-          <van-cell title="关于我们" icon="info-o" is-link />
+          <van-cell title="关于我们" icon="info-o" is-link to="/about" />
           <van-cell title="退出登录" icon="delete" @click="confirmLogout" />
         </van-cell-group>
       </div>
@@ -113,6 +113,11 @@
                   label="QQ"
                   placeholder="请输入QQ号"
                   type="tel"
+                />
+                <van-field
+                  v-model="profileForm.avatar_url"
+                  label="头像直链"
+                  placeholder="请输入头像图片的直链 URL"
                 />
               </van-cell-group>
               
@@ -251,7 +256,8 @@ const submitting = ref(false);
 const profileForm = ref({
   nickname: '',
   email: '',
-  qq_number: ''
+  qq_number: '',
+  avatar_url: ''
 });
 
 // 密码表单
@@ -301,7 +307,8 @@ const initFormData = () => {
     profileForm.value = {
       nickname: userStore.userInfo.nickname || '',
       email: userStore.userInfo.email || '',
-      qq_number: userStore.userInfo.qq_number || ''
+      qq_number: userStore.userInfo.qq_number || '',
+      avatar_url: userStore.userInfo.avatar_url || ''
     };
   }
 };

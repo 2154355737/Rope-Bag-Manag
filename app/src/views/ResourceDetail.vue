@@ -164,8 +164,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { ref, onMounted, watch } from 'vue';
+import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
 import { showToast, showDialog } from 'vant';
 import { resourceApi } from '../api/resource';
 import { useUserStore } from '../store/user';
@@ -223,10 +223,7 @@ const getResourceDetail = async () => {
     const res = await resourceApi.getResourceDetail(resourceId.value);
     resource.value = res.data;
     likeCount.value = resource.value?.like_count || 0;
-    // 资源详情已包含 tags 字段，无需额外请求
-    
-    // 增加浏览量
-    // 这里可以调用一个增加浏览量的接口
+    liked.value = false;
   } catch (error) {
     console.error('获取资源详情失败', error);
     showToast('获取资源详情失败');
@@ -270,13 +267,10 @@ const getResourceComments = async () => {
 // 获取相关推荐
 const getRelatedResources = async () => {
   if (!resource.value) return;
-  
   relatedLoading.value = true;
   try {
-    // 根据分类获取相关资源
     if (resource.value.category_id) {
       const res = await resourceApi.getResourcesByCategory(resource.value.category_id, 1, 5);
-      // 过滤掉当前资源
       relatedResources.value = (res.data.list || []).filter(item => item.id !== resourceId.value);
     }
   } catch (error) {
@@ -285,6 +279,31 @@ const getRelatedResources = async () => {
     relatedLoading.value = false;
   }
 };
+
+// 统一重载方法
+const reloadAll = async (id) => {
+  const newId = Number(id ?? route.params.id);
+  if (!Number.isFinite(newId)) return;
+  resourceId.value = newId;
+  await getResourceDetail();
+  await getResourceComments();
+  await getRelatedResources();
+};
+
+// 页面加载
+onMounted(() => {
+  reloadAll(resourceId.value);
+});
+
+// 路由参数变化时刷新（同组件复用场景）
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId !== oldId) reloadAll(Number(newId));
+});
+
+onBeforeRouteUpdate((to, from, next) => {
+  // 先刷新，再进入
+  reloadAll(Number(to.params.id)).then(() => next());
+});
 
 // 下载资源
 const downloadResource = async () => {
@@ -371,13 +390,6 @@ const submitComment = async () => {
     showToast('提交评论失败');
   }
 };
-
-// 页面加载
-onMounted(() => {
-  getResourceDetail();
-  getResourceComments();
-  getRelatedResources();
-});
 </script>
 
 <style scoped>

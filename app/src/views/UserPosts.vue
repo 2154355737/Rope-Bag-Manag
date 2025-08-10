@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import dayjs from 'dayjs';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '../store/user';
@@ -90,6 +90,19 @@ const onDelete = async (post) => {
     showToast('删除失败');
   }
 };
+
+// 监听用户切换
+watch(() => userStore.userId, (n, o) => {
+  posts.value = [];
+  page.value = 1;
+  finished.value = false;
+  error.value = false;
+  if (!userStore.isLoggedIn) {
+    router.replace({ path: '/login', query: { redirect: '/my-posts' } });
+    return;
+  }
+  loadMore();
+});
 
 onMounted(async () => {
   if (!userStore.isLoggedIn) {

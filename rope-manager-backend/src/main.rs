@@ -271,12 +271,19 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("http://127.0.0.1:5173")
                     .allowed_origin("http://localhost:3000")
                     .allowed_origin("http://127.0.0.1:3000")
+                    // Tauri 桌面应用
+                    .allowed_origin("http://tauri.localhost")
+                    .allowed_origin("https://tauri.localhost")
                     // 生产环境 - 添加你的服务器地址
                     .allowed_origin("http://39.105.113.219")
                     .allowed_origin("https://39.105.113.219")
-                    // 如果有域名，也添加上
-                    // .allowed_origin("http://yourdomain.com")
-                    // .allowed_origin("https://yourdomain.com")
+                    // 安卓 WebView 资源源（Tauri Android）
+                    .allowed_origin("https://appassets.androidplatform.net")
+                    // 允许 Tauri WebView（tauri:// 协议）
+                    .allowed_origin_fn(|origin, _req_head| {
+                        let o = origin.as_bytes();
+                        o.starts_with(b"tauri://") || o == b"null" || o == b"file://"
+                    })
                     .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
                     .allowed_headers(vec![
                         actix_web::http::header::AUTHORIZATION,

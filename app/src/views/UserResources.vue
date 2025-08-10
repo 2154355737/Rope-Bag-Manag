@@ -35,6 +35,7 @@
           :showActions="true"
           @load-more="loadMore"
           @more="onCardMore"
+          @resource-click="openResource"
         />
       </div>
       
@@ -99,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onActivated } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast, showDialog } from 'vant';
 import { useUserStore } from '../store/user';
@@ -361,11 +362,34 @@ const submitEdit = async (form) => {
   }
 };
 
+// 打开资源详情
+const openResource = (resource) => {
+  if (!resource || !resource.id) return;
+  router.push(`/resource/${resource.id}`);
+};
+
 // 监听筛选和排序变化
 watch([filterValue, sortValue], () => {
   page.value = 1;
   finished.value = false;
   loadResources();
+});
+
+// 用户切换时重载
+watch(() => userStore.userId, async (n, o) => {
+  page.value = 1;
+  finished.value = false;
+  resources.value = [];
+  if (!userStore.isLoggedIn) {
+    router.replace({ path: '/login', query: { redirect: '/my-resources' } });
+    return;
+  }
+  await loadResources();
+});
+
+onActivated(() => {
+  // 返回该页面时，如需可选择刷新
+  // if (resources.value.length === 0) loadResources();
 });
 
 // 页面加载时获取资源
@@ -378,7 +402,6 @@ onMounted(() => {
     });
     return;
   }
-  
   loadResources();
 });
 </script>

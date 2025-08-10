@@ -33,7 +33,7 @@ const formatDate = (d) => (d ? dayjs(d).format('YYYY-MM-DD HH:mm') : '');
 </script>
 
 <style scoped>
-.post-card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+.post-card { background: #fff; border-radius: 8px; padding: 12px; margin-bottom: 10px; cursor: pointer; }
 .header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .title { font-size: 16px; font-weight: 600; color: var(--text-color); flex: 1; }
 .meta { font-size: 12px; color: var(--text-color-lighter); display: flex; gap: 10px; margin-bottom: 6px; }

@@ -1,9 +1,14 @@
 <template>
   <div id="app">
-    <router-view v-slot="{ Component }">
+    <router-view v-slot="{ Component, route }">
+      <template v-if="route.meta && route.meta.keepAlive">
       <keep-alive>
         <component :is="Component" />
       </keep-alive>
+      </template>
+      <template v-else>
+        <component :is="Component" />
+      </template>
     </router-view>
   </div>
 </template>

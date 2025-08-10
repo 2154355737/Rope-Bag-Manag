@@ -64,6 +64,7 @@ import { showToast } from 'vant';
 import { useUserStore } from '../store/user';
 import { get } from '../utils/request';
 import { postApi } from '../api/post';
+import * as echarts from 'echarts';
 
 const router = useRouter();
 const userStore = useUserStore();
@@ -165,19 +166,15 @@ async function loadPosts() {
 }
 
 function initCharts() {
-  const ensureEcharts = () => new Promise((resolve) => {
-    if (window.echarts) return resolve(window.echarts);
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
-    s.onload = () => resolve(window.echarts);
-    document.body.appendChild(s);
-  });
-  ensureEcharts().then((echarts) => {
+  if (likesChartRef.value && viewsChartRef.value) {
     likesChart = echarts.init(likesChartRef.value);
     viewsChart = echarts.init(viewsChartRef.value);
     renderCharts();
-    window.addEventListener('resize', () => { likesChart.resize(); viewsChart.resize(); });
-  });
+    window.addEventListener('resize', () => { 
+      if (likesChart) likesChart.resize(); 
+      if (viewsChart) viewsChart.resize(); 
+    });
+  }
 }
 
 function renderCharts() {
@@ -188,8 +185,6 @@ function renderCharts() {
 
   totalLikes.value = (actionLikesCount.value || (likePkg + likePost));
   totalViews.value = viewTotal;
-
-  const E = (typeof window !== 'undefined' && window.echarts) ? window.echarts : null;
 
   if (likesChart) likesChart.setOption({
     backgroundColor: 'transparent',

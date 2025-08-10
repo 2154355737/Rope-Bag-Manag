@@ -54,6 +54,14 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 移动端安全区域支持 - 作为原生padding的备用方案 */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
 a {
   color: var(--primary-color);
   text-decoration: none;

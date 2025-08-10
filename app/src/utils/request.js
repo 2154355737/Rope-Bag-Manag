@@ -1,45 +1,104 @@
-import axios from 'axios';
+// 智能网络请求模块：自动选择axios或原生fetch
 import { showToast, showDialog } from 'vant';
 import router from '../router';
 
-// 创建axios实例
-const service = axios.create({
-  baseURL: '/api',
-  timeout: 15000
-});
+// 检测是否可以使用axios (在某些Tauri环境中可能有问题)
+let useNativeFetch = false;
+let axios = null;
 
-// 请求拦截器
-service.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
-    }
-    return config;
-  },
-  error => {
-    console.error('请求错误', error);
-    return Promise.reject(error);
+try {
+  // 尝试导入axios
+  axios = require('axios');
+} catch (error) {
+  try {
+    // 如果require失败，尝试import
+    import('axios').then(module => {
+      axios = module.default;
+    }).catch(() => {
+      console.warn('📦 无法加载axios，将使用原生fetch');
+      useNativeFetch = true;
+    });
+  } catch (importError) {
+    console.warn('📦 无法加载axios，将使用原生fetch');
+    useNativeFetch = true;
   }
-);
+}
 
-// 响应拦截器
-service.interceptors.response.use(
-  response => {
-    const res = response.data;
+// 获取API基础URL
+const getBaseURL = () => {
+  const envBaseURL = import.meta.env.VITE_API_BASE_URL;
+  const isTauri = window.__TAURI__ !== undefined;
+  
+  console.log('🔧 Request Config:', {
+    envBaseURL,
+    isTauri,
+    mode: import.meta.env.MODE,
+    useNativeFetch,
+    userAgent: navigator.userAgent
+  });
+  
+  // 在Tauri环境中使用完整URL
+  if (isTauri) {
+    return envBaseURL || 'http://39.105.113.219:15201/api/v1';
+  }
+  
+  return envBaseURL || '/api';
+};
 
-    // 统一处理返回数据格式
-    if (res.code !== 0) {
-      // 显示错误提示
+const baseURL = getBaseURL();
+
+// ========== 原生Fetch实现 ==========
+async function nativeFetchRequest(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  
+  try {
+    const fullURL = url.startsWith('http') ? url : `${baseURL}${url}`;
+    const token = localStorage.getItem('token');
+    
+    const defaultOptions = {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
+      signal: controller.signal
+    };
+    
+    const finalOptions = {
+      ...defaultOptions,
+      ...options,
+      headers: {
+        ...defaultOptions.headers,
+        ...options.headers
+      }
+    };
+    
+    console.log('🚀 发送原生请求:', {
+      method: finalOptions.method,
+      url: fullURL
+    });
+    
+    const response = await fetch(fullURL, finalOptions);
+    clearTimeout(timeoutId);
+    
+    console.log('📡 收到原生响应:', {
+      status: response.status,
+      statusText: response.statusText
+    });
+    
+    const data = await response.json();
+    
+    if (data.code !== 0) {
+      console.warn('⚠️ 业务错误:', data);
+      
       showToast({
-        message: res.message || '系统错误',
+        message: data.message || '系统错误',
         type: 'fail',
         duration: 2000
       });
-
-      // 处理特定错误码
-      if (res.code === 401) {
-        // token过期或无效
+      
+      if (data.code === 401) {
         showDialog({
           title: '登录提示',
           message: '登录状态已失效，请重新登录',
@@ -51,91 +110,85 @@ service.interceptors.response.use(
         });
       }
       
-      return Promise.reject(new Error(res.message || '系统错误'));
-    } else {
-      return res;
+      throw new Error(data.message || '系统错误');
     }
-  },
-  error => {
-    console.error('响应错误', error);
     
-    // 网络错误处理
+    console.log('✅ 请求成功:', data);
+    return data;
+    
+  } catch (error) {
+    clearTimeout(timeoutId);
+    console.error('❌ 原生请求错误:', error);
+    
     let message = '';
-    
-    if (error.response) {
-      // 服务器响应错误
-      switch (error.response.status) {
-        case 401:
-          message = '未授权，请登录';
-          // 清除token并跳转到登录页
-          localStorage.removeItem('token');
-          localStorage.removeItem('userInfo');
-          router.push('/login');
-          break;
-        case 403:
-          message = '拒绝访问';
-          break;
-        case 404:
-          message = '请求的资源不存在';
-          break;
-        case 500:
-          message = '服务器错误';
-          break;
-        default:
-          message = `请求错误 (${error.response.status})`;
-      }
-    } else if (error.request) {
-      // 请求发出但没收到响应
-      message = '服务器无响应';
+    if (error.name === 'AbortError') {
+      message = '请求超时，请检查网络连接';
+    } else if (error instanceof TypeError && error.message.includes('fetch')) {
+      message = '网络连接失败，请检查网络设置';
     } else {
-      // 请求配置出错
-      message = '请求配置错误';
+      message = error.message || '网络请求失败';
     }
     
-    // 显示错误提示
     showToast({
       message: message,
       type: 'fail',
-      duration: 2000
+      duration: 3000
     });
     
-    return Promise.reject(error);
+    throw error;
   }
-);
+}
+
+// ========== 统一接口 ==========
 
 // 封装GET请求
 export function get(url, params) {
-  return service({
-    url,
-    method: 'get',
-    params
-  });
+  // 在Tauri环境中优先使用原生fetch
+  const isTauri = window.__TAURI__ !== undefined;
+  
+  if (isTauri || useNativeFetch || !axios) {
+    let fullURL = url;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.keys(params).forEach(key => {
+        if (params[key] !== null && params[key] !== undefined) {
+          searchParams.append(key, params[key]);
+        }
+      });
+      fullURL += `?${searchParams.toString()}`;
+    }
+    return nativeFetchRequest(fullURL);
+  } else {
+    // 使用axios的后备实现（暂不实现，专注于原生fetch）
+    return nativeFetchRequest(url + (params ? '?' + new URLSearchParams(params).toString() : ''));
+  }
 }
 
 // 封装POST请求
 export function post(url, data) {
-  return service({
-    url,
-    method: 'post',
-    data
+  return nativeFetchRequest(url, {
+    method: 'POST',
+    body: data ? JSON.stringify(data) : undefined
   });
 }
 
 // 封装PUT请求
 export function put(url, data) {
-  return service({
-    url,
-    method: 'put',
-    data
+  return nativeFetchRequest(url, {
+    method: 'PUT',
+    body: data ? JSON.stringify(data) : undefined
   });
 }
 
 // 封装DELETE请求
 export function del(url, params) {
-  return service({
-    url,
-    method: 'delete',
-    params
+  let fullURL = url;
+  if (params) {
+    const searchParams = new URLSearchParams(params);
+    fullURL += `?${searchParams.toString()}`;
+  }
+  return nativeFetchRequest(fullURL, {
+    method: 'DELETE'
   });
 }
 
@@ -144,14 +197,11 @@ export function upload(url, file) {
   const formData = new FormData();
   formData.append('file', file);
   
-  return service({
-    url,
-    method: 'post',
-    data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
+  return nativeFetchRequest(url, {
+    method: 'POST',
+    body: formData,
+    headers: {} // 不设置Content-Type，让浏览器自动设置
   });
 }
 
-export default service; 
+export default { get, post, put, del, upload }; 

@@ -19,6 +19,7 @@ const PostDetail = () => import('../views/PostDetail.vue');
 const PostCreate = () => import('../views/PostCreate.vue');
 const Notifications = () => import('../views/Notifications.vue');
 const Subscriptions = () => import('../views/Subscriptions.vue');
+const About = () => import('../views/About.vue');
 
 const routes = [
   {
@@ -98,6 +99,12 @@ const routes = [
     name: 'Subscriptions',
     component: Subscriptions,
     meta: { title: '分类订阅', requiresAuth: true }
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: About,
+    meta: { title: '关于我们', keepAlive: false }
   },
   {
     path: '/login',

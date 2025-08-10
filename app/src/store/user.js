@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { get, post } from '../utils/request';
+import { get, post, put } from '../utils/request';
 import { showToast } from 'vant';
 import router from '../router';
 
