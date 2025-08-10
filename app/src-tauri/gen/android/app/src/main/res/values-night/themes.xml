@@ -11,11 +11,11 @@
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         
-        <!-- 系统栏颜色设置 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 系统栏颜色设置 - 夜间模式使用更深的半透明背景 -->
+        <item name="android:statusBarColor">#CC000000</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         
-        <!-- 状态栏内容颜色（夜间模式使用深色图标） -->
+        <!-- 状态栏内容颜色（夜间模式使用浅色图标） -->
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o">false</item>
         

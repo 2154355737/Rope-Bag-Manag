@@ -11,12 +11,12 @@
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         
-        <!-- 系统栏颜色设置 -->
-        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- 系统栏颜色设置 - 使用半透明背景确保状态栏内容可见 -->
+        <item name="android:statusBarColor">#80000000</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         
-        <!-- 状态栏内容颜色 -->
-        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
+        <!-- 状态栏内容颜色 - 使用浅色内容在深色背景上 -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o">true</item>
         
         <!-- 确保窗口可以扩展到系统栏下面，但内容会有正确的padding -->
