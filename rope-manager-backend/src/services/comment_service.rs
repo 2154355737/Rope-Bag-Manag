@@ -257,8 +257,7 @@ impl CommentService {
         let has_liked = self.comment_repo.has_user_liked(comment_id, user_id).await?;
 
         if like && !has_liked {
-            // 点赞
-            comment.likes += 1;
+            // 点赞（触发器会自动更新likes字段）
             self.comment_repo.add_user_like(comment_id, user_id).await?;
             
             // 记录用户行为
@@ -275,8 +274,7 @@ impl CommentService {
                 let _ = user_action_repo.create_user_action(&req).await;
             }
         } else if !like && has_liked {
-            // 取消点赞
-            comment.likes = comment.likes.saturating_sub(1);
+            // 取消点赞（触发器会自动更新likes字段）
             self.comment_repo.remove_user_like(comment_id, user_id).await?;
             
             // 记录用户行为
@@ -294,10 +292,17 @@ impl CommentService {
             }
         }
 
-        // 保存评论
-        self.comment_repo.update_comment(&comment).await?;
+        // 获取更新后的点赞数
+        let updated_comment = self.comment_repo.get_comment_by_id(comment_id).await?
+            .ok_or_else(|| anyhow::anyhow!("评论不存在"))?;
 
-        Ok(comment.likes)
+        Ok(updated_comment.likes)
+    }
+
+    // 检查用户是否已点赞评论
+    pub async fn check_comment_like_status(&self, comment_id: i32, user_id: i32) -> Result<bool> {
+        let is_liked = self.comment_repo.has_user_liked(comment_id, user_id).await?;
+        Ok(is_liked)
     }
 
     // 更新评论点踩数

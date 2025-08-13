@@ -253,7 +253,8 @@
  import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
  import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
  import { showToast, showDialog } from 'vant';
- import { resourceApi } from '../api/resource';
+ import { resourceApi } from '../api/resource'
+import { likeComment as likeCommentApi, checkCommentLikeStatus } from '../api/comment';
  import { useUserStore } from '../store/user';
  import ResourceList from '../components/ResourceList.vue';
  import dayjs from 'dayjs';
@@ -283,6 +284,9 @@ const showCommentInput = ref(false);
 const commentContent = ref('');
 const replyTo = ref(null);
 const quotedMessage = ref(null); // 引用的原消息
+
+// 评论点赞状态管理
+const commentLikeStates = ref(new Map()); // commentId -> { liked: boolean, likeCount: number, processing: boolean }
 
 // 评论分页和排序
 const currentPage = ref(1); // 当前页码
@@ -597,6 +601,34 @@ const processCommentsWithQuotes = (commentList) => {
   });
 };
 
+// 批量检查评论点赞状态
+const checkCommentsLikeStatus = async (comments) => {
+  if (!userStore.isLoggedIn || !comments.length) return;
+  
+  try {
+    // 为每个评论检查点赞状态
+    const promises = comments.map(async (comment) => {
+      try {
+        const response = await checkCommentLikeStatus(comment.id);
+        if (response.code === 200) {
+          comment.isLiked = response.data.liked;
+          commentLikeStates.value.set(comment.id, {
+            liked: response.data.liked,
+            likeCount: comment.likes || 0,
+            processing: false
+          });
+        }
+      } catch (error) {
+        console.error(`检查评论${comment.id}点赞状态失败:`, error);
+      }
+    });
+    
+    await Promise.all(promises);
+  } catch (error) {
+    console.error('批量检查评论点赞状态失败:', error);
+  }
+};
+
 // 获取资源评论
 const getResourceComments = async () => {
   commentLoading.value = true;
@@ -622,6 +654,9 @@ const getResourceComments = async () => {
       
       // 应用排序和分页
       updateDisplayedComments();
+      
+      // 检查评论点赞状态
+      await checkCommentsLikeStatus(processedComments);
     } else {
       allComments.value = [];
       comments.value = [];
@@ -776,16 +811,62 @@ const downloadResource = async () => {
 };
 
 // 点赞评论
-const likeComment = (comment) => {
+const likeComment = async (comment) => {
   if (!userStore.isLoggedIn) {
     showToast('请先登录');
     return;
   }
   
-  // TODO: 调用点赞接口
-  showToast('点赞成功');
-  comment.likes = (comment.likes || 0) + 1;
-  comment.isLiked = true;
+  const commentId = comment.id;
+  const currentState = commentLikeStates.value.get(commentId) || {
+    liked: comment.isLiked || false,
+    likeCount: comment.likes || 0,
+    processing: false
+  };
+  
+  if (currentState.processing) {
+    return; // 防止重复点击
+  }
+  
+  // 乐观更新UI
+  const newLiked = !currentState.liked;
+  const newLikeCount = newLiked ? currentState.likeCount + 1 : currentState.likeCount - 1;
+  
+  commentLikeStates.value.set(commentId, {
+    liked: newLiked,
+    likeCount: Math.max(0, newLikeCount),
+    processing: true
+  });
+  
+  try {
+    const response = await likeCommentApi(commentId, newLiked);
+    
+    // 更新实际的点赞数
+    commentLikeStates.value.set(commentId, {
+      liked: newLiked,
+      likeCount: response.data || Math.max(0, newLikeCount),
+      processing: false
+    });
+    
+    // 更新评论对象
+    comment.isLiked = newLiked;
+    comment.likes = response.data || Math.max(0, newLikeCount);
+    
+  } catch (error) {
+    console.error('评论点赞失败:', error);
+    
+    // 回滚UI状态
+    commentLikeStates.value.set(commentId, {
+      liked: currentState.liked,
+      likeCount: currentState.likeCount,
+      processing: false
+    });
+    
+    comment.isLiked = currentState.liked;
+    comment.likes = currentState.likeCount;
+    
+    showToast('操作失败，请重试');
+  }
 };
 
 // 回复评论

@@ -22,6 +22,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(batch_delete_comments_post)
             .service(like_comment)
             .service(dislike_comment)
+            .service(check_comment_like_status)
             .service(pin_comment)
     );
     
@@ -616,6 +617,30 @@ async fn batch_delete_comments_post(
         Err(e) => {
             log::error!("批量删除评论失败: {}", e);
             HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("批量删除评论失败: {}", e)))
+        }
+    }
+}
+
+// 检查评论点赞状态
+#[get("/{comment_id}/like-status")]
+async fn check_comment_like_status(
+    path: web::Path<i32>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    let comment_id = path.into_inner();
+    
+    match comment_service.check_comment_like_status(comment_id, auth_user.id).await {
+        Ok(is_liked) => {
+            HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({
+                "liked": is_liked
+            })))
+        },
+        Err(e) => {
+            log::error!("检查评论点赞状态失败: {}", e);
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+                500, &format!("检查评论点赞状态失败: {}", e)
+            ))
         }
     }
 } 
