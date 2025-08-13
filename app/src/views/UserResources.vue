@@ -185,15 +185,25 @@ const loadResources = async (isLoadMore = false) => {
     const res = await resourceApi.getUserResources(params);
     const newResources = res.data.list || [];
 
-    // 前端本地排序
-    const sorted = [...newResources];
-    if (sortValue.value === 'downloads') {
-      sorted.sort((a, b) => (b.download_count || 0) - (a.download_count || 0));
-    } else if (sortValue.value === 'likes') {
-      sorted.sort((a, b) => (b.like_count || 0) - (a.like_count || 0));
-    } else {
-      sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    }
+    // 前端本地排序：先按置顶和精华，再按用户选择的排序方式
+    const sorted = [...newResources].sort((a, b) => {
+      // 置顶资源优先
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      
+      // 精华资源次之
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      
+      // 在相同优先级内按用户选择的方式排序
+      if (sortValue.value === 'downloads') {
+        return (b.download_count || 0) - (a.download_count || 0);
+      } else if (sortValue.value === 'likes') {
+        return (b.like_count || 0) - (a.like_count || 0);
+      } else {
+        return new Date(b.created_at) - new Date(a.created_at);
+      }
+    });
 
     if (page.value === 1) {
       resources.value = sorted;

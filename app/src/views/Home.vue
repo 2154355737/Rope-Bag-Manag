@@ -98,6 +98,7 @@ import { useRouter } from 'vue-router';
 import { resourceApi, categoryApi, bannerApi } from '../api/resource';
 import { notificationApi } from '../api/notification';
 import { showToast } from 'vant';
+import { sortResources } from '../utils/sorting';
 
 import BannerSwiper from '../components/BannerSwiper.vue';
 import CategoryList from '../components/CategoryList.vue';
@@ -248,7 +249,11 @@ const loadFeaturedResources = async () => {
       pageSize: 5,
       is_featured: true
     });
-    featuredResources.value = res.data.list || [];
+    
+    const list = res.data.list || [];
+    
+    // 对精选资源进行排序：置顶 > 普通精选 > 创建时间
+    featuredResources.value = sortResources(list, { sortBy: 'created_at', sortOrder: 'desc' });
   } catch (error) {
     console.error('获取精选资源失败', error);
   } finally {
@@ -272,18 +277,7 @@ const loadLatestResources = async () => {
     const list = res.data.list || [];
     
     // 对资源进行排序：置顶 > 精华 > 创建时间
-    const sortedList = list.sort((a, b) => {
-      // 置顶资源优先
-      if (a.is_pinned && !b.is_pinned) return -1;
-      if (!a.is_pinned && b.is_pinned) return 1;
-      
-      // 精华资源次之
-      if (a.is_featured && !b.is_featured) return -1;
-      if (!a.is_featured && b.is_featured) return 1;
-      
-      // 最后按创建时间排序
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
+    const sortedList = sortResources(list, { sortBy: 'created_at', sortOrder: 'desc' });
     
     if (latestPage.value === 1) {
       latestResources.value = sortedList;
@@ -329,10 +323,13 @@ const loadHotResources = async () => {
     
     const list = res.data.list || [];
     
+    // 对热门资源进行排序：置顶 > 精华 > 下载量
+    const sortedList = sortResources(list, { sortBy: 'download_count', sortOrder: 'desc' });
+    
     if (hotPage.value === 1) {
-      hotResources.value = list;
+      hotResources.value = sortedList;
     } else {
-      hotResources.value = [...hotResources.value, ...list];
+      hotResources.value = [...hotResources.value, ...sortedList];
     }
     
     // 判断是否加载完成

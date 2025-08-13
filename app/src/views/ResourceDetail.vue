@@ -731,7 +731,23 @@ const getRelatedResources = async () => {
   try {
     if (resource.value.category_id) {
       const res = await resourceApi.getResourcesByCategory(resource.value.category_id, 1, 5);
-      relatedResources.value = (res.data.list || []).filter(item => item.id !== resourceId.value);
+      const list = (res.data.list || []).filter(item => item.id !== resourceId.value);
+      
+      // 对相关资源进行排序：置顶 > 精华 > 创建时间
+      const sortedList = list.sort((a, b) => {
+        // 置顶资源优先
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+        
+        // 精华资源次之
+        if (a.is_featured && !b.is_featured) return -1;
+        if (!a.is_featured && b.is_featured) return 1;
+        
+        // 最后按创建时间排序
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      
+      relatedResources.value = sortedList;
     }
   } catch (error) {
     console.error('获取相关资源失败', error);

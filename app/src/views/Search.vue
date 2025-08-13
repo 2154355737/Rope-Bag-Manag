@@ -280,10 +280,24 @@ const doSearch = async () => {
     const list = res.data.list || [];
     totalResults.value = res.data.total || 0;
     
+    // 对搜索结果进行排序：置顶 > 精华 > 普通 > 其他排序规则
+    const sortedList = list.sort((a, b) => {
+      // 置顶资源优先
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      
+      // 精华资源次之
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      
+      // 如果都不是置顶和精华，按原有排序规则
+      return 0;
+    });
+    
     if (page.value === 1) {
-      searchResults.value = list;
+      searchResults.value = sortedList;
     } else {
-      searchResults.value = [...searchResults.value, ...list];
+      searchResults.value = [...searchResults.value, ...sortedList];
     }
     
     // 判断是否加载完毕
