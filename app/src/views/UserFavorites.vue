@@ -7,7 +7,7 @@
           <div class="cards">
             <div class="kpi-card">
               <div class="kpi-num">{{ totalLikes }}</div>
-              <div class="kpi-label">累计点赞（资源+帖子）</div>
+              <div class="kpi-label">累计点赞（资源+帖子+评论）</div>
             </div>
             <div class="kpi-card">
               <div class="kpi-num">{{ totalViews }}</div>
@@ -52,6 +52,22 @@
             </div>
           </van-list>
         </van-tab>
+        <van-tab title="评论">
+          <van-list v-model:loading="loadingComment" :finished="finishedComment" finished-text="没有更多了" @load="loadComments">
+            <div class="favorite-item" v-for="comment in likesComments" :key="comment.id" @click="goToComment(comment)">
+              <div class="resource">
+                <div class="resource-info">
+                  <div class="resource-title">{{ comment.target_title }}</div>
+                  <div class="resource-desc ellipsis-2">{{ comment.target_description }}</div>
+                  <div class="resource-meta">
+                    <span>{{ formatDate(comment.created_at) }}</span>
+                    <span>{{ comment.like_type === 'comment' ? '评论点赞' : '点赞' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </van-list>
+        </van-tab>
       </van-tabs>
     </div>
   </div>
@@ -81,8 +97,10 @@ let likesChart, viewsChart;
 // 列表数据
 const likesPackages = ref([]);
 const likesPosts = ref([]);
+const likesComments = ref([]);
 const loadingPkg = ref(false), finishedPkg = ref(false), pkgPage = ref(1);
 const loadingPost = ref(false), finishedPost = ref(false), postPage = ref(1);
+const loadingComment = ref(false), finishedComment = ref(false), commentPage = ref(1);
 const pageSize = 10;
 
 // 新增：用户行为数据（用于真实统计）
@@ -121,6 +139,21 @@ async function fetchUserActionStats() {
 const onBack = () => router.back();
 const goToResource = (id) => router.push(`/resource/${id}`);
 const goToPost = (id) => router.push(`/post/${id}`);
+const goToComment = (comment) => {
+  // 根据评论类型跳转到对应的详情页
+  if (comment.like_type === 'comment') {
+    // 这里需要获取评论所属的资源或帖子ID
+    // 由于后端返回的数据可能不包含这些信息，暂时跳转到首页
+    router.push('/');
+  }
+};
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString();
+};
 
 // 临时数据：后端暂无“我的点赞”专属对象列表，先用热门资源/帖子替代
 async function loadPackages() {
@@ -163,6 +196,30 @@ async function loadPosts() {
       if (list2.length < pageSize) finishedPost.value = true; else postPage.value += 1;
     } catch { showToast('帖子加载失败'); finishedPost.value = true; }
   } finally { loadingPost.value = false; }
+}
+
+async function loadComments() {
+  if (loadingComment.value || finishedComment.value) return;
+  loadingComment.value = true;
+  try {
+    // 调用"我的点赞列表（评论）"
+    const res = await get('/users/my-likes', { page: commentPage.value, page_size: pageSize, target: 'comment' });
+    const list = res?.data?.list || [];
+    likesComments.value = likesComments.value.concat(list.map(c => ({
+      id: c.target_id,
+      target_title: c.target_title,
+      target_description: c.target_description,
+      like_type: c.like_type,
+      created_at: c.created_at
+    })));
+    if (list.length < pageSize) finishedComment.value = true; else commentPage.value += 1;
+  } catch (error) {
+    console.error('评论点赞加载失败:', error);
+    showToast('评论点赞加载失败');
+    finishedComment.value = true;
+  } finally { 
+    loadingComment.value = false; 
+  }
 }
 
 function initCharts() {
@@ -256,6 +313,7 @@ onMounted(async () => {
   initCharts();
   loadPackages();
   loadPosts();
+  loadComments();
 });
 </script>
 

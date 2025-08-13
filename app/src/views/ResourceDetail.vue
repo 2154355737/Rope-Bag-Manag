@@ -135,9 +135,9 @@
                 <div v-else class="comment-text">{{ comment.content }}</div>
               </div>
               <div class="comment-actions">
-                <div class="comment-action" @click="likeComment(comment)">
-                  <van-icon name="like-o" :class="{ 'liked': comment.isLiked }" />
-                  <span>{{ comment.likes || 0 }}</span>
+                <div class="comment-action" @click="likeComment(comment)" :class="{ 'processing': getCommentLikeState(comment).processing }">
+                  <van-icon name="like-o" :class="{ 'liked': getCommentLikeState(comment).liked }" />
+                  <span>{{ getCommentLikeState(comment).likeCount }}</span>
                 </div>
                 <div class="comment-action" @click="replyComment(comment)">
                   <van-icon name="comment-o" />
@@ -167,9 +167,9 @@
                     <div v-else class="reply-text">{{ reply.content }}</div>
                   </div>
                   <div class="reply-actions">
-                    <div class="comment-action" @click="likeComment(reply)">
-                      <van-icon name="like-o" :class="{ 'liked': reply.isLiked }" />
-                      <span>{{ reply.likes || 0 }}</span>
+                    <div class="comment-action" @click="likeComment(reply)" :class="{ 'processing': getCommentLikeState(reply).processing }">
+                      <van-icon name="like-o" :class="{ 'liked': getCommentLikeState(reply).liked }" />
+                      <span>{{ getCommentLikeState(reply).likeCount }}</span>
                     </div>
                     <div class="comment-action" @click="replyComment(reply, comment)">
                       <van-icon name="comment-o" />
@@ -287,6 +287,23 @@ const quotedMessage = ref(null); // 引用的原消息
 
 // 评论点赞状态管理
 const commentLikeStates = ref(new Map()); // commentId -> { liked: boolean, likeCount: number, processing: boolean }
+
+// 获取评论的点赞状态
+const getCommentLikeState = (comment) => {
+  const state = commentLikeStates.value.get(comment.id);
+  if (state) {
+    return {
+      liked: state.liked,
+      likeCount: state.likeCount,
+      processing: state.processing
+    };
+  }
+  return {
+    liked: comment.isLiked || false,
+    likeCount: comment.likes || 0,
+    processing: false
+  };
+};
 
 // 评论分页和排序
 const currentPage = ref(1); // 当前页码
@@ -1089,6 +1106,11 @@ const submitComment = async () => {
 
 .comment-action .liked {
   color: #ee0a24;
+}
+
+.comment-action.processing {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .no-comments {
