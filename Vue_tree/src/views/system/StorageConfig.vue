@@ -8,6 +8,7 @@
         <Button type="primary" @click="handleUpload" :disabled="!fileRef">上传测试文件</Button>
       </Space>
       <div class="mt-4 text-secondary">容量/文件数等统计：{{ statsText }}</div>
+      <div ref="stChartRef" style="width: 100%; height: 220px" class="mt-2"></div>
     </Card>
 
     <Card :loading="loadingFiles">
@@ -26,11 +27,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, computed, onMounted } from 'vue'
+  import { ref, computed, onMounted, nextTick } from 'vue'
   import { Card, Table, Button, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { defHttp } from '/@/utils/http/axios'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
@@ -47,6 +49,24 @@
   ]
 
   const statsText = computed(() => (stats.value ? JSON.stringify(stats.value) : '...'))
+
+  const stChartRef = ref<HTMLDivElement | null>(null)
+  let stChart: echarts.ECharts | null = null
+  const renderStChart = () => {
+    if (!stChartRef.value) return
+    if (!stChart) stChart = echarts.init(stChartRef.value as HTMLDivElement)
+    const map: Record<string, number> = {}
+    files.value.forEach((f: any) => {
+      const m = String(f.file_path || '').match(/\.([a-zA-Z0-9]+)$/)
+      const ext = (m && m[1] ? m[1] : 'other').toLowerCase()
+      map[ext] = (map[ext] || 0) + 1
+    })
+    const data = Object.entries(map)
+      .sort((a: any, b: any) => b[1] - a[1])
+      .slice(0, 8)
+      .map((i: any) => ({ name: i[0], value: i[1] }))
+    stChart.setOption({ tooltip: { trigger: 'item' }, legend: { bottom: 0 }, series: [{ type: 'pie', radius: '60%', data }] })
+  }
 
   const onFileChange = (e: any) => {
     const files = e?.target?.files
@@ -87,6 +107,8 @@
       loadingFiles.value = true
       const res = await defHttp.get<any>({ url: '/api/v1/storage/files' })
       files.value = res?.data || res || []
+      await nextTick()
+      renderStChart()
     } finally {
       loadingFiles.value = false
     }

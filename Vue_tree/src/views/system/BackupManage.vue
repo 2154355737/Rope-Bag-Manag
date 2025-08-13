@@ -4,6 +4,7 @@
       <Space>
         <Button type="primary" @click="handleCreate('Manual')">创建手动备份</Button>
       </Space>
+      <div ref="bkChartRef" style="width: 100%; height: 220px" class="mt-2"></div>
     </Card>
     <Card :loading="loading">
       <Table
@@ -25,11 +26,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Button, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getBackups, createBackup, deleteBackup, type BackupInfo } from '/@/api/dashboard'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
@@ -44,6 +46,20 @@
     { title: '状态', dataIndex: 'status', key: 'status' },
     { title: '操作', key: 'action', width: 120 },
   ]
+
+  const bkChartRef = ref<HTMLDivElement | null>(null)
+  let bkChart: echarts.ECharts | null = null
+  const renderBkChart = () => {
+    if (!bkChartRef.value) return
+    if (!bkChart) bkChart = echarts.init(bkChartRef.value as HTMLDivElement)
+    const typeCount: Record<string, number> = {}
+    dataSource.value.forEach((b: any) => {
+      const t = b.backup_type || 'Unknown'
+      typeCount[t] = (typeCount[t] || 0) + 1
+    })
+    const data = Object.keys(typeCount).map((k) => ({ name: k, value: typeCount[k] }))
+    bkChart.setOption({ tooltip: { trigger: 'item' }, legend: { bottom: 0 }, series: [{ type: 'pie', radius: '60%', data }] })
+  }
 
   const handleCreate = async (backup_type: 'Manual' | 'Auto' | 'Scheduled') => {
     await createBackup({ backup_type })
@@ -61,6 +77,8 @@
     try {
       const res = await getBackups({ page: 1, page_size: 10 })
       dataSource.value = res.list || []
+      await nextTick()
+      renderBkChart()
     } finally {
       loading.value = false
     }

@@ -1,7 +1,8 @@
 <template>
   <PageWrapper title="帖子管理" content="帖子列表与编辑">
     <Card class="!mb-4">
-      <Space>
+      <div ref="postChartRef" style="width: 100%; height: 260px"></div>
+      <Space class="!mt-2">
         <Input v-model:value="search" placeholder="搜索标题关键词" style="width: 240px" />
         <Button type="primary" @click="fetchList">搜索</Button>
         <Button @click="handleCreate">新建帖子</Button>
@@ -16,6 +17,8 @@
           <template v-else-if="column.key === 'action'">
             <Space>
               <Button type="link" @click="handleEdit(record)">编辑</Button>
+              <Button type="link" @click="() => publishPost(record)" v-if="record.status !== 'Published'">发布</Button>
+              <Button type="link" @click="() => archivePost(record)" v-if="record.status !== 'Archived'">归档</Button>
               <Button type="link" danger @click="() => handleDelete(record)">删除</Button>
             </Space>
           </template>
@@ -52,11 +55,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Modal, Form, Input, Select, Switch, Button, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getPosts, createPost, updatePost, deletePost, type PostItem } from '/@/api/posts'
   import { getCategories } from '/@/api/dashboard'
+  import * as echarts from 'echarts'
 
   const FormItem = Form.Item
 
@@ -65,13 +69,37 @@
   const categoryOptions = ref<any[]>([])
   const search = ref('')
 
+  const postChartRef = ref<HTMLDivElement | null>(null)
+  let postChart: echarts.ECharts | null = null
+
+  const renderPostChart = () => {
+    if (!postChartRef.value) return
+    if (!postChart) postChart = echarts.init(postChartRef.value as HTMLDivElement)
+    const labels = dataSource.value.map((p) => p.title)
+    const views = dataSource.value.map((p: any) => p.view_count || 0)
+    const likes = dataSource.value.map((p: any) => p.like_count || 0)
+    postChart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { bottom: 0, data: ['访问量', '点赞量'] },
+      grid: { left: 40, right: 10, top: 10, bottom: 50 },
+      xAxis: { type: 'category', data: labels },
+      yAxis: { type: 'value' },
+      series: [
+        { name: '访问量', type: 'bar', data: views },
+        { name: '点赞量', type: 'bar', data: likes },
+      ],
+    })
+  }
+
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
     { title: '标题', dataIndex: 'title', key: 'title' },
+    { title: '访问量', dataIndex: 'view_count', key: 'view_count' },
+    { title: '点赞量', dataIndex: 'like_count', key: 'like_count' },
     { title: '状态', dataIndex: 'status', key: 'status' },
     { title: '置顶', dataIndex: 'is_pinned', key: 'is_pinned' },
     { title: '精选', dataIndex: 'is_featured', key: 'is_featured' },
-    { title: '操作', key: 'action', width: 160 },
+    { title: '操作', key: 'action', width: 200 },
   ]
 
   const statusOptions = [
@@ -97,6 +125,16 @@
     currentId.value = record.id
     formState.value = { ...record, tags: (record as any).tags || [] }
     editOpen.value = true
+  }
+
+  const publishPost = async (record: PostItem) => {
+    await updatePost(record.id, { status: 'Published' as any })
+    await fetchList()
+  }
+
+  const archivePost = async (record: PostItem) => {
+    await updatePost(record.id, { status: 'Archived' as any })
+    await fetchList()
   }
 
   const handleDelete = async (record: PostItem) => {
@@ -128,6 +166,8 @@
       ])
       dataSource.value = list.list || []
       categoryOptions.value = (cats || []).map((c: any) => ({ label: c.name, value: c.id }))
+      await nextTick()
+      renderPostChart()
     } finally {
       loading.value = false
     }

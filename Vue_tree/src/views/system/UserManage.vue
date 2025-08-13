@@ -1,5 +1,8 @@
 <template>
   <PageWrapper title="用户管理" content="系统用户列表">
+    <Card :loading="loading" class="!mb-4">
+      <div ref="roleChartRef" style="width: 100%; height: 260px"></div>
+    </Card>
     <Card :loading="loading">
       <Table
         :columns="columns"
@@ -54,11 +57,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick, watch } from 'vue'
   import { Card, Table, Modal, Form, Input, Select, InputNumber, Button } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getUsers, updateUser, type UserItem } from '/@/api/users'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
@@ -67,6 +71,32 @@
 
   const loading = ref(true)
   const dataSource = ref<UserItem[]>([])
+
+  const roleChartRef = ref<HTMLDivElement | null>(null)
+  let roleChart: echarts.ECharts | null = null
+
+  const renderRoleChart = () => {
+    if (!roleChartRef.value) return
+    if (!roleChart) roleChart = echarts.init(roleChartRef.value as HTMLDivElement)
+    const roleCount: Record<string, number> = {}
+    dataSource.value.forEach((u: any) => {
+      const r = u.role || 'user'
+      roleCount[r] = (roleCount[r] || 0) + 1
+    })
+    const data = Object.keys(roleCount).map((k) => ({ name: k, value: roleCount[k] }))
+    roleChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [
+        {
+          type: 'pie',
+          radius: '60%',
+          data,
+          emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } },
+        },
+      ],
+    })
+  }
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
@@ -155,10 +185,14 @@
     try {
       const res = await getUsers({ page: 1, page_size: 20 })
       dataSource.value = res.list || []
+      await nextTick()
+      renderRoleChart()
     } finally {
       loading.value = false
     }
   }
+
+  watch(dataSource, () => nextTick().then(renderRoleChart))
 
   onMounted(fetchList)
 </script> 

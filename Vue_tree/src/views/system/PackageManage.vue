@@ -2,6 +2,7 @@
   <PageWrapper title="资源包管理" content="系统资源包列表">
     <Card :loading="loading" class="!mb-4">
       <Button type="primary" @click="handleCreate">新建资源</Button>
+      <div ref="pkgChartRef" style="width: 100%; height: 260px" class="mt-2"></div>
     </Card>
     <Card :loading="loading">
       <Table
@@ -72,12 +73,13 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Modal, Form, Input, Select, Switch, Button, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getPackages, createPackage, updatePackage, deletePackage, uploadPackageFile, reviewPackage, type PackageItem } from '/@/api/packages'
   import { getCategories } from '/@/api/dashboard'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
@@ -88,12 +90,36 @@
   const dataSource = ref<PackageItem[]>([])
   const categoryOptions = ref<any[]>([])
 
+  const pkgChartRef = ref<HTMLDivElement | null>(null)
+  let pkgChart: echarts.ECharts | null = null
+  const renderPkgChart = () => {
+    if (!pkgChartRef.value) return
+    if (!pkgChart) pkgChart = echarts.init(pkgChartRef.value as HTMLDivElement)
+    const labels = dataSource.value.map((p) => p.name)
+    const views = dataSource.value.map((p: any) => p.view_count || 0)
+    const downloads = dataSource.value.map((p: any) => p.download_count || 0)
+    const likes = dataSource.value.map((p: any) => p.like_count || 0)
+    pkgChart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { bottom: 0, data: ['访问量', '下载量', '点赞量'] },
+      grid: { left: 40, right: 10, top: 10, bottom: 50 },
+      xAxis: { type: 'category', data: labels },
+      yAxis: { type: 'value' },
+      series: [
+        { name: '访问量', type: 'bar', data: views },
+        { name: '下载量', type: 'bar', data: downloads },
+        { name: '点赞量', type: 'bar', data: likes },
+      ],
+    })
+  }
+
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
     { title: '标题', dataIndex: 'name', key: 'name' },
     { title: '作者', dataIndex: 'author', key: 'author' },
     { title: '分类', dataIndex: 'category_id', key: 'category_id' },
     { title: '状态', dataIndex: 'status', key: 'status' },
+    { title: '访问', dataIndex: 'view_count', key: 'view_count' },
     { title: '下载', dataIndex: 'download_count', key: 'download_count' },
     { title: '点赞', dataIndex: 'like_count', key: 'like_count' },
     { title: '操作', key: 'action', width: 220 },
@@ -194,6 +220,8 @@
       ])
       dataSource.value = res.list || []
       categoryOptions.value = (cats || []).map((c: any) => ({ label: c.name, value: c.id }))
+      await nextTick()
+      renderPkgChart()
     } finally {
       loading.value = false
     }

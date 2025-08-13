@@ -11,6 +11,7 @@ export interface PackageItem {
   download_count: number
   like_count: number
   favorite_count: number
+  view_count?: number
   category_id?: number
   status: 'Pending' | 'Active' | 'Rejected' | 'Inactive' | 'Deleted'
   created_at: string

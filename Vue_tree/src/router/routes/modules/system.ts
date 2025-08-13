@@ -107,6 +107,16 @@ const system: AppRouteModule = {
       },
     },
     {
+      path: 'security',
+      name: 'SecurityManage',
+      component: () => import('/@/views/system/SecurityManage.vue'),
+      meta: {
+        title: '安全管理',
+        icon: 'ion:shield-checkmark-outline',
+        roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
       path: 'logs',
       name: 'SystemLogs',
       component: () => import('/@/views/system/LogsManage.vue'),
@@ -114,6 +124,16 @@ const system: AppRouteModule = {
         title: '系统日志',
         icon: 'ion:document-text-outline',
         roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
+      path: 'moderation',
+      name: 'ModerationCenter',
+      component: () => import('/@/views/system/ModerationCenter.vue'),
+      meta: {
+        title: '内容审核',
+        icon: 'ion:checkmark-done-circle-outline',
+        roles: [RoleEnum.ADMIN, RoleEnum.MODERATOR],
       },
     },
     {

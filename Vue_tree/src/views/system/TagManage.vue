@@ -6,6 +6,7 @@
         <Button type="primary" @click="fetchList">搜索</Button>
         <Button @click="handleCreate">新建标签</Button>
       </Space>
+      <div ref="tagChartRef" style="width: 100%; height: 220px" class="mt-2"></div>
     </Card>
     <Card :loading="loading">
       <Table :columns="columns" :data-source="dataSource" :pagination="{ pageSize: 20 }" row-key="id">
@@ -34,16 +35,34 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Modal, Form, Input, Button, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getTags, createTag, updateTag, deleteTag, type TagItem } from '/@/api/tags'
+  import * as echarts from 'echarts'
 
   const FormItem = Form.Item
 
   const loading = ref(true)
   const dataSource = ref<TagItem[]>([])
   const search = ref('')
+
+  const tagChartRef = ref<HTMLDivElement | null>(null)
+  let tagChart: echarts.ECharts | null = null
+  const renderTagChart = () => {
+    if (!tagChartRef.value) return
+    if (!tagChart) tagChart = echarts.init(tagChartRef.value as HTMLDivElement)
+    const top = [...dataSource.value]
+      .sort((a, b) => (b.use_count || 0) - (a.use_count || 0))
+      .slice(0, 5)
+    tagChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 10, top: 10, bottom: 30 },
+      xAxis: { type: 'category', data: top.map((t) => t.name) },
+      yAxis: { type: 'value' },
+      series: [{ type: 'bar', data: top.map((t) => t.use_count || 0) }],
+    })
+  }
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
@@ -94,6 +113,8 @@
       loading.value = true
       const list = await getTags({ page: 1, page_size: 20, search: search.value || undefined })
       dataSource.value = list.list || []
+      await nextTick()
+      renderTagChart()
     } finally {
       loading.value = false
     }

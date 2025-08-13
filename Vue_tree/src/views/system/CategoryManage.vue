@@ -2,6 +2,7 @@
   <PageWrapper title="分类管理" content="系统分类列表">
     <Card :loading="loading" class="!mb-4">
       <Button type="primary" @click="handleCreate">新建分类</Button>
+      <div ref="catChartRef" style="width: 100%; height: 220px" class="mt-2"></div>
     </Card>
     <Card :loading="loading">
       <Table
@@ -54,11 +55,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Button, Modal, Form, Input, Switch, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getCategories, createCategory, updateCategory, deleteCategory, type Category } from '/@/api/dashboard'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
@@ -67,6 +69,29 @@
 
   const loading = ref(true)
   const dataSource = ref<Category[]>([])
+
+  const catChartRef = ref<HTMLDivElement | null>(null)
+  let catChart: echarts.ECharts | null = null
+  const renderCatChart = () => {
+    if (!catChartRef.value) return
+    if (!catChart) catChart = echarts.init(catChartRef.value as HTMLDivElement)
+    let enabled = 0, disabled = 0, locked = 0
+    dataSource.value.forEach((c) => {
+      c.enabled ? enabled++ : disabled++
+      if (c.subscription_locked) locked++
+    })
+    catChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [
+        { type: 'pie', radius: '60%', data: [
+          { name: '启用', value: enabled },
+          { name: '禁用', value: disabled },
+          { name: '订阅锁定', value: locked },
+        ]},
+      ],
+    })
+  }
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
@@ -123,6 +148,8 @@
       loading.value = true
       const list = await getCategories()
       dataSource.value = list || []
+      await nextTick()
+      renderCatChart()
     } finally {
       loading.value = false
     }

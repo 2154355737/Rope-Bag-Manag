@@ -1,5 +1,8 @@
 <template>
   <PageWrapper title="系统日志" content="系统运行日志列表">
+    <Card :loading="loading" class="!mb-4">
+      <div ref="logChartRef" style="width: 100%; height: 220px"></div>
+    </Card>
     <Card :loading="loading">
       <Table
         :columns="columns"
@@ -20,13 +23,32 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Button, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getSystemLogs, type SystemLog } from '/@/api/dashboard'
+  import * as echarts from 'echarts'
 
   const loading = ref(true)
   const dataSource = ref<SystemLog[]>([])
+
+  const logChartRef = ref<HTMLDivElement | null>(null)
+  let logChart: echarts.ECharts | null = null
+  const renderLogChart = () => {
+    if (!logChartRef.value) return
+    if (!logChart) logChart = echarts.init(logChartRef.value as HTMLDivElement)
+    const levelCount: Record<string, number> = {}
+    dataSource.value.forEach((l: any) => { const lvl = l.level || 'INFO'; levelCount[lvl] = (levelCount[lvl] || 0) + 1 })
+    const labels = Object.keys(levelCount)
+    const values = labels.map((k) => levelCount[k])
+    logChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 10, top: 10, bottom: 30 },
+      xAxis: { type: 'category', data: labels },
+      yAxis: { type: 'value' },
+      series: [{ type: 'bar', data: values }],
+    })
+  }
 
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
@@ -46,6 +68,8 @@
     try {
       const res = await getSystemLogs({ page: 1, page_size: 20 })
       dataSource.value = res.list || []
+      await nextTick()
+      renderLogChart()
     } finally {
       loading.value = false
     }

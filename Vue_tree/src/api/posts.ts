@@ -9,6 +9,8 @@ export interface PostItem {
   status: 'Draft' | 'Published' | 'Archived' | 'Deleted'
   is_pinned?: boolean
   is_featured?: boolean
+  view_count?: number
+  like_count?: number
   created_at?: string
   updated_at?: string
 }

@@ -4,6 +4,7 @@
       <Space>
         <Button type="primary" @click="handleCreate">新建公告</Button>
       </Space>
+      <div ref="annChartRef" style="width: 100%; height: 220px" class="mt-2"></div>
     </Card>
     <Card :loading="loading">
       <Table :columns="columns" :data-source="dataSource" :row-selection="rowSelection" row-key="id">
@@ -43,10 +44,11 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted, computed } from 'vue'
+  import { ref, onMounted, computed, nextTick } from 'vue'
   import { Card, Table, Modal, Form, Input, Button, Switch, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { defHttp } from '/@/utils/http/axios'
+  import * as echarts from 'echarts'
 
   const FormItem = Form.Item
 
@@ -70,6 +72,23 @@
   const submitLoading = ref(false)
   const currentId = ref<number | null>(null)
   const formState = ref<any>({ title: '', content: '', enabled: true })
+
+  const annChartRef = ref<HTMLDivElement | null>(null)
+  let annChart: echarts.ECharts | null = null
+  const renderAnnChart = () => {
+    if (!annChartRef.value) return
+    if (!annChart) annChart = echarts.init(annChartRef.value as HTMLDivElement)
+    let enabled = 0, disabled = 0
+    dataSource.value.forEach((a) => (a.enabled ? enabled++ : disabled++))
+    annChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{ type: 'pie', radius: '60%', data: [
+        { name: '启用', value: enabled },
+        { name: '禁用', value: disabled },
+      ] }],
+    })
+  }
 
   const handleCreate = () => {
     currentId.value = null
@@ -121,6 +140,8 @@
       loading.value = true
       const res = await defHttp.get<any>({ url: '/api/v1/admin/announcements' })
       dataSource.value = res?.data?.list || res?.list || []
+      await nextTick()
+      renderAnnChart()
     } finally {
       loading.value = false
     }

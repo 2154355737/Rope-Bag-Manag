@@ -1,5 +1,8 @@
 <template>
   <PageWrapper title="邮箱配置" content="SMTP 邮件服务配置与测试">
+    <Card :loading="loading" class="!mb-4">
+      <div ref="mailChartRef" style="width: 100%; height: 200px"></div>
+    </Card>
     <Card :loading="loading">
       <Form :model="formState" :label-col="{ span: 6 }" :wrapper-col="{ span: 14 }">
         <FormItem label="SMTP 主机">
@@ -35,11 +38,12 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick, watch } from 'vue'
   import { Card, Form, Input, Switch, Button, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { defHttp } from '/@/utils/http/axios'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
   const FormItem = Form.Item
@@ -48,9 +52,28 @@
   const formState = ref<any>({ smtp_host: '', smtp_port: 465, username: '', password: '', from: '', enable_ssl: true })
   const testEmail = ref('')
 
+  const mailChartRef = ref<HTMLDivElement | null>(null)
+  let mailChart: echarts.ECharts | null = null
+  const renderMailChart = () => {
+    if (!mailChartRef.value) return
+    if (!mailChart) mailChart = echarts.init(mailChartRef.value as HTMLDivElement)
+    const enabled = formState.value.enable_ssl ? 1 : 0
+    const disabled = formState.value.enable_ssl ? 0 : 1
+    mailChart.setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{ type: 'pie', radius: '60%', data: [
+        { name: 'SSL 启用', value: enabled },
+        { name: 'SSL 关闭', value: disabled },
+      ] }],
+    })
+  }
+
   const handleSave = async () => {
     await defHttp.post({ url: '/api/v1/admin/mail-settings', data: formState.value })
     createMessage.success('保存成功，已热更新邮件服务')
+    await nextTick()
+    renderMailChart()
   }
 
   const handleTest = async () => {
@@ -64,10 +87,14 @@
       loading.value = true
       const res = await defHttp.get<any>({ url: '/api/v1/admin/mail-settings' })
       formState.value = res?.data || res || formState.value
+      await nextTick()
+      renderMailChart()
     } finally {
       loading.value = false
     }
   }
+
+  watch(() => formState.value.enable_ssl, () => nextTick().then(renderMailChart))
 
   onMounted(fetchConfig)
 </script> 
