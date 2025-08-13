@@ -433,4 +433,14 @@ impl PackageService {
         let cnt = self.package_repo.unlike_package(user_id, package_id).await?;
         Ok(cnt)
     }
+
+    pub async fn check_like_status(&self, user_id: i32, package_id: i32) -> anyhow::Result<bool> {
+        let is_liked = self.package_repo.check_like_status(user_id, package_id).await?;
+        Ok(is_liked)
+    }
+
+    pub async fn record_view(&self, package_id: i32, user_id: Option<i32>, ip_address: Option<String>, user_agent: Option<String>) -> anyhow::Result<()> {
+        self.package_repo.record_view(package_id, user_id, ip_address, user_agent).await?;
+        Ok(())
+    }
 } 

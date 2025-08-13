@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::repositories::user_action_repo::UserActionRepository;
+use crate::repositories::user_action_repo::{UserActionRepository, UserLikeSummary};
 use crate::models::user_action::{
     UserAction, UserActionWithUser, CreateUserActionRequest, UserActionQueryParams, UserActionStats
 };
@@ -42,5 +42,10 @@ impl UserActionService {
     // 获取用户行为统计数据
     pub async fn get_action_stats(&self, params: &UserActionQueryParams) -> Result<UserActionStats> {
         self.user_action_repo.get_action_stats(params).await
+    }
+
+    // 获取用户点赞列表
+    pub async fn get_user_likes(&self, user_id: i32, page: u32, page_size: u32) -> Result<(Vec<UserLikeSummary>, i64)> {
+        self.user_action_repo.get_user_likes(user_id, page, page_size).await
     }
 } 

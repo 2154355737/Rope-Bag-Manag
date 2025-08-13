@@ -66,7 +66,7 @@ async fn get_public_activities(
     query: web::Query<UserActionQueryParams>,
     user_action_service: web::Data<UserActionService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    println!("[DEBUG] get_public_activities called with params: {:?}", query);
+    log::debug!("🔍 get_public_activities called with params: {:?}", query);
     
     // 限制只返回有意义的活动类型
     let meaningful_actions = vec![
@@ -119,7 +119,7 @@ async fn get_public_activities(
             })))
         },
         Err(e) => {
-            println!("[ERROR] get_public_activities failed: {}", e);
+            log::error!("❌ get_public_activities failed: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
                 "message": e.to_string()

@@ -25,11 +25,11 @@ impl PackageRepository {
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
                     is_pinned, is_featured \
              FROM packages ORDER BY created_at DESC";
-        println!("[SQL] get_all_packages: {}", sql);
+        log::debug!("🗄️ SQL: get_all_packages: {}", sql);
         let mut stmt = match conn.prepare(sql) {
             Ok(s) => s,
             Err(e) => {
-                println!("[ERROR] prepare failed: {}", e);
+                log::error!("❌ prepare failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -67,12 +67,12 @@ impl PackageRepository {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
                 Ok(list) => list,
                 Err(e) => {
-                    println!("[ERROR] collect failed: {}", e);
+                    log::error!("❌ collect failed: {}", e);
                     return Err(e.into());
                 }
             },
             Err(e) => {
-                println!("[ERROR] query_map failed: {}", e);
+                log::error!("❌ query_map failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -91,11 +91,11 @@ impl PackageRepository {
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
                     is_pinned, is_featured \
              FROM packages WHERE id = ?";
-        println!("[SQL] find_by_id: {} | id={}", sql, id);
+        log::debug!("🗄️ SQL: find_by_id: {} | id={}", sql, id);
         let mut stmt = match conn.prepare(sql) {
             Ok(s) => s,
             Err(e) => {
-                println!("[ERROR] prepare failed: {}", e);
+                log::error!("❌ prepare failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -133,16 +133,16 @@ impl PackageRepository {
             Ok(val) => Some(val),
             Err(rusqlite::Error::QueryReturnedNoRows) => None,
             Err(e) => {
-                println!("[ERROR] query_row failed: {}", e);
+                log::error!("❌ query_row failed: {}", e);
                 return Err(e.into());
             }
         };
-        println!("[SQL] find_by_id result: {:?}", package);
+        log::debug!("🗄️ SQL: find_by_id result: {:?}", package);
         let package = if let Some(mut pkg) = package {
             pkg.tags = Some(Self::get_tags_for_package_internal(&conn, pkg.id)?);
             Some(pkg)
         } else { None };
-        println!("[SQL] find_by_id tags fetched");
+        log::debug!("🗄️ SQL: find_by_id tags fetched");
         Ok(package)
     }
 
@@ -152,7 +152,7 @@ impl PackageRepository {
                                   download_count, like_count, favorite_count, category_id, status, \
                                   created_at, updated_at, is_pinned, is_featured) \
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        println!("[SQL] create_package: {}", sql);
+        log::debug!("🗄️ SQL: create_package: {}", sql);
         let params = params![
             package.name,
             package.author,
@@ -179,7 +179,7 @@ impl PackageRepository {
         match conn.execute(sql, params) {
             Ok(rows) => println!("[SQL] create_package affected rows: {}", rows),
             Err(e) => {
-                println!("[ERROR] create_package failed: {}", e);
+                log::error!("❌ create_package failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -203,7 +203,7 @@ impl PackageRepository {
                     file_url = ?, file_size = ?, download_count = ?, like_count = ?, \
                     favorite_count = ?, category_id = ?, status = ?, created_at = ?, \
                     updated_at = ?, is_pinned = ?, is_featured = ? WHERE id = ?";
-        println!("[SQL] update_package: {} | id={}", sql, package.id);
+        log::debug!("🗄️ SQL: update_package: {} | id={}", sql, package.id);
         let params = params![
             package.name,
             package.author,
@@ -231,7 +231,7 @@ impl PackageRepository {
         match conn.execute(sql, params) {
             Ok(rows) => println!("[SQL] update_package affected rows: {}", rows),
             Err(e) => {
-                println!("[ERROR] update_package failed: {}", e);
+                log::error!("❌ update_package failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -245,11 +245,11 @@ impl PackageRepository {
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
         let sql = "DELETE FROM packages WHERE id = ?";
-        println!("[SQL] delete_package: {} | id={}", sql, package_id);
+        log::debug!("🗄️ SQL: delete_package: {} | id={}", sql, package_id);
         match conn.execute(sql, params![package_id]) {
             Ok(rows) => println!("[SQL] delete_package affected rows: {}", rows),
             Err(e) => {
-                println!("[ERROR] delete_package failed: {}", e);
+                log::error!("❌ delete_package failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -259,11 +259,11 @@ impl PackageRepository {
     pub async fn increment_download_count(&self, package_id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
         let sql = "UPDATE packages SET download_count = download_count + 1 WHERE id = ?";
-        println!("[SQL] increment_download_count: {} | id={}", sql, package_id);
+        log::debug!("🗄️ SQL: increment_download_count: {} | id={}", sql, package_id);
         match conn.execute(sql, params![package_id]) {
             Ok(rows) => println!("[SQL] increment_download_count affected rows: {}", rows),
             Err(e) => {
-                println!("[ERROR] increment_download_count failed: {}", e);
+                log::error!("❌ increment_download_count failed: {}", e);
                 return Err(e.into());
             }
         }
@@ -279,8 +279,8 @@ impl PackageRepository {
         status: Option<String>,
     ) -> anyhow::Result<(Vec<Package>, i64)> {
         let conn = self.conn.lock().await;
-        println!("[DEBUG] get_packages_advanced called");
-        println!("[DEBUG] page: {}, page_size: {}, category: {:?}, search: {:?}, status: {:?}", page, page_size, category, search, status);
+        log::debug!("🔍 get_packages_advanced called");
+        log::debug!("🔍 page: {}, page_size: {}, category: {:?}, search: {:?}, status: {:?}", page, page_size, category, search, status);
         let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment, is_pinned, is_featured FROM packages WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         if let Some(category_id) = category {
@@ -298,7 +298,7 @@ impl PackageRepository {
             sql.push_str(" AND status = ?");
             params.push(Box::new(status.clone()));
         }
-        println!("[DEBUG] SQL before count: {}", sql);
+        log::debug!("🔍 SQL before count: {}", sql);
         println!("[DEBUG] Params before count: {:?}", params.len());
         // 统计总数（修正：直接统计，不用子查询）
         let count_sql = sql.clone();
@@ -311,7 +311,7 @@ impl PackageRepository {
         let total: i64 = match conn.query_row(&count_sql, &*params_refs, |row| row.get(0)) {
             Ok(val) => val,
             Err(e) => {
-                println!("[ERROR] count_sql failed: {}", e);
+                log::error!("❌ count_sql failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -320,12 +320,12 @@ impl PackageRepository {
         params.push(Box::new(page_size as i64));
         params.push(Box::new(((page - 1) * page_size) as i64));
         let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|v| &**v as &dyn rusqlite::ToSql).collect();
-        println!("[DEBUG] SQL final: {}", sql);
+        log::debug!("🔍 SQL final: {}", sql);
         println!("[DEBUG] Params final: {:?}", params.len());
         let mut stmt = match conn.prepare(&sql) {
             Ok(s) => s,
             Err(e) => {
-                println!("[ERROR] prepare SQL failed: {}", e);
+                log::error!("❌ prepare SQL failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -363,12 +363,12 @@ impl PackageRepository {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
                 Ok(list) => list,
                 Err(e) => {
-                    println!("[ERROR] collect packages failed: {}", e);
+                    log::error!("❌ collect packages failed: {}", e);
                     return Err(e.into());
                 }
             },
             Err(e) => {
-                println!("[ERROR] query_map failed: {}", e);
+                log::error!("❌ query_map failed: {}", e);
                 return Err(e.into());
             }
         };
@@ -400,7 +400,7 @@ impl PackageRepository {
     pub async fn check_package_exists(&self, package_id: i32) -> Result<bool> {
         let conn = self.conn.lock().await;
         let sql = "SELECT 1 FROM packages WHERE id = ?";
-        println!("[SQL] check_package_exists: {} | id={}", sql, package_id);
+        log::debug!("🗄️ SQL: check_package_exists: {} | id={}", sql, package_id);
         
         let exists = conn.query_row(
             sql,
@@ -414,7 +414,7 @@ impl PackageRepository {
     pub async fn get_package_file_url(&self, package_id: i32) -> Result<String> {
         let conn = self.conn.lock().await;
         let sql = "SELECT file_url FROM packages WHERE id = ?";
-        println!("[SQL] get_package_file_url: {} | id={}", sql, package_id);
+        log::debug!("🗄️ SQL: get_package_file_url: {} | id={}", sql, package_id);
         
         let file_url: String = conn.query_row(
             sql,
@@ -429,7 +429,7 @@ impl PackageRepository {
     pub async fn count_packages_by_category(&self, category_id: i32) -> Result<i32> {
         let conn = self.conn.lock().await;
         let sql = "SELECT COUNT(*) FROM packages WHERE category_id = ? AND status = 'active'";
-        println!("[SQL] count_packages_by_category: {} | category_id={}", sql, category_id);
+        log::debug!("🗄️ SQL: count_packages_by_category: {} | category_id={}", sql, category_id);
         
         let count: i32 = conn.query_row(
             sql,
@@ -442,31 +442,135 @@ impl PackageRepository {
 
     pub async fn like_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
         let conn = self.conn.lock().await;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS package_likes (user_id INTEGER NOT NULL, package_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, package_id))",
-            [],
+        
+        // 检查是否已经点赞
+        let already_liked: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
+            params![user_id, package_id],
+            |row| row.get(0),
         )?;
+        
+        if already_liked {
+            return Err(anyhow::anyhow!("Already liked this package"));
+        }
+        
+        // 插入点赞记录
         conn.execute(
-            "INSERT OR IGNORE INTO package_likes (user_id, package_id) VALUES (?, ?)",
+            "INSERT INTO package_likes (user_id, package_id) VALUES (?, ?)",
             params![user_id, package_id],
         )?;
+        
+        // 记录用户行为（已由触发器自动更新like_count）
         conn.execute(
-            "UPDATE packages SET like_count = COALESCE(like_count,0) + 1 WHERE id = ? AND EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
-            params![package_id, user_id, package_id],
+            "INSERT INTO user_actions (user_id, action_type, target_type, target_id) VALUES (?, 'Like', 'Package', ?)",
+            params![user_id, package_id],
         )?;
-        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE package_id = ?", params![package_id], |r| r.get(0))?;
+        
+        // 返回当前点赞总数
+        let cnt: i32 = conn.query_row(
+            "SELECT like_count FROM packages WHERE id = ?", 
+            params![package_id], 
+            |r| r.get(0)
+        ).unwrap_or(0);
+        
         Ok(cnt)
     }
 
     pub async fn unlike_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
         let conn = self.conn.lock().await;
+        
+        // 检查是否已点赞
+        let is_liked: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
+            params![user_id, package_id],
+            |row| row.get(0),
+        )?;
+        
+        if !is_liked {
+            return Err(anyhow::anyhow!("Package not liked yet"));
+        }
+        
+        // 删除点赞记录（触发器会自动更新like_count）
         conn.execute(
             "DELETE FROM package_likes WHERE user_id = ? AND package_id = ?",
             params![user_id, package_id],
         )?;
-        let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM package_likes WHERE package_id = ?", params![package_id], |r| r.get(0))?;
-        conn.execute("UPDATE packages SET like_count = ? WHERE id = ?", params![cnt, package_id])?;
+        
+        // 记录用户行为
+        conn.execute(
+            "INSERT INTO user_actions (user_id, action_type, target_type, target_id) VALUES (?, 'Unlike', 'Package', ?)",
+            params![user_id, package_id],
+        )?;
+        
+        // 返回当前点赞总数
+        let cnt: i32 = conn.query_row(
+            "SELECT like_count FROM packages WHERE id = ?", 
+            params![package_id], 
+            |r| r.get(0)
+        ).unwrap_or(0);
+        
         Ok(cnt)
+    }
+
+    // 检查用户是否已点赞某个资源
+    pub async fn check_like_status(&self, user_id: i32, package_id: i32) -> Result<bool> {
+        let conn = self.conn.lock().await;
+        let is_liked: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
+            params![user_id, package_id],
+            |row| row.get(0),
+        )?;
+        Ok(is_liked)
+    }
+
+    // 记录资源访问
+    pub async fn record_view(&self, package_id: i32, user_id: Option<i32>, ip_address: Option<String>, user_agent: Option<String>) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        // 防重复访问检查（同一用户/IP在24小时内只记录一次访问）
+        let mut should_record = true;
+        
+        if let Some(uid) = user_id {
+            // 已登录用户：检查24小时内是否已访问
+            let recent_view: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM package_views WHERE package_id = ? AND user_id = ? AND created_at > datetime('now', '-24 hours'))",
+                params![package_id, uid],
+                |row| row.get(0),
+            ).unwrap_or(false);
+            should_record = !recent_view;
+        } else if let Some(ref ip) = ip_address {
+            // 访客用户：检查IP在24小时内是否已访问
+            let recent_view: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM package_views WHERE package_id = ? AND ip_address = ? AND created_at > datetime('now', '-24 hours'))",
+                params![package_id, ip],
+                |row| row.get(0),
+            ).unwrap_or(false);
+            should_record = !recent_view;
+        }
+        
+        if should_record {
+            // 插入访问记录（触发器会自动更新view_count）
+            conn.execute(
+                "INSERT INTO package_views (package_id, user_id, ip_address, user_agent) VALUES (?, ?, ?, ?)",
+                params![package_id, user_id, ip_address, user_agent],
+            )?;
+            
+            // 记录用户行为
+            if let Some(uid) = user_id {
+                conn.execute(
+                    "INSERT INTO user_actions (user_id, action_type, target_type, target_id, ip_address, user_agent) VALUES (?, 'View', 'Package', ?, ?, ?)",
+                    params![uid, package_id, ip_address, user_agent],
+                )?;
+            } else {
+                // 访客用户的访问记录
+                conn.execute(
+                    "INSERT INTO user_actions (user_id, action_type, target_type, target_id, ip_address, user_agent) VALUES (NULL, 'View', 'Package', ?, ?, ?)",
+                    params![package_id, ip_address, user_agent],
+                )?;
+            }
+        }
+        
+        Ok(())
     }
 
     /* ---------------- 标签关联辅助 ---------------- */

@@ -82,6 +82,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(like_package))
                     .route(web::delete().to(unlike_package))
             )
+            .service(
+                web::resource("/{id}/like-status")
+                    .route(web::get().to(check_like_status))
+            )
     );
 }
 
@@ -241,7 +245,7 @@ async fn get_packages(
     query: web::Query<PackageQueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
     
-    println!("[DEBUG] get_packages called with query: {:?}", query);
+    log::debug!("🔍 get_packages called with query: {:?}", query);
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20);
     
@@ -277,7 +281,7 @@ async fn get_packages(
             }
         }))),
         Err(e) => {
-            println!("[ERROR] get_packages error: {}", e);
+            log::error!("❌ get_packages error: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": e.to_string()
@@ -327,6 +331,16 @@ async fn get_package(
             "code": 403,
             "message": "资源未审核通过"
         })));
+    }
+
+    // 记录访问量（只有已审核的资源才记录）
+    if matches!(package.status, crate::models::PackageStatus::Active) {
+        let user_id = AuthHelper::verify_user(&http_req).ok().map(|u| u.id);
+        let ip_address = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+        let user_agent = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+        
+        // 异步记录访问，不影响响应速度
+        let _ = package_service.record_view(package_id, user_id, ip_address, user_agent).await;
     }
 
     Ok(HttpResponse::Ok().json(json!({
@@ -405,48 +419,48 @@ async fn admin_create_package(
 ) -> Result<HttpResponse, actix_web::Error> {
     use crate::utils::auth_helper::AuthHelper;
     
-    println!("[DEBUG] admin_create_package called with data: {:?}", req);
+    log::debug!("🔍 admin_create_package called with data: {:?}", req);
     
     // 验证管理员权限
     let user = match AuthHelper::verify_user(&http_req) {
         Ok(user) => {
-            println!("[DEBUG] User verified: {:?}", user.username);
+            log::debug!("🔍 User verified: {:?}", user.username);
             user
         },
         Err(e) => {
-            println!("[ERROR] User verification failed: {:?}", e);
+            log::error!("❌ User verification failed: {:?}", e);
             return Ok(e.to_response());
         }
     };
     
     // 检查是否为管理员或元老
     if !matches!(user.role, crate::models::UserRole::Admin | crate::models::UserRole::Elder) {
-        println!("[ERROR] User role not allowed: {:?}", user.role);
+        log::error!("❌ User role not allowed: {:?}", user.role);
         return Ok(HttpResponse::Forbidden().json(json!({
             "code": 403,
             "message": "只有管理员和元老可以直接创建资源"
         })));
     }
     
-    println!("[DEBUG] User role check passed");
+    log::debug!("🔍 User role check passed");
     
     // 验证URL格式（如果提供了且不为空）
     if let Some(file_url) = &req.file_url {
-        println!("[DEBUG] Checking file_url: '{}'", file_url);
+        log::debug!("🔍 Checking file_url: '{}'", file_url);
         // 放宽URL验证：只要不为空就接受，可以是任意文本
         // 管理员可以输入任意形式的资源标识符
         if file_url.is_empty() {
-            println!("[DEBUG] Empty URL, will be stored as empty string");
+            log::debug!("🔍 Empty URL, will be stored as empty string");
         } else {
-            println!("[DEBUG] URL accepted: '{}'", file_url);
+            log::debug!("🔍 URL accepted: '{}'", file_url);
         }
     }
     
-    println!("[DEBUG] URL validation passed, calling package_service.create_package");
+    log::debug!("🔍 URL validation passed, calling package_service.create_package");
     
     match package_service.create_package(&req).await {
         Ok(package) => {
-            println!("[DEBUG] Package created successfully: {:?}", package.id);
+            log::debug!("🔍 Package created successfully: {:?}", package.id);
             Ok(HttpResponse::Ok().json(json!({
                 "code": 0,
                 "message": "资源创建成功",
@@ -454,8 +468,8 @@ async fn admin_create_package(
             })))
         },
         Err(e) => {
-            println!("[ERROR] Package creation failed: {}", e);
-            println!("[ERROR] Error details: {:?}", e);
+            log::error!("❌ Package creation failed: {}", e);
+            log::error!("❌ Error details: {:?}", e);
             Ok(HttpResponse::BadRequest().json(json!({
                 "code": 400,
                 "message": format!("创建失败: {}", e)
@@ -668,5 +682,18 @@ async fn unlike_package(
     match package_service.unlike_package(user.id, package_id).await {
         Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+async fn check_like_status(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let package_id = path.into_inner();
+    match package_service.check_like_status(user.id, package_id).await {
+        Ok(is_liked) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"liked": is_liked}}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
     }
 } 

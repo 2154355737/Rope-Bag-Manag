@@ -1,8 +1,9 @@
 use actix_web::{App, HttpServer, web};
-use actix_web::middleware::Logger;
 use actix_cors::Cors;
 use actix_files::Files;
 use log::info;
+use crate::utils::logger;
+use crate::middleware::api_logger::ApiLogger;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 // use serde_json::Value;
@@ -17,10 +18,11 @@ mod api;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // 初始化日志
-    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+    // 初始化优化的日志系统
+    logger::init_logger();
     
-    info!("启动绳包管理器后端服务...");
+    // 显示系统启动信息
+    logger::log_system_start("1.0.0", "15201");
     
     // 读取配置
     let config = config::Config::load().expect("加载配置失败");
@@ -187,7 +189,8 @@ async fn main() -> std::io::Result<()> {
     ));
     
     // 启动服务器
-    info!("服务器启动在 http://{}", server_address);
+    info!("✅ 所有服务初始化完成");
+    info!("🌐 API服务启动在: http://{}", server_address);
     
     HttpServer::new(move || {
         // 为每个工作线程创建仓库实例
@@ -248,6 +251,7 @@ async fn main() -> std::io::Result<()> {
         let comment_service = services::comment_service::CommentService::new(
             comment_repo.clone(), user_repo.clone()
         ).with_package_repo(package_repo.clone())
+        .with_user_action_repo(user_action_repo.clone())
         .with_notification_service(notification_service.clone())
         .with_forbidden_service(forbidden_word_service.clone());
         let community_service = services::community_service::CommunityService::new(
@@ -263,7 +267,7 @@ async fn main() -> std::io::Result<()> {
         let uploads_dir = &config.file.upload_path;
 
         App::new()
-            .wrap(Logger::default())
+            .wrap(ApiLogger)
             .wrap(
                 Cors::default()
                     // 开发环境

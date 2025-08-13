@@ -209,7 +209,7 @@ async fn get_community_activities(
     query: web::Query<UserActionQueryParams>,
     user_action_service: web::Data<UserActionService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    println!("[DEBUG] get_community_activities called with params: {:?}", query);
+    log::debug!("🔍 get_community_activities called with params: {:?}", query);
     
     match user_action_service.get_user_actions_with_user(&query).await {
         Ok((actions, total)) => {
@@ -226,7 +226,7 @@ async fn get_community_activities(
             })))
         },
         Err(e) => {
-            println!("[ERROR] get_community_activities failed: {}", e);
+            log::error!("❌ get_community_activities failed: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
                 "code": 500,
                 "message": e.to_string()

@@ -1389,7 +1389,7 @@ impl SystemRepository {
     pub async fn get_category_by_id(&self, id: i32) -> Result<Option<Category>> {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, description, enabled, subscription_locked, created_at, updated_at FROM categories WHERE id = ?";
-        println!("[SQL] get_category_by_id: {}", sql);
+        log::debug!("🗄️ SQL: get_category_by_id: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
         
@@ -1407,7 +1407,7 @@ impl SystemRepository {
             Ok(c) => Some(c),
             Err(rusqlite::Error::QueryReturnedNoRows) => None,
             Err(e) => {
-                println!("[ERROR] get_category_by_id error: {}", e);
+                log::error!("❌ get_category_by_id error: {}", e);
                 return Err(e.into());
             }
         };
@@ -1419,7 +1419,7 @@ impl SystemRepository {
     pub async fn create_category(&self, req: &CreateCategoryRequest) -> Result<Category> {
         let conn = self.conn.lock().await;
         let sql = "INSERT INTO categories (name, description, enabled, subscription_locked, created_at) VALUES (?, ?, ?, ?, datetime('now'))";
-        println!("[SQL] create_category: {}", sql);
+        log::debug!("🗄️ SQL: create_category: {}", sql);
         
         let enabled = req.enabled.unwrap_or(true);
         let subscription_locked = req.subscription_locked.unwrap_or(false);
@@ -1456,7 +1456,7 @@ impl SystemRepository {
         
         let conn = self.conn.lock().await;
         let sql = "UPDATE categories SET name = ?, description = ?, enabled = ?, subscription_locked = ?, updated_at = datetime('now') WHERE id = ?";
-        println!("[SQL] update_category: {}", sql);
+        log::debug!("🗄️ SQL: update_category: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
         stmt.execute(rusqlite::params![
@@ -1486,7 +1486,7 @@ impl SystemRepository {
     pub async fn delete_category(&self, id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
         let sql = "DELETE FROM categories WHERE id = ?";
-        println!("[SQL] delete_category: {}", sql);
+        log::debug!("🗄️ SQL: delete_category: {}", sql);
         
         let mut stmt = conn.prepare(sql)?;
         stmt.execute(rusqlite::params![id])?;

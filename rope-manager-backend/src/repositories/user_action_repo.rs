@@ -3,6 +3,7 @@ use chrono::{Utc, DateTime};
 use rusqlite::{params, Connection};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use serde::{Serialize, Deserialize};
 
 use crate::models::user_action::{
     UserAction, UserActionWithUser, CreateUserActionRequest, UserActionQueryParams, 
@@ -21,11 +22,11 @@ impl UserActionRepository {
 
     // 创建用户行为记录
     pub async fn create_user_action(&self, req: &CreateUserActionRequest) -> Result<UserAction> {
-        println!("开始创建用户行为记录，用户ID: {:?}", req.user_id);
+        
         let conn = self.conn.lock().await;
         
         // 确保表存在（移除外键约束以支持访客用户）
-        println!("确保user_actions表存在");
+        
         match conn.execute(
             "CREATE TABLE IF NOT EXISTS user_actions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +48,7 @@ impl UserActionRepository {
         let timestamp = Utc::now();
         let created_at_str = timestamp.to_rfc3339();
         
-        println!("准备执行SQL插入，用户ID: {:?}, 行为类型: {}", req.user_id, req.action_type);
+        
         
         // 对于访客用户(user_id = None)，不检查用户是否存在
         if let Some(user_id) = req.user_id {
@@ -85,7 +86,7 @@ impl UserActionRepository {
             ]
         ) {
             Ok(_) => {
-                println!("插入成功");
+                
                 let action_id = conn.last_insert_rowid() as i32;
                                  let action = UserAction {
                      id: action_id,
@@ -98,11 +99,11 @@ impl UserActionRepository {
                      user_agent: req.user_agent.clone(),
                      created_at: timestamp,
                  };
-                println!("用户行为记录创建成功: ID={}", action_id);
+                
                 Ok(action)
             },
             Err(e) => {
-                println!("插入失败: {}", e);
+                
                 Err(anyhow::anyhow!("插入用户行为记录失败: {}", e))
             }
         }
@@ -505,4 +506,54 @@ impl UserActionRepository {
             by_type,
         })
     }
+
+    // 获取用户的点赞列表（使用视图）
+    pub async fn get_user_likes(&self, user_id: i32, page: u32, page_size: u32) -> Result<(Vec<UserLikeSummary>, i64)> {
+        let conn = self.conn.lock().await;
+        let offset = (page - 1) * page_size;
+        
+        // 查询总数
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM user_likes_summary WHERE user_id = ?",
+            params![user_id],
+            |row| row.get(0),
+        )?;
+        
+        // 查询分页数据
+        let mut stmt = conn.prepare("
+            SELECT user_id, username, like_type, target_id, target_title, target_description, created_at
+            FROM user_likes_summary 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT ? OFFSET ?
+        ")?;
+        
+        let likes: Vec<UserLikeSummary> = stmt.query_map(
+            params![user_id, page_size, offset],
+            |row| {
+                Ok(UserLikeSummary {
+                    user_id: row.get(0)?,
+                    username: row.get(1)?,
+                    like_type: row.get(2)?,
+                    target_id: row.get(3)?,
+                    target_title: row.get(4)?,
+                    target_description: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            },
+        )?.collect::<Result<Vec<_>, _>>()?;
+        
+        Ok((likes, total))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UserLikeSummary {
+    pub user_id: i32,
+    pub username: String,
+    pub like_type: String,
+    pub target_id: i32,
+    pub target_title: String,
+    pub target_description: Option<String>,
+    pub created_at: String,
 } 

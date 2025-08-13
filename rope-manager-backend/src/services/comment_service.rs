@@ -5,6 +5,7 @@ use crate::models::Comment;
 use crate::repositories::comment_repo::CommentRepository;
 use crate::repositories::user_repo::UserRepository;
 use crate::repositories::package_repo::PackageRepository;
+use crate::repositories::user_action_repo::UserActionRepository;
 use crate::services::forbidden_word_service::ForbiddenWordService;
 use crate::services::notification_service::NotificationService;
 
@@ -13,17 +14,23 @@ pub struct CommentService {
     comment_repo: CommentRepository,
     user_repo: UserRepository,
     package_repo: Option<PackageRepository>,
+    user_action_repo: Option<UserActionRepository>,
     forbidden_service: Option<ForbiddenWordService>,
     notification_service: Option<NotificationService>,
 }
 
 impl CommentService {
     pub fn new(comment_repo: CommentRepository, user_repo: UserRepository) -> Self {
-        Self { comment_repo, user_repo, package_repo: None, forbidden_service: None, notification_service: None }
+        Self { comment_repo, user_repo, package_repo: None, user_action_repo: None, forbidden_service: None, notification_service: None }
     }
 
     pub fn with_package_repo(mut self, package_repo: PackageRepository) -> Self {
         self.package_repo = Some(package_repo);
+        self
+    }
+
+    pub fn with_user_action_repo(mut self, user_action_repo: UserActionRepository) -> Self {
+        self.user_action_repo = Some(user_action_repo);
         self
     }
 
@@ -253,10 +260,38 @@ impl CommentService {
             // 点赞
             comment.likes += 1;
             self.comment_repo.add_user_like(comment_id, user_id).await?;
+            
+            // 记录用户行为
+            if let Some(user_action_repo) = &self.user_action_repo {
+                let req = crate::models::CreateUserActionRequest {
+                    user_id: Some(user_id),
+                    action_type: "Like".to_string(),
+                    target_type: Some("Comment".to_string()),
+                    target_id: Some(comment_id),
+                    details: None,
+                    ip_address: None,
+                    user_agent: None,
+                };
+                let _ = user_action_repo.create_user_action(&req).await;
+            }
         } else if !like && has_liked {
             // 取消点赞
             comment.likes = comment.likes.saturating_sub(1);
             self.comment_repo.remove_user_like(comment_id, user_id).await?;
+            
+            // 记录用户行为
+            if let Some(user_action_repo) = &self.user_action_repo {
+                let req = crate::models::CreateUserActionRequest {
+                    user_id: Some(user_id),
+                    action_type: "Unlike".to_string(),
+                    target_type: Some("Comment".to_string()),
+                    target_id: Some(comment_id),
+                    details: None,
+                    ip_address: None,
+                    user_agent: None,
+                };
+                let _ = user_action_repo.create_user_action(&req).await;
+            }
         }
 
         // 保存评论
