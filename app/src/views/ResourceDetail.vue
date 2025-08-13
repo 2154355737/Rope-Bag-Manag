@@ -46,8 +46,12 @@
               <van-icon name="down" />
               <span>{{ resource.download_count || 0 }}</span>
             </div>
-            <div class="stat-item like-click" @click="toggleLike">
-              <van-icon :name="liked ? 'like' : 'like-o'" :color="liked ? '#ee0a24' : undefined" />
+            <div class="stat-item like-click" @click="toggleLike" :class="{ 'processing': isLikeProcessing }">
+              <van-icon 
+                :name="isLikeProcessing ? 'loading' : (liked ? 'like' : 'like-o')" 
+                :color="liked ? '#ee0a24' : undefined" 
+                :class="{ 'van-loading__spinner': isLikeProcessing }"
+              />
               <span>{{ likeCount }}</span>
             </div>
             <div class="stat-item">
@@ -60,8 +64,16 @@
             <van-button type="primary" block round @click="downloadResource" :loading="downloading">
               立即下载
             </van-button>
-            <van-button class="ml8" :type="liked ? 'danger' : 'default'" plain round icon="like-o" @click="toggleLike">
-              {{ liked ? '已赞' : '点赞' }}（{{ likeCount }}）
+            <van-button 
+              class="ml8" 
+              :type="liked ? 'danger' : 'default'" 
+              plain 
+              round 
+              icon="like-o" 
+              :loading="isLikeProcessing"
+              @click="toggleLike"
+            >
+              {{ isLikeProcessing ? '处理中...' : (liked ? '已赞' : '点赞') }}（{{ likeCount }}）
             </van-button>
           </div>
         </div>
@@ -238,7 +250,7 @@
 </template>
 
 <script setup>
- import { ref, computed, onMounted, watch } from 'vue';
+ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
  import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
  import { showToast, showDialog } from 'vant';
  import { resourceApi } from '../api/resource';
@@ -353,10 +365,19 @@ const getResourceDetail = async () => {
 
 // 检查用户点赞状态
 const checkLikeStatus = async () => {
+  if (!userStore.isLoggedIn || !resourceId.value) {
+    liked.value = false;
+    return;
+  }
+  
   try {
+    console.log('🔍 检查点赞状态，用户ID:', userStore.userId, '资源ID:', resourceId.value);
+    
     // 尝试调用点赞状态检查接口
     const res = await resourceApi.checkLikeStatus(resourceId.value);
-    liked.value = res?.data?.liked || false;
+    const isLiked = res?.data?.liked || res?.data?.is_liked || false;
+    liked.value = isLiked;
+    console.log('✅ 从点赞状态接口获取:', isLiked);
   } catch (error) {
     // 如果接口不存在或出错，尝试从用户行为记录中获取
     console.log('🔄 点赞状态接口不可用，尝试从用户行为记录获取:', error.message);
@@ -370,8 +391,9 @@ const checkLikeStatus = async () => {
         target_type: 'Package',
         target_id: resourceId.value
       });
-      liked.value = (userActions?.data?.actions?.length || 0) > 0;
-      console.log('✅ 从用户行为记录获取点赞状态:', liked.value);
+      const hasLiked = (userActions?.data?.actions?.length || 0) > 0;
+      liked.value = hasLiked;
+      console.log('✅ 从用户行为记录获取点赞状态:', hasLiked);
     } catch (fallbackError) {
       // 最终回退：默认为未点赞
       console.log('⚠️ 用户行为记录也无法获取，默认为未点赞');
@@ -380,20 +402,68 @@ const checkLikeStatus = async () => {
   }
 };
 
+// 防止重复点击的标记
+const isLikeProcessing = ref(false);
+
 const toggleLike = async () => {
-  if (!userStore.isLoggedIn) { showToast('请先登录'); return; }
+  if (!userStore.isLoggedIn) { 
+    showToast('请先登录'); 
+    return; 
+  }
+  
+  // 防止重复点击
+  if (isLikeProcessing.value) {
+    console.log('🔄 点赞操作进行中，忽略重复点击');
+    return;
+  }
+  
+  isLikeProcessing.value = true;
+  const originalLiked = liked.value;
+  const originalCount = likeCount.value;
+  
   try {
     if (!liked.value) {
-      const res = await resourceApi.likeResource(resourceId.value);
-      likeCount.value = res?.data?.like_count ?? (likeCount.value + 1);
+      // 乐观更新UI
       liked.value = true;
+      likeCount.value = likeCount.value + 1;
+      
+      console.log('👍 执行点赞操作');
+      const res = await resourceApi.likeResource(resourceId.value);
+      
+      // 从服务器响应更新实际数据
+      if (res?.data?.like_count !== undefined) {
+        likeCount.value = res.data.like_count;
+      }
+      console.log('✅ 点赞成功，当前点赞数:', likeCount.value);
+      showToast('点赞成功');
     } else {
-      const res = await resourceApi.unlikeResource(resourceId.value);
-      likeCount.value = res?.data?.like_count ?? Math.max(0, likeCount.value - 1);
+      // 乐观更新UI
       liked.value = false;
+      likeCount.value = Math.max(0, likeCount.value - 1);
+      
+      console.log('👎 执行取消点赞操作');
+      const res = await resourceApi.unlikeResource(resourceId.value);
+      
+      // 从服务器响应更新实际数据
+      if (res?.data?.like_count !== undefined) {
+        likeCount.value = res.data.like_count;
+      }
+      console.log('✅ 取消点赞成功，当前点赞数:', likeCount.value);
+      showToast('已取消点赞');
     }
-  } catch (e) {
-    showToast('操作失败');
+  } catch (error) {
+    // 错误时回滚UI状态
+    liked.value = originalLiked;
+    likeCount.value = originalCount;
+    
+    console.error('点赞操作失败:', error);
+    showToast('操作失败，请稍后重试');
+    
+    // 重新检查状态以确保同步
+    setTimeout(() => checkLikeStatus(), 1000);
+  } finally {
+    // 无论成功或失败都要释放处理标记
+    isLikeProcessing.value = false;
   }
 };
 
@@ -631,11 +701,38 @@ const reloadAll = async (id) => {
 // 页面加载
 onMounted(() => {
   reloadAll(resourceId.value);
+  
+  // 监听页面可见性变化，用户回到页面时重新检查点赞状态
+  const handleVisibilityChange = () => {
+    if (!document.hidden && userStore.isLoggedIn) {
+      console.log('🔄 页面重新可见，检查点赞状态');
+      checkLikeStatus();
+    }
+  };
+  
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+  // 清理事件监听器
+  onUnmounted(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  });
 });
 
 // 路由参数变化时刷新（同组件复用场景）
 watch(() => route.params.id, (newId, oldId) => {
   if (newId !== oldId) reloadAll(Number(newId));
+});
+
+// 监听用户登录状态变化，重新检查点赞状态
+watch(() => userStore.isLoggedIn, (newLoginStatus, oldLoginStatus) => {
+  if (newLoginStatus && !oldLoginStatus) {
+    // 用户刚登录，检查点赞状态
+    console.log('🔄 用户登录状态变化，重新检查点赞状态');
+    checkLikeStatus();
+  } else if (!newLoginStatus && oldLoginStatus) {
+    // 用户退出登录，重置点赞状态
+    liked.value = false;
+  }
 });
 
 onBeforeRouteUpdate((to, from, next) => {
@@ -939,7 +1036,19 @@ const submitComment = async () => {
   margin-right: 8px;
 }
 .actions-row { display: flex; align-items: center; gap: 8px; }
-.like-click { cursor: pointer; }
+.like-click { 
+  cursor: pointer; 
+  transition: opacity 0.3s ease;
+}
+
+.like-click.processing {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.like-click .van-loading__spinner {
+  animation: van-rotate 1s linear infinite;
+}
 .ml8 { margin-left: 8px; }
 
 /* 原回复样式已移除，使用新的reply-format样式 */
