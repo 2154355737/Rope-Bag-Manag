@@ -112,8 +112,15 @@
                 </div>
               </div>
               <div class="comment-content">
-                <span v-if="comment.reply_to_user" class="reply-indicator">回复 @{{ comment.reply_to_user }}：</span>
-                {{ comment.content }}
+                <!-- 回复格式显示：回复 @用户名: 内容 -->
+                <div v-if="comment.quoted_content" class="reply-format">
+                  <div class="reply-text">
+                    回复 @{{ comment.reply_to_user }}：<span v-if="comment.content">{{ comment.content }}</span>
+                  </div>
+                  <div class="original-message">{{ comment.quoted_content }}</div>
+                </div>
+                <!-- 普通评论 -->
+                <div v-else class="comment-text">{{ comment.content }}</div>
               </div>
               <div class="comment-actions">
                 <div class="comment-action" @click="likeComment(comment)">
@@ -137,8 +144,15 @@
                     </div>
                   </div>
                   <div class="reply-content">
-                    <span v-if="reply.reply_to_user" class="reply-indicator">回复 @{{ reply.reply_to_user }}：</span>
-                    {{ reply.content }}
+                    <!-- 回复格式显示：回复 @用户名: 内容 -->
+                    <div v-if="reply.quoted_content" class="reply-format">
+                      <div class="reply-text">
+                        回复 @{{ reply.reply_to_user }}：<span v-if="reply.content">{{ reply.content }}</span>
+                      </div>
+                      <div class="original-message">{{ reply.quoted_content }}</div>
+                    </div>
+                    <!-- 普通回复 -->
+                    <div v-else class="reply-text">{{ reply.content }}</div>
                   </div>
                   <div class="reply-actions">
                     <div class="comment-action" @click="likeComment(reply)">
@@ -192,8 +206,18 @@
     </div>
     
     <!-- 评论输入框 -->
-    <van-action-sheet v-model:show="showCommentInput" title="发表评论">
+    <van-action-sheet v-model:show="showCommentInput" :title="quotedMessage ? '回复评论' : '发表评论'">
       <div class="comment-form">
+        <!-- 引用原消息显示 -->
+        <div v-if="quotedMessage" class="quoted-original">
+          <div class="quoted-header">
+            <van-icon name="chat-o" class="quoted-header-icon" />
+            <span>回复 @{{ quotedMessage.author }} 的评论</span>
+            <van-icon name="cross" class="close-quote" @click="clearQuote" />
+          </div>
+          <div class="quoted-original-content">{{ quotedMessage.content }}</div>
+        </div>
+        
         <van-field
           v-model="commentContent"
           rows="3"
@@ -204,7 +228,7 @@
           show-word-limit
         />
         <div class="comment-form-actions">
-          <van-button plain @click="showCommentInput = false">取消</van-button>
+          <van-button plain @click="cancelComment">取消</van-button>
           <van-button type="primary" :disabled="!commentContent.trim()" @click="submitComment">发表</van-button>
         </div>
       </div>
@@ -246,6 +270,7 @@ const relatedLoading = ref(false);
 const showCommentInput = ref(false);
 const commentContent = ref('');
 const replyTo = ref(null);
+const quotedMessage = ref(null); // 引用的原消息
 
 // 评论分页和排序
 const currentPage = ref(1); // 当前页码
@@ -374,6 +399,134 @@ const toggleLike = async () => {
 
 // 已移除独立的标签请求逻辑，标签随资源详情返回
 
+// 处理评论数据，为回复评论添加引用信息
+const processCommentsWithQuotes = (commentList) => {
+  // 创建所有评论的映射表，用于查找被回复的原评论
+  const allCommentsByUser = new Map();
+  
+  // 第一遍：收集所有评论（包括主评论和回复）
+  commentList.forEach(comment => {
+    if (!allCommentsByUser.has(comment.author_name)) {
+      allCommentsByUser.set(comment.author_name, []);
+    }
+    allCommentsByUser.get(comment.author_name).push(comment);
+    
+    // 同时收集回复评论
+    if (comment.replies && comment.replies.length > 0) {
+      comment.replies.forEach(reply => {
+        if (!allCommentsByUser.has(reply.author_name)) {
+          allCommentsByUser.set(reply.author_name, []);
+        }
+        allCommentsByUser.get(reply.author_name).push(reply);
+      });
+    }
+  });
+  
+  // 第二遍：处理回复评论，添加引用信息
+  return commentList.map(comment => {
+    const processedComment = { ...comment };
+    
+    // 检查主评论是否是回复格式
+    const replyPattern = /^回复\s+@([^：:]+)[：:]\s*(.*)/;
+    const match = comment.content.match(replyPattern);
+    
+    if (match) {
+      const replyToUser = match[1].trim();
+      const actualContent = match[2].trim();
+      
+      // 查找被回复用户的最近评论
+      const targetUserComments = allCommentsByUser.get(replyToUser) || [];
+      const targetComment = targetUserComments
+        .filter(c => new Date(c.created_at) < new Date(comment.created_at))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      
+      if (targetComment) {
+        // 清理目标评论内容（如果目标评论也是回复格式，则提取纯内容）
+        let cleanTargetContent = targetComment.content;
+        const targetMatch = targetComment.content.match(replyPattern);
+        if (targetMatch) {
+          cleanTargetContent = targetMatch[2].trim();
+        }
+        
+        processedComment.quoted_content = cleanTargetContent;
+        processedComment.quoted_time = targetComment.created_at;
+        processedComment.reply_to_user = replyToUser;
+        
+        // 更新评论内容，如果没有实际内容则标记为纯回复
+        if (actualContent) {
+          processedComment.content = actualContent;
+        } else {
+          processedComment.content = ''; // 纯回复，无额外内容
+          processedComment.is_pure_reply = true;
+        }
+      }
+    }
+    
+    // 处理回复列表
+    if (comment.replies && comment.replies.length > 0) {
+      processedComment.replies = comment.replies.map(reply => {
+        const processedReply = { ...reply };
+        const replyMatch = reply.content.match(replyPattern);
+        
+        if (replyMatch) {
+          const replyToUser = replyMatch[1].trim();
+          const actualContent = replyMatch[2].trim();
+          
+          // 查找被回复的内容
+          let targetContent = null;
+          let targetTime = null;
+          
+                     // 先查看是否回复主评论作者
+           if (replyToUser === comment.author_name) {
+             // 清理主评论内容
+             let cleanMainContent = comment.content;
+             const mainMatch = comment.content.match(replyPattern);
+             if (mainMatch) {
+               cleanMainContent = mainMatch[2].trim();
+             }
+             targetContent = cleanMainContent;
+             targetTime = comment.created_at;
+           } else {
+             // 查找同层回复中的目标
+             const targetReply = comment.replies
+               .filter(r => r.author_name === replyToUser && new Date(r.created_at) < new Date(reply.created_at))
+               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+             
+             if (targetReply) {
+               // 清理目标回复内容
+               let cleanReplyContent = targetReply.content;
+               const replyContentMatch = targetReply.content.match(replyPattern);
+               if (replyContentMatch) {
+                 cleanReplyContent = replyContentMatch[2].trim();
+               }
+               targetContent = cleanReplyContent;
+               targetTime = targetReply.created_at;
+             }
+           }
+           
+           if (targetContent) {
+             processedReply.quoted_content = targetContent;
+             processedReply.quoted_time = targetTime;
+             processedReply.reply_to_user = replyToUser;
+             
+                         // 更新回复内容，如果没有实际内容则标记为纯回复
+            if (actualContent) {
+              processedReply.content = actualContent;
+            } else {
+              processedReply.content = ''; // 纯回复，无额外内容
+              processedReply.is_pure_reply = true;
+            }
+           }
+        }
+        
+        return processedReply;
+      });
+    }
+    
+    return processedComment;
+  });
+};
+
 // 获取资源评论
 const getResourceComments = async () => {
   commentLoading.value = true;
@@ -390,9 +543,12 @@ const getResourceComments = async () => {
     if (res.data) {
       let commentList = res.data.list || res.data || [];
       
+      // 处理评论数据，为回复评论添加引用信息
+      const processedComments = processCommentsWithQuotes(commentList);
+      
       // 存储所有评论
-      allComments.value = commentList;
-      totalComments.value = commentList.length;
+      allComments.value = processedComments;
+      totalComments.value = processedComments.length;
       
       // 应用排序和分页
       updateDisplayedComments();
@@ -536,15 +692,34 @@ const likeComment = (comment) => {
 };
 
 // 回复评论
-const replyComment = (comment) => {
+const replyComment = (comment, parentComment = null) => {
   if (!userStore.isLoggedIn) {
     showToast('请先登录');
     return;
   }
   
   replyTo.value = comment;
+  quotedMessage.value = {
+    author: comment.author_name,
+    content: comment.content,
+    time: comment.created_at
+  };
+  
   commentContent.value = `回复 @${comment.author_name}：`;
   showCommentInput.value = true;
+};
+
+// 清除引用
+const clearQuote = () => {
+  quotedMessage.value = null;
+  replyTo.value = null;
+  commentContent.value = '';
+};
+
+// 取消评论
+const cancelComment = () => {
+  showCommentInput.value = false;
+  clearQuote();
 };
 
 // 提交评论
@@ -562,7 +737,7 @@ const submitComment = async () => {
   try {
     await resourceApi.addComment(resourceId.value, commentContent.value);
     showToast('评论成功');
-    commentContent.value = '';
+    clearQuote(); // 清除引用和内容
     showCommentInput.value = false;
     
     // 重新获取评论，重置到第一页显示最新评论
@@ -767,23 +942,40 @@ const submitComment = async () => {
 .like-click { cursor: pointer; }
 .ml8 { margin-left: 8px; }
 
-/* 回复评论样式 */
-.reply-indicator {
-  color: var(--primary-color);
-  font-weight: 600;
-  background: rgba(79, 192, 141, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  margin-right: 4px;
+/* 原回复样式已移除，使用新的reply-format样式 */
+
+.comment-text, .reply-text {
+  line-height: 1.6;
+  color: var(--van-text-color, #323233);
+}
+
+/* 回复格式样式 */
+.reply-format {
+  line-height: 1.6;
+}
+
+.reply-format .reply-text {
+  color: var(--van-text-color, #323233);
+  margin-bottom: 4px;
+}
+
+.reply-format .original-message {
+  padding: 8px 12px;
+  background-color: #f7f8fa;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-top: 4px;
+  border-left: 3px solid #ddd;
 }
 
 .reply-list {
   margin-top: 16px;
   margin-left: 16px;
-  border-left: 3px solid var(--primary-color);
+  border-left: 3px solid var(--van-primary-color, #1989fa);
   padding-left: 16px;
-  background: linear-gradient(90deg, rgba(79, 192, 141, 0.03) 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(25, 137, 250, 0.03) 0%, transparent 100%);
   border-radius: 0 8px 8px 0;
 }
 
@@ -803,7 +995,7 @@ const submitComment = async () => {
   top: 20px;
   width: 8px;
   height: 2px;
-  background: var(--primary-color);
+  background: var(--van-primary-color, #1989fa);
   border-radius: 1px;
 }
 
@@ -823,8 +1015,8 @@ const submitComment = async () => {
   border-radius: 50%;
   margin-right: 10px;
   object-fit: cover;
-  border: 2px solid var(--primary-color);
-  box-shadow: 0 2px 4px rgba(79, 192, 141, 0.2);
+  border: 2px solid var(--van-primary-color, #1989fa);
+  box-shadow: 0 2px 4px rgba(25, 137, 250, 0.2);
 }
 
 .reply-author {
@@ -859,14 +1051,14 @@ const submitComment = async () => {
 }
 
 .reply-actions .comment-action {
-  background: rgba(79, 192, 141, 0.1);
+  background: rgba(25, 137, 250, 0.1);
   padding: 4px 8px;
   border-radius: 12px;
   transition: all 0.2s ease;
 }
 
 .reply-actions .comment-action:hover {
-  background: rgba(79, 192, 141, 0.2);
+  background: rgba(25, 137, 250, 0.2);
   transform: translateY(-1px);
 }
 
@@ -918,5 +1110,72 @@ const submitComment = async () => {
 .comment-pagination :deep(.van-pagination__item--active) {
   background-color: var(--primary-color);
   color: white;
+}
+
+/* 评论输入框中的引用样式 */
+.quoted-original {
+  margin: 16px 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border-left: 4px solid #6c757d;
+  border-radius: 0 8px 8px 0;
+  position: relative;
+}
+
+.quoted-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 6px;
+  font-size: 13px;
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.quoted-header-icon {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+.close-quote {
+  margin-left: auto;
+  padding: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  color: #999;
+  transition: color 0.3s ease;
+}
+
+.close-quote:hover {
+  color: #ff4757;
+}
+
+.quoted-original-content {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #6c757d;
+  font-style: italic;
+  max-height: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+}
+
+.quoted-original-content::before {
+  content: '"';
+  font-size: 16px;
+  font-weight: bold;
+  color: #999;
+  margin-right: 2px;
+}
+
+.quoted-original-content::after {
+  content: '"';
+  font-size: 16px;
+  font-weight: bold;
+  color: #999;
+  margin-left: 2px;
 }
 </style> 
