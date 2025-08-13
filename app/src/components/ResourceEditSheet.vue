@@ -151,10 +151,14 @@ const fetchDownloadUrl = async () => {
   try {
     downloading.value = true;
     const res = await resourceApi.downloadResource(props.resource.id);
-    form.value.file_url = res.data || '';
-    if (!form.value.file_url) showToast('未返回直链');
+    if (res.code === 0 && res.data) {
+      form.value.file_url = typeof res.data === 'string' ? res.data : res.data.url || '';
+      if (!form.value.file_url) showToast('未返回下载链接');
+    } else {
+      showToast(res.message || '获取下载链接失败');
+    }
   } catch (e) {
-    showToast('获取直链失败');
+    showToast('获取下载链接失败');
   } finally {
     downloading.value = false;
   }

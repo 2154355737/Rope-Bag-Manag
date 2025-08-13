@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct PackageRepository {
     conn: Arc<Mutex<Connection>>,
 }

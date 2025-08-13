@@ -188,6 +188,21 @@ async fn main() -> std::io::Result<()> {
         }
     ));
     
+    // 初始化存储服务
+    let storage_db_url = db_url.clone();
+    tokio::spawn(async move {
+        match services::package_storage_service::PackageStorageService::new(&storage_db_url) {
+            Ok(mut storage_service) => {
+                log::info!("🚀 正在初始化AList存储服务...");
+                match storage_service.initialize_storage().await {
+                    Ok(_) => log::info!("✅ AList存储服务初始化成功"),
+                    Err(e) => log::warn!("⚠️  AList存储服务初始化失败，但服务将继续运行: {}", e),
+                }
+            },
+            Err(e) => log::error!("❌ 创建存储服务失败: {}", e),
+        }
+    });
+    
     // 启动服务器
     info!("✅ 所有服务初始化完成");
     info!("🌐 API服务启动在: http://{}", server_address);
@@ -244,6 +259,8 @@ async fn main() -> std::io::Result<()> {
         .with_user_repo(user_repo.clone())
         .with_download_security_service(&download_security_service)
         .with_notification_service(notification_service.clone());
+        
+
         let admin_service = services::admin_service::AdminService::new(&db_url);
         let forbidden_word_service = services::forbidden_word_service::ForbiddenWordService::new(
             forbidden_word_repo.clone()

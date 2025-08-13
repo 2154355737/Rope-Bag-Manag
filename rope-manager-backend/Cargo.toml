@@ -20,6 +20,12 @@ path = "patch_database.rs"
 name = "check_db_structure"
 path = "check_db_structure.rs"
 
+[[bin]]
+name = "test_alist_connection"
+path = "test_alist_connection.rs"
+
+
+
 [dependencies]
 # Web框架
 actix-web = "4.4"

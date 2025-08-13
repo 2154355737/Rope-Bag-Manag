@@ -91,7 +91,7 @@ impl PackageService {
             author: req.author.clone(),
             version: req.version.clone(),
             description: req.description.clone(),
-            file_url: req.file_url.clone().unwrap_or_else(String::new), // 使用请求中的file_url
+            file_url: req.file_url.clone().unwrap_or_else(|| "".to_string()), // 使用请求中的file_url，如果没有则为空字符串
             file_size: None,
             download_count: 0,
             like_count: 0,
@@ -305,8 +305,21 @@ impl PackageService {
             return Err(anyhow::anyhow!("绳包不存在"));
         }
         
-        // 获取文件URL
-        let file_url = self.package_repo.get_package_file_url(package_id).await?;
+        // 获取文件路径
+        let file_path = self.package_repo.get_package_file_url(package_id).await?;
+        
+        // 通过AList服务获取动态下载链接
+        let download_url = if file_path.starts_with("/image/") {
+            // 文件存储在AList中，获取动态下载链接
+            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", file_path);
+            use crate::services::package_storage_service::PackageStorageService;
+            let mut storage_service = PackageStorageService::new("data.db")?;
+            storage_service.get_package_download_url(&file_path).await?
+        } else {
+            // 兼容旧的直链方式
+            log::info!("🔗 使用传统直链方式: {}", file_path);
+            file_path
+        };
         
         // 增加下载次数
         self.package_repo.increment_download_count(package_id).await?;
@@ -330,7 +343,7 @@ impl PackageService {
             }
         }
 
-        Ok(file_url)
+        Ok(download_url)
     }
 
     // 新增方法：带安全检测的下载
@@ -369,8 +382,21 @@ impl PackageService {
             }
         }
         
-        // 获取文件URL
-        let file_url = self.package_repo.get_package_file_url(package_id).await?;
+        // 获取文件路径
+        let file_path = self.package_repo.get_package_file_url(package_id).await?;
+        
+        // 通过AList服务获取动态下载链接
+        let download_url = if file_path.starts_with("/image/") {
+            // 文件存储在AList中，获取动态下载链接
+            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", file_path);
+            use crate::services::package_storage_service::PackageStorageService;
+            let mut storage_service = PackageStorageService::new("data.db")?;
+            storage_service.get_package_download_url(&file_path).await?
+        } else {
+            // 兼容旧的直链方式
+            log::info!("🔗 使用传统直链方式: {}", file_path);
+            file_path
+        };
         
         // 增加下载次数
         self.package_repo.increment_download_count(package_id).await?;
@@ -394,18 +420,51 @@ impl PackageService {
             }
         }
 
-        Ok(file_url)
+        log::info!("用户通过安全检测，允许下载包 ID={}，下载链接已生成", package_id);
+
+        Ok(download_url)
     }
 
     // 新增方法：更新包文件
     pub async fn update_package_file(&self, package_id: i32) -> Result<Package> {
-        let package = self.package_repo.find_by_id(package_id).await?;
-        let package = package.ok_or_else(|| anyhow::anyhow!("绳包不存在"))?;
-
-        // TODO: 实现文件上传逻辑
-        // 这里应该处理文件上传并更新包信息
-
-        Ok(package)
+        // TODO: 实现文件上传和关联逻辑
+        self.package_repo.find_by_id(package_id).await?.ok_or_else(|| {
+            anyhow::anyhow!("包不存在")
+        })
+    }
+    
+    pub async fn upload_package_file(
+        &self, 
+        package_id: i32, 
+        file_name: &str, 
+        file_data: Vec<u8>
+    ) -> Result<String> {
+        use crate::services::package_storage_service::PackageStorageService;
+        use actix_web::web::Bytes;
+        
+        // 创建存储服务
+        let mut storage_service = PackageStorageService::new("data.db")?;
+        
+        // 上传文件到AList存储
+        let upload_result = storage_service.upload_package_file(
+            file_name,
+            Bytes::from(file_data),
+            Some(package_id)
+        ).await?;
+        
+        // 更新包的file_url
+        let mut package = self.package_repo.find_by_id(package_id).await?
+                         .ok_or_else(|| anyhow::anyhow!("包不存在"))?;
+        
+        package.file_url = upload_result.file_path.clone();
+        package.file_size = Some(upload_result.file_size);
+        
+        // 保存到数据库
+        self.package_repo.update_package(&package).await?;
+        
+        log::info!("📦 包 {} 文件上传并更新成功: {}", package_id, upload_result.file_path);
+        
+        Ok(upload_result.file_path)
     }
 
     // 新增方法：获取分类

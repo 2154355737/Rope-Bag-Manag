@@ -812,12 +812,13 @@ const downloadResource = async () => {
   downloading.value = true;
   try {
     const res = await resourceApi.downloadResource(resourceId.value);
-    if (res.data && res.data.url) {
-      // 打开下载链接
-      window.open(res.data.url, '_blank');
+    if (res.code === 0 && res.data) {
+      // 直接使用返回的下载链接
+      const downloadUrl = typeof res.data === 'string' ? res.data : res.data.url;
+      window.open(downloadUrl, '_blank');
       showToast('开始下载');
     } else {
-      showToast('下载失败，请重试');
+      showToast(res.message || '下载失败，请重试');
     }
   } catch (error) {
     console.error('下载失败', error);

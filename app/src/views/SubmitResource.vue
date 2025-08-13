@@ -83,15 +83,25 @@
             </template>
           </van-field>
           
-          <!-- 将资源文件上传改为资源直链输入 -->
+          <!-- 文件上传组件 -->
           <van-field
-            v-model="form.file_url"
-            name="file_url"
-            label="资源直链"
-            placeholder="请输入 http/https 直链"
-            :rules="fileUrlRules"
-            clearable
-          />
+            name="file"
+            label="资源文件"
+            :rules="fileRules"
+          >
+            <template #input>
+              <van-uploader
+                v-model="fileList"
+                :after-read="afterRead"
+                :max-count="1"
+                accept="*"
+                upload-text="选择文件"
+                :max-size="100 * 1024 * 1024"
+                @oversize="onOversize"
+                @delete="onDelete"
+              />
+            </template>
+          </van-field>
           
           <van-field name="agreement">
             <template #input>
@@ -180,9 +190,12 @@ const form = ref({
   description: '',
   version: '',
   category_id: '',
-  tags: [],
-  file_url: ''
+  tags: []
 });
+
+// 文件上传相关
+const fileList = ref([]);
+const uploadedFile = ref(null);
 
 // 表单状态
 const submitting = ref(false);
@@ -199,12 +212,9 @@ const categoryOptions = computed(() => {
   }));
 });
 
-// URL 校验规则（http/https）
-const HTTP_URL_REGEX = /^(https?):\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)|((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}))(?::\d{2,5})?(?:\/[^\s?#]*)?(?:\?[^\s#]*)?(?:#[^\s]*)?$/i;
-const fileUrlRules = [
-  { required: true, message: '请填写资源直链' },
-  { pattern: HTTP_URL_REGEX, message: '请输入有效的 http/https 直链' },
-  { validator: (val) => String(val || '').length <= 2048, message: '链接过长' },
+// 文件校验规则
+const fileRules = [
+  { validator: () => fileList.value.length > 0, message: '请选择要上传的文件' },
 ];
 // 分类校验规则（自定义读取 form）
 const categoryRules = [
@@ -213,7 +223,7 @@ const categoryRules = [
 
 // 返回上一页
 const onBack = () => {
-  if (form.value.name || form.value.description || form.value.file_url) {
+  if (form.value.name || form.value.description || fileList.value.length > 0) {
     showDialog({
       title: '提示',
       message: '确定要放弃当前编辑吗？',
@@ -284,6 +294,22 @@ const agreeToTerms = () => {
   showAgreementPopup.value = false;
 };
 
+// 文件选择后的处理
+const afterRead = (file) => {
+  uploadedFile.value = file.file;
+  console.log('选择的文件:', file.file.name, '大小:', file.file.size);
+};
+
+// 文件大小超限处理
+const onOversize = () => {
+  showToast('文件大小不能超过100MB');
+};
+
+// 删除文件
+const onDelete = () => {
+  uploadedFile.value = null;
+};
+
 // 提交表单
 const onSubmit = async () => {
   if (!agreedToTerms.value) {
@@ -291,26 +317,45 @@ const onSubmit = async () => {
     return;
   }
   
+  if (!uploadedFile.value) {
+    showToast('请选择要上传的文件');
+    return;
+  }
+  
   submitting.value = true;
   
   try {
-    // 直接提交资源数据（使用资源直链）
+    // 第一步：创建资源记录（不包含文件）
     const categoryName = (categories.value.find(c => Number(c.id) === Number(form.value.category_id)) || {}).name;
     const resourceData = {
       title: form.value.name,
       description: form.value.description || undefined,
       category: categoryName || undefined,
       tags: form.value.tags,
-      file_url: form.value.file_url,
+      file_url: '', // 暂时为空，等待文件上传后更新
     };
     
-    const res = await resourceApi.createResource(resourceData);
+    const createRes = await resourceApi.createResource(resourceData);
     
-    if (res.code === 0) {
-      showToast('资源提交成功，等待审核');
+    if (createRes.code !== 0) {
+      showToast(createRes.message || '创建资源失败');
+      return;
+    }
+    
+    const resourceId = createRes.data.id;
+    showToast('资源创建成功，正在上传文件...');
+    
+    // 第二步：上传文件
+    const formData = new FormData();
+    formData.append('file', uploadedFile.value);
+    
+    const uploadRes = await resourceApi.uploadFile(resourceId, formData);
+    
+    if (uploadRes.code === 0) {
+      showToast('资源上传成功，等待审核');
       router.replace('/my-resources');
     } else {
-      showToast(res.message || '提交失败');
+      showToast(uploadRes.message || '文件上传失败');
     }
   } catch (error) {
     console.error('资源提交失败', error);

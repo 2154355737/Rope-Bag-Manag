@@ -7,6 +7,8 @@ use crate::services::comment_service::CommentService;
 use crate::repositories::system_repo::SystemRepository;
 use crate::require_auth;
 use crate::utils::auth_helper::AuthHelper;
+use futures_util::StreamExt;
+
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct PackageQueryParams {
@@ -360,11 +362,11 @@ async fn user_submit_resource(
     // 验证用户认证
     let user = require_auth!(&http_req);
     
-    // 验证URL格式（对普通用户要求更严格）
-    if !req.file_url.starts_with("http://") && !req.file_url.starts_with("https://") {
+    // file_url现在是可选的，如果没有提供，表示将后续上传文件
+    if !req.file_url.is_empty() && !req.file_url.starts_with("http://") && !req.file_url.starts_with("https://") {
         return Ok(HttpResponse::BadRequest().json(json!({
             "code": 400,
-            "message": "资源文件链接必须是有效的HTTP或HTTPS地址"
+            "message": "如果提供资源文件链接，必须是有效的HTTP或HTTPS地址"
         })));
     }
     
@@ -392,7 +394,7 @@ async fn user_submit_resource(
         version: None,
         description: req.description.clone(),
         category_id,
-        file_url: Some(req.file_url.clone()),
+        file_url: if req.file_url.is_empty() { None } else { Some(req.file_url.clone()) },
         tags: req.tags.clone(),
         is_pinned: None,
         is_featured: None,
@@ -598,21 +600,98 @@ async fn download_package(
 }
 
 async fn upload_package_file(
+    http_req: HttpRequest,
     path: web::Path<i32>,
+    mut payload: actix_multipart::Multipart,
     package_service: web::Data<PackageService>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 验证用户认证
+    let user = require_auth!(&http_req);
     let package_id = path.into_inner();
-    // TODO: 实现文件上传逻辑
-    match package_service.update_package_file(package_id).await {
-        Ok(package) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "文件上传成功",
-            "data": package
-        }))),
-        Err(e) => Ok(HttpResponse::BadRequest().json(json!({
+    
+    log::info!("📤 用户 {} 为包 {} 上传文件", user.username, package_id);
+    
+    // 检查包是否存在且用户有权限
+    match package_service.get_package_by_id(package_id).await {
+        Ok(Some(package)) => {
+            // 检查权限：只有作者或管理员可以上传文件
+            if package.author != user.username && !matches!(user.role, crate::models::UserRole::Admin | crate::models::UserRole::Elder) {
+                return Ok(HttpResponse::Forbidden().json(json!({
+                    "code": 403,
+                    "message": "只有资源作者或管理员可以上传文件"
+                })));
+            }
+        },
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(json!({
+                "code": 404,
+                "message": "资源不存在"
+            })));
+        },
+        Err(e) => {
+            log::error!("获取包信息失败: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": "获取资源信息失败"
+            })));
+        }
+    }
+    
+    let mut file_name = String::new();
+    let mut file_data = Vec::new();
+    
+    // 处理multipart数据
+    while let Some(item) = payload.next().await {
+        let mut field = item.map_err(|e| {
+            log::error!("处理multipart字段失败: {}", e);
+            actix_web::error::ErrorBadRequest("无效的文件数据")
+        })?;
+        
+        let field_name = field.name().unwrap_or("").to_string();
+        
+        if field_name == "file" {
+            file_name = field.content_disposition()
+                .and_then(|cd| cd.get_filename())
+                .unwrap_or("unknown")
+                .to_string();
+            
+            while let Some(chunk) = field.next().await {
+                let data = chunk.map_err(|e| {
+                    log::error!("读取文件数据失败: {}", e);
+                    actix_web::error::ErrorBadRequest("读取文件数据失败")
+                })?;
+                file_data.extend_from_slice(&data);
+            }
+        }
+    }
+    
+    if file_data.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({
             "code": 400,
-            "message": e.to_string()
-        })))
+            "message": "没有接收到文件数据"
+        })));
+    }
+    
+    // 上传文件到存储服务
+    match package_service.upload_package_file(package_id, &file_name, file_data).await {
+        Ok(file_path) => {
+            log::info!("📦 包 {} 文件上传成功: {}", package_id, file_path);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "文件上传成功",
+                "data": {
+                    "file_path": file_path,
+                    "file_name": file_name
+                }
+            })))
+        },
+        Err(e) => {
+            log::error!("文件上传失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("文件上传失败: {}", e)
+            })))
+        }
     }
 }
 

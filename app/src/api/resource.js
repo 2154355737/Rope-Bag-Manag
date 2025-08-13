@@ -84,6 +84,11 @@ export const resourceApi = {
     return post('/upload', formData);
   },
   
+  // 为指定资源上传文件
+  uploadFile: (resourceId, formData) => {
+    return post(`/packages/${resourceId}/upload`, formData);
+  },
+  
   // 获取资源评论
   getResourceComments: (resourceId, params = {}) => {
     const queryParams = {
