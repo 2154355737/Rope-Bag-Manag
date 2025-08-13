@@ -1,7 +1,7 @@
 <template>
   <div class="notifications-page">
     <van-nav-bar title="我的通知" left-arrow @click-left="onBack" fixed />
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <van-list
         v-model:loading="loading"
         v-model:error="loadError"
@@ -63,11 +63,23 @@ const open = async (n) => {
     try { await notificationApi.markRead(n.id); n.is_read = true; } catch (e) {}
   }
   if (n.link) {
-    // 站内链接以 http 开头直接跳转，否则作为路由处理
-    if (n.link.startsWith('http')) {
-      window.location.href = n.link;
+    let targetLink = n.link;
+    
+    // 处理包含localhost的链接，提取路径部分
+    if (targetLink.includes('localhost:5173/')) {
+      const url = new URL(targetLink);
+      targetLink = url.pathname + url.search + url.hash;
+    }
+    
+    // 外部链接直接跳转，内部链接使用路由
+    if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
+      window.location.href = targetLink;
     } else {
-      router.push(n.link);
+      // 确保路径以 / 开头
+      if (!targetLink.startsWith('/')) {
+        targetLink = '/' + targetLink;
+      }
+      router.push(targetLink);
     }
   }
 };
@@ -79,12 +91,109 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.notifications-page { min-height: 100vh; background: var(--background-color); }
-.content { padding: 12px; }
-.notif-item { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-.row { display: flex; align-items: center; justify-content: space-between; }
-.title { font-weight: 600; color: var(--text-color); }
-.time { color: var(--text-color-light); font-size: 12px; }
-.content-text { margin-top: 6px; color: var(--text-color); }
-.mr6 { margin-right: 6px; }
+.notifications-page { 
+  min-height: 100vh; 
+  background: var(--background-color); 
+  /* 确保页面占满整个视口 */
+  display: flex;
+  flex-direction: column;
+}
+
+.content { 
+  /* 基础内边距 */
+  padding: 12px; 
+  /* 顶部：NavBar高度 + 间距 + 内容边距，与全局样式保持一致 */
+  padding-top: calc(46px + env(safe-area-inset-top, 0px) + 16px + 12px);
+  /* 底部：底部导航高度 + 内容边距 */
+  padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px) + 12px);
+  /* 布局 */
+  flex: 1;
+  overflow-y: auto;
+}
+
+.notif-item { 
+  background: #fff; 
+  border-radius: 12px; 
+  padding: 12px; 
+  margin-bottom: 12px;
+  /* 添加轻微的阴影效果 */
+  box-shadow: var(--shadow-normal);
+  /* 添加过渡动画 */
+  transition: transform var(--animation-fast) var(--ease-out-cubic);
+}
+
+.notif-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-large);
+}
+
+.notif-item:active {
+  transform: translateY(0);
+}
+
+.row { 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+}
+
+.title { 
+  font-weight: 600; 
+  color: var(--text-color);
+  flex: 1;
+  /* 防止标题过长时破坏布局 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.time { 
+  color: var(--text-color-light); 
+  font-size: 12px;
+  /* 确保时间不被压缩 */
+  flex-shrink: 0;
+}
+
+.content-text { 
+  margin-top: 6px; 
+  color: var(--text-color);
+  /* 内容文本多行显示 */
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.mr6 { 
+  margin-right: 6px; 
+}
+
+/* 加载状态优化 */
+.van-list {
+  min-height: 200px;
+}
+
+/* 空状态优化 */
+.van-empty {
+  padding: 40px 20px;
+}
+
+/* 响应式优化 */
+@media (max-width: 375px) {
+  .content {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  
+  .notif-item {
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+}
+
+/* 横屏适配 - 与主CSS文件中的NavBar横屏高度保持一致 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .content {
+    padding-top: calc(40px + env(safe-area-inset-top, 0px) + 16px + 12px);
+  }
+}
 </style> 

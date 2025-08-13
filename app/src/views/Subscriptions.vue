@@ -1,7 +1,7 @@
 <template>
   <div class="subs-page">
     <van-nav-bar title="分类订阅" left-arrow @click-left="onBack" fixed />
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <van-skeleton title :row="8" :loading="loading" />
       <div v-if="!loading">
         <van-cell-group inset>
@@ -68,7 +68,9 @@ onMounted(fetchData);
 
 <style scoped>
 .subs-page { min-height: 100vh; background: var(--background-color); }
-.content { padding: 12px; }
+.content { 
+  padding: 12px; 
+}
 .row { display: flex; flex-direction: column; }
 .name { font-weight: 600; color: var(--text-color); }
 .desc { font-size: 12px; color: var(--text-color-lighter); margin-top: 2px; }

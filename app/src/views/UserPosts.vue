@@ -1,7 +1,7 @@
 <template>
   <div class="user-posts-page">
     <van-nav-bar title="我的帖子" left-arrow @click-left="onBack" fixed />
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <van-list
         v-model:loading="loading"
         v-model:error="error"
@@ -117,7 +117,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.content { padding: 12px; }
+.content { 
+  padding: 12px; 
+}
 .post-wrap { margin-bottom: 10px; }
 .row-actions { display: flex; gap: 8px; padding: 0 8px 8px 8px; }
 </style> 

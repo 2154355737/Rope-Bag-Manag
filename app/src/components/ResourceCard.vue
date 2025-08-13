@@ -5,16 +5,17 @@
       <div class="resource-card__header">
         <i-mdi-file-document-outline class="resource-card__icon" />
         <h3 class="resource-card__title ellipsis">{{ resource.name }}</h3>
-        <van-tag
-          v-if="statusInfo"
-          :type="statusInfo.type"
-          size="mini"
-          plain
-          class="status-tag"
-        >
-          {{ statusInfo.text }}
-        </van-tag>
       </div>
+      <!-- 状态标签固定在右上角 -->
+      <van-tag
+        v-if="statusInfo"
+        :type="statusInfo.type"
+        size="mini"
+        plain
+        class="status-tag-fixed"
+      >
+        {{ statusInfo.text }}
+      </van-tag>
       <div
         v-if="showActions"
         class="resource-card__more"
@@ -174,16 +175,32 @@ const formatDate = (date) => {
   font-weight: 500;
   margin-bottom: 6px;
   color: var(--text-color);
+  flex: 1;
+  max-width: 160px; /* 限制标题最大宽度，使其更短 */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.status-tag { margin-left: 6px; }
-
-/* 右上角更多操作按钮 */
-.resource-card__more {
+/* 状态标签固定在右上角 */
+.status-tag-fixed {
   position: absolute;
   top: 8px;
   right: 8px;
+  z-index: 2;
+}
+
+/* 右下角更多操作按钮 */
+.resource-card__more {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
   color: var(--text-color-lighter);
+  z-index: 1;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
 }
 
 .resource-card__desc {

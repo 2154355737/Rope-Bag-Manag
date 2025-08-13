@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="detail-content" :style="{ paddingTop: '46px' }">
+    <div class="detail-content">
       <!-- 加载骨架屏 -->
       <van-skeleton title :row="12" :loading="loading" v-if="loading" />
       
@@ -80,10 +80,23 @@
         <!-- 资源评论 -->
         <div class="detail-card">
           <div class="card-title">
-            评论 ({{ comments.length }})
+            评论 ({{ totalComments }})
             <div class="comment-action" @click="showCommentInput = true">
               <van-icon name="edit" />
               <span>写评论</span>
+            </div>
+          </div>
+          
+          <!-- 评论控制栏 -->
+          <div class="comment-controls-bar" v-if="comments.length > 0">
+            <div class="comment-sort">
+              <span class="sort-label">排序：</span>
+              <van-dropdown-menu>
+                <van-dropdown-item v-model="sortType" :options="sortOptions" @change="onSortChange" />
+              </van-dropdown-menu>
+            </div>
+            <div class="comment-info">
+              <span>{{ (currentPage - 1) * pageSize + 1 }}-{{ Math.min(currentPage * pageSize, totalComments) }} / {{ totalComments }}</span>
             </div>
           </div>
           
@@ -99,6 +112,7 @@
                 </div>
               </div>
               <div class="comment-content">
+                <span v-if="comment.reply_to_user" class="reply-indicator">回复 @{{ comment.reply_to_user }}：</span>
                 {{ comment.content }}
               </div>
               <div class="comment-actions">
@@ -111,6 +125,44 @@
                   <span>回复</span>
                 </div>
               </div>
+              
+              <!-- 回复评论列表 -->
+              <div class="reply-list" v-if="comment.replies && comment.replies.length > 0">
+                <div class="reply-item" v-for="reply in comment.replies" :key="reply.id">
+                  <div class="reply-header">
+                    <img :src="reply.author_avatar || '/img/default-avatar.jpg'" alt="头像" class="reply-avatar" />
+                    <div class="reply-author">
+                      <span class="reply-author-name">{{ reply.author_name }}</span>
+                      <span class="reply-time">{{ formatDate(reply.created_at) }}</span>
+                    </div>
+                  </div>
+                  <div class="reply-content">
+                    <span v-if="reply.reply_to_user" class="reply-indicator">回复 @{{ reply.reply_to_user }}：</span>
+                    {{ reply.content }}
+                  </div>
+                  <div class="reply-actions">
+                    <div class="comment-action" @click="likeComment(reply)">
+                      <van-icon name="like-o" :class="{ 'liked': reply.isLiked }" />
+                      <span>{{ reply.likes || 0 }}</span>
+                    </div>
+                    <div class="comment-action" @click="replyComment(reply, comment)">
+                      <van-icon name="comment-o" />
+                      <span>回复</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 分页控制 -->
+            <div class="comment-pagination" v-if="totalPages > 1">
+              <van-pagination
+                v-model="currentPage"
+                :total-items="totalComments"
+                :items-per-page="pageSize"
+                :force-ellipses="true"
+                @change="onPageChange"
+              />
             </div>
           </div>
           
@@ -158,25 +210,22 @@
       </div>
     </van-action-sheet>
     
-    <!-- 底部Tab栏 -->
-    <tab-bar />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
-import { showToast, showDialog } from 'vant';
-import { resourceApi } from '../api/resource';
-import { useUserStore } from '../store/user';
-import ResourceList from '../components/ResourceList.vue';
-import TabBar from '../components/TabBar.vue';
-import dayjs from 'dayjs';
-import { get, post, del } from '../utils/request';
-
-const router = useRouter();
-const route = useRoute();
-const userStore = useUserStore();
+ import { ref, computed, onMounted, watch } from 'vue';
+ import { useRouter, useRoute, onBeforeRouteUpdate } from 'vue-router';
+ import { showToast, showDialog } from 'vant';
+ import { resourceApi } from '../api/resource';
+ import { useUserStore } from '../store/user';
+ import ResourceList from '../components/ResourceList.vue';
+ import dayjs from 'dayjs';
+ import { get, post, del } from '../utils/request';
+ 
+ const router = useRouter();
+ const route = useRoute();
+ const userStore = useUserStore();
 
 // 获取路由参数中的资源ID
 const resourceId = ref(Number(route.params.id) || 0);
@@ -198,6 +247,21 @@ const showCommentInput = ref(false);
 const commentContent = ref('');
 const replyTo = ref(null);
 
+// 评论分页和排序
+const currentPage = ref(1); // 当前页码
+const pageSize = ref(5); // 每页评论数量
+const totalComments = ref(0); // 评论总数
+const sortType = ref('latest'); // 排序类型
+const allComments = ref([]); // 所有评论数据
+
+// 排序选项
+const sortOptions = [
+  { text: '最新发布', value: 'latest' },
+  { text: '最早发布', value: 'earliest' },
+  { text: '最多点赞', value: 'most_liked' },
+  { text: '最少点赞', value: 'least_liked' }
+];
+
 // 下载状态
 const downloading = ref(false);
 
@@ -216,6 +280,30 @@ const formatDate = (date) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm');
 };
 
+// 计算属性：总页数
+const totalPages = computed(() => {
+  return Math.ceil(totalComments.value / pageSize.value);
+});
+
+// 排序变化处理
+const onSortChange = (value) => {
+  sortType.value = value;
+  currentPage.value = 1; // 重置到第一页
+  updateDisplayedComments();
+};
+
+// 页码变化处理
+const onPageChange = (page) => {
+  currentPage.value = page;
+  updateDisplayedComments();
+  
+  // 滚动到评论区域顶部
+  const commentElement = document.querySelector('.comment-list');
+  if (commentElement) {
+    commentElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+};
+
 // 获取资源详情
 const getResourceDetail = async () => {
   loading.value = true;
@@ -223,7 +311,13 @@ const getResourceDetail = async () => {
     const res = await resourceApi.getResourceDetail(resourceId.value);
     resource.value = res.data;
     likeCount.value = resource.value?.like_count || 0;
-    liked.value = false;
+    
+    // 检查用户点赞状态
+    if (userStore.isLoggedIn) {
+      await checkLikeStatus();
+    } else {
+      liked.value = false;
+    }
   } catch (error) {
     console.error('获取资源详情失败', error);
     showToast('获取资源详情失败');
@@ -232,15 +326,44 @@ const getResourceDetail = async () => {
   }
 };
 
+// 检查用户点赞状态
+const checkLikeStatus = async () => {
+  try {
+    // 尝试调用点赞状态检查接口
+    const res = await resourceApi.checkLikeStatus(resourceId.value);
+    liked.value = res?.data?.liked || false;
+  } catch (error) {
+    // 如果接口不存在或出错，尝试从用户行为记录中获取
+    console.log('🔄 点赞状态接口不可用，尝试从用户行为记录获取:', error.message);
+    
+    try {
+      const userActions = await get('/user-actions', {
+        page: 1,
+        page_size: 100,
+        user_id: userStore.userId,
+        action_type: 'Like',
+        target_type: 'Package',
+        target_id: resourceId.value
+      });
+      liked.value = (userActions?.data?.actions?.length || 0) > 0;
+      console.log('✅ 从用户行为记录获取点赞状态:', liked.value);
+    } catch (fallbackError) {
+      // 最终回退：默认为未点赞
+      console.log('⚠️ 用户行为记录也无法获取，默认为未点赞');
+      liked.value = false;
+    }
+  }
+};
+
 const toggleLike = async () => {
   if (!userStore.isLoggedIn) { showToast('请先登录'); return; }
   try {
     if (!liked.value) {
-      const res = await post(`/packages/${resourceId.value}/like`, {});
+      const res = await resourceApi.likeResource(resourceId.value);
       likeCount.value = res?.data?.like_count ?? (likeCount.value + 1);
       liked.value = true;
     } else {
-      const res = await del(`/packages/${resourceId.value}/like`);
+      const res = await resourceApi.unlikeResource(resourceId.value);
       likeCount.value = res?.data?.like_count ?? Math.max(0, likeCount.value - 1);
       liked.value = false;
     }
@@ -255,14 +378,73 @@ const toggleLike = async () => {
 const getResourceComments = async () => {
   commentLoading.value = true;
   try {
-    const res = await resourceApi.getResourceComments(resourceId.value);
-    comments.value = res.data.list || [];
+    // 获取所有评论数据（不分页）
+    const params = {
+      page: 1,
+      pageSize: 1000 // 获取大量数据，避免分页限制
+    };
+    
+    console.log('评论请求参数:', params); // 调试日志
+    
+    const res = await resourceApi.getResourceComments(resourceId.value, params);
+    if (res.data) {
+      let commentList = res.data.list || res.data || [];
+      
+      // 存储所有评论
+      allComments.value = commentList;
+      totalComments.value = commentList.length;
+      
+      // 应用排序和分页
+      updateDisplayedComments();
+    } else {
+      allComments.value = [];
+      comments.value = [];
+      totalComments.value = 0;
+    }
   } catch (error) {
     console.error('获取评论失败', error);
+    showToast('加载评论失败');
+    // 设置默认值避免界面错误
+    allComments.value = [];
+    comments.value = [];
+    totalComments.value = 0;
   } finally {
     commentLoading.value = false;
   }
 };
+
+// 更新显示的评论（排序+分页）
+const updateDisplayedComments = () => {
+  // 先排序
+  let sortedComments = sortComments(allComments.value, sortType.value);
+  
+  // 再分页
+  const startIndex = (currentPage.value - 1) * pageSize.value;
+  const endIndex = startIndex + pageSize.value;
+  comments.value = sortedComments.slice(startIndex, endIndex);
+  
+  console.log(`显示评论: 第${currentPage.value}页, ${startIndex}-${endIndex}, 共${sortedComments.length}条`);
+};
+
+// 前端排序评论（临时方案）
+const sortComments = (commentList, sortType) => {
+  const sorted = [...commentList];
+  
+  switch (sortType) {
+    case 'latest':
+      return sorted.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    case 'earliest':
+      return sorted.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    case 'most_liked':
+      return sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+    case 'least_liked':
+      return sorted.sort((a, b) => (a.likes || 0) - (b.likes || 0));
+    default:
+      return sorted;
+  }
+};
+
+
 
 // 获取相关推荐
 const getRelatedResources = async () => {
@@ -383,7 +565,9 @@ const submitComment = async () => {
     commentContent.value = '';
     showCommentInput.value = false;
     
-    // 重新获取评论
+    // 重新获取评论，重置到第一页显示最新评论
+    currentPage.value = 1;
+    sortType.value = 'latest'; // 切换到最新排序以看到刚发布的评论
     await getResourceComments();
   } catch (error) {
     console.error('提交评论失败', error);
@@ -396,7 +580,6 @@ const submitComment = async () => {
 .resource-detail {
   background-color: var(--background-color);
   min-height: 100vh;
-  padding-bottom: 50px;
 }
 
 .detail-content {
@@ -486,12 +669,17 @@ const submitComment = async () => {
 }
 
 .comment-item {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e8eaed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  position: relative;
 }
 
 .comment-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .comment-header {
@@ -578,4 +766,157 @@ const submitComment = async () => {
 .actions-row { display: flex; align-items: center; gap: 8px; }
 .like-click { cursor: pointer; }
 .ml8 { margin-left: 8px; }
+
+/* 回复评论样式 */
+.reply-indicator {
+  color: var(--primary-color);
+  font-weight: 600;
+  background: rgba(79, 192, 141, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.reply-list {
+  margin-top: 16px;
+  margin-left: 16px;
+  border-left: 3px solid var(--primary-color);
+  padding-left: 16px;
+  background: linear-gradient(90deg, rgba(79, 192, 141, 0.03) 0%, transparent 100%);
+  border-radius: 0 8px 8px 0;
+}
+
+.reply-item {
+  padding: 16px 12px;
+  margin-bottom: 8px;
+  background: #fafbfc;
+  border-radius: 8px;
+  border: 1px solid #f0f1f3;
+  position: relative;
+}
+
+.reply-item::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 20px;
+  width: 8px;
+  height: 2px;
+  background: var(--primary-color);
+  border-radius: 1px;
+}
+
+.reply-item:last-child {
+  margin-bottom: 0;
+}
+
+.reply-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.reply-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  margin-right: 10px;
+  object-fit: cover;
+  border: 2px solid var(--primary-color);
+  box-shadow: 0 2px 4px rgba(79, 192, 141, 0.2);
+}
+
+.reply-author {
+  display: flex;
+  flex-direction: column;
+}
+
+.reply-author-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.reply-time {
+  font-size: 12px;
+  color: var(--text-color-lighter);
+}
+
+.reply-content {
+  font-size: 14px;
+  color: var(--text-color);
+  line-height: 1.6;
+  margin-bottom: 10px;
+  padding: 8px 0;
+}
+
+.reply-actions {
+  display: flex;
+  font-size: 12px;
+  color: var(--text-color-light);
+  gap: 12px;
+}
+
+.reply-actions .comment-action {
+  background: rgba(79, 192, 141, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.reply-actions .comment-action:hover {
+  background: rgba(79, 192, 141, 0.2);
+  transform: translateY(-1px);
+}
+
+/* 评论控制栏样式 */
+.comment-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.comment-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sort-label {
+  font-size: 14px;
+  color: var(--text-color);
+  font-weight: 500;
+}
+
+.comment-info {
+  font-size: 12px;
+  color: var(--text-color-lighter);
+}
+
+/* 分页样式 */
+.comment-pagination {
+  margin-top: 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+}
+
+.comment-pagination :deep(.van-pagination) {
+  justify-content: center;
+}
+
+.comment-pagination :deep(.van-pagination__item) {
+  margin: 0 4px;
+  border-radius: 6px;
+}
+
+.comment-pagination :deep(.van-pagination__item--active) {
+  background-color: var(--primary-color);
+  color: white;
+}
 </style> 

@@ -9,6 +9,14 @@
         shape="round"
         @click="goToSearch"
       />
+      <!-- 通知图标 -->
+      <div class="notification-icon" @click="goToNotifications">
+        <div class="notification-wrapper">
+          <!-- 通知图标 -->
+          <i-mdi-bell-ring-outline class="bell-icon" />
+          <span v-if="badgeText" class="notification-badge">{{ badgeText }}</span>
+        </div>
+      </div>
     </div>
     
     <!-- 轮播图 -->
@@ -81,24 +89,26 @@
       </div>
     </div>
     
-    <!-- 底部Tab栏 -->
-    <tab-bar />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { resourceApi, categoryApi, bannerApi } from '../api/resource';
+import { notificationApi } from '../api/notification';
 import { showToast } from 'vant';
 
 import BannerSwiper from '../components/BannerSwiper.vue';
 import CategoryList from '../components/CategoryList.vue';
 import ResourceList from '../components/ResourceList.vue';
-import TabBar from '../components/TabBar.vue';
 
 const router = useRouter();
 const searchValue = ref('');
+
+// 通知徽章
+const badgeText = ref('');
+let refreshTimer = null;
 
 // 轮播图数据
 const banners = ref([]);
@@ -339,6 +349,47 @@ const goToSearch = () => {
   router.push('/search');
 };
 
+// 跳转通知页面
+const goToNotifications = () => {
+  router.push('/notifications');
+};
+
+// 加载通知徽章
+const loadUnread = async (silent = false) => {
+  const token = localStorage.getItem('token');
+  if (!token) { 
+    badgeText.value = ''; 
+    return; 
+  }
+  
+  try {
+    const res = await notificationApi.unreadCount();
+    const n = res?.data?.count ?? 0;
+    badgeText.value = n > 0 ? (n > 99 ? '99+' : String(n)) : '';
+  } catch (e) {
+    console.warn('获取未读通知数失败:', e);
+    if (!silent) {
+      badgeText.value = '';
+    }
+  }
+};
+
+// 开始定时刷新
+const startRefreshTimer = () => {
+  if (refreshTimer) return;
+  refreshTimer = setInterval(() => {
+    loadUnread(true); // 静默刷新
+  }, 30000); // 每30秒刷新一次
+};
+
+// 停止定时刷新
+const stopRefreshTimer = () => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+};
+
 // 跳转分类页
 const goToCategory = () => {
   router.push('/category');
@@ -362,18 +413,140 @@ onMounted(() => {
   loadFeaturedResources();
   loadLatestResources();
   loadHotResources();
+  loadUnread();
+  startRefreshTimer();
+  
+  // 页面可见性变化时刷新数据
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      loadUnread(true);
+    }
+  });
+});
+
+onUnmounted(() => {
+  stopRefreshTimer();
 });
 </script>
 
 <style scoped>
+/* 底部间距已由全局 .page-content 统一处理 */
 .home-page {
-  padding-bottom: 50px;
 }
 
 .search-bar {
   position: sticky;
   top: 0;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background-color: var(--van-background-2, #fff);
+  border-bottom: 1px solid var(--van-border-color, #ebedf0);
+}
+
+.search-bar .van-search {
+  flex: 1;
+  padding: 0;
+  background-color: transparent;
+}
+
+.search-bar .van-search :deep(.van-search__content) {
+  background-color: var(--van-gray-1, #f7f8fa);
+  border-radius: 18px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.notification-icon {
+  position: relative;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  background-color: transparent;
+}
+
+.notification-icon:hover {
+  background-color: rgba(25, 137, 250, 0.08);
+  transform: translateY(-1px);
+}
+
+.notification-icon:active {
+  transform: translateY(0) scale(0.96);
+  background-color: rgba(25, 137, 250, 0.12);
+}
+
+.notification-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: linear-gradient(135deg, #ff4757, #ff3742);
+  color: white;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgba(255, 71, 87, 0.4), 0 1px 4px rgba(0, 0, 0, 0.1);
+  animation: subtle-bounce 0.6s ease-out;
+}
+
+/* 铃铛图标样式 */
+.bell-icon {
+  font-size: 22px;
+  color: #666;
+  transition: color 0.3s ease;
+  display: block;
+  line-height: 1;
+}
+
+.notification-icon:hover .bell-icon {
+  color: var(--van-primary-color, #1989fa);
+}
+
+/* 通知图标动画 */
+@keyframes subtle-bounce {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 悬停效果 */
+@media (hover: hover) {
+  .notification-icon:hover .notification-badge {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(255, 71, 87, 0.5), 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
 }
 
 .section {

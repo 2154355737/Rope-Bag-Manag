@@ -48,7 +48,7 @@
               :key="`hot-${index}`"
               class="search-tag"
               round
-              :type="index < 3 ? 'danger' : ''"
+              :type="index < 3 ? 'danger' : 'default'"
               @click="searchWithKeyword(item)"
             >
               {{ item }}
@@ -126,8 +126,6 @@
       </template>
     </div>
     
-    <!-- 底部Tab栏 -->
-    <tab-bar />
   </div>
 </template>
 
@@ -137,7 +135,6 @@ import { useRouter } from 'vue-router';
 import { showToast } from 'vant';
 import { resourceApi, tagApi } from '../api/resource';
 import ResourceList from '../components/ResourceList.vue';
-import TabBar from '../components/TabBar.vue';
 
 const router = useRouter();
 const searchValue = ref('');
@@ -358,7 +355,6 @@ onMounted(() => {
 .search-page {
   min-height: 100vh;
   background-color: var(--background-color);
-  padding-bottom: 50px;
 }
 
 .search-header {
@@ -403,6 +399,13 @@ onMounted(() => {
   margin-bottom: 8px;
   font-size: 13px;
   padding: 6px 12px;
+}
+
+/* 为默认类型的标签添加深色文本确保可见性 */
+.search-tag.van-tag--default {
+  color: #323233 !important;
+  background-color: #f7f8fa;
+  border: 1px solid #ebedf0;
 }
 
 .search-result-header {

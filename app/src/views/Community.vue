@@ -2,7 +2,7 @@
   <div class="community-page">
     <van-nav-bar title="社区" fixed />
 
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <div class="toolbar">
         <div class="tabs">
           <span :class="['tab', activeTab === 'latest' && 'active']" @click="switchTab('latest')">最新</span>
@@ -37,7 +37,6 @@
       </van-list>
     </div>
 
-    <tab-bar />
   </div>
 </template>
 
@@ -45,7 +44,6 @@
 import { ref, onMounted } from 'vue';
 import dayjs from 'dayjs';
 import { postApi } from '../api/post';
-import TabBar from '../components/TabBar.vue';
 import { useRouter } from 'vue-router';
 import { tagApi } from '../api/resource';
 import PostCard from '../components/PostCard.vue';
@@ -137,7 +135,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.content { padding: 12px; }
+.content { 
+  padding: 12px; 
+  /* 顶部间距由全局样式统一处理，底部间距由全局 .page-content 统一处理 */
+  /* 注释：全局.content样式已自动添加了NavBar高度+16px间距的padding-top */
+}
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .tabs { display: flex; gap: 12px; }
 .tab { font-size: 14px; color: var(--text-color-light); cursor: pointer; }
@@ -146,5 +148,4 @@ onMounted(() => {
 .tag { margin-bottom: 6px; }
 .clear { margin-left: auto; }
 .panel { background: #fff; border-radius: 8px; }
-
 </style> 

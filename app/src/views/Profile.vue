@@ -187,8 +187,6 @@
       </van-popup>
     </template>
     
-    <!-- 底部Tab栏 -->
-    <tab-bar />
   </div>
 </template>
 
@@ -197,7 +195,6 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showToast, showDialog } from 'vant';
 import { useUserStore } from '../store/user';
-import TabBar from '../components/TabBar.vue';
 import defaultAvatar from '@/assets/default-avatar.svg';
 import { get } from '../utils/request';
 import { postApi } from '../api/post';
@@ -379,7 +376,6 @@ onMounted(async () => {
 .profile-page {
   min-height: 100vh;
   background-color: var(--background-color);
-  padding-bottom: 50px;
 }
 
 .login-panel {

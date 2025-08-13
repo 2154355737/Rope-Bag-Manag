@@ -1,7 +1,7 @@
 <template>
   <div class="post-create-page">
     <van-nav-bar :title="navTitle" left-arrow @click-left="onBack" fixed />
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <van-form @submit="onSubmit">
         <van-cell-group inset>
           <van-field v-model="title" label="标题" placeholder="请输入标题" :rules="[{ required: true, message: '请输入标题' }]" />

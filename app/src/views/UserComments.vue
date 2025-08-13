@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <!-- 评论列表 -->
       <van-list
         v-model:loading="loading"
@@ -19,14 +19,6 @@
         <div v-if="comments.length > 0">
           <div class="comment-item" v-for="comment in comments" :key="comment.id">
             <div class="comment-resource">
-              <van-image
-                width="60"
-                height="60"
-                radius="4"
-                fit="cover"
-                :src="comment.resource_cover || '/img/default-cover.jpg'"
-                @click="goToResource(comment.resource_id)"
-              />
               <div class="resource-info" @click="goToResource(comment.resource_id)">
                 <div class="resource-title ellipsis">{{ comment.resource_name }}</div>
                 <div class="comment-time">{{ formatDate(comment.created_at) }}</div>
@@ -298,7 +290,6 @@ onMounted(() => {
 
 .resource-info {
   flex: 1;
-  margin-left: 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

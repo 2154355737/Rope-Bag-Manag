@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="login-content" :style="{ paddingTop: '46px' }">
+    <div class="login-content">
       <!-- 登录表单 -->
       <div class="login-form">
         <div class="login-logo">

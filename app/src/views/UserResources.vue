@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <!-- 操作栏 -->
       <div class="action-bar">
         <van-button 
@@ -410,7 +410,6 @@ onMounted(() => {
 .user-resources-page {
   min-height: 100vh;
   background-color: var(--background-color);
-  padding-bottom: 50px;
 }
 
 .content {

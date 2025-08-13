@@ -15,8 +15,8 @@
         <item name="android:statusBarColor">#80000000</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         
-        <!-- 状态栏内容颜色 - 使用浅色内容在深色背景上 -->
-        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+        <!-- 状态栏内容颜色 - 使用深色内容在浅色背景上，适配白色主题 -->
+        <item name="android:windowLightStatusBar" tools:targetApi="m">true</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o">true</item>
         
         <!-- 确保窗口可以扩展到系统栏下面，但内容会有正确的padding -->

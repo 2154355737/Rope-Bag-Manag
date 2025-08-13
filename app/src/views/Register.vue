@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="register-content" :style="{ paddingTop: '46px' }">
+    <div class="register-content">
       <!-- 注册表单 -->
       <div class="register-form">
         <div class="register-logo">

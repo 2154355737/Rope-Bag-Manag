@@ -50,6 +50,9 @@ export const postApi = {
   // 点赞/取消点赞帖子
   likePost: (id) => post(`/posts/${id}/like`, {}),
   unlikePost: (id) => del(`/posts/${id}/like`),
+  
+  // 检查帖子点赞状态
+  checkLikeStatus: (id) => get(`/posts/${id}/like-status`),
 };
 
 export default {

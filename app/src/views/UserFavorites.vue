@@ -1,7 +1,7 @@
 <template>
   <div class="user-favorites-page">
     <van-nav-bar title="我的点赞" left-arrow @click-left="onBack" fixed />
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <van-tabs v-model:active="activeTab" sticky>
         <van-tab title="总览">
           <div class="cards">
@@ -178,10 +178,10 @@ function initCharts() {
 }
 
 function renderCharts() {
-  // 使用用户行为真实计数作为 KPI；若为 0 则回退到当前已加载列表的汇总
-  const likePkg = actionLikeByType.value.Package || likesPackages.value.reduce((s, x) => s + (x.like_count || 0), 0);
-  const likePost = actionLikeByType.value.Post || likesPosts.value.reduce((s, x) => s + (x.like_count || 0), 0);
-  const viewTotal = actionViewsCount.value || likesPosts.value.reduce((s, x) => s + (x.view_count || 0), 0);
+  // 使用用户行为真实计数作为 KPI；若为 0 则回退到当前已加载列表的数量
+  const likePkg = actionLikeByType.value.Package || likesPackages.value.length;
+  const likePost = actionLikeByType.value.Post || likesPosts.value.length;
+  const viewTotal = actionViewsCount.value || 0; // 浏览数据只能从行为记录中获取，不能从帖子数据推算
 
   totalLikes.value = (actionLikesCount.value || (likePkg + likePost));
   totalViews.value = viewTotal;
@@ -236,7 +236,7 @@ function renderCharts() {
       barWidth: 24,
       itemStyle: {
         borderRadius: [8, 8, 0, 0],
-        color: E ? new E.graphic.LinearGradient(0, 1, 0, 0, [
+        color: echarts ? new echarts.graphic.LinearGradient(0, 1, 0, 0, [
           { offset: 0, color: '#4C6FFF33' },
           { offset: 1, color: '#4C6FFF' },
         ]) : '#4C6FFF'
@@ -261,7 +261,9 @@ onMounted(async () => {
 
 <style scoped>
 .user-favorites-page { min-height: 100vh; background-color: var(--background-color); }
-.content { padding: 12px; }
+.content { 
+  padding: 12px; 
+}
 .cards { display: flex; gap: 12px; }
 .kpi-card { flex: 1; background: #fff; border-radius: 8px; padding: 12px; text-align: center; }
 .kpi-num { font-size: 20px; font-weight: 700; color: var(--text-color); }

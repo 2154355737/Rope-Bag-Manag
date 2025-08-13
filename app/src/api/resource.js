@@ -85,8 +85,12 @@ export const resourceApi = {
   },
   
   // 获取资源评论
-  getResourceComments: (resourceId, page = 1, pageSize = 10) => {
-    return get(`/packages/${resourceId}/comments`, { page, page_size: pageSize });
+  getResourceComments: (resourceId, params = {}) => {
+    const queryParams = {
+      page: params.page || 1,
+      page_size: params.pageSize || 10
+    };
+    return get(`/packages/${resourceId}/comments`, queryParams);
   },
   
   // 添加评论
@@ -96,6 +100,20 @@ export const resourceApi = {
       target_id: resourceId,
       target_type: 'Package'
     });
+  },
+  
+  // 点赞/取消点赞资源
+  likeResource: (id) => {
+    return post(`/packages/${id}/like`, {});
+  },
+  
+  unlikeResource: (id) => {
+    return del(`/packages/${id}/like`);
+  },
+  
+  // 检查资源点赞状态
+  checkLikeStatus: (id) => {
+    return get(`/packages/${id}/like-status`);
   },
   
 

@@ -87,7 +87,50 @@ async function nativeFetchRequest(url, options = {}) {
       statusText: response.statusText
     });
     
-    const data = await response.json();
+    // 检查响应是否为空或者不是JSON格式
+    const contentType = response.headers.get('content-type');
+    let data;
+    
+    if (!response.ok) {
+      // 对于非200状态码，尝试解析错误响应
+      try {
+        if (contentType && contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          const text = await response.text();
+          data = { 
+            code: response.status, 
+            message: text || `HTTP ${response.status}: ${response.statusText}`,
+            data: null 
+          };
+        }
+      } catch (parseError) {
+        data = { 
+          code: response.status, 
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          data: null 
+        };
+      }
+      
+      // 抛出错误以便被catch块处理
+      const error = new Error(data.message || `HTTP ${response.status}`);
+      error.response = { status: response.status, data };
+      throw error;
+    }
+    
+    // 成功响应的处理
+    try {
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        data = { code: 0, data: text, message: 'success' };
+      }
+    } catch (parseError) {
+      console.warn('⚠️ JSON解析失败，返回原始文本');
+      const text = await response.text();
+      data = { code: 0, data: text, message: 'success' };
+    }
     
     if (data.code !== 0) {
       console.warn('⚠️ 业务错误:', data);

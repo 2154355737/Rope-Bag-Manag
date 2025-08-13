@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 // 路由懒加载
+const SplashScreen = () => import('../views/SplashScreen.vue');
 const Home = () => import('../views/Home.vue');
 const Category = () => import('../views/Category.vue');
 const ResourceDetail = () => import('../views/ResourceDetail.vue');
@@ -22,6 +23,15 @@ const Subscriptions = () => import('../views/Subscriptions.vue');
 const About = () => import('../views/About.vue');
 
 const routes = [
+  {
+    path: '/splash',
+    name: 'SplashScreen',
+    component: SplashScreen,
+    meta: {
+      title: '绳包社区',
+      hideFromHistory: true
+    }
+  },
   {
     path: '/',
     name: 'Home',

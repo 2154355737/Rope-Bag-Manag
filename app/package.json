@@ -10,7 +10,14 @@
     "tauri:dev": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli dev",
     "tauri:build": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli build",
     "tauri:android": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli android dev",
-    "tauri:android:build": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli android build"
+    "tauri:android:build": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli android build",
+    "stagewise": "npx stagewise",
+    "stage:dev": "echo 'Switching to development stage'",
+    "stage:test": "echo 'Switching to testing stage'",
+    "stage:staging": "echo 'Switching to staging stage'",
+    "stage:prod": "echo 'Switching to production stage'",
+    "dev:with-stagewise": "npx stagewise -p 3002 -a 5173 -v",
+    "start-stagewise": "start-with-stagewise.bat"
   },
   "dependencies": {
     "@vant/auto-import-resolver": "^1.0.1",
@@ -19,6 +26,7 @@
     "dayjs": "^1.11.10",
     "echarts": "^6.0.0",
     "pinia": "^2.1.7",
+    "stagewise": "^0.4.1",
     "unplugin-vue-components": "^0.25.2",
     "vant": "^4.8.0",
     "vite-plugin-html": "^3.2.0",

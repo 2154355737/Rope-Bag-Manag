@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="category-content" :style="{ paddingTop: '46px' }">
+    <div class="category-content">
       <!-- 分类列表 -->
       <van-skeleton title :row="8" :loading="loading" v-if="loading && !categories.length" />
       
@@ -49,8 +49,6 @@
       </template>
     </div>
     
-    <!-- 底部Tab栏 -->
-    <tab-bar />
   </div>
 </template>
 
@@ -60,7 +58,6 @@ import { useRouter, useRoute } from 'vue-router';
 import { showToast } from 'vant';
 import { categoryApi, resourceApi } from '../api/resource';
 import ResourceList from '../components/ResourceList.vue';
-import TabBar from '../components/TabBar.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -188,16 +185,16 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 底部间距已由全局 .page-content 统一处理 */
 .category-page {
   min-height: 100vh;
   background-color: var(--background-color);
-  padding-bottom: 50px;
 }
 
 .category-content {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 96px); /* 46px 顶部导航 + 50px 底部导航 */
+  height: calc(100vh - 46px); /* 仅扣除顶部导航高度，底部间距由全局处理 */
 }
 
 .category-list {
@@ -211,6 +208,28 @@ onMounted(() => {
   height: 100%;
   overflow-y: auto;
   background-color: #f7f8fa;
+  /* 添加右边框增强分离感 */
+  border-right: 1px solid var(--border-color);
+  /* 优化滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 192, 141, 0.3) transparent;
+}
+
+.van-sidebar::-webkit-scrollbar {
+  width: 3px;
+}
+
+.van-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.van-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(79, 192, 141, 0.3);
+  border-radius: 2px;
+}
+
+.van-sidebar::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 192, 141, 0.5);
 }
 
 .category-resources {
@@ -245,11 +264,36 @@ onMounted(() => {
 }
 
 .van-sidebar-item--select {
-  color: var(--primary-color);
-  font-weight: 500;
+  color: var(--primary-color) !important;
+  font-weight: 500 !important;
+  background-color: rgba(79, 192, 141, 0.08) !important;
 }
 
 .van-sidebar-item--select::before {
-  background-color: var(--primary-color);
+  background-color: var(--primary-color) !important;
+  width: 3px !important;
+}
+
+/* 增强选中状态的视觉效果 */
+.van-sidebar-item {
+  border-radius: 0 8px 8px 0 !important;
+  margin: 2px 0 !important;
+  transition: all 0.3s ease !important;
+  position: relative !important;
+}
+
+.van-sidebar-item:hover {
+  background-color: rgba(79, 192, 141, 0.04) !important;
+  transform: translateX(1px) !important;
+}
+
+.van-sidebar-item--select {
+  transform: translateX(2px) !important;
+  box-shadow: 2px 0 8px rgba(79, 192, 141, 0.15) !important;
+}
+
+.van-sidebar-item--select:hover {
+  background-color: rgba(79, 192, 141, 0.12) !important;
+  transform: translateX(3px) !important;
 }
 </style> 

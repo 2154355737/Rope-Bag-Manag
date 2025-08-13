@@ -8,7 +8,7 @@
       fixed
     />
     
-    <div class="content" :style="{ paddingTop: '46px' }">
+    <div class="content">
       <!-- 表单 -->
       <van-form @submit="onSubmit">
         <van-cell-group inset>
