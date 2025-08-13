@@ -27,6 +27,26 @@ const system: AppRouteModule = {
       },
     },
     {
+      path: 'post',
+      name: 'PostManage',
+      component: () => import('/@/views/system/PostManage.vue'),
+      meta: {
+        title: '帖子管理',
+        icon: 'ion:document-text-outline',
+        roles: [RoleEnum.ADMIN, RoleEnum.MODERATOR],
+      },
+    },
+    {
+      path: 'tag',
+      name: 'TagManage',
+      component: () => import('/@/views/system/TagManage.vue'),
+      meta: {
+        title: '标签管理',
+        icon: 'ion:pricetags-outline',
+        roles: [RoleEnum.ADMIN, RoleEnum.MODERATOR],
+      },
+    },
+    {
       path: 'package',
       name: 'SystemPackage',
       component: () => import('/@/views/system/PackageManage.vue'),
@@ -43,6 +63,36 @@ const system: AppRouteModule = {
       meta: {
         title: '分类管理',
         icon: 'ion:folder-outline',
+        roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
+      path: 'announcement',
+      name: 'AnnouncementManage',
+      component: () => import('/@/views/system/AnnouncementManage.vue'),
+      meta: {
+        title: '公告管理',
+        icon: 'ion:notifications-outline',
+        roles: [RoleEnum.ADMIN, RoleEnum.MODERATOR],
+      },
+    },
+    {
+      path: 'mail',
+      name: 'MailConfig',
+      component: () => import('/@/views/system/MailConfig.vue'),
+      meta: {
+        title: '邮箱配置',
+        icon: 'ion:mail-outline',
+        roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
+      path: 'storage',
+      name: 'StorageConfig',
+      component: () => import('/@/views/system/StorageConfig.vue'),
+      meta: {
+        title: '存储配置',
+        icon: 'ion:cloud-outline',
         roles: [RoleEnum.ADMIN],
       },
     },
