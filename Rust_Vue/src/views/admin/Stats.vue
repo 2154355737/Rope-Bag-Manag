@@ -1055,7 +1055,7 @@ onUnmounted(() => {
 .stats-desktop {
   padding: 24px;
   background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-  min-height: 100vh;
+  min-height: calc(100vh - 72px); /* 减去导航栏高度 */
 }
 
 /* 页面头部 */

@@ -195,13 +195,11 @@ impl PackageStorageService {
         
         log::info!("✅ 文件上传成功: {}", file_path);
         
-        // 获取下载链接
-        log::info!("🔗 正在生成下载链接...");
-        let download_url = self.alist_service.get_download_link(&file_path).await?;
-        
+        // 不在上传时获取下载链接，而是在实际下载时获取
+        // 避免权限问题："You are not an admin"
         let result = UploadResult {
             file_path: file_path.clone(),
-            download_url,
+            download_url: format!("alist:{}", file_path), // 标记为AList文件路径
             file_size: file_data.len() as i64,
         };
         
@@ -231,7 +229,13 @@ impl PackageStorageService {
     
     /// 获取包的下载链接
     pub async fn get_package_download_url(&mut self, file_path: &str) -> Result<String> {
-        self.alist_service.get_download_link(file_path).await
+        // 构造AList的直接访问URL，避免权限问题
+        // AList的直接访问格式通常是: http://domain/d/file_path
+        let alist_base_url = "http://alist.tiecode.org.cn";
+        let direct_url = format!("{}/d{}", alist_base_url, file_path);
+        
+        log::info!("🔗 生成AList直接访问链接: {}", direct_url);
+        Ok(direct_url)
     }
     
     /// 删除包文件

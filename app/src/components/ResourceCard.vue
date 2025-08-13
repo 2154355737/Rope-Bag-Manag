@@ -5,17 +5,13 @@
       <div class="resource-card__header">
         <i-mdi-file-document-outline class="resource-card__icon" />
         <h3 class="resource-card__title ellipsis">{{ resource.name }}</h3>
+        <!-- 所有标签在同一行横向排列 -->
+        <div class="tags">
+          <van-tag v-if="resource.is_pinned" type="danger" size="mini" plain>置顶</van-tag>
+          <van-tag v-if="resource.is_featured" type="warning" size="mini" plain>精华</van-tag>
+          <van-tag v-if="statusInfo" :type="statusInfo.type" size="mini" plain>{{ statusInfo.text }}</van-tag>
+        </div>
       </div>
-      <!-- 状态标签固定在右上角 -->
-      <van-tag
-        v-if="statusInfo"
-        :type="statusInfo.type"
-        size="mini"
-        plain
-        class="status-tag-fixed"
-      >
-        {{ statusInfo.text }}
-      </van-tag>
       <div
         v-if="showActions"
         class="resource-card__more"
@@ -167,8 +163,23 @@ const formatDate = (date) => {
   background: transparent;
 }
 
-.resource-card__header { display: flex; align-items: center; gap: 8px; }
+.resource-card__header { 
+  display: flex; 
+  align-items: flex-start; 
+  gap: 8px; 
+  flex-wrap: wrap;
+}
 .resource-card__icon { width: 28px; height: 28px; color: var(--primary-color); }
+
+/* 标签横向排列样式 */
+.tags {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  margin-left: auto;
+}
 
 .resource-card__title {
   font-size: 16px;
@@ -182,13 +193,7 @@ const formatDate = (date) => {
   text-overflow: ellipsis;
 }
 
-/* 状态标签固定在右上角 */
-.status-tag-fixed {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
-}
+
 
 /* 右下角更多操作按钮 */
 .resource-card__more {

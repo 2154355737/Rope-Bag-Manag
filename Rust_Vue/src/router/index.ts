@@ -138,6 +138,11 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '资源审核', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
   },
   {
+    path: '/admin/post-review',
+    component: () => import('../views/admin/PostReview.vue'),
+    meta: { title: '帖子审核', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'elder'] }
+  },
+  {
     path: '/admin/comments',
     component: () => import('../views/admin/CommentManage.vue'),
     meta: { title: '评论管理', requiresAuth: true, requiresAdmin: true, layout: 'desktop', device: 'desktop', roles: ['admin', 'moderator'] }

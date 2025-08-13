@@ -17,6 +17,11 @@ export interface Post {
   is_featured: boolean;
   created_at: string;
   updated_at: string;
+  // 审核相关字段
+  review_status?: string;
+  review_comment?: string;
+  reviewer_id?: number;
+  reviewed_at?: string;
   // 前端展示需要的额外字段
   author_avatar?: string;
   category?: string;
@@ -115,4 +120,20 @@ export const getFeaturedPosts = (params?: PostQueryParams): Promise<ApiResponse<
 // 获取热门帖子
 export const getPopularPosts = (params?: PostQueryParams): Promise<ApiResponse<PostListResponse>> => {
   return api.get('/v1/posts/popular', { params });
+};
+
+// 审核相关接口
+export interface ReviewPostRequest {
+  status: 'approved' | 'rejected';
+  comment?: string;
+}
+
+// 审核帖子
+export const reviewPost = (id: number, data: ReviewPostRequest): Promise<ApiResponse<void>> => {
+  return api.post(`/v1/posts/${id}/review`, data);
+};
+
+// 获取待审核帖子
+export const getPendingPosts = (params?: PostQueryParams): Promise<ApiResponse<PostListResponse>> => {
+  return api.get('/v1/posts/pending', { params });
 }; 

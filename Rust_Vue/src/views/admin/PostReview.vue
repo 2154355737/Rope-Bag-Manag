@@ -1,27 +1,25 @@
 <template>
-  <div class="admin-page resource-review">
+  <div class="admin-page post-review">
     <!-- 页面头部 -->
     <div class="page-header">
       <div class="header-content">
         <div class="header-left">
           <div class="header-icon">
-            <el-icon :size="32"><DocumentChecked /></el-icon>
+            <el-icon :size="32"><Document /></el-icon>
           </div>
           <div class="header-info">
-            <h1 class="page-title">资源审核</h1>
-            <p class="page-subtitle">审核用户上传的资源，决定是否上架到社区</p>
+            <h1 class="page-title">帖子审核</h1>
+            <p class="page-subtitle">审核用户发布的帖子，决定是否上架到社区</p>
           </div>
         </div>
         <div class="header-actions">
-          <el-button @click="loadPendingResources" :loading="loading">
+          <el-button @click="loadPendingPosts" :loading="loading">
             <el-icon><Refresh /></el-icon>
             刷新列表
           </el-button>
         </div>
       </div>
     </div>
-
-
 
     <!-- 统计卡片 -->
     <div class="stats-section">
@@ -70,7 +68,7 @@
       <div class="search-left">
         <el-input
           v-model="searchQuery"
-          placeholder="搜索资源名称或作者"
+          placeholder="搜索帖子标题或作者"
           clearable
           style="width: 250px"
           @input="handleSearch"
@@ -97,21 +95,21 @@
       </div>
       
       <div class="search-right">
-        <el-button type="success" @click="batchApprove" :disabled="selectedResources.length === 0">
+        <el-button type="success" @click="batchApprove" :disabled="selectedPosts.length === 0">
           <el-icon><Select /></el-icon>
           批量通过
         </el-button>
-        <el-button type="danger" @click="batchReject" :disabled="selectedResources.length === 0">
+        <el-button type="danger" @click="batchReject" :disabled="selectedPosts.length === 0">
           <el-icon><Close /></el-icon>
           批量拒绝
         </el-button>
       </div>
     </div>
 
-    <!-- 资源列表 -->
+    <!-- 帖子列表 -->
     <div class="table-section">
       <el-table 
-        :data="resourceList" 
+        :data="postList" 
         v-loading="loading"
         style="width: 100%"
         :header-cell-style="{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
@@ -121,38 +119,46 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="name" label="资源名称" min-width="200">
+        <el-table-column prop="title" label="帖子标题" min-width="200">
           <template #default="{ row }">
-            <div class="resource-name">
-              <el-link :href="row.file_url" target="_blank" type="primary">
-                {{ row.name }}
+            <div class="post-title">
+              <el-link @click="viewPost(row)" type="primary">
+                {{ row.title }}
               </el-link>
-              <div class="resource-desc">{{ row.description || '暂无描述' }}</div>
+              <div class="post-preview">{{ getContentPreview(row.content) }}</div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="author" label="作者" width="120" />
+        <el-table-column prop="author_name" label="作者" width="120" />
         <el-table-column prop="category_id" label="分类" width="100">
           <template #default="{ row }">
             {{ getCategoryName(row.category_id) }}
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="上传时间" width="180">
+        <el-table-column prop="created_at" label="发布时间" width="180">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
+        <el-table-column label="统计" width="120">
+          <template #default="{ row }">
+            <div class="post-stats">
+              <div>阅读: {{ row.view_count }}</div>
+              <div>点赞: {{ row.like_count }}</div>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" type="success" @click="approveResource(row)">
+            <el-button size="small" type="success" @click="approvePost(row)">
               <el-icon><Select /></el-icon>
               通过
             </el-button>
-            <el-button size="small" type="danger" @click="rejectResource(row)">
+            <el-button size="small" type="danger" @click="rejectPost(row)">
               <el-icon><Close /></el-icon>
               拒绝
             </el-button>
-            <el-button size="small" @click="viewResource(row)">
+            <el-button size="small" @click="viewPost(row)">
               <el-icon><View /></el-icon>
               详情
             </el-button>
@@ -178,16 +184,19 @@
     <el-dialog
       v-model="reviewDialogVisible"
       :title="currentAction === 'approve' ? '通过审核' : '拒绝审核'"
-      width="500px"
+      width="600px"
       @close="handleReviewDialogClose"
     >
-      <div v-if="currentResource">
-        <div class="resource-info">
-          <h3>{{ currentResource.name }}</h3>
-          <p><strong>作者：</strong>{{ currentResource.author }}</p>
-          <p><strong>描述：</strong>{{ currentResource.description || '暂无描述' }}</p>
-          <p><strong>上传时间：</strong>{{ formatTime(currentResource.created_at) }}</p>
-          <p><strong>文件链接：</strong><el-link :href="currentResource.file_url" target="_blank">查看文件</el-link></p>
+      <div v-if="currentPost">
+        <div class="post-info">
+          <h3>{{ currentPost.title }}</h3>
+          <p><strong>作者：</strong>{{ currentPost.author_name }}</p>
+          <p><strong>分类：</strong>{{ getCategoryName(currentPost.category_id) }}</p>
+          <p><strong>发布时间：</strong>{{ formatTime(currentPost.created_at) }}</p>
+          <div class="post-content">
+            <strong>内容：</strong>
+            <div class="content-preview">{{ currentPost.content }}</div>
+          </div>
         </div>
         
         <el-form :model="reviewForm" label-width="80px" class="review-form">
@@ -215,6 +224,24 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 帖子详情查看弹窗 -->
+    <el-dialog
+      v-model="postDetailVisible"
+      title="帖子详情"
+      width="80%"
+      @close="postDetailVisible = false"
+    >
+      <div v-if="viewingPost" class="post-detail">
+        <h2>{{ viewingPost.title }}</h2>
+        <div class="post-meta">
+          <span>作者：{{ viewingPost.author_name }}</span>
+          <span>分类：{{ getCategoryName(viewingPost.category_id) }}</span>
+          <span>发布时间：{{ formatTime(viewingPost.created_at) }}</span>
+        </div>
+        <div class="post-content-full" v-html="viewingPost.content"></div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -222,16 +249,15 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
-  DocumentChecked, 
+  Document,
   Refresh, 
   Clock, 
   Select, 
   Close, 
-  Document, 
   Search, 
-  View
+  View 
 } from '@element-plus/icons-vue'
-import { packageApi, type Package, type ReviewResourceRequest } from '../../api/packages'
+import { getPendingPosts, reviewPost, type Post, type ReviewPostRequest } from '../../api/posts'
 import { categoryApi, type Category } from '../../api/categories'
 import { formatDate } from '../../utils/format'
 import { getUserInfo } from '../../utils/auth'
@@ -239,8 +265,8 @@ import { getUserInfo } from '../../utils/auth'
 // 响应式数据
 const loading = ref(false)
 const reviewLoading = ref(false)
-const resourceList = ref<Package[]>([])
-const selectedResources = ref<Package[]>([])
+const postList = ref<Post[]>([])
+const selectedPosts = ref<Post[]>([])
 const categories = ref<Category[]>([])
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -256,20 +282,23 @@ const totalReviewed = computed(() => approvedCount.value + rejectedCount.value)
 
 // 审核对话框相关
 const reviewDialogVisible = ref(false)
-const currentResource = ref<Package | null>(null)
+const currentPost = ref<Post | null>(null)
 const currentAction = ref<'approve' | 'reject'>('approve')
 const reviewForm = reactive({
   comment: ''
 })
 
-// 方法
+// 帖子详情查看
+const postDetailVisible = ref(false)
+const viewingPost = ref<Post | null>(null)
 
-const loadPendingResources = async () => {
+// 方法
+const loadPendingPosts = async () => {
   loading.value = true
   try {
     const params: any = {
       page: currentPage.value,
-      page_size: pageSize.value  // 修改为后端期望的参数名
+      page_size: pageSize.value
     }
     
     if (searchQuery.value) {
@@ -280,26 +309,26 @@ const loadPendingResources = async () => {
       params.category_id = categoryFilter.value
     }
     
-    console.log('📤 发送待审核资源请求:', params)  // 添加调试日志
-    const res = await packageApi.getPendingResources(params)
+    console.log('📤 发送待审核帖子请求:', params)
+    const res = await getPendingPosts(params)
     
     if (res.code === 0 && res.data) {
-      console.log('✅ 待审核资源加载成功:', res.data)
-      resourceList.value = res.data.list
+      console.log('✅ 待审核帖子加载成功:', res.data)
+      postList.value = res.data.list
       total.value = res.data.total
       pendingCount.value = res.data.total
     } else {
-      console.warn('❌ 待审核资源加载失败:', res)
-      ElMessage.error(res.message || '加载待审核资源失败')
+      console.warn('❌ 待审核帖子加载失败:', res)
+      ElMessage.error(res.message || '加载待审核帖子失败')
     }
   } catch (error: any) {
-    console.error('🚫 加载待审核资源出错:', error)
+    console.error('🚫 加载待审核帖子出错:', error)
     if (error.response?.status === 403) {
-      ElMessage.error('权限不足：只有管理员和元老可以查看待审核资源')
+      ElMessage.error('权限不足：只有管理员和元老可以查看待审核帖子')
     } else if (error.response?.status === 404) {
       ElMessage.error('API接口不存在，请检查后端服务')
     } else {
-      ElMessage.error(error.response?.data?.message || '加载待审核资源时发生错误')
+      ElMessage.error(error.response?.data?.message || '加载待审核帖子时发生错误')
     }
   } finally {
     loading.value = false
@@ -317,7 +346,7 @@ const loadCategories = async () => {
   }
 }
 
-const getCategoryName = (categoryId: number | null): string => {
+const getCategoryName = (categoryId: number | null | undefined): string => {
   if (!categoryId) return '未分类'
   const category = categories.value.find(c => c.id === categoryId)
   return category ? category.name : '未知分类'
@@ -327,53 +356,56 @@ const formatTime = (dateString: string): string => {
   return formatDate(dateString, 'YYYY-MM-DD HH:mm:ss')
 }
 
+const getContentPreview = (content: string): string => {
+  // 移除HTML标签并截取前50个字符
+  const plainText = content.replace(/<[^>]*>/g, '')
+  return plainText.length > 50 ? plainText.substring(0, 50) + '...' : plainText
+}
+
 const handleSearch = () => {
   currentPage.value = 1
-  loadPendingResources()
+  loadPendingPosts()
 }
 
 const handleFilter = () => {
   currentPage.value = 1
-  loadPendingResources()
+  loadPendingPosts()
 }
 
 const handleSizeChange = () => {
   currentPage.value = 1
-  loadPendingResources()
+  loadPendingPosts()
 }
 
 const handleCurrentChange = () => {
-  loadPendingResources()
+  loadPendingPosts()
 }
 
-const handleSelectionChange = (selection: Package[]) => {
-  selectedResources.value = selection
+const handleSelectionChange = (selection: Post[]) => {
+  selectedPosts.value = selection
 }
 
-const approveResource = (resource: Package) => {
-  currentResource.value = resource
+const approvePost = (post: Post) => {
+  currentPost.value = post
   currentAction.value = 'approve'
   reviewForm.comment = ''
   reviewDialogVisible.value = true
 }
 
-const rejectResource = (resource: Package) => {
-  currentResource.value = resource
+const rejectPost = (post: Post) => {
+  currentPost.value = post
   currentAction.value = 'reject'
   reviewForm.comment = ''
   reviewDialogVisible.value = true
 }
 
-const viewResource = (resource: Package) => {
-  if (resource.file_url) {
-    window.open(resource.file_url, '_blank')
-  } else {
-    ElMessage.warning('该资源没有文件链接')
-  }
+const viewPost = (post: Post) => {
+  viewingPost.value = post
+  postDetailVisible.value = true
 }
 
 const confirmReview = async () => {
-  if (!currentResource.value) return
+  if (!currentPost.value) return
   
   // 如果是拒绝，必须填写原因
   if (currentAction.value === 'reject' && !reviewForm.comment.trim()) {
@@ -383,16 +415,16 @@ const confirmReview = async () => {
   
   reviewLoading.value = true
   try {
-    const reviewData: ReviewResourceRequest = {
+    const reviewData: ReviewPostRequest = {
       status: currentAction.value === 'approve' ? 'approved' : 'rejected',
       comment: reviewForm.comment.trim() || undefined
     }
     
-    const res = await packageApi.reviewResource(currentResource.value.id, reviewData)
+    const res = await reviewPost(currentPost.value.id, reviewData)
     
     if (res.code === 0) {
       const actionText = currentAction.value === 'approve' ? '通过' : '拒绝'
-      ElMessage.success(`资源审核${actionText}成功`)
+      ElMessage.success(`帖子审核${actionText}成功`)
       reviewDialogVisible.value = false
       
       // 更新统计数据
@@ -404,32 +436,32 @@ const confirmReview = async () => {
       pendingCount.value--
       
       // 重新加载列表
-      await loadPendingResources()
+      await loadPendingPosts()
     } else {
       ElMessage.error(res.message || '审核失败')
     }
   } catch (error) {
-    console.error('审核资源出错:', error)
-    ElMessage.error('审核资源时发生错误')
+    console.error('审核帖子出错:', error)
+    ElMessage.error('审核帖子时发生错误')
   } finally {
     reviewLoading.value = false
   }
 }
 
 const handleReviewDialogClose = () => {
-  currentResource.value = null
+  currentPost.value = null
   reviewForm.comment = ''
 }
 
 const batchApprove = async () => {
-  if (selectedResources.value.length === 0) {
-    ElMessage.warning('请选择要批量通过的资源')
+  if (selectedPosts.value.length === 0) {
+    ElMessage.warning('请选择要批量通过的帖子')
     return
   }
   
   try {
     await ElMessageBox.confirm(
-      `确定要批量通过选中的 ${selectedResources.value.length} 个资源吗？`,
+      `确定要批量通过选中的 ${selectedPosts.value.length} 个帖子吗？`,
       '批量通过',
       {
         confirmButtonText: '确定',
@@ -438,19 +470,19 @@ const batchApprove = async () => {
       }
     )
     
-    const promises = selectedResources.value.map(resource => 
-      packageApi.reviewResource(resource.id, { status: 'approved' })
+    const promises = selectedPosts.value.map(post => 
+      reviewPost(post.id, { status: 'approved' })
     )
     
     await Promise.all(promises)
     ElMessage.success('批量通过成功')
     
     // 更新统计
-    approvedCount.value += selectedResources.value.length
-    pendingCount.value -= selectedResources.value.length
+    approvedCount.value += selectedPosts.value.length
+    pendingCount.value -= selectedPosts.value.length
     
-    selectedResources.value = []
-    await loadPendingResources()
+    selectedPosts.value = []
+    await loadPendingPosts()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('批量通过失败')
@@ -459,8 +491,8 @@ const batchApprove = async () => {
 }
 
 const batchReject = async () => {
-  if (selectedResources.value.length === 0) {
-    ElMessage.warning('请选择要批量拒绝的资源')
+  if (selectedPosts.value.length === 0) {
+    ElMessage.warning('请选择要批量拒绝的帖子')
     return
   }
   
@@ -481,8 +513,8 @@ const batchReject = async () => {
       }
     )
     
-    const promises = selectedResources.value.map(resource => 
-      packageApi.reviewResource(resource.id, { 
+    const promises = selectedPosts.value.map(post => 
+      reviewPost(post.id, { 
         status: 'rejected',
         comment: reason.trim()
       })
@@ -492,11 +524,11 @@ const batchReject = async () => {
     ElMessage.success('批量拒绝成功')
     
     // 更新统计
-    rejectedCount.value += selectedResources.value.length
-    pendingCount.value -= selectedResources.value.length
+    rejectedCount.value += selectedPosts.value.length
+    pendingCount.value -= selectedPosts.value.length
     
-    selectedResources.value = []
-    await loadPendingResources()
+    selectedPosts.value = []
+    await loadPendingPosts()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('批量拒绝失败')
@@ -520,9 +552,9 @@ onMounted(async () => {
     return
   }
   
-  console.log('✅ 权限验证通过，加载资源审核页面')
+  console.log('✅ 权限验证通过，加载帖子审核页面')
   await loadCategories()
-  await loadPendingResources()
+  await loadPendingPosts()
 })
 </script>
 
@@ -557,7 +589,7 @@ onMounted(async () => {
 .header-icon {
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, #67c23a, #85ce61);
+  background: linear-gradient(135deg, #409eff, #66b1ff);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -674,19 +706,24 @@ onMounted(async () => {
   box-shadow: var(--shadow-light);
 }
 
-.resource-name {
+.post-title {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.resource-desc {
+.post-preview {
   font-size: 12px;
   color: var(--text-secondary);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.post-stats {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 /* 分页 */
@@ -696,26 +733,65 @@ onMounted(async () => {
   justify-content: center;
 }
 
-/* 审核表单 */
-.resource-info {
+/* 帖子信息 */
+.post-info {
   background: var(--bg-light);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
 }
 
-.resource-info h3 {
+.post-info h3 {
   margin: 0 0 12px 0;
   color: var(--text-primary);
 }
 
-.resource-info p {
+.post-info p {
   margin: 8px 0;
   color: var(--text-secondary);
 }
 
+.post-content {
+  margin-top: 12px;
+}
+
+.content-preview {
+  background: var(--bg-primary);
+  border-radius: 4px;
+  padding: 12px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+}
+
 .review-form {
   margin-top: 16px;
+}
+
+/* 帖子详情 */
+.post-detail {
+  padding: 16px;
+}
+
+.post-detail h2 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+}
+
+.post-meta {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.post-content-full {
+  line-height: 1.6;
+  color: var(--text-primary);
 }
 
 /* 深色模式适配 */
@@ -728,7 +804,11 @@ onMounted(async () => {
   background: #1f2937;
 }
 
-.dark .resource-info {
+.dark .post-info {
   background: #374151;
+}
+
+.dark .content-preview {
+  background: #1f2937;
 }
 </style> 

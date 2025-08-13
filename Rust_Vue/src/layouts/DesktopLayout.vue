@@ -40,7 +40,6 @@ provide('setGlobalLoading', (loading: boolean) => {
   grid-template-columns: 280px 1fr;
   grid-template-rows: 72px 1fr;
   background-color: var(--bg-primary);
-  overflow: hidden;
   transition: var(--transition-normal);
 }
 

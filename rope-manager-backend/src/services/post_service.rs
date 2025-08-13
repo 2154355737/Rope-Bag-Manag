@@ -174,8 +174,14 @@ impl PostService {
         }
 
         if let Some(status) = query.status {
-            conditions.push("status = ?");
-            params.push(Box::new(status));
+            // 检查是否是审核状态查询
+            if status == "pending" || status == "approved" || status == "rejected" {
+                conditions.push("review_status = ?");
+                params.push(Box::new(status));
+            } else {
+                conditions.push("status = ?");
+                params.push(Box::new(status));
+            }
         }
 
         // 公开查询时如果未传 review_status 则默认只显示 approved

@@ -356,7 +356,7 @@ impl UserRepository {
                     download_count, like_count, favorite_count, category_id, status, 
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment,
                     is_pinned, is_featured 
-             FROM packages WHERE author = ? ORDER BY created_at DESC"
+             FROM packages WHERE author = ? ORDER BY is_pinned DESC, is_featured DESC, created_at DESC"
         )?;
 
         let packages = stmt.query_map(params![username], |row| {

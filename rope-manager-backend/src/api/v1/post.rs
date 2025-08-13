@@ -21,6 +21,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_popular_posts))
             )
             .service(
+                web::resource("/pending")
+                    .route(web::get().to(get_pending_posts))
+            )
+            .service(
                 web::resource("/{id}")
                     .route(web::get().to(get_post))
                     .route(web::put().to(update_post))
@@ -425,5 +429,47 @@ async fn unlike_post(
     match post_service.unlike_post(user.id, post_id).await {
         Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"like_count": count}}))),
         Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+// 获取待审核帖子（管理员/元老）
+async fn get_pending_posts(
+    http_req: HttpRequest,
+    query: web::Query<PostQueryParams>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 验证权限：仅管理员/元老可以查看待审核帖子
+    let user = match AuthHelper::verify_user(&http_req) { 
+        Ok(u) => u, 
+        Err(e) => return Ok(e.to_response()) 
+    };
+    
+    if user.role != crate::models::UserRole::Admin && user.role != crate::models::UserRole::Elder {
+        return Ok(HttpResponse::Forbidden().json(json!({ 
+            "code": 403, 
+            "message": "权限不足：只有管理员和元老可以查看待审核帖子" 
+        })));
+    }
+
+    // 修改查询参数，只获取待审核状态的帖子
+    let mut params = query.into_inner();
+    params.status = Some("pending".to_string()); // 设置为待审核状态
+    
+    match post_service.get_posts(params).await {
+        Ok(posts_response) => {
+            log::info!("✅ 管理员 {} 查看待审核帖子列表，共 {} 条", user.username, posts_response.total);
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "data": posts_response,
+                "message": "获取待审核帖子成功"
+            })))
+        },
+        Err(e) => {
+            log::error!("❌ 获取待审核帖子失败: {}", e);
+            Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("获取待审核帖子失败: {}", e)
+            })))
+        }
     }
 } 

@@ -116,11 +116,30 @@ export const resourceApi = {
     return del(`/packages/${id}/like`);
   },
   
-  // 检查资源点赞状态
+    // 检查资源点赞状态
   checkLikeStatus: (id) => {
     return get(`/packages/${id}/like-status`);
   },
-  
+
+  // 获取精华资源
+  getFeaturedResources: (limit = 10) => {
+    return get('/packages', { is_featured: true, page_size: limit, sort_by: 'created_at', sort_order: 'desc' });
+  },
+
+  // 获取置顶资源
+  getPinnedResources: (limit = 10) => {
+    return get('/packages', { is_pinned: true, page_size: limit, sort_by: 'created_at', sort_order: 'desc' });
+  },
+
+  // 设置资源置顶状态（管理员功能）
+  setPinStatus: (id, pinned) => {
+    return put(`/packages/${id}`, { is_pinned: pinned });
+  },
+
+  // 设置资源精华状态（管理员功能）
+  setFeaturedStatus: (id, featured) => {
+    return put(`/packages/${id}`, { is_featured: featured });
+  }
 
 };
 

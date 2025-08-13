@@ -25,7 +25,7 @@ impl PackageRepository {
                     download_count, like_count, favorite_count, category_id, status, \
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
                     is_pinned, is_featured \
-             FROM packages ORDER BY created_at DESC";
+             FROM packages ORDER BY is_pinned DESC, is_featured DESC, created_at DESC";
         log::debug!("🗄️ SQL: get_all_packages: {}", sql);
         let mut stmt = match conn.prepare(sql) {
             Ok(s) => s,
@@ -245,16 +245,63 @@ impl PackageRepository {
 
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
-        let sql = "DELETE FROM packages WHERE id = ?";
-        log::debug!("🗄️ SQL: delete_package: {} | id={}", sql, package_id);
-        match conn.execute(sql, params![package_id]) {
-            Ok(rows) => println!("[SQL] delete_package affected rows: {}", rows),
+        
+        // 开始事务，确保所有删除操作要么全部成功，要么全部回滚
+        conn.execute("BEGIN TRANSACTION", [])?;
+        
+        let result = (|| -> Result<()> {
+            // 1. 删除package_likes表中的相关记录
+            log::debug!("🗄️ 删除package_likes中的相关记录: package_id={}", package_id);
+            conn.execute("DELETE FROM package_likes WHERE package_id = ?", params![package_id])?;
+            
+            // 2. 删除comments表中的相关记录
+            log::debug!("🗄️ 删除comments中的相关记录: package_id={}", package_id);
+            conn.execute("DELETE FROM comments WHERE package_id = ?", params![package_id])?;
+            
+            // 3. 删除package_tags表中的相关记录（如果存在）
+            log::debug!("🗄️ 删除package_tags中的相关记录: package_id={}", package_id);
+            conn.execute("DELETE FROM package_tags WHERE package_id = ?", params![package_id])?;
+            
+            // 4. 删除package_views表中的相关记录（如果存在）
+            log::debug!("🗄️ 删除package_views中的相关记录: package_id={}", package_id);
+            conn.execute("DELETE FROM package_views WHERE package_id = ?", params![package_id])?;
+            
+            // 5. 删除download_records表中的相关记录（如果存在）
+            log::debug!("🗄️ 删除download_records中的相关记录: package_id={}", package_id);
+            conn.execute("DELETE FROM download_records WHERE package_id = ?", params![package_id])?;
+            
+            // 6. 最后删除packages表中的记录
+            let sql = "DELETE FROM packages WHERE id = ?";
+            log::debug!("🗄️ SQL: delete_package: {} | id={}", sql, package_id);
+            match conn.execute(sql, params![package_id]) {
+                Ok(rows) => {
+                    log::info!("[SQL] delete_package affected rows: {}", rows);
+                    if rows == 0 {
+                        return Err(anyhow::anyhow!("Package with ID {} not found", package_id));
+                    }
+                },
+                Err(e) => {
+                    log::error!("❌ delete_package failed: {}", e);
+                    return Err(e.into());
+                }
+            }
+            
+            Ok(())
+        })();
+        
+        // 根据执行结果提交或回滚事务
+        match result {
+            Ok(()) => {
+                conn.execute("COMMIT", [])?;
+                log::info!("✅ 成功删除绳包及所有相关记录: package_id={}", package_id);
+                Ok(())
+            },
             Err(e) => {
-                log::error!("❌ delete_package failed: {}", e);
-                return Err(e.into());
+                conn.execute("ROLLBACK", [])?;
+                log::error!("❌ 删除绳包失败，已回滚所有操作: {}", e);
+                Err(e)
             }
         }
-        Ok(())
     }
 
     pub async fn increment_download_count(&self, package_id: i32) -> Result<()> {
@@ -317,7 +364,7 @@ impl PackageRepository {
             }
         };
         // 分页
-        sql.push_str(" ORDER BY created_at DESC LIMIT ? OFFSET ?");
+        sql.push_str(" ORDER BY is_pinned DESC, is_featured DESC, created_at DESC LIMIT ? OFFSET ?");
         params.push(Box::new(page_size as i64));
         params.push(Box::new(((page - 1) * page_size) as i64));
         let params_refs: Vec<&dyn rusqlite::ToSql> = params.iter().map(|v| &**v as &dyn rusqlite::ToSql).collect();

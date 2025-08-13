@@ -142,10 +142,24 @@ const loadCategoryResources = async () => {
     
     const newResources = res.data.list || [];
     
+    // 对资源进行排序：置顶 > 精华 > 创建时间
+    const sortedResources = newResources.sort((a, b) => {
+      // 置顶资源优先
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      
+      // 精华资源次之
+      if (a.is_featured && !b.is_featured) return -1;
+      if (!a.is_featured && b.is_featured) return 1;
+      
+      // 最后按创建时间排序
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    
     if (page.value === 1) {
-      resources.value = newResources;
+      resources.value = sortedResources;
     } else {
-      resources.value = [...resources.value, ...newResources];
+      resources.value = [...resources.value, ...sortedResources];
     }
     
     // 判断是否加载完毕

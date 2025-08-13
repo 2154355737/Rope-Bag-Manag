@@ -76,7 +76,8 @@ const loadHotTags = async () => {
 const loadFeatured = async () => {
   featuredLoading.value = true;
   try {
-    const res = await postApi.getFeaturedPosts(5);
+    // 获取已审核通过的精选帖子
+    const res = await postApi.getPosts({ is_featured: true, status: 'approved', page_size: 5 });
     featured.value = res.data?.list || [];
   } finally {
     featuredLoading.value = false;
@@ -88,7 +89,8 @@ const loadMore = async () => {
   loading.value = true;
   try {
     const base = { page: page.value, page_size: 10 };
-    const tabParams = activeTab.value === 'popular' ? {} : activeTab.value === 'featured' ? { is_featured: true } : { status: 'Published' };
+    // 对于公共显示，应该查询已审核通过的帖子
+    const tabParams = activeTab.value === 'popular' ? { status: 'approved' } : activeTab.value === 'featured' ? { is_featured: true, status: 'approved' } : { status: 'approved' };
     const tagParams = currentTag.value ? { tags: [currentTag.value] } : {};
     const res = await postApi.getPosts({ ...base, ...tabParams, ...tagParams });
     const list = res.data?.list || [];

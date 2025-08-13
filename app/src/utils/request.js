@@ -56,12 +56,18 @@ async function nativeFetchRequest(url, options = {}) {
     const fullURL = url.startsWith('http') ? url : `${baseURL}${url}`;
     const token = localStorage.getItem('token');
     
+    const defaultHeaders = {
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+    
+    // 如果不是 FormData，才设置 Content-Type
+    if (!(options.body instanceof FormData)) {
+      defaultHeaders['Content-Type'] = 'application/json';
+    }
+    
     const defaultOptions = {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` })
-      },
+      headers: defaultHeaders,
       signal: controller.signal
     };
     
@@ -209,10 +215,22 @@ export function get(url, params) {
 
 // 封装POST请求
 export function post(url, data) {
-  return nativeFetchRequest(url, {
-    method: 'POST',
-    body: data ? JSON.stringify(data) : undefined
-  });
+  const options = {
+    method: 'POST'
+  };
+  
+  if (data) {
+    if (data instanceof FormData) {
+      // FormData 不需要 JSON.stringify，浏览器会自动设置正确的 Content-Type
+      options.body = data;
+      // 不设置任何 headers，让浏览器自动处理 multipart/form-data
+    } else {
+      // 普通对象需要 JSON 序列化
+      options.body = JSON.stringify(data);
+    }
+  }
+  
+  return nativeFetchRequest(url, options);
 }
 
 // 封装PUT请求

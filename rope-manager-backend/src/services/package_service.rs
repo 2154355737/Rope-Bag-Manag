@@ -264,6 +264,73 @@ impl PackageService {
             }
         }
         
+        // 如果状态变为Rejected（审核拒绝），删除存储文件并发送通知
+        if old_package.status != crate::models::PackageStatus::Rejected && 
+           updated_package.status == crate::models::PackageStatus::Rejected {
+            
+            // 删除存储文件
+            if !updated_package.file_url.is_empty() {
+                log::info!("📂 审核拒绝，准备删除存储文件: {}", updated_package.file_url);
+                
+                // 判断是否为AList存储的文件
+                if updated_package.file_url.starts_with("alist:") {
+                    // AList存储文件
+                    let actual_path = &updated_package.file_url[6..]; // 移除 "alist:" 前缀
+                    use crate::services::package_storage_service::PackageStorageService;
+                    let mut storage_service = PackageStorageService::new("data.db")?;
+                    
+                    match storage_service.delete_package_file(actual_path).await {
+                        Ok(_) => {
+                            log::info!("✅ 成功删除AList存储文件: {}", actual_path);
+                        },
+                        Err(e) => {
+                            log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", actual_path, e);
+                        }
+                    }
+                } else if updated_package.file_url.starts_with("/image/") {
+                    // 兼容旧版本的AList文件路径
+                    use crate::services::package_storage_service::PackageStorageService;
+                    let mut storage_service = PackageStorageService::new("data.db")?;
+                    
+                    match storage_service.delete_package_file(&updated_package.file_url).await {
+                        Ok(_) => {
+                            log::info!("✅ 成功删除AList存储文件: {}", updated_package.file_url);
+                        },
+                        Err(e) => {
+                            log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", updated_package.file_url, e);
+                        }
+                    }
+                } else {
+                    log::info!("🔗 文件为直链方式，无需删除存储文件: {}", updated_package.file_url);
+                }
+            }
+
+            // 审核拒绝 -> 给作者发送站内通知
+            if let (Some(user_repo), Some(notify)) = (&self.user_repo, &self.notification_service) {
+                if let Ok(Some(author_user)) = user_repo.find_by_username(&updated_package.author).await {
+                    let title = "资源审核未通过";
+                    let content = format!(
+                        "您的资源《{}》未通过审核。{}",
+                        updated_package.name,
+                        updated_package.review_comment.as_deref().unwrap_or("请根据平台规范重新提交。")
+                    );
+                    if let Err(e) = notify.notify(
+                        author_user.id, 
+                        title, 
+                        &content, 
+                        None, 
+                        Some("ResourceRejected"), 
+                        Some("Package"), 
+                        Some(updated_package.id)
+                    ).await {
+                        log::error!("发送审核拒绝站内通知失败: {}", e);
+                    } else {
+                        log::info!("成功发送审核拒绝站内通知给用户: {}", author_user.username);
+                    }
+                }
+            }
+        }
+        
         Ok(updated_package)
     }
 
@@ -309,9 +376,16 @@ impl PackageService {
         let file_path = self.package_repo.get_package_file_url(package_id).await?;
         
         // 通过AList服务获取动态下载链接
-        let download_url = if file_path.starts_with("/image/") {
+        let download_url = if file_path.starts_with("alist:") {
             // 文件存储在AList中，获取动态下载链接
-            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", file_path);
+            let actual_path = &file_path[6..]; // 移除 "alist:" 前缀
+            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", actual_path);
+            use crate::services::package_storage_service::PackageStorageService;
+            let mut storage_service = PackageStorageService::new("data.db")?;
+            storage_service.get_package_download_url(actual_path).await?
+        } else if file_path.starts_with("/image/") {
+            // 兼容旧版本的AList文件路径
+            log::info!("🔗 检测到旧版AList存储文件，生成动态下载链接: {}", file_path);
             use crate::services::package_storage_service::PackageStorageService;
             let mut storage_service = PackageStorageService::new("data.db")?;
             storage_service.get_package_download_url(&file_path).await?
@@ -386,9 +460,16 @@ impl PackageService {
         let file_path = self.package_repo.get_package_file_url(package_id).await?;
         
         // 通过AList服务获取动态下载链接
-        let download_url = if file_path.starts_with("/image/") {
+        let download_url = if file_path.starts_with("alist:") {
             // 文件存储在AList中，获取动态下载链接
-            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", file_path);
+            let actual_path = &file_path[6..]; // 移除 "alist:" 前缀
+            log::info!("🔗 检测到AList存储文件，生成动态下载链接: {}", actual_path);
+            use crate::services::package_storage_service::PackageStorageService;
+            let mut storage_service = PackageStorageService::new("data.db")?;
+            storage_service.get_package_download_url(actual_path).await?
+        } else if file_path.starts_with("/image/") {
+            // 兼容旧版本的AList文件路径
+            log::info!("🔗 检测到旧版AList存储文件，生成动态下载链接: {}", file_path);
             use crate::services::package_storage_service::PackageStorageService;
             let mut storage_service = PackageStorageService::new("data.db")?;
             storage_service.get_package_download_url(&file_path).await?

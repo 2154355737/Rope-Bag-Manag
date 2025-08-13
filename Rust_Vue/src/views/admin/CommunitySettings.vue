@@ -534,7 +534,7 @@ onMounted(() => {
 .admin-page {
   padding: 24px;
   background: var(--bg-primary);
-  min-height: 100vh;
+  min-height: calc(100vh - 72px); /* 减去导航栏高度 */
 }
 
 /* 页面头部 */
