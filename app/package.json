@@ -1,6 +1,6 @@
 {
   "name": "resource-community-app",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "tauri:build": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli build",
     "tauri:android": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli android dev",
     "tauri:android:build": "cross-env VITE_API_BASE_URL=http://39.105.113.219:15201/api/v1 npx @tauri-apps/cli android build",
+    "build:android": "build_android.bat",
     "stagewise": "npx stagewise",
     "stage:dev": "echo 'Switching to development stage'",
     "stage:test": "echo 'Switching to testing stage'",

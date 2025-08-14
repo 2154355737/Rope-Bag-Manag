@@ -72,6 +72,14 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_stats))
             )
             .service(
+                web::resource("/app/launch-daily-stats")
+                    .route(web::get().to(get_app_launch_daily_stats))
+            )
+            .service(
+                web::resource("/app/dau-stats")
+                    .route(web::get().to(get_dau_stats))
+            )
+            .service(
                 web::resource("/user-registration-trend")
                     .route(web::get().to(get_user_registration_trend))
             )

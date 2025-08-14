@@ -5,6 +5,11 @@ import Components from 'unplugin-vue-components/vite';
 import { VantResolver } from '@vant/auto-import-resolver';
 import Icons from 'unplugin-icons/vite';
 import IconsResolver from 'unplugin-icons/resolver';
+import { readFileSync } from 'fs';
+
+// 读取package.json中的版本号
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const appVersion = packageJson.version;
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
@@ -44,6 +49,7 @@ export default defineConfig(({ command, mode }) => {
     define: {
       __TAURI_BUILD__: isTauri,
       __DEV__: command === 'serve',
+      __APP_VERSION__: JSON.stringify(appVersion),
     },
   };
 

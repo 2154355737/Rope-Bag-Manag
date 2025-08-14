@@ -63,7 +63,7 @@ onMounted(load);
 
 <style scoped>
 .content { padding: 12px; }
-.announcements-content { padding-top: 80px !important; }
+.announcements-content { padding-top: 6px !important; }
 .announcement-card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .icon { color: #fa8c16; }

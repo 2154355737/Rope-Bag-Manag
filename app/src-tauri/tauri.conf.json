@@ -23,11 +23,7 @@
       "csp": "default-src 'self'; connect-src 'self' http://39.105.113.219:15201 http://localhost:15201 http://127.0.0.1:15201 https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http: https:; font-src 'self' data: http://at.alicdn.com https://at.alicdn.com;"
     }
   },
-  "plugins": {
-    "log": {
-      "level": "info"
-    }
-  },
+  "plugins": {},
   "bundle": {
     "active": true,
     "targets": "all",

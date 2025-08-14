@@ -2,6 +2,7 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
+import { appApi } from './api/app';
 
 // 导入Vant样式
 import 'vant/lib/index.css';
@@ -17,4 +18,7 @@ app.use(createPinia());
 app.use(router);
 
 // 挂载应用
-app.mount('#app'); 
+app.mount('#app');
+
+// 上报应用启动（不阻塞）
+appApi.reportLaunch(); 

@@ -2,7 +2,7 @@
   <div class="post-create-page">
     <van-nav-bar :title="navTitle" left-arrow @click-left="onBack" fixed />
     <div class="content">
-      <van-form @submit="onSubmit">
+      <van-form @submit.prevent="onSubmit">
         <van-cell-group inset>
           <van-field v-model="title" label="标题" placeholder="请输入标题" :rules="[{ required: true, message: '请输入标题' }]" />
           <van-field v-model="content" rows="6" type="textarea" label="内容" placeholder="请输入内容" :rules="[{ required: true, message: '请输入内容' }]" />
@@ -61,6 +61,11 @@ onMounted(async () => {
 });
 
 const onSubmit = async () => {
+  // 防止重复提交
+  if (submitting.value) {
+    return;
+  }
+  
   submitting.value = true;
   try {
     if (isEditing.value) {

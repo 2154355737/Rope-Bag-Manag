@@ -8,7 +8,7 @@
           <van-cell title="运行环境" :value="envDisplay" />
           <van-cell title="开发人员" value="Muteduanxing" />
           <van-cell title="官方QQ群" value="616300355" />
-          <van-cell title="当前版本" value="bate 1.0.0" />
+          <van-cell title="当前版本" :value="`v${appVersion}`" />
         </van-cell-group>
       </div>
 
@@ -33,6 +33,9 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const onBack = () => router.back()
+
+// 获取应用版本号
+const appVersion = __APP_VERSION__
 
 // 运行环境展示（来源：构建模式 + 简要UA）
 const envDisplay = computed(() => {

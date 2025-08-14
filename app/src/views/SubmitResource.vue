@@ -10,7 +10,7 @@
     
     <div class="content">
       <!-- 表单 -->
-      <van-form @submit="onSubmit">
+      <van-form @submit.prevent="onSubmit">
         <van-cell-group inset>
           <van-field
             v-model="form.name"
@@ -312,6 +312,11 @@ const onDelete = () => {
 
 // 提交表单
 const onSubmit = async () => {
+  // 防止重复提交
+  if (submitting.value) {
+    return;
+  }
+
   if (!agreedToTerms.value) {
     showToast('请阅读并同意《资源上传协议》');
     return;

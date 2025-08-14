@@ -838,8 +838,50 @@ const downloadResource = async () => {
     if (res.code === 0 && res.data) {
       // 直接使用返回的下载链接
       const downloadUrl = typeof res.data === 'string' ? res.data : res.data.url;
-      window.open(downloadUrl, '_blank');
-      showToast('开始下载');
+      
+      // 使用智能下载助手
+      const { smartDownload, fallbackDownload } = await import('../utils/downloadHelper.js');
+      
+      // 从URL提取文件名
+      const urlParts = downloadUrl.split('/');
+      const filename = urlParts[urlParts.length - 1] || `resource_${resourceId.value}_${Date.now()}.zip`;
+      
+      showToast('正在准备下载...');
+      
+      try {
+        // 首先尝试智能下载
+        const result = await smartDownload(downloadUrl, filename);
+        
+        if (result.success) {
+          const message = result.message || `下载已触发 (${result.methodName})，请查看下载文件夹`;
+          showToast(message);
+        } else {
+          console.warn('智能下载失败，尝试备用方案:', result.error);
+          
+          // 智能下载失败，尝试备用方案
+          const fallbackResult = fallbackDownload(downloadUrl, filename);
+          
+          if (fallbackResult.success) {
+            showToast(`下载已开始 (备用方案)，请查看下载文件夹`);
+          } else {
+            showToast('下载失败，请尝试在浏览器中直接访问下载链接');
+            console.error('所有下载方案都失败了');
+            
+            // 最后的手段：复制链接到剪贴板（如果支持的话）
+            if (navigator.clipboard) {
+              try {
+                await navigator.clipboard.writeText(downloadUrl);
+                showToast('下载链接已复制到剪贴板，请在浏览器中粘贴访问');
+              } catch (clipboardError) {
+                console.error('复制到剪贴板失败:', clipboardError);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('下载过程中出错:', error);
+        showToast('下载失败，请稍后重试');
+      }
     } else {
       showToast(res.message || '下载失败，请重试');
     }
