@@ -2,7 +2,10 @@
   <PageWrapper title="资源包管理" content="系统资源包列表">
     <Card :loading="loading" class="!mb-4">
       <Button type="primary" @click="handleCreate">新建资源</Button>
-      <div ref="pkgChartRef" style="width: 100%; height: 260px" class="mt-2"></div>
+      <div class="mt-2" style="display: flex; gap: 12px">
+        <div ref="downloadChartRef" style="flex: 1; height: 260px"></div>
+        <div ref="hotChartRef" style="flex: 1; height: 260px"></div>
+      </div>
     </Card>
     <Card :loading="loading">
       <Table
@@ -76,7 +79,7 @@
   import { ref, onMounted, nextTick } from 'vue'
   import { Card, Table, Modal, Form, Input, Select, Switch, Button, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
-  import { getPackages, createPackage, updatePackage, deletePackage, uploadPackageFile, reviewPackage, type PackageItem } from '/@/api/packages'
+  import { getPackages, createPackage, updatePackage, deletePackage, uploadPackageFile, reviewPackage, type PackageItem, getTopDownloads, getTopLikes } from '/@/api/packages'
   import { getCategories } from '/@/api/dashboard'
   import { useMessage } from '/@/hooks/web/useMessage'
   import * as echarts from 'echarts'
@@ -90,27 +93,46 @@
   const dataSource = ref<PackageItem[]>([])
   const categoryOptions = ref<any[]>([])
 
-  const pkgChartRef = ref<HTMLDivElement | null>(null)
-  let pkgChart: echarts.ECharts | null = null
-  const renderPkgChart = () => {
-    if (!pkgChartRef.value) return
-    if (!pkgChart) pkgChart = echarts.init(pkgChartRef.value as HTMLDivElement)
-    const labels = dataSource.value.map((p) => p.name)
-    const views = dataSource.value.map((p: any) => p.view_count || 0)
-    const downloads = dataSource.value.map((p: any) => p.download_count || 0)
-    const likes = dataSource.value.map((p: any) => p.like_count || 0)
-    pkgChart.setOption({
+  const downloadChartRef = ref<HTMLDivElement | null>(null)
+  const hotChartRef = ref<HTMLDivElement | null>(null)
+  let downloadChart: echarts.ECharts | null = null
+  let hotChart: echarts.ECharts | null = null
+
+  const renderDownloadBar = (el: HTMLDivElement, title: string, categories: string[], values: number[]) => {
+    if (!downloadChart) downloadChart = echarts.init(el)
+    downloadChart.setOption({
+      title: { text: title, left: 'center' },
       tooltip: { trigger: 'axis' },
-      legend: { bottom: 0, data: ['访问量', '下载量', '点赞量'] },
-      grid: { left: 40, right: 10, top: 10, bottom: 50 },
-      xAxis: { type: 'category', data: labels },
+      grid: { left: 40, right: 10, top: 40, bottom: 40 },
+      xAxis: { type: 'category', data: categories, axisLabel: { rotate: 30 } },
       yAxis: { type: 'value' },
-      series: [
-        { name: '访问量', type: 'bar', data: views },
-        { name: '下载量', type: 'bar', data: downloads },
-        { name: '点赞量', type: 'bar', data: likes },
-      ],
+      series: [{ type: 'bar', data: values }],
     })
+  }
+
+  const renderHotBar = (el: HTMLDivElement, title: string, categories: string[], values: number[]) => {
+    if (!hotChart) hotChart = echarts.init(el)
+    hotChart.setOption({
+      title: { text: title, left: 'center' },
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 10, top: 40, bottom: 40 },
+      xAxis: { type: 'category', data: categories, axisLabel: { rotate: 30 } },
+      yAxis: { type: 'value' },
+      series: [{ type: 'bar', data: values }],
+    })
+  }
+
+  const renderRankCharts = (downloads: PackageItem[], hots: PackageItem[]) => {
+    if (downloadChartRef.value) {
+      const names = downloads.map((p) => p.name)
+      const values = downloads.map((p) => p.download_count || 0)
+      renderDownloadBar(downloadChartRef.value, '下载榜', names, values)
+    }
+    if (hotChartRef.value) {
+      const names = hots.map((p) => p.name)
+      const values = hots.map((p) => p.like_count || 0)
+      renderHotBar(hotChartRef.value, '热门榜', names, values)
+    }
   }
 
   const columns = [
@@ -211,6 +233,14 @@
 
   const handleCancel = () => (editOpen.value = false)
 
+  const fetchRanks = async () => {
+    const [downRes, hotRes] = await Promise.all([getTopDownloads(10).catch(() => ({ list: [] })), getTopLikes(10).catch(() => ({ list: [] }))])
+    const downloads = (downRes as any)?.list || []
+    const hots = (hotRes as any)?.list || []
+    await nextTick()
+    renderRankCharts(downloads, hots)
+  }
+
   const fetchList = async () => {
     try {
       loading.value = true
@@ -220,8 +250,9 @@
       ])
       dataSource.value = res.list || []
       categoryOptions.value = (cats || []).map((c: any) => ({ label: c.name, value: c.id }))
+      loading.value = false
       await nextTick()
-      renderPkgChart()
+      await fetchRanks()
     } finally {
       loading.value = false
     }

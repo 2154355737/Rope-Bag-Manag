@@ -473,6 +473,92 @@ impl PackageRepository {
         Ok(file_url)
     }
 
+    // 新增：按下载量TOP榜
+    pub async fn top_by_downloads(&self, limit: i32) -> Result<Vec<Package>> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT id, name, author, version, description, file_url, file_size, \
+                    download_count, like_count, favorite_count, category_id, status, \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
+                    is_pinned, is_featured \
+             FROM packages WHERE status = 'active' ORDER BY download_count DESC LIMIT ?";
+        let mut stmt = conn.prepare(sql)?;
+        let list = stmt.query_map(params![limit], |row| {
+            Ok(Package {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                author: row.get(2)?,
+                version: row.get(3)?,
+                description: row.get(4)?,
+                file_url: row.get(5)?,
+                file_size: row.get(6)?,
+                download_count: row.get(7)?,
+                like_count: row.get(8)?,
+                favorite_count: row.get(9)?,
+                category_id: row.get(10)?,
+                status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
+                    "inactive" => crate::models::PackageStatus::Inactive,
+                    "deleted" => crate::models::PackageStatus::Deleted,
+                    _ => crate::models::PackageStatus::Pending,
+                },
+                created_at: row.get(12)?,
+                updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
+                tags: None,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(list)
+    }
+
+    // 新增：按点赞数TOP热门榜
+    pub async fn top_by_likes(&self, limit: i32) -> Result<Vec<Package>> {
+        let conn = self.conn.lock().await;
+        let sql = "SELECT id, name, author, version, description, file_url, file_size, \
+                    download_count, like_count, favorite_count, category_id, status, \
+                    created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
+                    is_pinned, is_featured \
+             FROM packages WHERE status = 'active' ORDER BY like_count DESC, download_count DESC LIMIT ?";
+        let mut stmt = conn.prepare(sql)?;
+        let list = stmt.query_map(params![limit], |row| {
+            Ok(Package {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                author: row.get(2)?,
+                version: row.get(3)?,
+                description: row.get(4)?,
+                file_url: row.get(5)?,
+                file_size: row.get(6)?,
+                download_count: row.get(7)?,
+                like_count: row.get(8)?,
+                favorite_count: row.get(9)?,
+                category_id: row.get(10)?,
+                status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
+                    "inactive" => crate::models::PackageStatus::Inactive,
+                    "deleted" => crate::models::PackageStatus::Deleted,
+                    _ => crate::models::PackageStatus::Pending,
+                },
+                created_at: row.get(12)?,
+                updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
+                tags: None,
+            })
+        })?.collect::<Result<Vec<_>, _>>()?;
+        Ok(list)
+    }
+
     // 统计指定分类的资源数量（只统计active状态的资源）
     pub async fn count_packages_by_category(&self, category_id: i32) -> Result<i32> {
         let conn = self.conn.lock().await;

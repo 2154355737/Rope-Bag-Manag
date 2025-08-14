@@ -583,4 +583,14 @@ impl PackageService {
         self.package_repo.record_view(package_id, user_id, ip_address, user_agent).await?;
         Ok(())
     }
+
+    // 榜单：下载榜TOP N
+    pub async fn top_by_downloads(&self, limit: i32) -> Result<Vec<Package>> {
+        self.package_repo.top_by_downloads(limit).await
+    }
+
+    // 榜单：热门榜（点赞数优先，其次下载量）TOP N
+    pub async fn top_by_likes(&self, limit: i32) -> Result<Vec<Package>> {
+        self.package_repo.top_by_likes(limit).await
+    }
 } 

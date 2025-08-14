@@ -20,6 +20,9 @@ pub struct PackageQueryParams {
 }
 
 #[derive(Debug, Deserialize)]
+struct TopQuery { limit: Option<i32> }
+
+#[derive(Debug, Deserialize)]
 pub struct CreateResourceRequest {
     pub title: String,
     pub description: Option<String>,
@@ -35,6 +38,14 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("")
                     .route(web::get().to(get_packages))
+            )
+            .service(
+                web::resource("/top-downloads")
+                    .route(web::get().to(get_top_downloads))
+            )
+            .service(
+                web::resource("/top-likes")
+                    .route(web::get().to(get_top_likes))
             )
             // 审核相关路由 - 必须在 /{id} 之前定义
             .service(
@@ -89,6 +100,22 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(check_like_status))
             )
     );
+}
+
+async fn get_top_downloads(query: web::Query<TopQuery>, package_service: web::Data<PackageService>) -> Result<HttpResponse, actix_web::Error> {
+    let limit = query.limit.unwrap_or(10).max(1).min(50);
+    match package_service.top_by_downloads(limit).await {
+        Ok(list) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list}}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
+}
+
+async fn get_top_likes(query: web::Query<TopQuery>, package_service: web::Data<PackageService>) -> Result<HttpResponse, actix_web::Error> {
+    let limit = query.limit.unwrap_or(10).max(1).min(50);
+    match package_service.top_by_likes(limit).await {
+        Ok(list) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list}}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
 }
 
 // 审核资源请求结构

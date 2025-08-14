@@ -63,6 +63,8 @@ export interface ReviewPayload {
 const Api = {
   Packages: '/api/v1/packages',
   AdminCreate: '/api/v1/packages/admin-create',
+  TopDownloads: '/api/v1/packages/top-downloads',
+  TopLikes: '/api/v1/packages/top-likes',
 }
 
 const uploadUrl = (id: number) => `/api/v1/packages/${id}/upload`
@@ -92,4 +94,12 @@ export function uploadPackageFile(id: number, file: File) {
 
 export function reviewPackage(id: number, data: ReviewPayload) {
   return defHttp.post<any>({ url: reviewUrl(id), data })
+}
+
+export function getTopDownloads(limit = 10) {
+  return defHttp.get<{ list: PackageItem[] }>({ url: Api.TopDownloads, params: { limit } })
+}
+
+export function getTopLikes(limit = 10) {
+  return defHttp.get<{ list: PackageItem[] }>({ url: Api.TopLikes, params: { limit } })
 } 
