@@ -1,11 +1,11 @@
 <template>
   <div class="notifications-page">
-    <van-nav-bar title="我的通知" left-arrow @click-left="onBack" fixed>
+    <van-nav-bar title="我的通知" left-arrow @click-left="onBack" fixed placeholder>
 		  <template #right>
 			<van-button size="small" type="primary" plain :loading="markingAll" @click="markAll">全部已读</van-button>
 		  </template>
 		</van-nav-bar>
-    <div class="content">
+    <div class="content page-with-fixed-navbar">
       <van-list
         v-model:loading="loading"
         v-model:error="loadError"
@@ -144,6 +144,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
 }
+.page-with-fixed-navbar { padding-top: 8px !important; }
 
 .notif-item { 
   background: #fff; 

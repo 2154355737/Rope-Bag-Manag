@@ -97,8 +97,18 @@ impl PostService {
         }
 
         if let Some(status) = req.status {
+            // 同步业务状态，并根据业务状态调整审核状态
+            let status_str = format!("{:?}", status);
             updates.push("status = ?");
-            params.push(Box::new(format!("{:?}", status)));
+            params.push(Box::new(status_str.clone()));
+            // Published => approved；Draft => pending；其他不改
+            if status_str == "Published" {
+                updates.push("review_status = ?");
+                params.push(Box::new("approved".to_string()));
+            } else if status_str == "Draft" {
+                updates.push("review_status = ?");
+                params.push(Box::new("pending".to_string()));
+            }
         }
 
         if let Some(is_pinned) = req.is_pinned {
@@ -119,7 +129,6 @@ impl PostService {
 
             let sql = format!("UPDATE posts SET {} WHERE id = ?", updates.join(", "));
             params.push(Box::new(post_id));
-
             let mut stmt = conn.prepare(&sql)?;
             stmt.execute(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())))?;
         }
@@ -149,6 +158,21 @@ impl PostService {
         }
 
         Ok(true)
+    }
+
+    // 新增：检查用户是否点赞了指定帖子
+    pub async fn is_post_liked_by_user(&self, user_id: i32, post_id: i32) -> SqliteResult<bool> {
+        let conn = Connection::open(&self.db_path)?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS post_likes (user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, post_id))",
+            [],
+        )?;
+        let exists: Result<i32, _> = conn.query_row(
+            "SELECT 1 FROM post_likes WHERE user_id = ? AND post_id = ? LIMIT 1",
+            params![user_id, post_id],
+            |r| r.get(0),
+        );
+        Ok(exists.is_ok())
     }
 
     // 获取帖子列表

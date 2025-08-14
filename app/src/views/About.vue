@@ -1,7 +1,7 @@
 <template>
   <div class="about-page">
-    <van-nav-bar title="关于我们" left-arrow @click-left="onBack" fixed />
-    <div class="content">
+    <van-nav-bar title="关于我们" left-arrow @click-left="onBack" fixed placeholder />
+    <div class="content page-with-fixed-navbar">
       <div class="card">
         <div class="title">基础信息</div>
         <van-cell-group inset>
@@ -46,6 +46,7 @@ const envDisplay = computed(() => {
 .content { 
   padding: 12px; 
 }
+.page-with-fixed-navbar { padding-top: 8px !important; }
 .card { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .title { font-size: 16px; font-weight: 600; color: var(--text-color); margin-bottom: 8px; }
 .desc { font-size: 14px; color: var(--text-color); line-height: 1.6; }

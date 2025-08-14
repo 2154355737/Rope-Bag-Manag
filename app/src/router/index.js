@@ -21,6 +21,7 @@ const PostCreate = () => import('../views/PostCreate.vue');
 const Notifications = () => import('../views/Notifications.vue');
 const Subscriptions = () => import('../views/Subscriptions.vue');
 const About = () => import('../views/About.vue');
+const Announcements = () => import('../views/Announcements.vue');
 
 const routes = [
   {
@@ -31,6 +32,12 @@ const routes = [
       title: '绳包社区',
       hideFromHistory: true
     }
+  },
+  {
+    path: '/announcements',
+    name: 'Announcements',
+    component: Announcements,
+    meta: { title: '公告', keepAlive: false }
   },
   {
     path: '/',

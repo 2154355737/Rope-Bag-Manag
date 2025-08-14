@@ -1,8 +1,19 @@
 <template>
   <div class="community-page">
-    <van-nav-bar title="社区" fixed />
+    <van-nav-bar title="社区" fixed placeholder />
 
-    <div class="content">
+    <div class="content page-with-fixed-navbar">
+      <!-- 公告栏 -->
+      <div class="announcement" v-if="latestAnnouncement" @click="viewAnnouncements">
+        <van-icon name="volume-o" class="announcement-icon" />
+        <div class="announcement-text" :title="latestAnnouncement.title">{{ latestAnnouncement.title }}</div>
+        <van-tag type="danger" size="mini" plain v-if="latestAnnouncement.priority === 1">置顶</van-tag>
+      </div>
+      <div class="announcement" v-else @click="viewAnnouncements">
+        <van-icon name="volume-o" class="announcement-icon" />
+        <div class="announcement-text">暂无公告，点击查看历史公告</div>
+      </div>
+
       <div class="toolbar">
         <div class="tabs">
           <span :class="['tab', activeTab === 'latest' && 'active']" @click="switchTab('latest')">最新</span>
@@ -62,6 +73,8 @@ const hotTags = ref([]);
 const currentTag = ref('');
 const activeTab = ref('latest');
 
+const latestAnnouncement = ref(null);
+
 const formatMeta = (post) => {
   const date = dayjs(post.created_at).format('YYYY-MM-DD HH:mm');
   return `作者：${post.author_name || post.author_id} · ${date} · 浏览 ${post.view_count || 0}`;
@@ -101,6 +114,18 @@ const loadMore = async () => {
   }
 };
 
+const loadAnnouncements = async () => {
+  try {
+    const resp = await postApi.getActiveAnnouncements();
+    const list = resp?.data?.list || resp?.data || [];
+    if (Array.isArray(list) && list.length) {
+      latestAnnouncement.value = list.sort((a, b) => (b.priority || 0) - (a.priority || 0) || new Date(b.start_time || 0) - new Date(a.start_time || 0))[0];
+    }
+  } catch (e) {
+    latestAnnouncement.value = null;
+  }
+};
+
 const switchTab = (tab) => {
   if (activeTab.value === tab) return;
   activeTab.value = tab;
@@ -128,11 +153,13 @@ const clearTag = () => {
 
 const goDetail = (id) => router.push(`/post/${id}`);
 const goCreate = () => router.push('/post/create');
+const viewAnnouncements = () => router.push('/announcements');
 
 onMounted(() => {
   loadHotTags();
   loadFeatured();
   loadMore();
+  loadAnnouncements();
 });
 </script>
 
@@ -142,6 +169,7 @@ onMounted(() => {
   /* 顶部间距由全局样式统一处理，底部间距由全局 .page-content 统一处理 */
   /* 注释：全局.content样式已自动添加了NavBar高度+16px间距的padding-top */
 }
+.page-with-fixed-navbar { padding-top: 8px !important; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .tabs { display: flex; gap: 12px; }
 .tab { font-size: 14px; color: var(--text-color-light); cursor: pointer; }
@@ -150,4 +178,8 @@ onMounted(() => {
 .tag { margin-bottom: 6px; }
 .clear { margin-left: auto; }
 .panel { background: #fff; border-radius: 8px; }
+
+.announcement { display: flex; align-items: center; gap: 8px; background: #fff7e6; border: 1px solid #ffd591; color: #ad6800; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; }
+.announcement-icon { color: #fa8c16; }
+.announcement-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 </style> 

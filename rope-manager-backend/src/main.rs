@@ -139,6 +139,14 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // 统一公告表结构（迁移至带 enabled/start_time/end_time 的单一版本）
+    match conn.execute_batch(include_str!("../sql/migrate_announcements.sql")) {
+        Ok(_) => info!("公告表结构初始化/迁移成功"),
+        Err(e) => {
+            info!("公告表迁移可能已应用: {}", e);
+        }
+    }
+
     // 检查并启用邮件服务（如果配置了有效的SMTP信息）
     match conn.prepare("SELECT username, password, enabled FROM mail_settings WHERE id = 1") {
         Ok(mut stmt) => {
@@ -198,8 +206,8 @@ async fn main() -> std::io::Result<()> {
                     Ok(_) => log::info!("✅ AList存储服务初始化成功"),
                     Err(e) => log::warn!("⚠️  AList存储服务初始化失败，但服务将继续运行: {}", e),
                 }
-            },
-            Err(e) => log::error!("❌ 创建存储服务失败: {}", e),
+            }
+            Err(e) => log::warn!("⚠️  创建AList存储服务失败: {}", e),
         }
     });
     

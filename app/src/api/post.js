@@ -53,6 +53,9 @@ export const postApi = {
   
   // 检查帖子点赞状态
   checkLikeStatus: (id) => get(`/posts/${id}/like-status`),
+
+  // 公告：获取有效公告列表（公开）
+  getActiveAnnouncements: () => get('/announcements/active'),
 };
 
 export default {

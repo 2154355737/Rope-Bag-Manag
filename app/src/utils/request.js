@@ -47,6 +47,22 @@ const getBaseURL = () => {
 
 const baseURL = getBaseURL();
 
+// 将查询参数序列化为查询字符串（数组使用 key[] 表示法）
+function buildQueryString(params) {
+  const searchParams = new URLSearchParams();
+  Object.keys(params || {}).forEach(key => {
+    const value = params[key];
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      value.forEach(v => searchParams.append(`${key}[]`, v));
+    } else {
+      searchParams.append(key, value);
+    }
+  });
+  const qs = searchParams.toString();
+  return qs ? `?${qs}` : '';
+}
+
 // ========== 原生Fetch实现 ==========
 async function nativeFetchRequest(url, options = {}) {
   const controller = new AbortController();
@@ -195,21 +211,17 @@ export function get(url, params) {
   // 在Tauri环境中优先使用原生fetch
   const isTauri = window.__TAURI__ !== undefined;
   
+  const queryString = buildQueryString(params);
+
   if (isTauri || useNativeFetch || !axios) {
     let fullURL = url;
     if (params) {
-      const searchParams = new URLSearchParams();
-      Object.keys(params).forEach(key => {
-        if (params[key] !== null && params[key] !== undefined) {
-          searchParams.append(key, params[key]);
-        }
-      });
-      fullURL += `?${searchParams.toString()}`;
+      fullURL += queryString;
     }
     return nativeFetchRequest(fullURL);
   } else {
-    // 使用axios的后备实现（暂不实现，专注于原生fetch）
-    return nativeFetchRequest(url + (params ? '?' + new URLSearchParams(params).toString() : ''));
+    // 使用axios的后备实现保持与原生序列化一致
+    return nativeFetchRequest(url + (params ? queryString : ''));
   }
 }
 
@@ -221,11 +233,8 @@ export function post(url, data) {
   
   if (data) {
     if (data instanceof FormData) {
-      // FormData 不需要 JSON.stringify，浏览器会自动设置正确的 Content-Type
       options.body = data;
-      // 不设置任何 headers，让浏览器自动处理 multipart/form-data
     } else {
-      // 普通对象需要 JSON 序列化
       options.body = JSON.stringify(data);
     }
   }

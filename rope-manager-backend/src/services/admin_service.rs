@@ -132,10 +132,14 @@ impl AdminService {
     pub async fn create_announcement(&self, data: &Value) -> Result<Announcement> {
         let title = data["title"].as_str().unwrap_or("").to_string();
         let content = data["content"].as_str().unwrap_or("").to_string();
-        let priority = data["priority"].as_i64().unwrap_or(1);
+        let type_ = data["type"].as_str().unwrap_or("Info").to_string();
+        let priority = data["priority"].as_i64().unwrap_or(5) as i32;
+        let enabled = data["enabled"].as_bool().unwrap_or(true);
         let start_time = data["start_time"].as_str().unwrap_or("").to_string();
         let end_time = data["end_time"].as_str().map(|s| s.to_string());
-        self.system_repo.create_announcement(&title, &content, priority as i32, &start_time, end_time.as_deref()).await
+        self.system_repo
+            .create_announcement(&title, &content, &type_, priority, enabled, &start_time, end_time.as_deref())
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -143,10 +147,14 @@ impl AdminService {
     pub async fn update_announcement(&self, id: i32, data: &Value) -> Result<()> {
         let title = data["title"].as_str().unwrap_or("").to_string();
         let content = data["content"].as_str().unwrap_or("").to_string();
-        let priority = data["priority"].as_i64().unwrap_or(1);
+        let type_ = data["type"].as_str().unwrap_or("Info").to_string();
+        let priority = data["priority"].as_i64().unwrap_or(5) as i32;
+        let enabled = data["enabled"].as_bool().unwrap_or(true);
         let start_time = data["start_time"].as_str().unwrap_or("").to_string();
         let end_time = data["end_time"].as_str().map(|s| s.to_string());
-        self.system_repo.update_announcement(id, &title, &content, priority as i32, &start_time, end_time.as_deref()).await
+        self.system_repo
+            .update_announcement(id, &title, &content, &type_, priority, enabled, &start_time, end_time.as_deref())
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 

@@ -1,7 +1,7 @@
 <template>
   <div class="user-favorites-page">
-    <van-nav-bar title="我的点赞" left-arrow @click-left="onBack" fixed />
-    <div class="content">
+    <van-nav-bar title="我的点赞" left-arrow @click-left="onBack" fixed placeholder />
+    <div class="content page-with-fixed-navbar">
       <van-tabs v-model:active="activeTab" sticky>
         <van-tab title="总览">
           <div class="cards">
@@ -319,9 +319,8 @@ onMounted(async () => {
 
 <style scoped>
 .user-favorites-page { min-height: 100vh; background-color: var(--background-color); }
-.content { 
-  padding: 12px; 
-}
+.content { padding: 12px; }
+.page-with-fixed-navbar { padding-top: 8px !important; }
 .cards { display: flex; gap: 12px; }
 .kpi-card { flex: 1; background: #fff; border-radius: 8px; padding: 12px; text-align: center; }
 .kpi-num { font-size: 20px; font-weight: 700; color: var(--text-color); }

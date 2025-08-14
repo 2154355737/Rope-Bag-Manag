@@ -6,9 +6,10 @@
       left-arrow
       @click-left="onBack"
       fixed
+      placeholder
     />
     
-    <div class="content">
+    <div class="content page-with-fixed-navbar">
       <!-- 评论列表 -->
       <van-list
         v-model:loading="loading"
@@ -273,7 +274,11 @@ onMounted(() => {
 }
 
 .content {
-  padding: 16px;
+  padding: 12px;
+}
+
+.page-with-fixed-navbar {
+  padding-top: 8px !important;
 }
 
 .comment-item {

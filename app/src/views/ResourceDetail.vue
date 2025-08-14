@@ -206,6 +206,7 @@
             :finished="true"
             :showCover="true"
             :emptyText="'暂无相关推荐'"
+            @resource-click="onRelatedResourceClick"
           />
         </div>
       </template>
@@ -284,6 +285,12 @@ const showCommentInput = ref(false);
 const commentContent = ref('');
 const replyTo = ref(null);
 const quotedMessage = ref(null); // 引用的原消息
+
+// 打开相关推荐资源
+const onRelatedResourceClick = (res) => {
+  if (!res || !res.id) return;
+  router.push(`/resource/${res.id}`);
+};
 
 // 评论点赞状态管理
 const commentLikeStates = ref(new Map()); // commentId -> { liked: boolean, likeCount: number, processing: boolean }

@@ -6,9 +6,10 @@
       left-arrow
       @click-left="onBack"
       fixed
+      placeholder
     />
     
-    <div class="content">
+    <div class="content page-with-fixed-navbar">
       <!-- 操作栏 -->
       <div class="action-bar">
         <van-button 
@@ -444,6 +445,7 @@ onMounted(() => {
 .content {
   padding: 16px;
 }
+.page-with-fixed-navbar { padding-top: 8px !important; }
 
 .action-bar {
   display: flex;

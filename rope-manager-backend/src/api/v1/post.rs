@@ -47,6 +47,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::post().to(like_post))
                     .route(web::delete().to(unlike_post))
             )
+            .service(
+                web::resource("/{id}/like-status")
+                    .route(web::get().to(check_like_status))
+            )
     );
 }
 
@@ -232,14 +236,16 @@ async fn review_post(
     let post_id = path.into_inner();
     let status = req.status.to_lowercase();
     let allowed = status == "approved" || status == "rejected";
-    if !allowed { return Ok(HttpResponse::BadRequest().json(json!({"code":400,"message":"无效状态"}))); }
+    if !allowed { return Ok(HttpResponse::BadRequest().json(json!({"code":400,"message":"无效状态"})));
+    }
 
-    // 直接执行 SQL 更新（简单实现）：
+    // 同步业务状态：通过=>Published，拒绝=>Draft（保持为草稿）
     use rusqlite::{Connection, params};
     let conn = Connection::open(post_service.db_path()).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let new_business_status = if status == "approved" { "Published" } else { "Draft" };
     conn.execute(
-        "UPDATE posts SET review_status = ?, review_comment = ?, reviewer_id = ?, reviewed_at = CURRENT_TIMESTAMP WHERE id = ?",
-        params![status, req.comment.clone().unwrap_or_default(), user.id, post_id]
+        "UPDATE posts SET review_status = ?, review_comment = ?, reviewer_id = ?, reviewed_at = CURRENT_TIMESTAMP, status = ? WHERE id = ?",
+        params![status, req.comment.clone().unwrap_or_default(), user.id, new_business_status, post_id]
     ).map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     Ok(HttpResponse::Ok().json(json!({"code":0, "message":"审核成功"})))
@@ -471,5 +477,19 @@ async fn get_pending_posts(
                 "message": format!("获取待审核帖子失败: {}", e)
             })))
         }
+    }
+} 
+
+// 检查帖子点赞状态
+async fn check_like_status(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let post_id = path.into_inner();
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    match post_service.is_post_liked_by_user(user.id, post_id).await {
+        Ok(liked) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"liked": liked}}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
     }
 } 
