@@ -4,6 +4,7 @@
       <div ref="postChartRef" style="width: 100%; height: 260px"></div>
       <Space class="!mt-2">
         <Input v-model:value="search" placeholder="搜索标题关键词" style="width: 240px" />
+        <Select v-model:value="statusFilter" :options="statusOptionsSelect" style="width: 140px" placeholder="状态" allowClear @change="fetchList" />
         <Button type="primary" @click="fetchList">搜索</Button>
         <Button @click="handleCreate">新建帖子</Button>
       </Space>
@@ -68,6 +69,14 @@
   const dataSource = ref<PostItem[]>([])
   const categoryOptions = ref<any[]>([])
   const search = ref('')
+  const statusFilter = ref<string | undefined>(undefined)
+
+  const statusOptionsSelect = [
+    { label: '全部', value: '' },
+    { label: '发布', value: 'Published' },
+    { label: '草稿', value: 'Draft' },
+    { label: '归档', value: 'Archived' },
+  ]
 
   const postChartRef = ref<HTMLDivElement | null>(null)
   let postChart: echarts.ECharts | null = null
@@ -160,8 +169,10 @@
   const fetchList = async () => {
     try {
       loading.value = true
+      const params: any = { page: 1, page_size: 20, search: search.value || undefined }
+      if (statusFilter.value) params.status = statusFilter.value
       const [list, cats] = await Promise.all([
-        getPosts({ page: 1, page_size: 20, search: search.value || undefined }),
+        getPosts(params),
         getCategories(),
       ])
       dataSource.value = list.list || []

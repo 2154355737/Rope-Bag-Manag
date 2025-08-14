@@ -60,6 +60,22 @@ impl AdminService {
         self.system_repo.get_user_registration_trend().await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
+    // 记录App启动
+    pub async fn record_app_launch(&self, user_id: Option<i32>, device_id: Option<&str>, app_version: Option<&str>, platform: Option<&str>) -> Result<()> {
+        self.system_repo.record_app_launch(user_id, device_id, app_version, platform).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 获取每日启动量
+    pub async fn get_app_launch_daily_stats(&self, days: i32) -> Result<Vec<crate::models::DailyStats>> {
+        self.system_repo.get_app_launch_daily_stats(days).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 获取DAU统计
+    pub async fn get_dau_stats(&self, days: i32) -> Result<Vec<crate::models::DailyStats>> {
+        self.system_repo.get_dau_stats(days).await.map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
     // 更新创建备份方法
     pub async fn create_backup(&self, backup_type: &str, description: Option<&str>, user_id: Option<i32>) -> Result<BackupInfo> {
         self.system_repo.create_backup(backup_type, description, user_id).await

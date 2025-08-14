@@ -42,6 +42,25 @@
             </template>
           </van-field>
 
+          <!-- 可选：直接上传替换文件（将覆盖直链） -->
+          <van-field label="替换文件">
+            <template #input>
+              <van-uploader
+                v-model="uploadFileList"
+                :after-read="afterRead"
+                :max-count="1"
+                accept="*"
+                upload-text="选择文件"
+                :max-size="100 * 1024 * 1024"
+                @oversize="onOversize"
+                @delete="onDelete"
+              />
+            </template>
+            <template #label>
+              <div>替换文件<span class="label-desc">（可选）</span></div>
+            </template>
+          </van-field>
+
           <!-- 分类选择器（名称展示，保存写入 category_id） -->
           <van-field
             is-link
@@ -96,6 +115,10 @@ const form = ref({ name: '', description: '', category_id: null, file_url: '', t
 
 const downloading = ref(false);
 
+// 新增：上传文件（可选）
+const uploadFileList = ref([]);
+const selectedFile = ref(null);
+
 // 新增：HTTP/HTTPS URL 正则与校验规则
 const HTTP_URL_REGEX = /^(https?):\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)|((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}))(?::\d{2,5})?(?:\/[\S&&[^?#]]*)?(?:\?[^\s#]*)?(?:#[^\s]*)?$/i;
 const fileUrlRules = [
@@ -137,6 +160,9 @@ watch(
       }
       // 预加载分类/标签（无论是否有 resource 都加载）
       try { await Promise.all([fetchCategories(), fetchHotTags()]); } catch (e) { /* ignore */ }
+      // 清理上传状态
+      uploadFileList.value = [];
+      selectedFile.value = null;
     }
   },
   { immediate: true }
@@ -228,12 +254,18 @@ const onCategoryConfirm = (arg1, arg2) => {
   showCategoryPicker.value = false;
 };
 
+// 选择文件
+const afterRead = (file) => {
+  selectedFile.value = file.file;
+};
+const onOversize = () => showToast('文件大小不能超过100MB');
+const onDelete = () => { selectedFile.value = null; };
+
 // 调整：提交前进行表单校验
 const onSubmit = async () => {
   try {
     await formRef.value?.validate();
   } catch (e) {
-    // Vant 已在字段下方提示，这里简单阻断
     return;
   }
   // 合成标签：热门选择 + 自定义
@@ -242,7 +274,8 @@ const onSubmit = async () => {
     .map(s => s.trim())
     .filter(Boolean);
   const tags = Array.from(new Set([...(selectedTags.value || []), ...custom]));
-  emit('submit', { ...form.value, tags });
+  // 将选中文件一起回传
+  emit('submit', { ...form.value, tags, __file: selectedFile.value || null });
 };
 </script>
 
@@ -254,4 +287,5 @@ const onSubmit = async () => {
 .flex { display: flex; align-items: center; }
 .gap-8 { gap: 8px; }
 .tag-box { display: flex; flex-direction: column; gap: 8px; }
+.label-desc { color: var(--text-color-lighter); font-size: 12px; margin-left: 4px; }
 </style>

@@ -38,6 +38,14 @@
       </Form>
     </Card>
 
+    <Card class="!mb-4">
+      <template #title>应用使用统计</template>
+      <div style="display:flex; gap:12px">
+        <div ref="launchChartRef" style="flex:1; height: 260px"></div>
+        <div ref="dauChartRef" style="flex:1; height: 260px"></div>
+      </div>
+    </Card>
+
     <Card :loading="loading">
       <template #title>历史版本</template>
       <Table :columns="columns" :data-source="history" row-key="version" :pagination="false">
@@ -55,12 +63,13 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, nextTick } from 'vue'
   import { Card, Form, Input, Button, Space, Table } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { defHttp } from '/@/utils/http/axios'
   import { useMessage } from '/@/hooks/web/useMessage'
   import { broadcastNotifications } from '/@/api/dashboard'
+  import * as echarts from 'echarts'
 
   const FormItem = Form.Item
   const { createMessage } = useMessage()
@@ -78,6 +87,23 @@
     { title: '时间', dataIndex: 'created_at', key: 'created_at' },
     { title: '操作', key: 'action', width: 160 },
   ]
+
+  const launchChartRef = ref<HTMLDivElement | null>(null)
+  const dauChartRef = ref<HTMLDivElement | null>(null)
+  let launchChart: echarts.ECharts | null = null
+  let dauChart: echarts.ECharts | null = null
+  const renderLine = (el: HTMLDivElement, instRef: 'launch' | 'dau', title: string, xs: string[], ys: number[]) => {
+    if (instRef === 'launch') { if (!launchChart) launchChart = echarts.init(el) } else { if (!dauChart) dauChart = echarts.init(el) }
+    const inst = instRef === 'launch' ? launchChart! : dauChart!
+    inst.setOption({
+      title: { text: title, left: 'center' },
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 10, top: 40, bottom: 40 },
+      xAxis: { type: 'category', data: xs },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', data: ys, smooth: true, areaStyle: {} }],
+    })
+  }
 
   const onFileChange = (e: any) => {
     const files = e?.target?.files
@@ -155,9 +181,7 @@
 
   const fetchAll = async () => {
     loading.value = true
-    // 优先一次性获取所有设置，避免多次请求与404噪音
     const settings = await getAllSettings()
-    // 兜底：若全量接口失败则并行单个拉取
     if (!settings || Object.keys(settings).length === 0) {
       const [cur, latest, link, hist, notes] = await Promise.all([
         getSetting('app_current_version'),
@@ -172,15 +196,31 @@
       formState.value.update_notes = notes || ''
       history.value = hist ? JSON.parse(hist) : []
       loading.value = false
-      return
+    } else {
+      formState.value.current_version = settings['app_current_version'] || ''
+      formState.value.latest_version = settings['app_latest_version'] || ''
+      formState.value.latest_download_url = settings['app_latest_download_url'] || ''
+      formState.value.update_notes = settings['app_update_notes'] || ''
+      history.value = settings['app_version_history'] ? JSON.parse(settings['app_version_history']) : []
+      loading.value = false
     }
+    await nextTick()
+    await fetchUsageStats()
+  }
 
-    formState.value.current_version = settings['app_current_version'] || ''
-    formState.value.latest_version = settings['app_latest_version'] || ''
-    formState.value.latest_download_url = settings['app_latest_download_url'] || ''
-    formState.value.update_notes = settings['app_update_notes'] || ''
-    history.value = settings['app_version_history'] ? JSON.parse(settings['app_version_history']) : []
-    loading.value = false
+  const fetchUsageStats = async () => {
+    const [launchRes, dauRes] = await Promise.all([
+      defHttp.get<any>({ url: '/api/v1/admin/app-launches/daily', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
+      defHttp.get<any>({ url: '/api/v1/admin/users/dau', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
+    ])
+    const launches = (launchRes as any)?.list || []
+    const daus = (dauRes as any)?.list || []
+    const lx = [...launches].reverse().map((i: any) => i.date)
+    const ly = [...launches].reverse().map((i: any) => i.count)
+    const dx = [...daus].reverse().map((i: any) => i.date)
+    const dy = [...daus].reverse().map((i: any) => i.count)
+    if (launchChartRef.value) renderLine(launchChartRef.value, 'launch', '每日启动量', lx, ly)
+    if (dauChartRef.value) renderLine(dauChartRef.value, 'dau', 'DAU（日活）', dx, dy)
   }
 
   const handleSave = async () => {

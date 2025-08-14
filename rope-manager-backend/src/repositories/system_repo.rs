@@ -348,6 +348,84 @@ impl SystemRepository {
         Ok(affected)
     }
 
+    // 记录App启动（创建表并插入一条启动记录）
+    pub async fn record_app_launch(&self, user_id: Option<i32>, device_id: Option<&str>, app_version: Option<&str>, platform: Option<&str>) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_launches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                device_id TEXT,
+                app_version TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+        conn.execute(
+            "INSERT INTO app_launches (user_id, device_id, app_version, platform, created_at) VALUES (?, ?, ?, ?, datetime('now'))",
+            rusqlite::params![user_id, device_id, app_version, platform],
+        )?;
+        Ok(())
+    }
+
+    // 获取最近N天每日启动量统计
+    pub async fn get_app_launch_daily_stats(&self, days: i32) -> Result<Vec<crate::models::DailyStats>> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_launches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                device_id TEXT,
+                app_version TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT date(created_at) as day, COUNT(*) as count FROM app_launches \
+             WHERE date(created_at) >= date('now', ?)
+             GROUP BY date(created_at) ORDER BY day DESC",
+        )?;
+        let since = format!("-{} days", days.max(1));
+        let rows = stmt.query_map(rusqlite::params![since], |row| {
+            Ok(crate::models::DailyStats { date: row.get(0)?, count: row.get(1)? })
+        })?;
+        let mut list = Vec::new();
+        for r in rows { list.push(r?); }
+        Ok(list)
+    }
+
+    // 获取最近N天DAU（按 app_launches 中每日去重 user_id 统计）
+    pub async fn get_dau_stats(&self, days: i32) -> Result<Vec<crate::models::DailyStats>> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS app_launches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                device_id TEXT,
+                app_version TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL
+            )",
+            [],
+        )?;
+        let mut stmt = conn.prepare(
+            "SELECT day, COUNT(DISTINCT user_id) as count FROM (
+                 SELECT date(created_at) as day, user_id FROM app_launches 
+                 WHERE user_id IS NOT NULL AND date(created_at) >= date('now', ?)
+            ) t GROUP BY day ORDER BY day DESC",
+        )?;
+        let since = format!("-{} days", days.max(1));
+        let rows = stmt.query_map(rusqlite::params![since], |row| {
+            Ok(crate::models::DailyStats { date: row.get(0)?, count: row.get(1)? })
+        })?;
+        let mut list = Vec::new();
+        for r in rows { list.push(r?); }
+        Ok(list)
+    }
+
     // 完善创建备份方法
     pub async fn create_backup(&self, backup_type: &str, description: Option<&str>, user_id: Option<i32>) -> Result<crate::models::system::BackupInfo> {
         // 生成唯一备份ID

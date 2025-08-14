@@ -98,6 +98,13 @@ impl NotificationRepository {
         Ok(count)
     }
 
+    /// 标记该用户所有通知为已读
+    pub async fn mark_all_read(&self, user_id: i32) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute("UPDATE notifications SET is_read=1 WHERE user_id=? AND is_read=0", params![user_id])?;
+        Ok(())
+    }
+
     // 新增：查询全站通知（按时间倒序，分页）
     pub async fn list_all(&self, page: i32, size: i32) -> Result<Vec<Notification>> {
         let conn = self.conn.lock().await;

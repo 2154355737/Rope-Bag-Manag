@@ -351,13 +351,32 @@ const submitEdit = async (form) => {
       tags: Array.isArray(form.tags) ? form.tags : undefined,
       file_url: form.file_url || undefined,
     };
+    // 先更新基础字段
     const res = await resourceApi.updateResource(currentResource.value.id, payload);
+    if (res.code !== 0) throw new Error(res.message || '保存失败');
+
+    // 如果选择了文件，则调用上传接口覆盖文件
+    if (form.__file) {
+      const fd = new FormData();
+      fd.append('file', form.__file);
+      const up = await resourceApi.uploadFile(currentResource.value.id, fd);
+      if (up.code === 0) {
+        // 覆盖前端的 file_url
+        const path = up.data?.file_path || up.data || '';
+        if (path) {
+          payload.file_url = path;
+        }
+      } else {
+        throw new Error(up.message || '文件上传失败');
+      }
+    }
+
     showToast('保存成功');
     showEditSheet.value = false;
     // 更新本地列表项
     const idx = resources.value.findIndex(r => r.id === currentResource.value.id);
     if (idx !== -1) {
-      // 后端可能不返回 tags，合并本地提交的值
+      // 合并更新（优先使用后端回包，其次使用本地payload）
       const merged = { ...resources.value[idx], ...res.data };
       if (payload.tags) merged.tags = payload.tags;
       if (payload.category_id !== undefined) merged.category_id = payload.category_id;
@@ -366,7 +385,7 @@ const submitEdit = async (form) => {
     }
   } catch (e) {
     console.error('保存失败', e);
-    showToast('保存失败');
+    showToast(e?.message || '保存失败');
   } finally {
     editSaving.value = false;
   }

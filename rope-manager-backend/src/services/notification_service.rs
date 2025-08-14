@@ -33,6 +33,7 @@ impl NotificationService {
 
     pub async fn mark_read(&self, user_id: i32, id: i32) -> Result<()> { self.repo.mark_read(user_id, id).await }
     pub async fn unread_count(&self, user_id: i32) -> Result<i32> { self.repo.unread_count(user_id).await }
+    pub async fn mark_all_read(&self, user_id: i32) -> Result<()> { self.repo.mark_all_read(user_id).await }
 
     // 管理员用：全站列表与总数
     pub async fn list_all(&self, page: i32, size: i32) -> Result<Vec<Notification>> { self.repo.list_all(page, size).await }

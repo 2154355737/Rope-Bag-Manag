@@ -4,6 +4,7 @@ use crate::models::ApiResponse;
 use crate::models::CommentListResponse;
 use crate::services::comment_service::CommentService;
 use crate::services::admin_service::AdminService;
+use actix_web::post;
 
 #[derive(serde::Deserialize)]
 pub struct PublicCommentQuery {
@@ -13,12 +14,24 @@ pub struct PublicCommentQuery {
     pub size: Option<i32>,
 }
 
+#[derive(serde::Deserialize)]
+struct AppLaunchReq { user_id: Option<i32>, device_id: Option<String>, app_version: Option<String>, platform: Option<String> }
+
 pub fn public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/public")
             .service(get_public_comments)
             .service(get_public_banners)
+            .service(app_launch)
     );
+}
+
+#[post("/app/launch")]
+async fn app_launch(req: web::Json<AppLaunchReq>, admin_service: web::Data<AdminService>) -> HttpResponse {
+    match admin_service.record_app_launch(req.user_id, req.device_id.as_deref(), req.app_version.as_deref(), req.platform.as_deref()).await {
+        Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"ok"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
 }
 
 #[get("/comments")]

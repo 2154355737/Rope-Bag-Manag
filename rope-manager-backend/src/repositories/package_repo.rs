@@ -19,6 +19,24 @@ impl PackageRepository {
         })
     }
 
+    // 修复历史错误的触发器：将 DELETE 触发器中误用的 NEW.* 替换为 OLD.*
+    pub async fn fix_broken_triggers(&self) -> Result<()> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare("SELECT name, sql FROM sqlite_master WHERE type='trigger'")?;
+        let rows = stmt.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
+        for r in rows {
+            let (name, sql) = r?;
+            let lower = sql.to_lowercase();
+            if lower.contains("delete") && lower.contains("new.") {
+                let fixed_sql = sql.replace("NEW.", "OLD.");
+                let drop_sql = format!("DROP TRIGGER IF EXISTS {}", name);
+                let _ = conn.execute(&drop_sql, [])?;
+                conn.execute_batch(&fixed_sql)?;
+            }
+        }
+        Ok(())
+    }
+
     pub async fn get_all_packages(&self) -> Result<Vec<Package>> {
         let conn = self.conn.lock().await;
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
@@ -244,6 +262,8 @@ impl PackageRepository {
     }
 
     pub async fn delete_package(&self, package_id: i32) -> Result<()> {
+        // 尝试修复历史错误触发器，避免删除时报 NEW.* 列不存在
+        let _ = self.fix_broken_triggers().await;
         let conn = self.conn.lock().await;
         
         // 开始事务，确保所有删除操作要么全部成功，要么全部回滚
@@ -254,9 +274,9 @@ impl PackageRepository {
             log::debug!("🗄️ 删除package_likes中的相关记录: package_id={}", package_id);
             conn.execute("DELETE FROM package_likes WHERE package_id = ?", params![package_id])?;
             
-            // 2. 删除comments表中的相关记录
-            log::debug!("🗄️ 删除comments中的相关记录: package_id={}", package_id);
-            conn.execute("DELETE FROM comments WHERE package_id = ?", params![package_id])?;
+            // 2. 删除comments表中的相关记录（按新结构 target_type/target_id）
+            log::debug!("🗄️ 删除comments中的相关记录: Package target_id={}", package_id);
+            let _ = conn.execute("DELETE FROM comments WHERE target_type = 'Package' AND target_id = ?", params![package_id]).ok();
             
             // 3. 删除package_tags表中的相关记录（如果存在）
             log::debug!("🗄️ 删除package_tags中的相关记录: package_id={}", package_id);
@@ -264,11 +284,11 @@ impl PackageRepository {
             
             // 4. 删除package_views表中的相关记录（如果存在）
             log::debug!("🗄️ 删除package_views中的相关记录: package_id={}", package_id);
-            conn.execute("DELETE FROM package_views WHERE package_id = ?", params![package_id])?;
+            let _ = conn.execute("DELETE FROM package_views WHERE package_id = ?", params![package_id]).ok();
             
             // 5. 删除download_records表中的相关记录（如果存在）
             log::debug!("🗄️ 删除download_records中的相关记录: package_id={}", package_id);
-            conn.execute("DELETE FROM download_records WHERE package_id = ?", params![package_id])?;
+            let _ = conn.execute("DELETE FROM download_records WHERE package_id = ?", params![package_id]).ok();
             
             // 6. 最后删除packages表中的记录
             let sql = "DELETE FROM packages WHERE id = ?";

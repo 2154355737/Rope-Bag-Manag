@@ -36,6 +36,32 @@ async fn get_all_notifications(
     })))
 }
 
+// Admin: 获取每日启动量
+async fn get_app_launch_daily_stats(
+    req: HttpRequest,
+    admin_service: web::Data<AdminService>,
+    query: web::Query<serde_json::Value>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let _ = require_admin!(&req);
+    let days = query.get("days").and_then(|v| v.as_i64()).unwrap_or(30) as i32;
+    let list = admin_service.get_app_launch_daily_stats(days).await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list}})))
+}
+
+// Admin: 获取最近N天DAU
+async fn get_dau_stats(
+    req: HttpRequest,
+    admin_service: web::Data<AdminService>,
+    query: web::Query<serde_json::Value>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let _ = require_admin!(&req);
+    let days = query.get("days").and_then(|v| v.as_i64()).unwrap_or(30) as i32;
+    let list = admin_service.get_dau_stats(days).await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list}})))
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/admin")

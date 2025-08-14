@@ -1,6 +1,10 @@
 <template>
   <div class="notifications-page">
-    <van-nav-bar title="我的通知" left-arrow @click-left="onBack" fixed />
+    <van-nav-bar title="我的通知" left-arrow @click-left="onBack" fixed>
+		  <template #right>
+			<van-button size="small" type="primary" plain :loading="markingAll" @click="markAll">全部已读</van-button>
+		  </template>
+		</van-nav-bar>
     <div class="content">
       <van-list
         v-model:loading="loading"
@@ -31,6 +35,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import dayjs from 'dayjs';
 import { notificationApi } from '@/api/notification';
+import { showToast } from 'vant';
 
 const router = useRouter();
 const list = ref([]);
@@ -38,6 +43,7 @@ const page = ref(1);
 const loading = ref(false);
 const finished = ref(false);
 const loadError = ref(false);
+const markingAll = ref(false);
 
 const formatDate = (s) => s ? dayjs(s).format('YYYY-MM-DD HH:mm') : '';
 const onBack = () => router.back();
@@ -55,6 +61,25 @@ const loadMore = async () => {
     loadError.value = true;
   } finally {
     loading.value = false;
+  }
+};
+
+const markAll = async () => {
+  if (markingAll.value) return;
+  markingAll.value = true;
+  try {
+    const res = await notificationApi.markAllRead();
+    if (res && res.code === 0) {
+      // 本地标记
+      list.value = list.value.map(n => ({ ...n, is_read: true }));
+      showToast('已全部标记为已读');
+    } else {
+      showToast(res?.message || '操作失败');
+    }
+  } catch (e) {
+    showToast('操作失败');
+  } finally {
+    markingAll.value = false;
   }
 };
 
