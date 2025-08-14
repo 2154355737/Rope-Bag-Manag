@@ -376,6 +376,8 @@ onMounted(async () => {
 .profile-page {
   min-height: 100vh;
   background-color: var(--background-color);
+  padding-top: env(safe-area-inset-top);
+  padding-top: constant(safe-area-inset-top); /* iOS 11.0 */
 }
 
 .login-panel {

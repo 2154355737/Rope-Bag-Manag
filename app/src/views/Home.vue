@@ -453,6 +453,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  padding-top: calc(8px + constant(safe-area-inset-top)); /* iOS 11.0 */
   background-color: var(--van-background-2, #fff);
   border-bottom: 1px solid var(--van-border-color, #ebedf0);
 }

@@ -251,7 +251,8 @@ html, body {
 
 /* 防止内容被底部导航遮挡：统一底部内边距 */
 .page-content {
-  padding-bottom: calc(66px + env(safe-area-inset-bottom));
+  padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(66px + constant(safe-area-inset-bottom, 0px)); /* iOS 11.0 */
 }
 
 /* NavBar样式已迁移到main.css中统一管理 */
@@ -275,5 +276,28 @@ html, body {
 .register-content {
   padding-top: calc(46px + env(safe-area-inset-top)) !important;
   padding-top: calc(46px + constant(safe-area-inset-top)) !important; /* iOS 11.0 */
+}
+
+/* 社区页面的特殊处理 */
+.page-with-fixed-navbar {
+  padding-top: 8px !important;
+}
+
+/* Android系统导航栏底部间距增强处理 */
+@supports not (padding-bottom: env(safe-area-inset-bottom)) {
+  .page-content {
+    /* 对于不支持safe-area的Android设备，使用更大的底部间距 */
+    padding-bottom: 82px !important;
+  }
+}
+
+/* Android设备的额外底部间距处理 */
+@media screen and (min-resolution: 0.001dpcm) {
+  @supports (-webkit-appearance: none) {
+    .page-content {
+      /* Android Chrome特殊处理，确保内容不被系统导航栏遮挡 */
+      padding-bottom: calc(66px + max(env(safe-area-inset-bottom, 0px), 8px)) !important;
+    }
+  }
 }
 </style> 

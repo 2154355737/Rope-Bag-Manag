@@ -375,6 +375,9 @@ onMounted(() => {
   position: sticky;
   top: 0;
   z-index: 100;
+  padding-top: env(safe-area-inset-top);
+  padding-top: constant(safe-area-inset-top); /* iOS 11.0 */
+  background-color: var(--van-background-2, #fff);
 }
 
 .search-content {

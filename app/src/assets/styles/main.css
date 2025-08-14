@@ -119,6 +119,7 @@ ul, ol {
 /* 页面容器通用样式 - 为底部导航预留空间 */
 .page-content {
   padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(66px + constant(safe-area-inset-bottom, 0px)); /* iOS 11.0 */
 }
 
 /* App根容器 */
