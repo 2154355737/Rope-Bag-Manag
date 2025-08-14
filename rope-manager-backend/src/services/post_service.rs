@@ -139,8 +139,7 @@ impl PostService {
                     params![post_id],
                     |r| Ok((r.get(0)?, r.get(1)?))
                 )?;
-                let url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-                let link = format!("{}/post/{}", url, post_id);
+                let link = format!("/post/{}", post_id);
                 let mut parts = Vec::new();
                 if pin_changed == Some(true) { parts.push("置顶"); }
                 if feat_changed == Some(true) { parts.push("加精"); }

@@ -89,21 +89,30 @@ const open = async (n) => {
   }
   if (n.link) {
     let targetLink = n.link;
-    
-    // 处理包含localhost的链接，提取路径部分
-    if (targetLink.includes('localhost:5173/')) {
-      const url = new URL(targetLink);
-      targetLink = url.pathname + url.search + url.hash;
+
+    // 如果是完整 URL，尝试识别内部路由并改用前端路由跳转
+    try {
+      if (/^https?:\/\//i.test(targetLink)) {
+        const u = new URL(targetLink);
+        const internalPaths = [
+          /^\/resource\//, /^\/post\//, /^\/category\//, /^\/search$/, /^\/community$/,
+          /^\/profile(\/.*)?$/, /^\/notifications$/, /^\/my-resources$/, /^\/my-posts$/, /^\/my-comments$/, /^\/favorites$/
+        ];
+        const isInternal = internalPaths.some(rx => rx.test(u.pathname));
+        if (isInternal) {
+          router.push(u.pathname + u.search + u.hash);
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore URL parse error
     }
-    
-    // 外部链接直接跳转，内部链接使用路由
+
+    // 非完整URL或外部链接保留默认处理
     if (targetLink.startsWith('http://') || targetLink.startsWith('https://')) {
       window.location.href = targetLink;
     } else {
-      // 确保路径以 / 开头
-      if (!targetLink.startsWith('/')) {
-        targetLink = '/' + targetLink;
-      }
+      if (!targetLink.startsWith('/')) targetLink = '/' + targetLink;
       router.push(targetLink);
     }
   }

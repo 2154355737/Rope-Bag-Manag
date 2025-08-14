@@ -236,8 +236,7 @@ impl PackageService {
             // 审核通过 -> 给作者发送站内通知
             if let (Some(user_repo), Some(notify)) = (&self.user_repo, &self.notification_service) {
                 if let Ok(Some(author_user)) = user_repo.find_by_username(&updated_package.author).await {
-                    let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-                    let link = format!("{}/resource/{}", resource_url, updated_package.id);
+                    let link = format!("/resource/{}", updated_package.id);
                     let title = "资源审核通过";
                     let content = format!("您的资源《{}》已通过审核", updated_package.name);
                     if let Err(e) = notify.notify(author_user.id, title, &content, Some(&link), Some("ResourceApproved"), Some("Package"), Some(updated_package.id)).await {
@@ -250,8 +249,7 @@ impl PackageService {
             if let (Some(sub_repo), Some(notify)) = (&self.subscription_repo, &self.notification_service) {
                 if let Some(cat_id) = updated_package.category_id {
                     if let Ok(user_ids) = sub_repo.get_subscribed_user_ids(cat_id).await {
-                        let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-                        let link = format!("{}/resource/{}", resource_url, updated_package.id);
+                        let link = format!("/resource/{}", updated_package.id);
                         for uid in user_ids {
                             let title = "订阅更新";
                             let content = format!("您订阅的分类有新资源：《{}》", updated_package.name);

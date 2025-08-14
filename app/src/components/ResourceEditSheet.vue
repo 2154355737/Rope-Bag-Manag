@@ -26,21 +26,6 @@
             rows="3"
           />
 
-          <!-- 下载直链：可编辑、可获取、可复制 -->
-          <van-field
-            v-model="form.file_url"
-            clearable
-            label="下载直链"
-            placeholder="请输入或点击右侧获取"
-            :rules="fileUrlRules"
-          >
-            <template #right-icon>
-              <div class="flex gap-8">
-                <van-button size="small" plain :loading="downloading" @click.stop="fetchDownloadUrl">获取</van-button>
-                <van-button size="small" type="primary" plain :disabled="!form.file_url" @click.stop="copyDownloadUrl">复制</van-button>
-              </div>
-            </template>
-          </van-field>
 
           <!-- 可选：直接上传替换文件（将覆盖直链） -->
           <van-field label="替换文件">
@@ -111,7 +96,7 @@ const props = defineProps({
 
 const visible = ref(false);
 const formRef = ref(null);
-const form = ref({ name: '', description: '', category_id: null, file_url: '', tags: [] });
+const form = ref({ name: '', description: '', category_id: null, tags: [] });
 
 const downloading = ref(false);
 
@@ -119,13 +104,6 @@ const downloading = ref(false);
 const uploadFileList = ref([]);
 const selectedFile = ref(null);
 
-// 新增：HTTP/HTTPS URL 正则与校验规则
-const HTTP_URL_REGEX = /^(https?):\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|localhost)|((25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d{2}|[1-9]?\d)){3}))(?::\d{2,5})?(?:\/[\S&&[^?#]]*)?(?:\?[^\s#]*)?(?:#[^\s]*)?$/i;
-const fileUrlRules = [
-  { required: true, message: '请填写下载直链' },
-  { pattern: HTTP_URL_REGEX, message: '请输入有效的 http/https 直链' },
-  { validator: (val) => String(val || '').length <= 2048, message: '链接过长' },
-];
 
 // 分类
 const showCategoryPicker = ref(false);
@@ -153,7 +131,6 @@ watch(
           name: props.resource.name || '',
           description: props.resource.description || '',
           category_id: props.resource.category_id ?? null,
-          file_url: props.resource.file_url || '',
           tags: Array.isArray(props.resource.tags) ? props.resource.tags : [],
         };
         selectedTags.value = [...form.value.tags];
@@ -172,32 +149,6 @@ const close = () => {
   emit('update:modelValue', false);
 };
 
-const fetchDownloadUrl = async () => {
-  if (!props.resource?.id) return;
-  try {
-    downloading.value = true;
-    const res = await resourceApi.downloadResource(props.resource.id);
-    if (res.code === 0 && res.data) {
-      form.value.file_url = typeof res.data === 'string' ? res.data : res.data.url || '';
-      if (!form.value.file_url) showToast('未返回下载链接');
-    } else {
-      showToast(res.message || '获取下载链接失败');
-    }
-  } catch (e) {
-    showToast('获取下载链接失败');
-  } finally {
-    downloading.value = false;
-  }
-};
-
-const copyDownloadUrl = async () => {
-  try {
-    await navigator.clipboard.writeText(form.value.file_url || '');
-    showToast('已复制');
-  } catch (e) {
-    showToast('复制失败');
-  }
-};
 
 const fetchCategories = async () => {
   try {

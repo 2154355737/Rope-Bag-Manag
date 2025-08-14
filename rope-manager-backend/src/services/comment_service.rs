@@ -133,8 +133,7 @@ impl CommentService {
                 if let Ok(Some(pkg)) = pkg_repo.find_by_id(comment.target_id).await {
                     if let Ok(Some(author_user)) = self.user_repo.find_by_username(&pkg.author).await {
                         if author_user.id != user_id {
-                            let resource_url = std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:5173".to_string());
-                            let link = format!("{}/resource/{}", resource_url, pkg.id);
+                            let link = format!("/resource/{}", pkg.id);
                             let title = "资源收到新评论";
                             let content = format!("您的资源《{}》有一条新评论", pkg.name);
                             if let Err(e) = notify.notify(author_user.id, title, &content, Some(&link), Some("CommentReceived"), Some("Package"), Some(pkg.id)).await {
