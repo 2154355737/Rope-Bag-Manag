@@ -28,10 +28,25 @@ impl PackageStorageService {
         let package_repo = PackageRepository::new(db_path)?;
         log::info!("✅ 数据库连接已建立: {}", db_path);
         
-        let alist_service = AListService::new();
+        // 优先从系统设置读取AList参数，否则退回到环境变量/默认
+        let (base_url, username, password) = {
+            use rusqlite::Connection;
+            let conn = Connection::open(db_path).ok();
+            if let Some(conn) = conn {
+                let get = |k: &str| -> Option<String> {
+                    conn.query_row("SELECT value FROM system_settings WHERE key = ?", [k], |r| r.get::<_, String>(0)).ok()
+                };
+                let bu = get("alist_base_url");
+                let un = get("alist_username");
+                let pw = get("alist_password");
+                (bu, un, pw)
+            } else { (None, None, None) }
+        };
+        let alist_service = match (base_url, username, password) {
+            (Some(bu), Some(un), Some(pw)) => AListService::new_with_params(bu, un, pw),
+            _ => AListService::new(),
+        };
         log::info!("✅ AList服务已初始化");
-        log::info!("📡 AList服务地址: http://alist.tiecode.org.cn/");
-        log::info!("👤 AList用户: 2154355737@qq.com");
         
         let storage_base_path = "/image/结绳社区".to_string();
         log::info!("📁 存储基础路径: {}", storage_base_path);
@@ -48,11 +63,13 @@ impl PackageStorageService {
     pub async fn initialize_storage(&mut self) -> Result<()> {
         log::info!("🔧 开始初始化存储目录结构...");
         
-        // 创建基础目录
-        log::info!("📁 创建基础目录: {}", self.storage_base_path);
-        match self.alist_service.create_folder(&self.storage_base_path).await {
-            Ok(_) => log::info!("✅ 基础目录创建成功"),
-            Err(e) => log::warn!("⚠️  基础目录可能已存在: {}", e),
+        // 创建基础目录（存在则跳过）
+        log::info!("📁 确认基础目录: {}", self.storage_base_path);
+        match self.alist_service.create_folder_if_missing(&self.storage_base_path).await {
+            Ok(created) => {
+                if created { log::info!("✅ 基础目录创建成功"); } else { log::info!("✅ 基础目录已存在"); }
+            }
+            Err(e) => log::warn!("⚠️ 基础目录检查/创建失败: {}", e),
         }
         
         // 获取所有分类并创建对应目录
@@ -89,15 +106,19 @@ impl PackageStorageService {
             let monthly_path = format!("{}/{}", category_path, year_month);
             
             log::info!("📂 创建分类目录: {}", category_path);
-            match self.alist_service.create_folder(&category_path).await {
-                Ok(_) => log::info!("✅ 分类目录创建成功: {}", category),
-                Err(e) => log::debug!("📁 分类目录可能已存在: {} ({})", category, e),
+            match self.alist_service.create_folder_if_missing(&category_path).await {
+                Ok(created) => {
+                    if created { log::info!("✅ 分类目录创建成功: {}", category); } else { log::info!("📁 分类目录已存在: {}", category); }
+                }
+                Err(e) => log::warn!("⚠️ 分类目录检查/创建失败: {} ({})", category, e),
             }
             
             log::info!("📅 创建月份目录: {}", monthly_path);
-            match self.alist_service.create_folder(&monthly_path).await {
-                Ok(_) => log::info!("✅ 月份目录创建成功: {}/{}", category, year_month),
-                Err(e) => log::debug!("📁 月份目录可能已存在: {}/{} ({})", category, year_month, e),
+            match self.alist_service.create_folder_if_missing(&monthly_path).await {
+                Ok(created) => {
+                    if created { log::info!("✅ 月份目录创建成功: {}/{}", category, year_month); } else { log::info!("📁 月份目录已存在: {}/{}", category, year_month); }
+                }
+                Err(e) => log::warn!("⚠️ 月份目录检查/创建失败: {}/{} ({})", category, year_month, e),
             }
         }
         
@@ -231,11 +252,19 @@ impl PackageStorageService {
     pub async fn get_package_download_url(&mut self, file_path: &str) -> Result<String> {
         // 构造AList的直接访问URL，避免权限问题
         // AList的直接访问格式通常是: http://domain/d/file_path
-        let alist_base_url = "http://alist.tiecode.org.cn";
-        let direct_url = format!("{}/d{}", alist_base_url, file_path);
-        
-        log::info!("🔗 生成AList直接访问链接: {}", direct_url);
-        Ok(direct_url)
+        // 优先调用 AList API 获取 raw_url，失败则落回 /d 直链
+        match self.alist_service.get_download_link(file_path).await {
+            Ok(url) => {
+                log::info!("🔗 生成AList下载链接: {}", url);
+                Ok(url)
+            }
+            Err(e) => {
+                log::warn!("获取 raw_url 失败，回退直链: {}", e);
+                let direct_url = format!("{}/d{}", self.alist_service.base_url(), file_path);
+                log::info!("🔗 生成AList直接访问链接: {}", direct_url);
+                Ok(direct_url)
+            }
+        }
     }
     
     /// 删除包文件
@@ -260,7 +289,40 @@ impl PackageStorageService {
     pub async fn list_storage_files(&mut self, path: Option<&str>) -> Result<Vec<FileInfo>> {
         let list_path = path.unwrap_or(&self.storage_base_path);
         let file_list = self.alist_service.list_files(list_path).await?;
-        Ok(file_list.content)
+        Ok(file_list.content.unwrap_or_default())
+    }
+    
+    /// 递归列出存储中的所有文件完整路径（分类/年月两级目录）
+    pub async fn list_storage_file_paths(&mut self) -> Result<Vec<String>> {
+        let mut paths: Vec<String> = Vec::new();
+        let base = self.storage_base_path.clone();
+        let top = self.alist_service.list_files(&base).await?;
+        for item in top.content.unwrap_or_default() {
+            if item.is_dir {
+                let cat_path = format!("{}/{}", base, item.name);
+                let months = self.alist_service.list_files(&cat_path).await?;
+                for m in months.content.unwrap_or_default() {
+                    if m.is_dir {
+                        let month_path = format!("{}/{}", cat_path, m.name);
+                        let files = self.alist_service.list_files(&month_path).await?;
+                        for f in files.content.unwrap_or_default() {
+                            if !f.is_dir {
+                                paths.push(format!("{}/{}", month_path, f.name));
+                            }
+                        }
+                    } else {
+                        // 某些情况下文件直接在分类目录下
+                        if !m.is_dir {
+                            paths.push(format!("{}/{}", cat_path, m.name));
+                        }
+                    }
+                }
+            } else {
+                // 顶层直接文件
+                paths.push(format!("{}/{}", base, item.name));
+            }
+        }
+        Ok(paths)
     }
     
     /// 获取存储统计信息

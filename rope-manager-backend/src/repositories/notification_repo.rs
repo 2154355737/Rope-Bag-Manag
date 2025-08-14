@@ -97,4 +97,38 @@ impl NotificationRepository {
         let count: i32 = conn.query_row("SELECT COUNT(*) FROM notifications WHERE user_id=? AND is_read=0", params![user_id], |row| row.get(0))?;
         Ok(count)
     }
+
+    // 新增：查询全站通知（按时间倒序，分页）
+    pub async fn list_all(&self, page: i32, size: i32) -> Result<Vec<Notification>> {
+        let conn = self.conn.lock().await;
+        let offset = (page - 1).max(0) * size.max(1);
+        let mut stmt = conn.prepare(
+            "SELECT id,user_id,title,content,link,notif_type,related_type,related_id,is_read,created_at \
+             FROM notifications ORDER BY id DESC LIMIT ? OFFSET ?",
+        )?;
+        let rows = stmt.query_map(params![size, offset], |row| {
+            Ok(Notification {
+                id: row.get(0)?,
+                user_id: row.get(1)?,
+                title: row.get(2)?,
+                content: row.get(3)?,
+                link: row.get(4).ok(),
+                notif_type: row.get(5).ok(),
+                related_type: row.get(6).ok(),
+                related_id: row.get(7).ok(),
+                is_read: row.get::<_, i32>(8)? != 0,
+                created_at: chrono::DateTime::parse_from_rfc3339(&row.get::<_, String>(9)?).map(|d| d.with_timezone(&Utc)).unwrap_or_else(|_| Utc::now()),
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows { list.push(r?); }
+        Ok(list)
+    }
+
+    // 新增：全站通知总数
+    pub async fn count_all(&self) -> Result<i32> {
+        let conn = self.conn.lock().await;
+        let count: i32 = conn.query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))?;
+        Ok(count)
+    }
 } 

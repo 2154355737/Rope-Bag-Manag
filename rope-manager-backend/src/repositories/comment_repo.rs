@@ -29,6 +29,7 @@ impl CommentRepository {
         user_id: Option<i32>,
         start_date: Option<&str>,
         end_date: Option<&str>,
+        search: Option<&str>,
     ) -> Result<(Vec<Comment>, i64)> {
         let conn = self.conn.lock().await;
         
@@ -64,6 +65,13 @@ impl CommentRepository {
         if let Some(end) = end_date {
             where_clauses.push("created_at <= ?");
             params_values.push(Box::new(end.to_string()));
+        }
+        
+        if let Some(sword) = search {
+            // 同时支持按内容模糊与按用户ID精确（字符串）
+            where_clauses.push("(content LIKE ? OR CAST(user_id AS TEXT) = ?)");
+            params_values.push(Box::new(format!("%{}%", sword)));
+            params_values.push(Box::new(sword.to_string()));
         }
         
         let where_clause = if !where_clauses.is_empty() {

@@ -6,6 +6,7 @@ echo.
 echo Setting environment variables...
 set DATABASE_PATH=data.db
 set HOST=127.0.0.1
+set ALIST_PASSWORD=ahk12378dx
 set PORT=15201
 set JWT_SECRET=your-secret-key-change-in-production
 set UPLOAD_PATH=uploads

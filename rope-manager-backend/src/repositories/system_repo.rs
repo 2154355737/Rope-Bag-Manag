@@ -204,7 +204,7 @@ impl SystemRepository {
     }
 
     // 新增方法：获取系统日志
-    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>) -> Result<(Vec<crate::services::admin_service::SystemLog>, i64)> {
+    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>, start_time: Option<&str>, end_time: Option<&str>) -> Result<(Vec<crate::services::admin_service::SystemLog>, i64)> {
         let conn = self.conn.lock().await;
         
         // 创建日志表（如果不存在）
@@ -234,6 +234,14 @@ impl SystemRepository {
             let search_pattern = format!("%{}%", s);
             params_vec.push(search_pattern.clone());
             params_vec.push(search_pattern);
+        }
+        if let Some(st) = start_time {
+            conditions.push("timestamp >= ?");
+            params_vec.push(st.to_string());
+        }
+        if let Some(et) = end_time {
+            conditions.push("timestamp <= ?");
+            params_vec.push(et.to_string());
         }
         
         // 更新参数引用
@@ -313,6 +321,31 @@ impl SystemRepository {
         )?;
         
         Ok(conn.last_insert_rowid())
+    }
+
+    // 新增：删除单条日志
+    pub async fn delete_log(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute("DELETE FROM system_logs WHERE id = ?", params![id])?;
+        Ok(())
+    }
+
+    // 新增：批量删除日志
+    pub async fn batch_delete_logs(&self, ids: &[i64]) -> Result<usize> {
+        if ids.is_empty() { return Ok(0); }
+        let conn = self.conn.lock().await;
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!("DELETE FROM system_logs WHERE id IN ({})", placeholders);
+        let mut stmt = conn.prepare(&sql)?;
+        let affected = stmt.execute(rusqlite::params_from_iter(ids.iter()))?;
+        Ok(affected)
+    }
+
+    // 新增：清空日志
+    pub async fn clear_logs(&self) -> Result<usize> {
+        let conn = self.conn.lock().await;
+        let affected = conn.execute("DELETE FROM system_logs", [])?;
+        Ok(affected)
     }
 
     // 完善创建备份方法
@@ -1879,5 +1912,18 @@ impl SystemRepository {
         )?;
         
         Ok(count)
+    }
+
+    // 新增：用户注册趋势（最近30天）
+    pub async fn get_user_registration_trend(&self) -> Result<Vec<crate::models::DailyStats>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare(
+            "SELECT date(created_at) as day, COUNT(*) as count FROM users GROUP BY date(created_at) ORDER BY day DESC LIMIT 30"
+        )?;
+        let list = stmt.query_map([], |row| {
+            Ok(crate::models::DailyStats { date: row.get(0)?, count: row.get(1)? })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+        Ok(list)
     }
 } 

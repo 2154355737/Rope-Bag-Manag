@@ -55,6 +55,7 @@ impl CommentService {
         user_id: Option<i32>,
         start_date: Option<&str>,
         end_date: Option<&str>,
+        search: Option<&str>,
     ) -> Result<(Vec<Comment>, i64)> {
         self.comment_repo.get_all_comments(
             page,
@@ -65,6 +66,7 @@ impl CommentService {
             user_id,
             start_date,
             end_date,
+            search,
         ).await
     }
 

@@ -3,3 +3,4 @@ Rust_Vue/src/layouts/mobile/MobileLayout.vue
 node_modules
 rope-manager-backend/data.db
 app/dist/assets/
+rope-manager-backend/target2

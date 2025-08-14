@@ -39,8 +39,8 @@ impl AdminService {
     }
 
     // 新增方法：获取系统日志
-    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>) -> Result<(Vec<SystemLog>, i64)> {
-        self.system_repo.get_logs(page, page_size, level, search).await
+    pub async fn get_logs(&self, page: Option<u32>, page_size: Option<u32>, level: Option<&str>, search: Option<&str>, start_time: Option<&str>, end_time: Option<&str>) -> Result<(Vec<SystemLog>, i64)> {
+        self.system_repo.get_logs(page, page_size, level, search, start_time, end_time).await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -48,6 +48,16 @@ impl AdminService {
     pub async fn add_log(&self, level: &str, message: &str, details: Option<&str>) -> Result<i64> {
         self.system_repo.add_log(level, message, details).await
             .map_err(|e| anyhow::anyhow!("{}", e))
+    }
+
+    // 删除日志
+    pub async fn delete_log(&self, id: i64) -> Result<()> { self.system_repo.delete_log(id).await.map_err(|e| anyhow::anyhow!("{}", e)) }
+    pub async fn batch_delete_logs(&self, ids: &[i64]) -> Result<usize> { self.system_repo.batch_delete_logs(ids).await.map_err(|e| anyhow::anyhow!("{}", e)) }
+    pub async fn clear_logs(&self) -> Result<usize> { self.system_repo.clear_logs().await.map_err(|e| anyhow::anyhow!("{}", e)) }
+
+    // 用户注册趋势
+    pub async fn get_user_registration_trend(&self) -> Result<Vec<crate::models::DailyStats>> {
+        self.system_repo.get_user_registration_trend().await.map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     // 更新创建备份方法

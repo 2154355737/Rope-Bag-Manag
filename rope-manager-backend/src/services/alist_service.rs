@@ -5,6 +5,11 @@ use std::io::Cursor;
 use anyhow::{Result, anyhow};
 use actix_multipart::Multipart;
 use actix_web::web::Bytes;
+use once_cell::sync::Lazy;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+static TOKEN_CACHE: Lazy<Mutex<HashMap<(String, String), String>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Clone)]
 pub struct AListService {
@@ -40,30 +45,70 @@ pub struct FileInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileListResponse {
-    pub content: Vec<FileInfo>,
+    pub content: Option<Vec<FileInfo>>,
     pub total: i32,
     pub readme: Option<String>,
     pub write: bool,
     pub provider: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EntryInfo {
+    pub name: Option<String>,
+    pub size: Option<i64>,
+    pub is_dir: bool,
+    pub modified: Option<String>,
+    pub created: Option<String>,
+    pub sign: Option<String>,
+    pub thumb: Option<String>,
+    #[serde(rename = "type")]
+    pub type_: Option<i32>,
+    pub raw_url: Option<String>,
+    pub readme: Option<String>,
+    pub header: Option<String>,
+    pub provider: Option<String>,
+}
+
 impl AListService {
     pub fn new() -> Self {
+        // 默认从环境变量读取，若不存在则使用保底值
         log::info!("🔧 初始化AList服务客户端...");
-        let base_url = "http://alist.tiecode.org.cn".to_string();
-        let username = "2154355737@qq.com".to_string();
-        let password = "ahk12378dx";
-        
+        let base_url = std::env::var("ALIST_BASE_URL").unwrap_or_else(|_| "http://alist.tiecode.org.cn".to_string());
+        let username = std::env::var("ALIST_USERNAME").unwrap_or_else(|_| "2154355737@qq.com".to_string());
+        let password = std::env::var("ALIST_PASSWORD").unwrap_or_else(|_| "".to_string());
+
         log::info!("📡 AList服务器: {}", base_url);
         log::info!("👤 登录用户: {}", username);
-        log::info!("🔐 密码: {}***", &password[..3]);
+        if !password.is_empty() { log::info!("🔐 已提供密码: ***"); } else { log::warn!("⚠️ 未提供ALIST_PASSWORD，可能无法登录"); }
+        
+        // 从全局缓存读取 token
+        let cache_key = (base_url.clone(), username.clone());
+        let token = TOKEN_CACHE.lock().ok().and_then(|m| m.get(&cache_key).cloned());
         
         Self {
             client: reqwest::Client::new(),
             base_url,
             username,
             password: password.to_string(),
-            token: None,
+            token,
+        }
+    }
+    
+    /// 获取当前 base_url
+    pub fn base_url(&self) -> &str { &self.base_url }
+    
+    /// 通过参数创建（便于从数据库设置加载）
+    pub fn new_with_params(base_url: String, username: String, password: String) -> Self {
+        log::info!("🔧 初始化AList服务客户端(自定义参数)...");
+        // 从全局缓存读取 token
+        let cache_key = (base_url.clone(), username.clone());
+        let token = TOKEN_CACHE.lock().ok().and_then(|m| m.get(&cache_key).cloned());
+        Self {
+            client: reqwest::Client::new(),
+            base_url,
+            username,
+            password,
+            token,
         }
     }
     
@@ -93,6 +138,10 @@ impl AListService {
         if response_json.code == 200 {
             if let Some(data) = response_json.data {
                 self.token = Some(data.token.clone());
+                // 写入全局缓存
+                if let Ok(mut m) = TOKEN_CACHE.lock() {
+                    m.insert((self.base_url.clone(), self.username.clone()), data.token.clone());
+                }
                 log::info!("✅ AList 登录成功");
                 log::debug!("🎫 获取到Token: {}...", &data.token[..20]);
                 return Ok(());
@@ -106,8 +155,16 @@ impl AListService {
         Err(anyhow!("AList 登录失败: {}", response_json.message))
     }
     
-    /// 确保已登录（如果没有token就先登录）
+    /// 确保已登录（如果没有token就先登录），优先使用缓存
     async fn ensure_logged_in(&mut self) -> Result<()> {
+        if self.token.is_none() {
+            // 尝试从缓存拿一次
+            if let Ok(m) = TOKEN_CACHE.lock() {
+                if let Some(tok) = m.get(&(self.base_url.clone(), self.username.clone())).cloned() {
+                    self.token = Some(tok);
+                }
+            }
+        }
         if self.token.is_none() {
             self.login().await?;
         }
@@ -153,7 +210,9 @@ impl AListService {
             // 检查是否是token失效错误
             if response_json.message.contains("token is invalidated") || response_json.message.contains("invalid token") {
                 log::warn!("⚠️  Token失效，清除token并重试 (尝试 {})", attempt);
-                self.token = None; // 清除失效的token
+                // 清空本地与缓存
+                self.token = None; 
+                if let Ok(mut m) = TOKEN_CACHE.lock() { m.remove(&(self.base_url.clone(), self.username.clone())); }
                 if attempt == 2 {
                     return Err(anyhow!("获取文件列表失败，token重试后仍然无效: {}", response_json.message));
                 }
@@ -165,6 +224,71 @@ impl AListService {
         }
         
         Err(anyhow!("获取文件列表失败: 超过最大重试次数"))
+    }
+
+    /// 获取文件/目录信息（用于判断存在性与获取 raw_url）
+    pub async fn get_info(&mut self, path: &str) -> Result<EntryInfo> {
+        for attempt in 1..=2 {
+            self.ensure_logged_in().await?;
+            let url = format!("{}/api/fs/get", self.base_url);
+            let body = json!({
+                "path": path,
+                "password": "",
+                "page": 1,
+                "per_page": 0,
+                "refresh": false
+            });
+            let resp = self.client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header("Authorization", self.token.as_ref().unwrap())
+                .json(&body)
+                .send()
+                .await?;
+            let text = resp.text().await?;
+            let parsed: AListResponse<EntryInfo> = serde_json::from_str(&text)?;
+            if parsed.code == 200 {
+                if let Some(data) = parsed.data { return Ok(data); }
+                else { return Err(anyhow!("获取条目信息失败: data为空")); }
+            }
+            if parsed.message.to_lowercase().contains("token") && attempt == 1 {
+                self.token = None; // 下次重试刷新 token
+                if let Ok(mut m) = TOKEN_CACHE.lock() { m.remove(&(self.base_url.clone(), self.username.clone())); }
+                continue;
+            }
+            return Err(anyhow!("获取条目信息失败: {}", parsed.message));
+        }
+        Err(anyhow!("获取条目信息失败: 超过最大重试次数"))
+    }
+
+    /// 判断目录是否存在（使用 /api/fs/get）
+    pub async fn folder_exists(&mut self, path: &str) -> Result<bool> {
+        match self.get_info(path).await {
+            Ok(info) => Ok(info.is_dir),
+            Err(e) => {
+                let msg = e.to_string().to_lowercase();
+                if msg.contains("not exist") || msg.contains("not found") || msg.contains("不存在") {
+                    Ok(false)
+                } else {
+                    Err(anyhow!("检查目录存在性失败: {}", e))
+                }
+            }
+        }
+    }
+
+    /// 若目录不存在则创建，存在则跳过
+    pub async fn create_folder_if_missing(&mut self, path: &str) -> Result<bool> {
+        match self.folder_exists(path).await {
+            Ok(true) => {
+                log::debug!("📁 目录已存在, 跳过创建: {}", path);
+                Ok(false)
+            }
+            Ok(false) => {
+                self.create_folder(path).await?;
+                Ok(true)
+            }
+            Err(e) => Err(e),
+        }
     }
     
     /// 创建文件夹
@@ -201,6 +325,7 @@ impl AListService {
             if response_json.message.contains("token is invalidated") || response_json.message.contains("invalid token") {
                 log::warn!("⚠️  Token失效，清除token并重试 (尝试 {})", attempt);
                 self.token = None; // 清除失效的token
+                if let Ok(mut m) = TOKEN_CACHE.lock() { m.remove(&(self.base_url.clone(), self.username.clone())); }
                 if attempt == 2 {
                     return Err(anyhow!("创建文件夹失败，token重试后仍然无效: {}", response_json.message));
                 }
@@ -251,6 +376,7 @@ impl AListService {
             if response_json.message.contains("token is invalidated") || response_json.message.contains("invalid token") {
                 log::warn!("⚠️  Token失效，清除token并重试 (尝试 {})", attempt);
                 self.token = None; // 清除失效的token
+                if let Ok(mut m) = TOKEN_CACHE.lock() { m.remove(&(self.base_url.clone(), self.username.clone())); }
                 if attempt == 2 {
                     return Err(anyhow!("文件上传失败，token重试后仍然无效: {}", response_json.message));
                 }
@@ -264,56 +390,19 @@ impl AListService {
         Err(anyhow!("文件上传失败: 超过最大重试次数"))
     }
     
-    /// 获取文件下载链接
+    /// 通过API获取下载直链（优先 raw_url，失败则退回 /d 路径）
     pub async fn get_download_link(&mut self, file_path: &str) -> Result<String> {
-        // 最多重试2次
-        for attempt in 1..=2 {
-            self.ensure_logged_in().await?;
-            
-            let link_url = format!("{}/api/fs/link", self.base_url);
-            
-            let link_data = json!({
-                "path": file_path,
-                "password": ""
-            });
-            
-            log::debug!("🔄 获取下载链接尝试 {}: {}", attempt, file_path);
-            
-            let response = self.client
-                .post(&link_url)
-                .header("Content-Type", "application/json")
-                .header("Authorization", self.token.as_ref().unwrap())
-                .json(&link_data)
-                .send()
-                .await?;
-            
-            let response_text = response.text().await?;
-            let response_json: AListResponse<Value> = serde_json::from_str(&response_text)?;
-            
-            if response_json.code == 200 {
-                if let Some(data) = response_json.data {
-                    if let Some(raw_url) = data.get("raw_url").and_then(|u| u.as_str()) {
-                        log::debug!("✅ 获取下载链接成功: {}", file_path);
-                        return Ok(raw_url.to_string());
-                    }
-                }
+        match self.get_info(file_path).await {
+            Ok(info) => {
+                if let Some(url) = info.raw_url { return Ok(url); }
+                // raw_url 为空时退回 /d 直链
+                Ok(format!("{}/d{}", self.base_url, file_path))
             }
-            
-            // 检查是否是token失效错误
-            if response_json.message.contains("token is invalidated") || response_json.message.contains("invalid token") {
-                log::warn!("⚠️  Token失效，清除token并重试 (尝试 {})", attempt);
-                self.token = None; // 清除失效的token
-                if attempt == 2 {
-                    return Err(anyhow!("获取下载链接失败，token重试后仍然无效: {}", response_json.message));
-                }
-                continue; // 重试
+            Err(e) => {
+                log::warn!("通过API获取 raw_url 失败，回退直链: {}", e);
+                Ok(format!("{}/d{}", self.base_url, file_path))
             }
-            
-            // 其他错误直接返回
-            return Err(anyhow!("获取下载链接失败: {}", response_json.message));
         }
-        
-        Err(anyhow!("获取下载链接失败: 超过最大重试次数"))
     }
     
     /// 删除文件
@@ -341,6 +430,12 @@ impl AListService {
         if response_json.code == 200 {
             log::info!("🗑️ 文件删除成功: {}", file_path);
             return Ok(());
+        }
+        
+        // token 失效清理缓存
+        if response_json.message.contains("token") {
+            self.token = None;
+            if let Ok(mut m) = TOKEN_CACHE.lock() { m.remove(&(self.base_url.clone(), self.username.clone())); }
         }
         
         Err(anyhow!("文件删除失败: {}", response_json.message))

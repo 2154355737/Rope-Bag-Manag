@@ -144,7 +144,30 @@ async fn get_download_link(
             }))))
         },
         Err(e) => {
-            log::error!("获取下载链接失败: {}", e);
+            // 兼容按原始文件名请求：尝试在基础路径下查找最近上传的同名文件
+            log::warn!("直接获取下载链接失败，尝试按文件名回退: {}", e);
+            // 递归列出并匹配最近同名文件（包含年月目录）
+            match storage_service.list_storage_file_paths().await {
+                Ok(paths) => {
+                    let name = std::path::Path::new(&req.file_path).file_name().and_then(|s| s.to_str()).unwrap_or("");
+                    if name.is_empty() { 
+                        log::error!("文件名为空，无法回退");
+                    } else {
+                        // 优先精确匹配文件名结尾
+                        if let Some(path) = paths.into_iter().filter(|p| p.ends_with(name)).last() {
+                            match storage_service.get_package_download_url(&path).await {
+                                Ok(url) => {
+                                    return Ok(HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({
+                                        "download_url": url
+                                    }))));
+                                }
+                                Err(e2) => log::error!("按文件名回退仍失败: {}", e2),
+                            }
+                        }
+                    }
+                }
+                Err(e2) => log::error!("列出存储文件失败: {}", e2),
+            }
             Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
                 500, &format!("获取下载链接失败: {}", e)
             )))
@@ -193,6 +216,7 @@ async fn delete_file(
 #[actix_web::get("/files")]
 async fn list_files(
     auth_user: AuthenticatedUser,
+    query: web::Query<std::collections::HashMap<String, String>>,
 ) -> Result<HttpResponse> {
     // 只有管理员可以查看存储文件列表
     if !auth_user.is_admin() {
@@ -211,7 +235,11 @@ async fn list_files(
         }
     };
 
-    match storage_service.list_storage_files(None).await {
+    // 可选路径
+    let path_opt = query.get("path").map(|s| s.to_string());
+    let path_ref = path_opt.as_deref();
+
+    match storage_service.list_storage_files(path_ref).await {
         Ok(files) => {
             Ok(HttpResponse::Ok().json(ApiResponse::success(files)))
         },

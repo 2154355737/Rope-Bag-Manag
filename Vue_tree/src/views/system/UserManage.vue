@@ -1,7 +1,7 @@
 <template>
   <PageWrapper title="用户管理" content="系统用户列表">
     <Card :loading="loading" class="!mb-4">
-      <div ref="roleChartRef" style="width: 100%; height: 260px"></div>
+      <div ref="trendChartRef" style="width: 100%; height: 260px"></div>
     </Card>
     <Card :loading="loading">
       <Table
@@ -61,40 +61,31 @@
   import { Card, Table, Modal, Form, Input, Select, InputNumber, Button } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getUsers, updateUser, type UserItem } from '/@/api/users'
+  import { getUserRegistrationTrend } from '/@/api/dashboard'
   import { useMessage } from '/@/hooks/web/useMessage'
   import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
 
-  // 使用 Ant Design Vue 的表单项别名以启用样式
   const FormItem = Form.Item
 
   const loading = ref(true)
   const dataSource = ref<UserItem[]>([])
 
-  const roleChartRef = ref<HTMLDivElement | null>(null)
-  let roleChart: echarts.ECharts | null = null
+  const trendChartRef = ref<HTMLDivElement | null>(null)
+  let trendChart: echarts.ECharts | null = null
 
-  const renderRoleChart = () => {
-    if (!roleChartRef.value) return
-    if (!roleChart) roleChart = echarts.init(roleChartRef.value as HTMLDivElement)
-    const roleCount: Record<string, number> = {}
-    dataSource.value.forEach((u: any) => {
-      const r = u.role || 'user'
-      roleCount[r] = (roleCount[r] || 0) + 1
-    })
-    const data = Object.keys(roleCount).map((k) => ({ name: k, value: roleCount[k] }))
-    roleChart.setOption({
-      tooltip: { trigger: 'item' },
-      legend: { bottom: 0 },
-      series: [
-        {
-          type: 'pie',
-          radius: '60%',
-          data,
-          emphasis: { itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: 'rgba(0, 0, 0, 0.5)' } },
-        },
-      ],
+  const renderTrendChart = (list: { date: string; count: number }[]) => {
+    if (!trendChartRef.value) return
+    if (!trendChart) trendChart = echarts.init(trendChartRef.value as HTMLDivElement)
+    const days = [...list].reverse().map((i) => i.date)
+    const counts = [...list].reverse().map((i) => i.count)
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      grid: { left: 40, right: 10, top: 10, bottom: 30 },
+      xAxis: { type: 'category', data: days },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', data: counts, smooth: true, areaStyle: {} }],
     })
   }
 
@@ -181,18 +172,25 @@
     }
   }
 
+  const fetchTrend = async () => {
+    const res = await getUserRegistrationTrend().catch(() => ({ list: [] }))
+    const list = (res as any)?.list || []
+    await nextTick()
+    renderTrendChart(list)
+  }
+
   const fetchList = async () => {
     try {
       const res = await getUsers({ page: 1, page_size: 20 })
       dataSource.value = res.list || []
       await nextTick()
-      renderRoleChart()
+      await fetchTrend()
     } finally {
       loading.value = false
     }
   }
 
-  watch(dataSource, () => nextTick().then(renderRoleChart))
+  watch(dataSource, () => nextTick().then(fetchTrend))
 
   onMounted(fetchList)
 </script> 

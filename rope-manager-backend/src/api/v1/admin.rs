@@ -12,6 +12,29 @@ use crate::middleware::auth::AuthenticatedUser;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 // MailConfig已移至models/mail.rs
+use crate::services::notification_service::NotificationService;
+use crate::services::user_service::UserService;
+
+#[derive(Deserialize)]
+struct AdminNotificationQuery { page: Option<i32>, page_size: Option<i32> }
+
+async fn get_all_notifications(
+    req: HttpRequest,
+    q: web::Query<AdminNotificationQuery>,
+    notify: web::Data<NotificationService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 管理员权限
+    let _ = require_admin!(&req);
+    let page = q.page.unwrap_or(1);
+    let page_size = q.page_size.unwrap_or(20);
+    let list = notify.list_all(page, page_size).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let total = notify.count_all().await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": { "list": list, "total": total, "page": page, "page_size": page_size }
+    })))
+}
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -21,6 +44,32 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/stats")
                     .route(web::get().to(get_stats))
+            )
+            .service(
+                web::resource("/user-registration-trend")
+                    .route(web::get().to(get_user_registration_trend))
+            )
+            .service(
+                web::resource("/logs")
+                    .route(web::get().to(get_logs))
+            )
+            .service(
+                web::resource("/logs/batch-delete")
+                    .route(web::post().to(batch_delete_logs))
+            )
+            .service(
+                web::resource("/logs/clear")
+                    .route(web::post().to(clear_logs))
+            )
+            .service(
+                web::resource("/logs/{id}")
+                    .route(web::delete().to(delete_log))
+            )
+            // 站内通知广播
+            .service(
+                web::scope("/notifications")
+                    .route("/broadcast", web::post().to(broadcast_notifications))
+                    .route("", web::get().to(get_all_notifications))
             )
             .service(
                 web::resource("/user-stats")
@@ -33,10 +82,6 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/user-actions")
                     .route(web::get().to(get_user_actions))
-            )
-            .service(
-                web::resource("/logs")
-                    .route(web::get().to(get_logs))
             )
             .service(
                 web::resource("/backup")
@@ -165,6 +210,81 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     );
 }
 
+// 管理员站内通知广播
+#[derive(Deserialize)]
+struct BroadcastRequest {
+    target: String,                 // all | subscribers | single
+    category_id: Option<i32>,
+    email: Option<String>,          // single时可用
+    username: Option<String>,       // single时可用
+    user_id: Option<i32>,           // single时可用
+    title: String,
+    content: String,
+    link: Option<String>,
+    notif_type: Option<String>,
+    related_type: Option<String>,
+    related_id: Option<i32>,
+}
+
+async fn broadcast_notifications(
+    req: HttpRequest,
+    body: web::Json<BroadcastRequest>,
+    notify: web::Data<NotificationService>,
+    user_service: web::Data<UserService>,
+    subscription_repo: web::Data<SubscriptionRepository>,
+) -> Result<HttpResponse, actix_web::Error> {
+    // 管理员权限
+    let _ = require_admin!(&req);
+
+    let mut user_ids: Vec<i32> = Vec::new();
+    match body.target.as_str() {
+        "all" => {
+            let users = user_service.get_users().await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+            user_ids = users.into_iter().map(|u| u.id).collect();
+        }
+        "subscribers" => {
+            let cid = body.category_id.ok_or_else(|| actix_web::error::ErrorBadRequest("category_id 必填"))?;
+            user_ids = subscription_repo.get_subscribed_user_ids(cid).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        }
+        "single" => {
+            if let Some(id) = body.user_id { user_ids.push(id); }
+            else if let Some(email) = &body.email {
+                if let Some(u) = user_service.get_user_by_email(email).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))? { user_ids.push(u.id); }
+            } else if let Some(username) = &body.username {
+                if let Some(u) = user_service.get_user_by_username(username).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))? { user_ids.push(u.id); }
+            } else {
+                return Ok(HttpResponse::BadRequest().json(json!({"code":400, "message":"single 需提供 user_id 或 email 或 username"})));
+            }
+        }
+        _ => {
+            return Ok(HttpResponse::BadRequest().json(json!({"code":400, "message":"target 必须为 all/subscribers/single"})));
+        }
+    }
+
+    let mut success = 0i32;
+    let mut failed = 0i32;
+    for uid in user_ids {
+        match notify.notify(
+            uid,
+            &body.title,
+            &body.content,
+            body.link.as_deref(),
+            body.notif_type.as_deref(),
+            body.related_type.as_deref(),
+            body.related_id,
+        ).await {
+            Ok(_) => success += 1,
+            Err(_) => failed += 1,
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "broadcast_ok",
+        "data": {"success": success, "failed": failed}
+    })))
+}
+
 // 用户端查看有效公告的API
 pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -287,8 +407,11 @@ async fn get_logs(
     
     let search = params.get("search")
         .and_then(|v| v.as_str());
+
+    let start_time = params.get("start_time").and_then(|v| v.as_str());
+    let end_time = params.get("end_time").and_then(|v| v.as_str());
     
-    match admin_service.get_logs(page, page_size, level, search).await {
+    match admin_service.get_logs(page, page_size, level, search, start_time, end_time).await {
         Ok((logs, total)) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
@@ -309,6 +432,37 @@ async fn get_logs(
     }
 }
 
+// 新增：删除日志
+async fn delete_log(
+    path: web::Path<i64>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    admin_service.delete_log(path.into_inner()).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"deleted"})))
+}
+
+// 新增：批量删除日志
+#[derive(Deserialize)]
+struct BatchDeleteLogsReq { ids: Vec<i64> }
+async fn batch_delete_logs(
+    req: web::Json<BatchDeleteLogsReq>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let count = admin_service.batch_delete_logs(&req.ids).await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"ok", "data": {"deleted": count}})))
+}
+
+// 新增：清空日志
+async fn clear_logs(admin_service: web::Data<AdminService>) -> Result<HttpResponse, actix_web::Error> {
+    let count = admin_service.clear_logs().await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"ok", "data": {"deleted": count}})))
+}
+
+// 用户注册趋势
+async fn get_user_registration_trend(admin_service: web::Data<AdminService>) -> Result<HttpResponse, actix_web::Error> {
+    let list = admin_service.get_user_registration_trend().await.map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list} })))
+}
 // 更新创建备份接口
 async fn create_backup(
     req: web::Json<serde_json::Value>,
@@ -1035,15 +1189,27 @@ async fn send_test_email(
             })));
         }
     };
+
+    // 兼容推送通知：允许自定义标题与内容
+    let title = req.get("title").and_then(|v| v.as_str()).unwrap_or("测试邮件");
+    let content = req.get("content").and_then(|v| v.as_str()).unwrap_or("这是一封测试邮件");
+
     let es = email_service.read().await;
-    match es.send_test_mail(email).await {
+    // 如果传入了 title/content，则直接使用普通发送；否则走测试邮件模板
+    let result = if req.get("title").is_some() || req.get("content").is_some() {
+        es.send(email, title, content).await.map(|_| 1_i64)
+    } else {
+        es.send_test_mail(email).await
+    };
+
+    match result {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
-            "message": "测试邮件发送成功"
+            "message": "邮件发送成功"
         }))),
         Err(e) => Ok(HttpResponse::Ok().json(json!({
             "code": 500,
-            "message": format!("测试邮件发送失败: {}", e)
+            "message": format!("邮件发送失败: {}", e)
         })))
     }
 }

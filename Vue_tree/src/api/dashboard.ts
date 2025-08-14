@@ -62,6 +62,7 @@ export interface HealthStatus {
 // API接口定义
 const Api = {
   GetStats: '/api/v1/admin/stats',
+  GetUserRegistrationTrend: '/api/v1/admin/user-registration-trend',
   GetUserStats: '/api/v1/admin/user-stats',
   GetCategories: '/api/v1/categories',
   CreateCategory: '/api/v1/categories',
@@ -73,6 +74,8 @@ const Api = {
   DeleteBackup: (id: string) => `/api/v1/admin/backup/${id}`,
   GetBackupStats: '/api/v1/admin/backup/stats',
   HealthCheck: '/health',
+  // 新增：站内通知广播
+  BroadcastNotifications: '/api/v1/admin/notifications/broadcast',
 }
 
 /**
@@ -124,11 +127,23 @@ export const getUserActions = (params?: { page?: number; size?: number }) => {
 /**
  * @description: 获取系统日志
  */
-export const getSystemLogs = (params?: { page?: number; page_size?: number; level?: string }) => {
+export const getSystemLogs = (params?: { page?: number; page_size?: number; level?: string; search?: string; start_time?: string; end_time?: string }) => {
   return defHttp.get<{ list: SystemLog[]; total: number }>({
     url: Api.GetLogs,
     params,
   })
+}
+
+export const deleteLog = (id: number) => {
+  return defHttp.delete<any>({ url: `/api/v1/admin/logs/${id}` })
+}
+
+export const batchDeleteLogs = (ids: number[]) => {
+  return defHttp.post<any>({ url: `/api/v1/admin/logs/batch-delete`, data: { ids } })
+}
+
+export const clearLogs = () => {
+  return defHttp.post<any>({ url: `/api/v1/admin/logs/clear` })
 }
 
 /**
@@ -171,4 +186,28 @@ export const getBackupStats = () => {
  */
 export const healthCheck = () => {
   return defHttp.get<HealthStatus>({ url: Api.HealthCheck })
+}
+
+// 用户注册趋势
+export const getUserRegistrationTrend = () => {
+  return defHttp.get<{ list: { date: string; count: number }[] }>({ url: Api.GetUserRegistrationTrend })
+}
+
+/**
+ * @description: 站内通知广播
+ */
+export const broadcastNotifications = (data: {
+  target: 'all' | 'subscribers' | 'single'
+  category_id?: number
+  email?: string
+  username?: string
+  user_id?: number
+  title: string
+  content: string
+  link?: string
+  notif_type?: string
+  related_type?: string
+  related_id?: number
+}) => {
+  return defHttp.post<any>({ url: Api.BroadcastNotifications, data })
 } 

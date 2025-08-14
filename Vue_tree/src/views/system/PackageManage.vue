@@ -18,8 +18,8 @@
           <template v-else-if="column.key === 'action'">
             <Space>
               <Button type="link" @click="handleEdit(record)">编辑</Button>
-              <Button type="link" @click="() => handleReview(record, 'Active')">通过</Button>
-              <Button type="link" danger @click="() => handleReview(record, 'Rejected')">驳回</Button>
+              <Button type="link" @click="() => handleReview(record, 'approved')">通过</Button>
+              <Button type="link" danger @click="() => handleReview(record, 'rejected')">驳回</Button>
               <Button type="link" danger @click="() => handleDelete(record)">删除</Button>
             </Space>
           </template>
@@ -184,8 +184,8 @@
     fetchList()
   }
 
-  const handleReview = async (record: PackageItem, status: 'Active' | 'Rejected') => {
-    await reviewPackage(record.id, { status, review_comment: formState.value.review_comment || '' })
+  const handleReview = async (record: PackageItem, status: 'approved' | 'rejected') => {
+    await reviewPackage(record.id, { status, comment: formState.value.review_comment || '' })
     createMessage.success('审核已提交')
     fetchList()
   }

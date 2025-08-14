@@ -8,6 +8,12 @@ export class AxiosRetry {
    * 重试
    */
   retry(AxiosInstance: AxiosInstance, error: AxiosError) {
+    // 4xx（如404）为客户端错误，不进行自动重试
+    const status = error?.response?.status
+    if (status && status >= 400 && status < 500) {
+      return Promise.reject(error)
+    }
+
     // @ts-ignore
     const { config } = error.response
     const { waitTime, count } = config?.requestOptions?.retryRequest

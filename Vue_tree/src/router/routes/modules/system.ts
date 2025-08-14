@@ -137,6 +137,36 @@ const system: AppRouteModule = {
       },
     },
     {
+      path: 'app',
+      name: 'AppManage',
+      component: () => import('/@/views/system/AppManage.vue'),
+      meta: {
+        title: 'App管理',
+        icon: 'ion:phone-portrait-outline',
+        roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
+      path: 'notify',
+      name: 'NotificationPush',
+      component: () => import('/@/views/system/NotificationPush.vue'),
+      meta: {
+        title: '推送通知',
+        icon: 'ion:megaphone-outline',
+        roles: [RoleEnum.ADMIN],
+      },
+    },
+    {
+      path: 'comments',
+      name: 'CommentManage',
+      component: () => import('/@/views/system/CommentManage.vue'),
+      meta: {
+        title: '评论管理',
+        icon: 'ion:chatbubbles-outline',
+        roles: [RoleEnum.ADMIN, RoleEnum.MODERATOR],
+      },
+    },
+    {
       path: 'settings',
       name: 'SystemSettings',
       component: () => import('/@/views/setup/index.vue'),

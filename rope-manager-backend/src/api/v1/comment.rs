@@ -17,9 +17,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(delete_comment)
             .service(get_comment_replies)
             .service(reply_comment)
-            .service(batch_update_status)
-            .service(batch_delete_comments)
+            .service(batch_update_status_put)
+            .service(batch_update_status_post)
             .service(batch_delete_comments_post)
+            .service(batch_delete_comments_delete)
             .service(like_comment)
             .service(dislike_comment)
             .service(check_comment_like_status)
@@ -109,7 +110,7 @@ async fn get_all_comments(
         let start_date = match &query.start_date { Some(d) if !d.is_empty() => Some(d.as_str()), _ => None };
         let end_date = match &query.end_date { Some(d) if !d.is_empty() => Some(d.as_str()), _ => None };
         return match comment_service.get_all_comments(
-            page, size, status, target_type, query.target_id, query.user_id, start_date, end_date,
+            page, size, status, target_type, query.target_id, query.user_id, start_date, end_date, query.search.as_deref(),
         ).await {
             Ok((comments, total)) => {
                 let response = CommentListResponse { list: comments, total, page, size };
@@ -144,7 +145,7 @@ async fn get_all_comments(
     let end_date = None;
 
     match comment_service.get_all_comments(
-        page, size, status, target_type, query.target_id, None, start_date, end_date,
+        page, size, status, target_type, query.target_id, None, start_date, end_date, None,
     ).await {
         Ok((comments, total)) => {
             let response = CommentListResponse { list: comments, total, page, size };
@@ -388,58 +389,77 @@ async fn reply_comment(
     }
 }
 
-// 批量更新评论状态
-#[put("/batch/status")]
-async fn batch_update_status(
-    req: web::Json<BatchStatusRequest>,
+// 批量更新评论状态 - 内部处理函数
+async fn do_batch_update_status(
+    payload: BatchStatusRequest,
     comment_service: web::Data<CommentService>,
     auth_user: AuthenticatedUser,
-) -> impl Responder {
-    // 只有管理员可以批量更新状态
+) -> HttpResponse {
     if !auth_user.is_admin() {
-        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-            403, "只有管理员可以批量更新评论状态"
-        ));
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(403, "只有管理员可以批量更新评论状态"));
     }
-    
-    match comment_service.batch_update_status(req.ids.clone(), req.status.clone()).await {
-        Ok(_) => {
-            HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量更新评论状态成功"))
-        },
+    match comment_service.batch_update_status(payload.ids, payload.status).await {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量更新评论状态成功")),
         Err(e) => {
             log::error!("批量更新评论状态失败: {}", e);
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                500, &format!("批量更新评论状态失败: {}", e)
-            ))
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("批量更新评论状态失败: {}", e)))
         }
     }
 }
 
-// 批量删除评论
-#[delete("/batch")]
-async fn batch_delete_comments(
+// 批量更新评论状态
+#[put("/batch/status")]
+async fn batch_update_status_put(
+    req: web::Json<BatchStatusRequest>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    do_batch_update_status(req.into_inner(), comment_service, auth_user).await
+}
+
+#[post("/batch-status")]
+async fn batch_update_status_post(
+    req: web::Json<BatchStatusRequest>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    do_batch_update_status(req.into_inner(), comment_service, auth_user).await
+}
+
+// 批量删除评论 - 内部处理函数
+async fn do_batch_delete_comments(
+    payload: BatchIdsRequest,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> HttpResponse {
+    if !auth_user.is_admin() {
+        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(403, "只有管理员可以批量删除评论"));
+    }
+    match comment_service.batch_delete_comments(payload.ids).await {
+        Ok(_) => HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量删除评论成功")),
+        Err(e) => {
+            log::error!("批量删除评论失败: {}", e);
+            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("批量删除评论失败: {}", e)))
+        }
+    }
+}
+
+#[post("/batch-delete")]
+async fn batch_delete_comments_post(
     req: web::Json<BatchIdsRequest>,
     comment_service: web::Data<CommentService>,
     auth_user: AuthenticatedUser,
 ) -> impl Responder {
-    // 只有管理员可以批量删除评论
-    if !auth_user.is_admin() {
-        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(
-            403, "只有管理员可以批量删除评论"
-        ));
-    }
-    
-    match comment_service.batch_delete_comments(req.ids.clone()).await {
-        Ok(_) => {
-            HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量删除评论成功"))
-        },
-        Err(e) => {
-            log::error!("批量删除评论失败: {}", e);
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
-                500, &format!("批量删除评论失败: {}", e)
-            ))
-        }
-    }
+    do_batch_delete_comments(req.into_inner(), comment_service, auth_user).await
+}
+
+#[delete("/batch-delete")]
+async fn batch_delete_comments_delete(
+    req: web::Json<BatchIdsRequest>,
+    comment_service: web::Data<CommentService>,
+    auth_user: AuthenticatedUser,
+) -> impl Responder {
+    do_batch_delete_comments(req.into_inner(), comment_service, auth_user).await
 }
 
 // 点赞评论
@@ -601,25 +621,6 @@ pub async fn get_user_comments(
         }
     }
 } 
-
-#[post("/batch-delete")]
-async fn batch_delete_comments_post(
-    req: web::Json<BatchIdsRequest>,
-    comment_service: web::Data<CommentService>,
-    auth_user: AuthenticatedUser,
-) -> impl Responder {
-    // 复用DELETE逻辑
-    if !auth_user.is_admin() {
-        return HttpResponse::Forbidden().json(ApiResponse::<()>::error(403, "只有管理员可以批量删除评论"));
-    }
-    match comment_service.batch_delete_comments(req.ids.clone()).await {
-        Ok(_) => HttpResponse::Ok().json(ApiResponse::<()>::success_msg("批量删除评论成功")),
-        Err(e) => {
-            log::error!("批量删除评论失败: {}", e);
-            HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("批量删除评论失败: {}", e)))
-        }
-    }
-}
 
 // 检查评论点赞状态
 #[get("/{comment_id}/like-status")]

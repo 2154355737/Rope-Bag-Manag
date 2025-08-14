@@ -8,6 +8,15 @@ use crate::services::user_action_service::UserActionService;
 use crate::services::package_service::PackageService;
 use crate::services::post_service::PostService;
 
+#[derive(serde::Deserialize)]
+struct GetUsersQuery {
+    page: Option<i32>,
+    page_size: Option<i32>,
+    search: Option<String>,
+    role: Option<String>,
+    ban_status: Option<String>,
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/users")
@@ -61,22 +70,36 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 async fn get_users(
     http_req: HttpRequest,
     user_service: web::Data<UserService>,
+    query: web::Query<GetUsersQuery>,
 ) -> Result<HttpResponse, actix_web::Error> {
     // 验证管理员权限
     match AuthHelper::require_admin(&http_req) {
         Ok(_admin_user) => {
             match user_service.get_users().await {
-                Ok(users) => Ok(HttpResponse::Ok().json(json!({
-                    "code": 0,
-                    "message": "success",
-                    "data": {
-                        "list": users,
-                        "total": users.len(),
-                        "page": 1,
-                        "pageSize": users.len(),
-                        "totalPages": 1
-                    }
-                }))),
+                Ok(mut users) => {
+                    // 过滤
+                    if let Some(s) = &query.search { let k = s.to_lowercase(); users.retain(|u| u.username.to_lowercase().contains(&k) || u.email.to_lowercase().contains(&k)); }
+                    if let Some(r) = &query.role { let rk = r.to_lowercase(); users.retain(|u| format!("{:?}", u.role).to_lowercase()==rk || match u.role { crate::models::UserRole::Admin=>"admin",crate::models::UserRole::Moderator=>"moderator",crate::models::UserRole::Elder=>"elder",crate::models::UserRole::User=>"user",}.eq(&rk)); }
+                    if let Some(bs) = &query.ban_status { let bsk = bs.to_lowercase(); users.retain(|u| match u.ban_status { crate::models::BanStatus::Normal=>"normal", crate::models::BanStatus::Suspended=>"suspended", crate::models::BanStatus::Banned=>"banned"}.eq(&bsk)); }
+                    // 分页
+                    let page = query.page.unwrap_or(1).max(1);
+                    let page_size = query.page_size.unwrap_or(20).max(1);
+                    let total = users.len() as i32;
+                    let start = ((page - 1) * page_size) as usize;
+                    let end = std::cmp::min(start + page_size as usize, users.len());
+                    let page_list = if start < users.len() { users[start..end].to_vec() } else { Vec::new() };
+                    Ok(HttpResponse::Ok().json(json!({
+                        "code": 0,
+                        "message": "success",
+                        "data": {
+                            "list": page_list,
+                            "total": total,
+                            "page": page,
+                            "pageSize": page_size,
+                            "totalPages": ((total as f64)/(page_size as f64)).ceil() as i32
+                        }
+                    })))
+                },
                 Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
                     "code": 500,
                     "message": e.to_string()
@@ -371,34 +394,33 @@ async fn create_user(
     }
 }
 
-// 新增方法：批量删除用户
+// 批量删除用户（支持 ids 或 usernames）
 async fn batch_delete_users(
     req: web::Json<serde_json::Value>,
     user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let usernames = req["usernames"].as_array()
-        .map(|arr| arr.iter()
-            .filter_map(|v| v.as_str())
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>())
-        .unwrap_or_default();
-
-    if usernames.is_empty() {
-        return Ok(HttpResponse::BadRequest().json(json!({
-            "code": 400,
-            "message": "请选择要删除的用户"
-        })));
+    // 优先按ids删除
+    if let Some(ids_val) = req.get("ids") {
+        if let Some(arr) = ids_val.as_array() {
+            let ids: Vec<i32> = arr.iter().filter_map(|v| v.as_i64().map(|x| x as i32)).collect();
+            if !ids.is_empty() {
+                match user_service.batch_delete_users_by_ids(ids).await {
+                    Ok(_) => return Ok(HttpResponse::Ok().json(json!({"code":0,"message":"批量删除成功"}))),
+                    Err(e) => return Ok(HttpResponse::InternalServerError().json(json!({"code":500,"message":e.to_string()})))
+                }
+            }
+        }
     }
-
+    // 兼容按用户名删除
+    let usernames = req["usernames"].as_array()
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(|s| s.to_string()).collect::<Vec<String>>())
+        .unwrap_or_default();
+    if usernames.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(json!({"code":400,"message":"缺少 ids 或 usernames"})));
+    }
     match user_service.batch_delete_users(usernames).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "批量删除成功"
-        }))),
-        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
-            "code": 500,
-            "message": e.to_string()
-        })))
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0,"message":"批量删除成功"}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500,"message":e.to_string()})))
     }
 } 
 

@@ -56,8 +56,8 @@ export interface UpdatePackagePayload {
 }
 
 export interface ReviewPayload {
-  status: 'Active' | 'Rejected'
-  review_comment?: string
+  status: 'approved' | 'rejected'
+  comment?: string
 }
 
 const Api = {

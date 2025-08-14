@@ -112,13 +112,13 @@
   }
 
   const approvePackage = async (row: PackageItem) => {
-    await reviewPackage(row.id, { status: 'Active', review_comment: '' })
+    await reviewPackage(row.id, { status: 'approved', comment: '' })
     await fetchPackages()
     await nextTick(); renderModChart()
   }
 
   const rejectPackage = async (row: PackageItem) => {
-    await reviewPackage(row.id, { status: 'Rejected', review_comment: '' })
+    await reviewPackage(row.id, { status: 'rejected', comment: '' })
     await fetchPackages()
     await nextTick(); renderModChart()
   }
