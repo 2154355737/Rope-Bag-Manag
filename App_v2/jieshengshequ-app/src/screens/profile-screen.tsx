@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download } from 'lucide-react'
+import QRCodeLib from 'qrcode'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -9,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,6 +25,14 @@ const ProfileScreen: React.FC = () => {
   // 编辑状态管理
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // 分享和二维码状态管理
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
+  const [isQRDialogOpen, setIsQRDialogOpen] = useState(false)
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('')
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false)
+  const [qrContentType, setQrContentType] = useState<'url' | 'vcard'>('url')
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
   
   // 用户资料状态
   const [userProfile, setUserProfile] = useState({
@@ -103,6 +112,181 @@ const ProfileScreen: React.FC = () => {
       ...prev,
       [field]: value
     }))
+  }
+
+  // 生成个人资料链接
+  const generateProfileLink = () => {
+    const baseUrl = window.location.origin
+    const profileId = userProfile.name.toLowerCase().replace(/\s+/g, '-')
+    return `${baseUrl}/profile/${profileId}`
+  }
+
+  // 处理分享功能
+  const handleShare = () => {
+    setIsShareDialogOpen(true)
+  }
+
+  // 复制链接到剪贴板
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast({
+        title: "复制成功",
+        description: "链接已复制到剪贴板",
+        variant: "default"
+      })
+    } catch (err) {
+      // 降级方案
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      toast({
+        title: "复制成功",
+        description: "链接已复制到剪贴板",
+        variant: "default"
+      })
+    }
+  }
+
+  // 打开二维码对话框
+  const openQRDialog = () => {
+    setIsQRDialogOpen(true)
+    if (!qrCodeDataUrl) {
+      generateQRCode()
+    }
+  }
+
+  // 生成二维码
+  const generateQRCode = async () => {
+    setIsGeneratingQR(true)
+    
+    try {
+      const profileLink = generateProfileLink()
+      
+      // 根据类型生成不同的二维码内容
+      let qrContent = profileLink
+      
+      if (qrContentType === 'vcard') {
+        qrContent = `BEGIN:VCARD
+VERSION:3.0
+FN:${userProfile.name}
+ORG:结绳社区
+TITLE:${userProfile.level}
+EMAIL:${userProfile.email}
+URL:${profileLink}
+NOTE:${userProfile.bio}
+END:VCARD`
+      }
+
+      // 生成二维码图片
+      const qrOptions = {
+        errorCorrectionLevel: 'M' as const,
+        type: 'image/png' as const,
+        quality: 0.95,
+        margin: 1,
+        color: {
+          dark: '#1f2937',  // 深灰色，更现代
+          light: '#ffffff',
+        },
+        width: 240,
+        scale: 8,  // 高清晰度
+      }
+
+      const dataUrl = await QRCodeLib.toDataURL(qrContent, qrOptions)
+      setQrCodeDataUrl(dataUrl)
+      
+      // 如果有canvas引用，也在canvas上绘制
+      if (qrCanvasRef.current) {
+        await QRCodeLib.toCanvas(qrCanvasRef.current, qrContent, qrOptions)
+      }
+      
+    } catch (error) {
+      console.error('生成二维码失败:', error)
+      toast({
+        title: "生成失败",
+        description: "二维码生成失败，请重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGeneratingQR(false)
+    }
+  }
+
+  // 下载二维码
+  const downloadQRCode = () => {
+    if (!qrCodeDataUrl) {
+      toast({
+        title: "下载失败",
+        description: "请先生成二维码",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      // 创建下载链接
+      const link = document.createElement('a')
+      link.href = qrCodeDataUrl
+      link.download = `${userProfile.name}-个人二维码.png`
+      
+      // 触发下载
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      toast({
+        title: "下载成功",
+        description: "二维码图片已保存",
+        variant: "default"
+      })
+    } catch (error) {
+      console.error('下载二维码失败:', error)
+      toast({
+        title: "下载失败",
+        description: "保存图片时出现错误",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // 重新生成二维码
+  const regenerateQRCode = () => {
+    setQrCodeDataUrl('')
+    generateQRCode()
+  }
+
+  // 关闭二维码对话框时清理状态
+  const handleQRDialogClose = (open: boolean) => {
+    setIsQRDialogOpen(open)
+    if (!open) {
+      // 可选：保留二维码数据以便下次快速显示
+      // setQrCodeDataUrl('')
+      setIsGeneratingQR(false)
+    }
+  }
+
+  // 原生分享API
+  const nativeShare = async () => {
+    const profileLink = generateProfileLink()
+    const shareData = {
+      title: `${userProfile.name} - 结绳社区`,
+      text: `来看看 ${userProfile.name} 在结绳社区的个人资料`,
+      url: profileLink
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else {
+        // 降级到复制链接
+        await copyToClipboard(profileLink)
+      }
+    } catch (err) {
+      console.log('分享取消或失败')
+    }
   }
   
   // 处理头像上传
@@ -309,13 +493,7 @@ const ProfileScreen: React.FC = () => {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-1 text-xs px-3 py-1 h-7 w-16"
-                onClick={() => {
-                  toast({
-                    title: "分享个人资料",
-                    description: "个人资料链接已复制到剪贴板",
-                    variant: "default"
-                  })
-                }}
+                onClick={handleShare}
               >
                 <Share2 size={12} />
                 分享
@@ -324,13 +502,7 @@ const ProfileScreen: React.FC = () => {
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-1 text-xs px-3 py-1 h-7 w-16"
-                onClick={() => {
-                  toast({
-                    title: "个人二维码",
-                    description: "正在生成个人二维码",
-                    variant: "default"
-                  })
-                }}
+                onClick={openQRDialog}
               >
                 <QrCode size={12} />
                 二维码
@@ -357,6 +529,9 @@ const ProfileScreen: React.FC = () => {
                   <div className="p-6">
                   <DialogHeader className="pb-2">
                     <DialogTitle className="text-center text-lg">编辑个人资料</DialogTitle>
+                    <DialogDescription className="text-center text-sm">
+                      修改您的个人信息和偏好设置
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-5 py-2">
                     <div className="bg-muted/30 rounded-lg p-4 space-y-3">
@@ -750,6 +925,176 @@ const ProfileScreen: React.FC = () => {
           <LogOut size={16} className="mr-2" /> 退出登录
         </Button>
       </div>
+
+      {/* 分享对话框 */}
+      <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+        <DialogContent className="max-w-sm w-[calc(100vw-3rem)] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-center">分享个人资料</DialogTitle>
+            <DialogDescription className="text-center">
+              通过链接或原生分享功能分享您的个人资料
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-3 bg-primary/10 rounded-full flex items-center justify-center">
+                <Share2 size={24} className="text-primary" />
+              </div>
+              <h3 className="font-medium mb-2">{userProfile.name}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{userProfile.bio}</p>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="text-xs text-muted-foreground mb-1">个人资料链接</div>
+                <div className="text-sm break-all">{generateProfileLink()}</div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(generateProfileLink())}
+                  className="flex items-center gap-2"
+                >
+                  <Copy size={16} />
+                  复制链接
+                </Button>
+                <Button
+                  onClick={nativeShare}
+                  className="flex items-center gap-2"
+                >
+                  <Share2 size={16} />
+                  分享
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 二维码对话框 */}
+      <Dialog open={isQRDialogOpen} onOpenChange={handleQRDialogClose}>
+        <DialogContent className="max-w-sm w-[calc(100vw-3rem)] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-center">个人二维码</DialogTitle>
+            <DialogDescription className="text-center">
+              生成包含个人信息的二维码，支持链接和名片两种格式
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="w-64 h-64 mx-auto mb-4 bg-white rounded-lg border-2 border-gray-200 flex items-center justify-center overflow-hidden">
+                {isGeneratingQR ? (
+                  <div className="text-center">
+                    <div className="w-8 h-8 mx-auto mb-2 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div className="text-xs text-gray-500">生成中...</div>
+                  </div>
+                ) : qrCodeDataUrl ? (
+                  <img 
+                    src={qrCodeDataUrl} 
+                    alt="个人二维码" 
+                    className="w-full h-full object-contain p-4"
+                  />
+                ) : (
+                  <div className="text-center">
+                    <QrCode size={48} className="mx-auto mb-2 text-gray-400" />
+                    <div className="text-xs text-gray-500">二维码</div>
+                    <div className="text-xs text-gray-400 mt-1">扫描查看个人资料</div>
+                  </div>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                扫描二维码查看 {userProfile.name} 的个人资料
+              </p>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-muted-foreground">二维码类型：</div>
+                <div className="flex gap-1">
+                  <Button
+                    variant={qrContentType === 'url' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs h-6 px-2"
+                    onClick={() => {
+                      setQrContentType('url')
+                      setQrCodeDataUrl('')
+                      generateQRCode()
+                    }}
+                  >
+                    链接
+                  </Button>
+                  <Button
+                    variant={qrContentType === 'vcard' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs h-6 px-2"
+                    onClick={() => {
+                      setQrContentType('vcard')
+                      setQrCodeDataUrl('')
+                      generateQRCode()
+                    }}
+                  >
+                    名片
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="text-xs text-muted-foreground">
+                {qrContentType === 'url' ? '链接二维码：' : 'vCard名片：'}
+              </div>
+              <div className="p-3 bg-muted/30 rounded-lg text-xs space-y-1">
+                {qrContentType === 'url' ? (
+                  <div>
+                    <div className="font-medium mb-1">个人资料链接：</div>
+                    <div className="break-all text-blue-600">{generateProfileLink()}</div>
+                  </div>
+                ) : (
+                  <>
+                    <div><span className="font-medium">姓名：</span>{userProfile.name}</div>
+                    <div><span className="font-medium">等级：</span>{userProfile.level}</div>
+                    <div><span className="font-medium">邮箱：</span>{userProfile.email}</div>
+                    <div><span className="font-medium">链接：</span>{generateProfileLink()}</div>
+                    <div><span className="font-medium">简介：</span>{userProfile.bio}</div>
+                  </>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(generateProfileLink())}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <Copy size={14} />
+                  复制链接
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={regenerateQRCode}
+                  disabled={isGeneratingQR}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <QrCode size={14} />
+                  重新生成
+                </Button>
+                <Button
+                  onClick={downloadQRCode}
+                  disabled={!qrCodeDataUrl || isGeneratingQR}
+                  className="flex items-center gap-1 text-xs"
+                >
+                  <Download size={14} />
+                  保存图片
+                </Button>
+              </div>
+            </div>
+          </div>
+          
+          {/* 隐藏的canvas用于生成二维码 */}
+          <canvas ref={qrCanvasRef} style={{ display: 'none' }} />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
