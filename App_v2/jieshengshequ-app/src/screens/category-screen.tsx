@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label'
 
 const CategoryScreen: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState('all')
-  const [activeSubCategory, setActiveSubCategory] = useState('all')
   
   const categories = [
     { id: 'all', name: '全部' },
@@ -23,44 +22,7 @@ const CategoryScreen: React.FC = () => {
     { id: 'interview', name: '面试题' },
   ]
   
-  const subCategories = {
-    all: [
-      { id: 'all', name: '全部' },
-      { id: 'beginner', name: '入门' },
-      { id: 'intermediate', name: '中级' },
-      { id: 'advanced', name: '高级' },
-    ],
-    basic: [
-      { id: 'all', name: '全部' },
-      { id: 'syntax', name: '语法' },
-      { id: 'datatype', name: '数据类型' },
-      { id: 'function', name: '函数' },
-    ],
-    advanced: [
-      { id: 'all', name: '全部' },
-      { id: 'async', name: '异步编程' },
-      { id: 'memory', name: '内存管理' },
-      { id: 'performance', name: '性能优化' },
-    ],
-    project: [
-      { id: 'all', name: '全部' },
-      { id: 'web', name: 'Web开发' },
-      { id: 'mobile', name: '移动开发' },
-      { id: 'backend', name: '后端开发' },
-    ],
-    algorithm: [
-      { id: 'all', name: '全部' },
-      { id: 'sort', name: '排序算法' },
-      { id: 'search', name: '搜索算法' },
-      { id: 'graph', name: '图论算法' },
-    ],
-    interview: [
-      { id: 'all', name: '全部' },
-      { id: 'coding', name: '编程题' },
-      { id: 'theory', name: '理论题' },
-      { id: 'design', name: '设计题' },
-    ],
-  }
+
   
   const resources = [
     {
@@ -165,10 +127,7 @@ const CategoryScreen: React.FC = () => {
               key={category.id}
               variant={activeCategory === category.id ? "default" : "ghost"}
               className="rounded-full text-sm px-4"
-              onClick={() => {
-                setActiveCategory(category.id)
-                setActiveSubCategory('all')
-              }}
+              onClick={() => setActiveCategory(category.id)}
             >
               {category.name}
             </Button>
@@ -176,21 +135,7 @@ const CategoryScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 二级分类 */}
-      <div className="border-b overflow-x-auto bg-muted/30">
-        <div className="flex p-2 min-w-max">
-          {subCategories[activeCategory as keyof typeof subCategories].map((subCategory) => (
-            <Button
-              key={subCategory.id}
-              variant={activeSubCategory === subCategory.id ? "secondary" : "ghost"}
-              className="rounded-full text-xs px-3"
-              onClick={() => setActiveSubCategory(subCategory.id)}
-            >
-              {subCategory.name}
-            </Button>
-          ))}
-        </div>
-      </div>
+
 
       {/* 内容标签页 */}
       <div className="p-4 flex-1">

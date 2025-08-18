@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowLeft, Send, FileText, Package, Upload, Hash, Folder, Tag, Code, Image, Bold, Italic, Link, Camera, X, Eye, Edit3, Info, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Send, FileText, Package, Upload, Hash, Folder, Tag, Code, Image, Bold, Italic, Link, Camera, X, Eye, Edit3, Info, Clock, CheckCircle, AlertCircle, Monitor, Smartphone, Globe, Settings, Star, List, Plus } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,9 +30,14 @@ const PublishScreen: React.FC = () => {
   const [version, setVersion] = useState('')
   const [category, setCategory] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [screenshots, setScreenshots] = useState<File[]>([])
+  const [requirements, setRequirements] = useState<string[]>([])
+  const [newRequirement, setNewRequirement] = useState('')
 
   // 帖子专用字段  
   const [images, setImages] = useState<File[]>([])
+  const [codeSnippet, setCodeSnippet] = useState('')
+  const [showCodeEditor, setShowCodeEditor] = useState(false)
   
   // 富文本编辑器状态
   const [showPreview, setShowPreview] = useState(false)
@@ -73,6 +78,28 @@ const PublishScreen: React.FC = () => {
     }
   }
 
+  const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const uploadedScreenshots = event.target.files
+    if (uploadedScreenshots) {
+      setScreenshots([...screenshots, ...Array.from(uploadedScreenshots)])
+    }
+  }
+
+  const handleAddRequirement = () => {
+    if (newRequirement.trim() && !requirements.includes(newRequirement.trim()) && requirements.length < 10) {
+      setRequirements([...requirements, newRequirement.trim()])
+      setNewRequirement('')
+    }
+  }
+
+  const handleRemoveRequirement = (reqToRemove: string) => {
+    setRequirements(requirements.filter(req => req !== reqToRemove))
+  }
+
+  const removeScreenshot = (index: number) => {
+    setScreenshots(screenshots.filter((_, i) => i !== index))
+  }
+
   const handleRemoveFile = (index: number) => {
     setFiles(files.filter((_, i) => i !== index))
   }
@@ -81,7 +108,8 @@ const PublishScreen: React.FC = () => {
     setImages(images.filter((_, i) => i !== index))
   }
 
-  const insertMarkdown = (syntax: string, placeholder: string = '') => {
+  // Markdown工具栏功能
+  const insertMarkdown = (syntax: string, placeholder = '') => {
     const textarea = document.getElementById('content-editor') as HTMLTextAreaElement
     if (!textarea) return
 
@@ -92,23 +120,25 @@ const PublishScreen: React.FC = () => {
     let newText = ''
     switch (syntax) {
       case 'bold':
-        newText = `**${selectedText || placeholder}**`
+        newText = `**${selectedText || placeholder || '粗体文字'}**`
         break
       case 'italic':
-        newText = `*${selectedText || placeholder}*`
+        newText = `*${selectedText || placeholder || '斜体文字'}*`
         break
       case 'code':
-        newText = `\`${selectedText || placeholder}\``
-        break
-      case 'codeblock':
-        newText = `\`\`\`\n${selectedText || placeholder}\n\`\`\``
+        newText = `\`${selectedText || placeholder || '代码'}\``
         break
       case 'link':
-        newText = `[${selectedText || placeholder}](url)`
+        newText = `[${selectedText || '链接文字'}](${placeholder || 'https://'})`
         break
       case 'image':
-        newText = `![${selectedText || placeholder}](image-url)`
+        newText = `![${selectedText || '图片描述'}](${placeholder || '图片链接'})`
         break
+      case 'codeblock':
+        newText = `\`\`\`\n${selectedText || placeholder || '代码块'}\n\`\`\``
+        break
+      default:
+        return
     }
 
     const newContent = content.substring(0, start) + newText + content.substring(end)
@@ -164,9 +194,12 @@ const PublishScreen: React.FC = () => {
         ...(publishType === 'resource' ? {
           version,
           category,
-          files: files.map(f => f.name)
+          files: files.map(f => ({ name: f.name, size: f.size, type: f.type })),
+          screenshots: screenshots.map(s => ({ name: s.name, size: s.size })),
+          requirements
         } : {
-          images: images.map(img => img.name)
+          images: images.map(img => ({ name: img.name, size: img.size })),
+          codeSnippet
         })
       }
       
@@ -186,6 +219,9 @@ const PublishScreen: React.FC = () => {
       setCategory('')
       setFiles([])
       setImages([])
+      setScreenshots([])
+      setRequirements([])
+      setCodeSnippet('')
       
       // 延迟跳转，让用户看到成功提示
       setTimeout(() => {
@@ -215,20 +251,7 @@ const PublishScreen: React.FC = () => {
           <h1 className="text-lg font-semibold">
             {publishType === 'resource' ? '发布资源' : '发布帖子'}
           </h1>
-          <Button
-            onClick={handlePublish}
-            disabled={isPublishing || !title.trim() || !content.trim()}
-            size="sm"
-          >
-            {isPublishing ? (
-              <>发布中...</>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-1" />
-                发布
-              </>
-            )}
-          </Button>
+          <div className="w-10"></div>
         </div>
         </div>
       </div>
@@ -429,6 +452,126 @@ const PublishScreen: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* 预览截图 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  预览截图
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {screenshots.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {screenshots.map((screenshot, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={URL.createObjectURL(screenshot)}
+                            alt={`Screenshot ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border"
+                          />
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-1 right-1 h-6 w-6 p-0"
+                            onClick={() => removeScreenshot(index)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="text-center">
+                      <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">添加预览截图</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPG/PNG格式，建议尺寸16:9</p>
+                    </div>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/jpeg,image/png"
+                      onChange={handleScreenshotUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>截图建议：</strong>
+                      <ul className="mt-1 space-y-0.5">
+                        <li>• 展示资源的主要功能和界面</li>
+                        <li>• 图片清晰，尺寸统一</li>
+                        <li>• 建议3-5张截图，突出亮点</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 系统要求 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Settings className="h-4 w-4 mr-2" />
+                  系统要求
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {requirements.length > 0 && (
+                    <div className="space-y-2">
+                      {requirements.map((req, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm">{req}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveRequirement(req)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="例如：Node.js >= 16.0.0"
+                      value={newRequirement}
+                      onChange={(e) => setNewRequirement(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && handleAddRequirement()}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddRequirement}
+                      disabled={!newRequirement.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>要求说明：</strong>
+                      <ul className="mt-1 space-y-0.5">
+                        <li>• 列出运行环境和依赖版本</li>
+                        <li>• 包括操作系统、软件版本等</li>
+                        <li>• 帮助用户判断兼容性</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
 
@@ -536,6 +679,74 @@ const PublishScreen: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* 帖子专用：代码片段 */}
+        {publishType === 'post' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                <div className="flex items-center">
+                  <Code className="h-4 w-4 mr-2" />
+                  代码片段（可选）
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCodeEditor(!showCodeEditor)}
+                >
+                  {showCodeEditor ? '收起' : '展开'}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            {showCodeEditor && (
+              <CardContent>
+                <div className="space-y-3">
+                  <Textarea
+                    placeholder="粘贴代码片段，支持多种编程语言..."
+                    value={codeSnippet}
+                    onChange={(e) => setCodeSnippet(e.target.value)}
+                    className="font-mono text-sm min-h-[200px]"
+                    maxLength={5000}
+                  />
+                  <div className="flex justify-between items-center">
+                    <div className="text-xs text-muted-foreground">
+                      {codeSnippet.length}/5000 字符
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => insertMarkdown('codeblock', codeSnippet)}
+                        disabled={!codeSnippet.trim()}
+                      >
+                        插入到内容
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCodeSnippet('')}
+                        disabled={!codeSnippet.trim()}
+                      >
+                        清空
+                      </Button>
+                    </div>
+                  </div>
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      <strong>代码建议：</strong>
+                      <ul className="mt-1 space-y-0.5">
+                        <li>• 添加注释说明代码功能</li>
+                        <li>• 保持代码格式清晰易读</li>
+                        <li>• 可以点击"插入到内容"添加到正文中</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </CardContent>
+            )}
+          </Card>
+        )}
 
         {/* 帖子专用：图片上传 */}
         {publishType === 'post' && (
@@ -657,6 +868,44 @@ const PublishScreen: React.FC = () => {
             </div>
           </AlertDescription>
         </Alert>
+        </div>
+
+        {/* 预览和发布区域 */}
+        <div className="container max-w-2xl mx-auto px-4 pb-4">
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                // 这里可以添加预览功能，比如打开模态框显示预览
+                toast.success('预览功能开发中', {
+                  description: '敬请期待完整的预览体验',
+                  duration: 2000,
+                })
+              }}
+              disabled={!title.trim() || !content.trim()}
+            >
+              <Eye className="h-4 w-4 mr-1" />
+              预览
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handlePublish}
+              disabled={isPublishing || !title.trim() || !content.trim()}
+            >
+              {isPublishing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  发布中...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-1" />
+                  {publishType === 'resource' ? '发布资源' : '发布帖子'}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -3,7 +3,8 @@ import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Heart, MessageSquare, Share2, Bookmark, 
-  MoreHorizontal, Send, Flag, Hash, ThumbsUp, ThumbsDown 
+  MoreHorizontal, Send, Flag, Hash, ThumbsUp, ThumbsDown,
+  Eye, Calendar, CheckCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -26,6 +27,7 @@ const PostDetailScreen: React.FC = () => {
     author: {
       name: '王五',
       avatar: 'https://i.pravatar.cc/150?img=3',
+      verified: true,
     },
     content: '刚完成了一个结绳语言的移动应用项目，分享一些开发过程中的经验和踩过的坑。\n\n首先，结绳语言的异步处理机制非常强大，但需要注意内存管理问题。在开发过程中，我发现如果不正确处理异步任务的取消，很容易导致内存泄漏。\n\n其次，结绳语言的UI渲染性能优化有几个关键点：\n1. 减少不必要的重渲染\n2. 使用虚拟列表处理大量数据\n3. 图片懒加载和缓存\n\n最后，结绳语言的调试工具非常好用，强烈推荐大家尝试！',
     images: [
@@ -45,7 +47,9 @@ async function fetchData() {
     tags: ['移动开发', '项目分享', '经验总结', '踩坑记录', '结绳实战'],
     likes: 78,
     comments: 23,
+    views: 1250,
     time: '昨天 14:30',
+    publishDate: '2025-01-14',
   }
   
   // 模拟评论数据
@@ -134,6 +138,13 @@ async function fetchData() {
     }
   }
 
+  // 格式化数字
+  const formatNumber = (num: number) => {
+    if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+    return num.toString()
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
@@ -163,7 +174,12 @@ async function fetchData() {
                     <AvatarFallback>{post.author.name[0]}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium">{post.author.name}</div>
+                    <div className="flex items-center">
+                      <span className="font-medium">{post.author.name}</span>
+                      {post.author.verified && (
+                        <CheckCircle size={14} className="ml-1 text-blue-500" />
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">{post.time}</div>
                   </div>
                 </div>
@@ -210,20 +226,50 @@ async function fetchData() {
               </div>
             </CardContent>
             
-            <CardFooter className="p-2 pt-0 border-t flex justify-between">
-              <Button variant="ghost" size="sm" className="text-muted-foreground flex-1">
-                <Heart size={16} className="mr-1" /> {post.likes}
-              </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground flex-1">
-                <MessageSquare size={16} className="mr-1" /> {post.comments}
-              </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground flex-1">
-                <Share2 size={16} className="mr-1" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground flex-1">
-                <Bookmark size={16} className="mr-1" />
-              </Button>
+            <CardFooter className="p-4 pt-3 border-t">
+              <div className="flex items-center text-muted-foreground text-xs space-x-4">
+                <div className="flex items-center">
+                  <Calendar size={14} className="mr-1" />
+                  {post.publishDate}
+                </div>
+                <div className="flex items-center">
+                  <Eye size={14} className="mr-1" />
+                  {formatNumber(post.views)}
+                </div>
+                <div className="flex items-center">
+                  <Heart size={14} className="mr-1" />
+                  {formatNumber(post.likes)}
+                </div>
+                <div className="flex items-center">
+                  <MessageSquare size={14} className="mr-1" />
+                  {formatNumber(post.comments)}
+                </div>
+              </div>
             </CardFooter>
+          </Card>
+
+          {/* 操作按钮 */}
+          <Card className="mb-4">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-4 gap-2">
+                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
+                  <Heart size={18} className="mb-1" />
+                  <span className="text-xs">点赞</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
+                  <Share2 size={18} className="mb-1" />
+                  <span className="text-xs">分享</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
+                  <Bookmark size={18} className="mb-1" />
+                  <span className="text-xs">收藏</span>
+                </Button>
+                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
+                  <Flag size={18} className="mb-1" />
+                  <span className="text-xs">举报</span>
+                </Button>
+              </div>
+            </CardContent>
           </Card>
 
           {/* 评论区 */}
@@ -330,29 +376,36 @@ async function fetchData() {
               ))}
             </div>
           </div>
+
+          {/* 评论输入框 */}
+          <Card className="mt-4">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Input
+                  id="comment-input"
+                  name="comment"
+                  placeholder="发表评论..."
+                  className="flex-1"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  maxLength={200}
+                  autoComplete="off"
+                />
+                <Button 
+                  disabled={!commentText.trim()}
+                  onClick={handleSubmitComment}
+                >
+                  <Send size={16} className="mr-1" />
+                  发送
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                {commentText.length}/200 字符
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </ScrollArea>
-
-      {/* 评论输入框 */}
-      <div className="sticky bottom-16 border-t bg-background p-2 flex items-center">
-        <Input
-          id="comment-input"
-          name="comment"
-          placeholder="发表评论..."
-          className="mr-2"
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          maxLength={200}
-          autoComplete="off"
-        />
-        <Button 
-          size="icon" 
-          disabled={!commentText.trim()}
-          onClick={handleSubmitComment}
-        >
-          <Send size={18} />
-        </Button>
-      </div>
     </div>
   )
 }

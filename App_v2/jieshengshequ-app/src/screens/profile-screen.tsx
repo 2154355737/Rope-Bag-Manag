@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -8,15 +9,145 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { toast } from '@/hooks/use-toast'
 import { useTheme } from '@/components/theme-provider'
 
 const ProfileScreen: React.FC = () => {
+  const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
+  
+  // 编辑状态管理
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  
+  // 用户资料状态
+  const [userProfile, setUserProfile] = useState({
+    name: '程序员小王',
+    bio: '结绳语言爱好者，专注移动开发',
+    avatar: 'https://i.pravatar.cc/150?img=5',
+    level: 'Lv.3 进阶开发者',
+    email: 'xiaowang@example.com',
+    location: '北京市',
+    website: 'https://github.com/xiaowang',
+    skills: ['结绳语言', 'React', 'TypeScript', '移动开发', 'Tailwind CSS', 'Node.js', 'Python', 'UI设计']
+  })
+  
+  // 编辑表单状态
+  const [editForm, setEditForm] = useState({
+    name: userProfile.name,
+    bio: userProfile.bio,
+    email: userProfile.email,
+    location: userProfile.location,
+    website: userProfile.website,
+    skills: userProfile.skills.join(', ')
+  })
+  
+  // 格式化数字显示
+  const formatNumber = (num: number) => {
+    if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+    return num.toString()
+  }
+  
+  // 处理编辑对话框打开
+  const handleEditClick = () => {
+    setEditForm({
+      name: userProfile.name,
+      bio: userProfile.bio,
+      email: userProfile.email,
+      location: userProfile.location,
+      website: userProfile.website,
+      skills: userProfile.skills.join(', ')
+    })
+    setIsEditDialogOpen(true)
+  }
+  
+  // 处理表单输入变化
+  const handleFormChange = (field: string, value: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+  
+  // 处理头像上传
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      // 这里应该上传到服务器，现在模拟
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          setUserProfile(prev => ({
+            ...prev,
+            avatar: e.target!.result as string
+          }))
+          toast({
+            title: "头像上传成功",
+            description: "您的头像已更新",
+            duration: 3000,
+          })
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+  
+  // 处理保存
+  const handleSave = async () => {
+    if (!editForm.name.trim()) {
+      toast({
+        title: "保存失败",
+        description: "用户名不能为空",
+        variant: "destructive",
+        duration: 3000,
+      })
+      return
+    }
+    
+    setIsSaving(true)
+    
+    try {
+      // 模拟API调用
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // 更新用户资料
+      setUserProfile(prev => ({
+        ...prev,
+        name: editForm.name,
+        bio: editForm.bio,
+        email: editForm.email,
+        location: editForm.location,
+        website: editForm.website,
+        skills: editForm.skills.split(',').map(s => s.trim()).filter(s => s)
+      }))
+      
+      setIsEditDialogOpen(false)
+      toast({
+        title: "保存成功",
+        description: "您的个人资料已更新",
+        duration: 3000,
+      })
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: "请稍后重试",
+        variant: "destructive",
+        duration: 3000,
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
   
   const userStats = {
     posts: 12,
-    followers: 156,
-    following: 89,
+    resources: 8,
+    views: 2560,
     likes: 328,
   }
   
@@ -74,7 +205,7 @@ const ProfileScreen: React.FC = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold">个人中心</h1>
           
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
             <Settings size={20} />
           </Button>
         </div>
@@ -82,40 +213,206 @@ const ProfileScreen: React.FC = () => {
 
       {/* 用户信息 */}
       <div className="p-4 border-b">
-        <div className="flex items-center">
-          <Avatar className="h-20 w-20 mr-4">
-            <AvatarImage src="https://i.pravatar.cc/150?img=5" />
-            <AvatarFallback>用户</AvatarFallback>
-          </Avatar>
+        <div className="flex items-start gap-4">
+          <div className="relative flex-shrink-0">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={userProfile.avatar} />
+              <AvatarFallback>{userProfile.name[0]}</AvatarFallback>
+            </Avatar>
+            <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background">
+              <Camera size={14} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
           
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">程序员小王</h2>
-              <Button variant="outline" size="sm" className="flex items-center">
-                <Edit size={14} className="mr-1" /> 编辑
-              </Button>
+              <h2 className="text-xl font-bold">{userProfile.name}</h2>
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center" onClick={handleEditClick}>
+                    <Edit size={14} className="mr-1" /> 编辑
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-sm w-[calc(100vw-3rem)] rounded-xl p-0 overflow-hidden shadow-xl left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
+                  <div className="p-6">
+                  <DialogHeader className="pb-2">
+                    <DialogTitle className="text-center text-lg">编辑个人资料</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-5 py-2">
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-sm font-medium text-foreground">用户名 <span className="text-red-500">*</span></Label>
+                        <Input
+                          id="name"
+                          value={editForm.name}
+                          onChange={(e) => handleFormChange('name', e.target.value)}
+                          maxLength={20}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+                          placeholder="请输入用户名"
+                        />
+                        <div className="text-xs text-muted-foreground text-right">
+                          {editForm.name.length}/20
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="bio" className="text-sm font-medium text-foreground">个人简介</Label>
+                        <Textarea
+                          id="bio"
+                          value={editForm.bio}
+                          onChange={(e) => handleFormChange('bio', e.target.value)}
+                          maxLength={100}
+                          rows={3}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors resize-none"
+                          placeholder="介绍一下你自己..."
+                        />
+                        <div className="text-xs text-muted-foreground text-right">
+                          {editForm.bio.length}/100
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="text-sm font-medium text-foreground">邮箱地址</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={editForm.email}
+                          onChange={(e) => handleFormChange('email', e.target.value)}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+                          placeholder="your@email.com"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="location" className="text-sm font-medium text-foreground">所在地</Label>
+                        <Input
+                          id="location"
+                          value={editForm.location}
+                          onChange={(e) => handleFormChange('location', e.target.value)}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+                          placeholder="北京市"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="website" className="text-sm font-medium text-foreground">个人网站</Label>
+                        <Input
+                          id="website"
+                          type="url"
+                          value={editForm.website}
+                          onChange={(e) => handleFormChange('website', e.target.value)}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+                          placeholder="https://your-website.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="skills" className="text-sm font-medium text-foreground">技能标签</Label>
+                        <Input
+                          id="skills"
+                          value={editForm.skills}
+                          onChange={(e) => handleFormChange('skills', e.target.value)}
+                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
+                          placeholder="React, TypeScript, 移动开发"
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          💡 用逗号分隔多个技能，将显示为标签
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsEditDialogOpen(false)}
+                      disabled={isSaving}
+                      className="rounded-lg px-6 hover:bg-muted/80 transition-colors"
+                    >
+                      取消
+                    </Button>
+                    <Button 
+                      onClick={handleSave} 
+                      disabled={isSaving}
+                      className="rounded-lg px-6 bg-primary hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
+                    >
+                      {isSaving ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          保存中...
+                        </>
+                      ) : (
+                        <>
+                          <Save size={14} className="mr-2" />
+                          保存更改
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
-            <p className="text-muted-foreground text-sm mb-2">结绳语言爱好者，专注移动开发</p>
-            <Badge variant="outline">Lv.3 进阶开发者</Badge>
+            <p className="text-muted-foreground text-sm mb-3">{userProfile.bio}</p>
+            
+            {/* 等级标签 */}
+            <div className="flex items-center mb-3">
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-medium">
+                {userProfile.level}
+              </Badge>
+            </div>
+            
+            {/* 技能标签 */}
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground font-medium">技能专长</div>
+              <div className="flex flex-wrap gap-2">
+                {userProfile.skills.slice(0, 6).map((skill, index) => (
+                  <Badge 
+                    key={index} 
+                    variant="secondary" 
+                    className="text-xs bg-muted hover:bg-muted/80 transition-colors cursor-default px-3 py-1 rounded-full"
+                  >
+                    {skill}
+                  </Badge>
+                ))}
+                {userProfile.skills.length > 6 && (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs text-muted-foreground border-dashed cursor-default px-3 py-1 rounded-full"
+                  >
+                    +{userProfile.skills.length - 6}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
         </div>
         
         <div className="grid grid-cols-4 mt-4 text-center">
           <div>
-            <div className="font-bold">{userStats.posts}</div>
-            <div className="text-xs text-muted-foreground">发布</div>
+            <div className="font-bold">{formatNumber(userStats.posts)}</div>
+            <div className="text-xs text-muted-foreground">帖子</div>
           </div>
           <div>
-            <div className="font-bold">{userStats.followers}</div>
-            <div className="text-xs text-muted-foreground">粉丝</div>
+            <div className="font-bold">{formatNumber(userStats.resources)}</div>
+            <div className="text-xs text-muted-foreground">资源</div>
           </div>
           <div>
-            <div className="font-bold">{userStats.following}</div>
-            <div className="text-xs text-muted-foreground">关注</div>
+            <div className="font-bold">{formatNumber(userStats.views)}</div>
+            <div className="text-xs text-muted-foreground">浏览</div>
           </div>
           <div>
-            <div className="font-bold">{userStats.likes}</div>
-            <div className="text-xs text-muted-foreground">获赞</div>
+            <div className="font-bold">{formatNumber(userStats.likes)}</div>
+            <div className="text-xs text-muted-foreground">点赞</div>
           </div>
         </div>
       </div>

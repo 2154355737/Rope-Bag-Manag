@@ -8,7 +8,13 @@ import CommunityScreen from './screens/community-screen'
 import MessagesScreen from './screens/messages-screen'
 import ProfileScreen from './screens/profile-screen'
 import PostDetailScreen from './screens/post-detail-screen'
+import ResourceDetailScreen from './screens/resource-detail-screen'
+import AnnouncementDetailScreen from './screens/announcement-detail-screen'
 import PublishScreen from './screens/publish-screen'
+import SettingsScreen from './screens/settings-screen'
+import HelpScreen from './screens/help-screen'
+import AboutScreen from './screens/about-screen'
+import PrivacyScreen from './screens/privacy-screen'
 import Layout from './components/layout'
 import { initializeStatusBar } from './utils/statusBar'
 import { addPlatformClass, initializeKeyboard } from './utils/platform'
@@ -96,6 +102,12 @@ const App: React.FC = () => {
             <Route path="profile" element={<ProfileScreen />} />
             <Route path="publish" element={<PublishScreen />} />
             <Route path="post/:id" element={<PostDetailScreen />} />
+            <Route path="resource/:id" element={<ResourceDetailScreen />} />
+            <Route path="announcement/:id" element={<AnnouncementDetailScreen />} />
+            <Route path="settings" element={<SettingsScreen />} />
+            <Route path="help" element={<HelpScreen />} />
+            <Route path="about" element={<AboutScreen />} />
+            <Route path="privacy" element={<PrivacyScreen />} />
           </Route>
         </Routes>
       </Router>

@@ -1,58 +1,24 @@
-/* 安全区域适配样式 */
-
-/* 定义CSS变量用于安全区域 */
-:root {
-  --safe-area-inset-top: env(safe-area-inset-top);
-  --safe-area-inset-right: env(safe-area-inset-right);
-  --safe-area-inset-bottom: env(safe-area-inset-bottom);
-  --safe-area-inset-left: env(safe-area-inset-left);
-  
-  /* 状态栏高度（Android通常是24dp，iOS动态） */
-  --status-bar-height: var(--safe-area-inset-top, 24px);
-  
-  /* 导航栏高度（由JS动态设置） */
-  --navigation-bar-height: 0px;
-  --navigation-bar-type: 'none';
-  --navigation-bar-visible: 0;
-  --has-home-indicator: 0;
-  
-  /* 底部安全距离（包含导航栏） */
-  --safe-bottom-padding: var(--navigation-bar-height, 0px);
+/* 安全区域基础样式 */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
 }
 
-/* 全屏应用容器 */
-.app-container {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  overflow: hidden;
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* 安全区域内容容器 */
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 自定义安全区域支持 */
 .safe-area-container {
-  padding-top: var(--safe-area-inset-top);
-  padding-right: var(--safe-area-inset-right);
-  padding-bottom: var(--safe-area-inset-bottom);
-  padding-left: var(--safe-area-inset-left);
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-}
-
-/* 状态栏占位 */
-.status-bar-spacer {
-  height: var(--status-bar-height);
-  width: 100%;
-  background-color: inherit;
-  flex-shrink: 0;
-}
-
-/* 导航栏占位 */
-.navigation-bar-spacer {
-  height: var(--navigation-bar-height);
-  width: 100%;
-  background-color: inherit;
-  flex-shrink: 0;
+  padding-top: max(env(safe-area-inset-top), var(--custom-safe-area-top, 0px));
+  padding-bottom: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
 }
 
 /* 主内容区域 */
@@ -62,206 +28,116 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* 固定头部样式 */
-.fixed-header {
-  position: fixed;
-  top: var(--safe-area-inset-top);
-  left: var(--safe-area-inset-left);
-  right: var(--safe-area-inset-right);
-  z-index: 1000;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* 固定底部导航 */
+/* 固定底部导航栏 */
 .fixed-bottom-nav {
   position: fixed;
   bottom: 0;
-  left: var(--safe-area-inset-left);
-  right: var(--safe-area-inset-right);
-  z-index: 1000;
-  background-color: #ffffff;
-  border-top: 1px solid #e5e7eb;
-  /* 添加底部安全距离 */
-  padding-bottom: var(--safe-bottom-padding);
+  left: 0;
+  right: 0;
+  padding-bottom: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
 }
 
-/* 全屏模式适配 */
-.fullscreen {
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
+/* App容器 */
+.app-container {
+  min-height: 100vh;
+  min-height: 100dvh; /* 动态视口高度 */
 }
 
-/* 刘海屏适配 */
-@supports (padding: max(0px)) {
-  .safe-area-container {
-    padding-top: max(var(--safe-area-inset-top), 24px);
-    padding-right: max(var(--safe-area-inset-right), 0px);
-    padding-bottom: max(var(--safe-area-inset-bottom), 0px);
-    padding-left: max(var(--safe-area-inset-left), 0px);
-  }
-  
-  .fixed-header {
-    top: max(var(--safe-area-inset-top), 24px);
-    left: max(var(--safe-area-inset-left), 0px);
-    right: max(var(--safe-area-inset-right), 0px);
-  }
-  
-  .fixed-bottom-nav {
-    bottom: max(var(--safe-area-inset-bottom), 0px);
-    left: max(var(--safe-area-inset-left), 0px);
-    right: max(var(--safe-area-inset-right), 0px);
-  }
+/* 预览模式样式 */
+.safe-area-preview {
+  position: relative;
 }
 
-/* Android特定样式 */
-.platform-android .status-bar-spacer {
-  height: 24px; /* Android状态栏标准高度 */
-}
-
-.platform-android .navigation-bar-spacer {
-  height: 48px; /* Android导航栏标准高度 */
-}
-
-/* iOS特定样式 */
-.platform-ios .status-bar-spacer {
-  height: var(--safe-area-inset-top);
-}
-
-.platform-ios .navigation-bar-spacer {
-  height: var(--safe-area-inset-bottom);
-}
-
-/* 横屏适配 */
-@media (orientation: landscape) {
-  .safe-area-container {
-    padding-left: max(var(--safe-area-inset-left), var(--safe-area-inset-right));
-    padding-right: max(var(--safe-area-inset-left), var(--safe-area-inset-right));
-  }
-}
-
-/* 导航栏类型特定样式 */
-/* 无导航栏 */
-.nav-none .fixed-bottom-nav {
-  padding-bottom: 0 !important;
-  bottom: 0 !important;
-}
-
-.nav-none .safe-area-container {
-  padding-bottom: 0 !important;
-}
-
-.nav-none .main-content {
-  padding-bottom: 64px !important; /* 只预留底部导航的高度 */
-}
-
-/* 手势导航 */
-.nav-gesture .fixed-bottom-nav {
-  padding-bottom: var(--navigation-bar-height);
-}
-
-.nav-gesture .main-content {
-  padding-bottom: calc(64px + var(--navigation-bar-height)); /* 64px是底部导航的高度 */
-}
-
-/* 按键导航 */
-.nav-buttons .fixed-bottom-nav {
-  padding-bottom: var(--navigation-bar-height);
-}
-
-.nav-buttons .main-content {
-  padding-bottom: calc(64px + var(--navigation-bar-height));
-}
-
-/* Home Indicator样式 */
-.has-home-indicator .fixed-bottom-nav::after {
+.safe-area-preview::before {
   content: '';
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 134px;
-  height: 5px;
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 2.5px;
-}
-
-/* 横屏模式下的Home Indicator */
-@media (orientation: landscape) {
-  .has-home-indicator .fixed-bottom-nav::after {
-    bottom: 4px;
-    height: 3px;
-    width: 100px;
-  }
-}
-
-/* 键盘弹起时的适配 */
-.keyboard-open {
-  padding-bottom: 0 !important;
-}
-
-.keyboard-open .fixed-bottom-nav {
-  bottom: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* 特殊设备适配 */
-/* 小米、华为等厂商的手势导航 */
-.nav-gesture.platform-android .fixed-bottom-nav {
-  padding-bottom: max(var(--navigation-bar-height), 20px);
-}
-
-/* Samsung等厂商的按键导航 */
-.nav-buttons.platform-android .fixed-bottom-nav {
-  padding-bottom: max(var(--navigation-bar-height), 48px);
-}
-
-/* 导航栏不可见时的样式 */
-body:not(.nav-visible) .fixed-bottom-nav {
-  padding-bottom: 0 !important;
-}
-
-body:not(.nav-visible) .main-content {
-  padding-bottom: 64px !important; /* 只预留底部导航栏的高度 */
-}
-
-body:not(.nav-visible) .safe-area-container {
-  padding-bottom: 0 !important;
-}
-
-/* 确保全屏模式下没有额外间距 */
-.nav-none:not(.nav-visible) .fixed-bottom-nav {
-  padding-bottom: 0 !important;
-  bottom: 0 !important;
-}
-
-/* 调试样式：显示当前导航栏状态 */
-.nav-none::before {
-  content: "无导航栏";
-}
-
-.nav-gesture::before {
-  content: "手势导航";
-}
-
-.nav-buttons::before {
-  content: "按键导航";
-}
-
-body::before {
   position: fixed;
-  top: 50px;
-  right: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 4px 8px;
-  font-size: 12px;
-  z-index: 9998;
-  border-radius: 4px;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: max(env(safe-area-inset-top), var(--custom-safe-area-top, 0px));
+  background: rgba(255, 0, 0, 0.2);
+  border-bottom: 2px dashed rgba(255, 0, 0, 0.5);
+  z-index: 9999;
   pointer-events: none;
 }
 
-/* 生产环境隐藏调试信息 */
-body:not(.debug-mode)::before {
-  display: none;
+.safe-area-preview::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
+  background: rgba(255, 0, 0, 0.2);
+  border-top: 2px dashed rgba(255, 0, 0, 0.5);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* 预览模式指示器 */
+.safe-area-preview .safe-area-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* 导航栏适配 */
+.nav-none .fixed-bottom-nav {
+  padding-bottom: var(--custom-safe-area-bottom, 0px);
+}
+
+.nav-gesture .fixed-bottom-nav {
+  padding-bottom: max(var(--navigation-bar-height, 0px), var(--custom-safe-area-bottom, 0px));
+}
+
+.nav-buttons .fixed-bottom-nav {
+  padding-bottom: max(var(--navigation-bar-height, 0px), var(--custom-safe-area-bottom, 0px));
+}
+
+/* 键盘弹出时的适配 */
+.keyboard-open .main-content {
+  height: calc(100vh - var(--keyboard-height, 0px));
+}
+
+/* 平台特定样式 */
+.platform-android .safe-area-container {
+  /* Android 特定的安全区域处理 */
+}
+
+.platform-ios .safe-area-container {
+  /* iOS 特定的安全区域处理 */
+}
+
+.platform-web .safe-area-container {
+  /* Web 平台不需要特殊的安全区域处理 */
+  padding-top: var(--custom-safe-area-top, 0px);
+  padding-bottom: var(--custom-safe-area-bottom, 0px);
+}
+
+/* 调试模式样式 */
+.debug-mode .safe-area-container {
+  outline: 2px dashed rgba(0, 255, 0, 0.3);
+}
+
+/* 响应式适配 */
+@media (orientation: landscape) {
+  .safe-area-container {
+    padding-left: max(env(safe-area-inset-left), var(--custom-safe-area-left, 0px));
+    padding-right: max(env(safe-area-inset-right), var(--custom-safe-area-right, 0px));
+  }
+}
+
+/* 深色模式下的预览样式 */
+.dark .safe-area-preview::before,
+.dark .safe-area-preview::after {
+  background: rgba(255, 255, 0, 0.2);
+  border-color: rgba(255, 255, 0, 0.5);
 } 

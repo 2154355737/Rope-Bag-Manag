@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Search, Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, X, Eye, Download, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const HomeScreen: React.FC = () => {
+  const navigate = useNavigate()
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [isDropdownInteracting, setIsDropdownInteracting] = useState(false)
@@ -32,6 +34,23 @@ const HomeScreen: React.FC = () => {
     if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
+  }
+
+  // 处理卡片点击
+  const handleCardClick = (card: any) => {
+    switch (card.type) {
+      case 'post':
+        navigate(`/post/${card.id}`)
+        break
+      case 'resource':
+        navigate(`/resource/${card.id}`)
+        break
+      case 'announcement':
+        navigate(`/announcement/${card.id}`)
+        break
+      default:
+        navigate(`/post/${card.id}`)
+    }
   }
   
   const categories = [
@@ -285,7 +304,10 @@ const HomeScreen: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Card className={`overflow-hidden relative ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}>
+                <Card 
+                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
+                  onClick={() => handleCardClick(card)}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center mb-3">
                       <Avatar className="h-6 w-6 mr-2">
@@ -359,7 +381,10 @@ const HomeScreen: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Card className={`overflow-hidden relative ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}>
+                <Card 
+                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
+                  onClick={() => handleCardClick(card)}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center mb-3">
                       <Avatar className="h-6 w-6 mr-2">
@@ -439,7 +464,10 @@ const HomeScreen: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Card className={`overflow-hidden relative ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}>
+                <Card 
+                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
+                  onClick={() => handleCardClick(card)}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center mb-3">
                       <Avatar className="h-6 w-6 mr-2">
