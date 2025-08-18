@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X } from 'lucide-react'
+import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -285,20 +286,62 @@ const ProfileScreen: React.FC = () => {
       {/* 用户信息 */}
       <div className="p-4 border-b">
         <div className="flex items-start gap-4">
-          <div className="relative flex-shrink-0">
-            <Avatar className="h-20 w-20">
-              <AvatarImage src={userProfile.avatar} />
-              <AvatarFallback>{userProfile.name[0]}</AvatarFallback>
-            </Avatar>
-            <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background">
-              <Camera size={14} />
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleAvatarUpload}
-                className="hidden"
-              />
-            </label>
+          <div className="flex flex-col items-center">
+            <div className="relative flex-shrink-0">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={userProfile.avatar} />
+                <AvatarFallback>{userProfile.name[0]}</AvatarFallback>
+              </Avatar>
+              <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background">
+                <Camera size={14} />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            
+            {/* 快捷操作按钮 */}
+            <div className="flex flex-col gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-xs px-3 py-1 h-7 w-16"
+                onClick={() => {
+                  toast({
+                    title: "分享个人资料",
+                    description: "个人资料链接已复制到剪贴板",
+                    variant: "default"
+                  })
+                }}
+              >
+                <Share2 size={12} />
+                分享
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-xs px-3 py-1 h-7 w-16"
+                onClick={() => {
+                  toast({
+                    title: "个人二维码",
+                    description: "正在生成个人二维码",
+                    variant: "default"
+                  })
+                }}
+              >
+                <QrCode size={12} />
+                二维码
+              </Button>
+            </div>
+            
+            {/* 在线状态指示器 */}
+            <div className="flex items-center gap-1 mt-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs text-muted-foreground">在线</span>
+            </div>
           </div>
           
           <div className="flex-1 min-w-0">
@@ -491,6 +534,27 @@ const ProfileScreen: React.FC = () => {
       {/* 我的周报 */}
       <div className="p-4 border-b">
         <h3 className="text-lg font-medium mb-3">我的周报</h3>
+        
+        {/* 今日活跃度 */}
+        <div className="mb-4 p-3 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Award size={16} className="text-primary" />
+              <span className="text-sm font-medium">今日活跃度</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-sm font-bold text-primary">85%</span>
+              <span className="text-xs text-muted-foreground">+12%</span>
+            </div>
+          </div>
+          <div className="mt-2 bg-background/50 rounded-full h-2">
+            <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: '85%' }}></div>
+          </div>
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>已发布 3 篇内容</span>
+            <span>获得 12 个赞</span>
+          </div>
+        </div>
         
         <div className="grid grid-cols-3 gap-2 mb-4">
           <Card>

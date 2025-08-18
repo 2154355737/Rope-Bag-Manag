@@ -124,7 +124,7 @@
 
 /* 调试模式样式 */
 .debug-mode .safe-area-container {
-  outline: 2px dashed rgba(0, 255, 0, 0.3);
+  /* outline: 2px dashed rgba(0, 255, 0, 0.3); */
 }
 
 /* 响应式适配 */
