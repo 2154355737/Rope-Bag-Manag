@@ -272,11 +272,14 @@ async function fetchData() {
                           {showReplyInput === comment.id && (
                             <div className="flex items-center mt-2">
                               <Input
+                                id={`reply-input-${comment.id}`}
+                                name={`reply-${comment.id}`}
                                 placeholder="回复评论..."
                                 className="text-xs h-8 mr-2"
                                 value={replyText}
                                 onChange={(e) => setReplyText(e.target.value)}
                                 maxLength={200}
+                                autoComplete="off"
                               />
                               <Button 
                                 size="sm" 
@@ -333,11 +336,14 @@ async function fetchData() {
       {/* 评论输入框 */}
       <div className="sticky bottom-16 border-t bg-background p-2 flex items-center">
         <Input
+          id="comment-input"
+          name="comment"
           placeholder="发表评论..."
           className="mr-2"
           value={commentText}
           onChange={(e) => setCommentText(e.target.value)}
           maxLength={200}
+          autoComplete="off"
         />
         <Button 
           size="icon" 

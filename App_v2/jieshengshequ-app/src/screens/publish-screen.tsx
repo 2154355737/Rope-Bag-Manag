@@ -315,10 +315,13 @@ const PublishScreen: React.FC = () => {
           </CardHeader>
           <CardContent>
             <Input
+              id="publish-title"
+              name="title"
               placeholder={publishType === 'resource' ? '输入资源名称...' : '输入帖子标题...'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={100}
+              autoComplete="off"
             />
             <div className="text-xs text-muted-foreground mt-2">
               {title.length}/100
@@ -335,9 +338,12 @@ const PublishScreen: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <Input
+                  id="resource-version"
+                  name="version"
                   placeholder="例如：v1.0.0, 2024.1, beta-1.2"
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
+                  autoComplete="off"
                 />
               </CardContent>
             </Card>
@@ -602,10 +608,13 @@ const PublishScreen: React.FC = () => {
             </div>
             <div className="flex gap-2">
               <Input
+                id="new-tag-input"
+                name="newTag"
                 placeholder="添加标签"
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                autoComplete="off"
               />
               <Button
                 variant="outline"
