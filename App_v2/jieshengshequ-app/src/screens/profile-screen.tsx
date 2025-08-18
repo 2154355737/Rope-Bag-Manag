@@ -52,6 +52,36 @@ const ProfileScreen: React.FC = () => {
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
   }
+
+  // 获取状态显示信息
+  const getStatusInfo = (status: 'published' | 'pending' | 'rejected') => {
+    switch (status) {
+      case 'published':
+        return {
+          text: '已发布',
+          variant: 'default' as const,
+          className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+        }
+      case 'pending':
+        return {
+          text: '待审核',
+          variant: 'secondary' as const,
+          className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+        }
+      case 'rejected':
+        return {
+          text: '已拒绝',
+          variant: 'destructive' as const,
+          className: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+        }
+      default:
+        return {
+          text: '未知',
+          variant: 'outline' as const,
+          className: ''
+        }
+    }
+  }
   
   // 处理编辑对话框打开
   const handleEditClick = () => {
@@ -151,49 +181,90 @@ const ProfileScreen: React.FC = () => {
     likes: 328,
   }
   
-  const learningData = {
-    totalHours: 86,
-    completedCourses: 7,
+  const weeklyReportData = {
+    totalPosts: 86,
+    completedProjects: 7,
     currentStreak: 12,
     achievements: [
       { id: 1, name: '初学者', icon: '🌱', description: '完成第一个课程' },
       { id: 2, name: '勤奋学习', icon: '📚', description: '连续学习7天' },
       { id: 3, name: '代码大师', icon: '💻', description: '完成5个项目' },
     ],
-    weeklyProgress: [2, 1.5, 3, 0, 2.5, 4, 1],
+    weeklyPosts: [2, 1, 3, 0, 2, 4, 1],
   }
   
   const userContent = {
-    posts: [
+    resources: [
       {
         id: 1,
-        title: '结绳语言异步编程实践',
+        title: '结绳语言开发工具包',
         image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y29kaW5nfGVufDB8fDB8fHww',
         likes: 42,
-        comments: 8,
+        downloads: 128,
+        status: 'published' as const,
       },
       {
         id: 2,
-        title: '我的结绳学习心得',
+        title: '移动端UI组件库',
         image: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29kaW5nfGVufDB8fDB8fHww',
         likes: 36,
-        comments: 15,
+        downloads: 89,
+        status: 'pending' as const,
+      },
+      {
+        id: 5,
+        title: 'React Native组件集合',
+        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
+        likes: 0,
+        downloads: 0,
+        status: 'rejected' as const,
       },
     ],
-    favorites: [
+    posts: [
       {
         id: 3,
         title: '结绳高级特性详解',
         image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww',
-        author: '李教授',
+        author: '程序员小王',
         likes: 156,
+        comments: 23,
+        status: 'published' as const,
       },
       {
         id: 4,
         title: '结绳性能优化指南',
         image: 'https://images.unsplash.com/photo-1551033406-611cf9a28f67?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGNvZGluZ3xlbnwwfHwwfHx8MA%3D%3D',
-        author: '王工程师',
+        author: '程序员小王',
         likes: 89,
+        comments: 12,
+        status: 'pending' as const,
+      },
+      {
+        id: 6,
+        title: '结绳语言最佳实践分享',
+        image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=500&auto=format&fit=crop&q=60',
+        author: '程序员小王',
+        likes: 0,
+        comments: 0,
+        status: 'rejected' as const,
+      },
+    ],
+    comments: [
+      {
+        id: 5,
+        postTitle: '结绳语言新手入门指南',
+        content: '这个教程写得很详细，对新手很友好！',
+        author: '张三',
+        likes: 15,
+        time: '2小时前',
+      },
+      {
+        id: 6,
+        postTitle: 'Capacitor跨平台开发实践',
+        content: '感谢分享，解决了我的问题',
+        author: '李四',
+        likes: 8,
+        time: '5小时前',
       },
     ],
   }
@@ -417,42 +488,42 @@ const ProfileScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* 学习数据 */}
+      {/* 我的周报 */}
       <div className="p-4 border-b">
-        <h3 className="text-lg font-medium mb-3">学习数据</h3>
+        <h3 className="text-lg font-medium mb-3">我的周报</h3>
         
         <div className="grid grid-cols-3 gap-2 mb-4">
           <Card>
             <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{learningData.totalHours}</div>
-              <div className="text-xs text-muted-foreground">总学时</div>
+              <div className="text-2xl font-bold text-primary">{weeklyReportData.totalPosts}</div>
+              <div className="text-xs text-muted-foreground">总发布</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{learningData.completedCourses}</div>
-              <div className="text-xs text-muted-foreground">完成课程</div>
+              <div className="text-2xl font-bold text-primary">{weeklyReportData.completedProjects}</div>
+              <div className="text-xs text-muted-foreground">完成项目</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{learningData.currentStreak}</div>
-              <div className="text-xs text-muted-foreground">连续学习</div>
+              <div className="text-2xl font-bold text-primary">{weeklyReportData.currentStreak}</div>
+              <div className="text-xs text-muted-foreground">连续活跃</div>
             </CardContent>
           </Card>
         </div>
         
         <Card className="mb-4">
           <CardContent className="p-3">
-            <h4 className="text-sm font-medium mb-2">本周学习时长</h4>
+            <h4 className="text-sm font-medium mb-2">本周发布</h4>
             <div className="flex items-end h-20 gap-1">
-              {learningData.weeklyProgress.map((hours, index) => (
+              {weeklyReportData.weeklyPosts.map((posts, index) => (
                 <div 
                   key={index}
                   className="flex-1 bg-primary rounded-t"
                   style={{ 
-                    height: `${(hours / 4) * 100}%`,
-                    opacity: hours ? undefined : 0.3
+                    height: `${(posts / 4) * 100}%`,
+                    opacity: posts ? undefined : 0.3
                   }}
                 />
               ))}
@@ -471,7 +542,7 @@ const ProfileScreen: React.FC = () => {
         
         <h4 className="text-sm font-medium mb-2">成就徽章</h4>
         <div className="flex gap-3 overflow-x-auto pb-2">
-          {learningData.achievements.map((achievement) => (
+          {weeklyReportData.achievements.map((achievement) => (
             <div key={achievement.id} className="flex flex-col items-center min-w-[60px]">
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-1">
                 <span className="text-2xl">{achievement.icon}</span>
@@ -484,12 +555,51 @@ const ProfileScreen: React.FC = () => {
 
       {/* 内容管理 */}
       <div className="p-4 flex-1">
-        <Tabs defaultValue="posts" className="w-full">
+        <Tabs defaultValue="resources" className="w-full">
           <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="posts">我的发布</TabsTrigger>
-            <TabsTrigger value="favorites">我的收藏</TabsTrigger>
-            <TabsTrigger value="likes">我的点赞</TabsTrigger>
+            <TabsTrigger value="resources">我的资源</TabsTrigger>
+            <TabsTrigger value="posts">帖子</TabsTrigger>
+            <TabsTrigger value="comments">评论</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="resources" className="mt-0">
+            <div className="grid grid-cols-2 gap-3">
+              {userContent.resources.map((resource) => (
+                <motion.div
+                  key={resource.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card className="overflow-hidden relative">
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge className={`text-xs px-2 py-0.5 ${getStatusInfo(resource.status).className}`}>
+                        {getStatusInfo(resource.status).text}
+                      </Badge>
+                    </div>
+                    <img 
+                      src={resource.image} 
+                      alt={resource.title}
+                      className="w-full h-24 object-cover"
+                    />
+                    <CardContent className="p-2">
+                      <h4 className="text-sm font-medium line-clamp-1">{resource.title}</h4>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                        <div className="flex items-center">
+                          <Heart size={12} className="mr-1" />
+                          <span>{resource.likes}</span>
+                        </div>
+                        <div className="flex items-center">
+                          <BookOpen size={12} className="mr-1" />
+                          <span>{resource.downloads}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </TabsContent>
           
           <TabsContent value="posts" className="mt-0">
             <div className="grid grid-cols-2 gap-3">
@@ -500,7 +610,12 @@ const ProfileScreen: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Card className="overflow-hidden">
+                  <Card className="overflow-hidden relative">
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge className={`text-xs px-2 py-0.5 ${getStatusInfo(post.status).className}`}>
+                        {getStatusInfo(post.status).text}
+                      </Badge>
+                    </div>
                     <img 
                       src={post.image} 
                       alt={post.title}
@@ -509,14 +624,11 @@ const ProfileScreen: React.FC = () => {
                     <CardContent className="p-2">
                       <h4 className="text-sm font-medium line-clamp-1">{post.title}</h4>
                       <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+                        <span>{post.author}</span>
                         <div className="flex items-center">
                           <Heart size={12} className="mr-1" />
                           <span>{post.likes}</span>
                         </div>
-                        <div className="flex items-center">
-                          <BookOpen size={12} className="mr-1" />
-                          <span>{post.comments}</span>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -525,40 +637,33 @@ const ProfileScreen: React.FC = () => {
             </div>
           </TabsContent>
           
-          <TabsContent value="favorites" className="mt-0">
-            <div className="grid grid-cols-2 gap-3">
-              {userContent.favorites.map((favorite) => (
+          <TabsContent value="comments" className="mt-0">
+            <div className="space-y-3">
+              {userContent.comments.map((comment) => (
                 <motion.div
-                  key={favorite.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
+                  key={comment.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Card className="overflow-hidden">
-                    <img 
-                      src={favorite.image} 
-                      alt={favorite.title}
-                      className="w-full h-24 object-cover"
-                    />
-                    <CardContent className="p-2">
-                      <h4 className="text-sm font-medium line-clamp-1">{favorite.title}</h4>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                        <span>{favorite.author}</span>
+                  <Card>
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <h4 className="text-sm font-medium text-primary line-clamp-1">{comment.postTitle}</h4>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap ml-2">{comment.time}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{comment.content}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">回复给 {comment.author}</span>
                         <div className="flex items-center">
                           <Heart size={12} className="mr-1" />
-                          <span>{favorite.likes}</span>
+                          <span className="text-xs">{comment.likes}</span>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                 </motion.div>
               ))}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="likes" className="mt-0">
-            <div className="flex items-center justify-center h-40 text-muted-foreground">
-              暂无点赞内容
             </div>
           </TabsContent>
         </Tabs>
