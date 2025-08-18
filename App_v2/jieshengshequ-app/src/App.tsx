@@ -15,6 +15,10 @@ import SettingsScreen from './screens/settings-screen'
 import HelpScreen from './screens/help-screen'
 import AboutScreen from './screens/about-screen'
 import PrivacyScreen from './screens/privacy-screen'
+import LoginScreen from './screens/login-screen'
+import RegisterScreen from './screens/register-screen'
+import ForgotPasswordScreen from './screens/forgot-password-screen'
+import TermsScreen from './screens/terms-screen'
 import Layout from './components/layout'
 import { initializeStatusBar } from './utils/statusBar'
 import { addPlatformClass, initializeKeyboard } from './utils/platform'
@@ -104,11 +108,17 @@ const App: React.FC = () => {
             <Route path="post/:id" element={<PostDetailScreen />} />
             <Route path="resource/:id" element={<ResourceDetailScreen />} />
             <Route path="announcement/:id" element={<AnnouncementDetailScreen />} />
-            <Route path="settings" element={<SettingsScreen />} />
+                            <Route path="settings" element={<SettingsScreen />} />
             <Route path="help" element={<HelpScreen />} />
             <Route path="about" element={<AboutScreen />} />
             <Route path="privacy" element={<PrivacyScreen />} />
           </Route>
+          
+          {/* 认证相关页面 */}
+          <Route path="/login" element={<LoginScreen />} />
+          <Route path="/register" element={<RegisterScreen />} />
+          <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+          <Route path="/terms" element={<TermsScreen />} />
         </Routes>
       </Router>
       
