@@ -446,17 +446,23 @@ onUnmounted(() => {
 }
 
 .search-bar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
-  padding-top: calc(8px + env(safe-area-inset-top));
-  padding-top: calc(8px + constant(safe-area-inset-top)); /* iOS 11.0 */
+  padding-top: calc(8px + var(--safe-area-inset-top));
   background-color: var(--van-background-2, #fff);
   border-bottom: 1px solid var(--van-border-color, #ebedf0);
+}
+
+/* 为搜索栏下方的内容添加顶部内边距，确保不被搜索栏遮挡 */
+.home-page {
+  padding-top: calc(44px + var(--safe-area-inset-top));
 }
 
 .search-bar .van-search {

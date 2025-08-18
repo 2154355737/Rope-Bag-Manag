@@ -1,0 +1,109 @@
+import React, { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import SplashScreen from './screens/splash-screen'
+import OnboardingScreen from './screens/onboarding-screen'
+import HomeScreen from './screens/home-screen'
+import CategoryScreen from './screens/category-screen'
+import CommunityScreen from './screens/community-screen'
+import MessagesScreen from './screens/messages-screen'
+import ProfileScreen from './screens/profile-screen'
+import PostDetailScreen from './screens/post-detail-screen'
+import PublishScreen from './screens/publish-screen'
+import Layout from './components/layout'
+import { initializeStatusBar } from './utils/statusBar'
+import { addPlatformClass, initializeKeyboard } from './utils/platform'
+import { detectNavigationBar, setNavigationBarCSSVariables, watchNavigationBarChanges } from './utils/navigationBar'
+import { detectNavigationBarWithNativePlugin, watchNavigationBarWithNativePlugin } from './utils/navigationBarNative'
+import NavigationDebugPanel from './components/NavigationDebugPanel'
+import './styles/safe-area.css'
+
+const App: React.FC = () => {
+  const [showSplash, setShowSplash] = useState(true)
+  const [firstLaunch, setFirstLaunch] = useState(true)
+
+  useEffect(() => {
+    // 初始化平台适配
+    const initializePlatform = async () => {
+      // 添加平台类名
+      addPlatformClass()
+      
+      // 初始化状态栏
+      await initializeStatusBar()
+      
+      // 初始化键盘监听
+      initializeKeyboard()
+      
+      // 检测并设置导航栏
+                  // 优先使用原生插件检测
+            const navInfo = await detectNavigationBarWithNativePlugin()
+            setNavigationBarCSSVariables(navInfo)
+            console.log('导航栏信息:', navInfo)
+      
+      // 启用调试样式（方便调试）
+      document.body.classList.add('debug-mode')
+      
+      // 监听导航栏变化
+                  // 监听导航栏变化
+            watchNavigationBarWithNativePlugin((newNavInfo) => {
+              setNavigationBarCSSVariables(newNavInfo)
+              console.log('导航栏变化:', newNavInfo)
+            })
+    }
+    
+    initializePlatform()
+
+    // 模拟启动页显示3秒
+    const timer = setTimeout(() => {
+      setShowSplash(false)
+    }, 3000)
+
+    // 检查是否首次启动（实际应用中应该使用AsyncStorage或类似存储）
+    // 这里仅作演示
+    const checkFirstLaunch = async () => {
+      // 模拟检查首次启动
+      // 实际应用中应该从存储中读取
+      setFirstLaunch(true)
+    }
+    
+    checkFirstLaunch()
+    
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (showSplash) {
+    return <SplashScreen onSkip={() => setShowSplash(false)} />
+  }
+
+  if (firstLaunch && !showSplash) {
+    return <OnboardingScreen onComplete={() => setFirstLaunch(false)} />
+  }
+
+  return (
+    <>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<HomeScreen />} />
+            <Route path="home" element={<HomeScreen />} />
+            <Route path="category" element={<CategoryScreen />} />
+            <Route path="community" element={<CommunityScreen />} />
+            <Route path="messages" element={<MessagesScreen />} />
+            <Route path="profile" element={<ProfileScreen />} />
+            <Route path="publish" element={<PublishScreen />} />
+            <Route path="post/:id" element={<PostDetailScreen />} />
+          </Route>
+        </Routes>
+      </Router>
+      
+      {/* 显示调试面板（包括生产环境，方便调试） */}
+      <NavigationDebugPanel show={false} />
+    </>
+  )
+}
+
+export default App

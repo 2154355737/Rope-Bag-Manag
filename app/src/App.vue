@@ -13,7 +13,7 @@
     </div>
     
     <!-- 主要内容区域 -->
-    <div class="page-content">
+    <div class="page-content has-fixed-bottom">
       <router-view v-slot="{ Component, route }">
         <transition 
           :name="transitionName" 
@@ -42,6 +42,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, markRaw, shallo
 import { useRouter, useRoute } from 'vue-router';
 import { useUserStore } from './store/user';
 import { initKeyboardAdapter, destroyKeyboardAdapter } from './utils/keyboard';
+import { initSafeArea, cleanupSafeArea } from './utils/safeAreaHelper';
 import preloader from './utils/preloader';
 import TabBar from './components/TabBar.vue';
 
@@ -164,11 +165,31 @@ onMounted(async () => {
   
   // 初始化键盘适配器
   initKeyboardAdapter();
+  
+  // 初始化安全区域辅助工具
+  initSafeArea();
+  
+  // 监听安全区域更新事件
+  window.addEventListener('safe-area-updated', handleSafeAreaUpdated);
 });
+
+// 处理安全区域更新
+const handleSafeAreaUpdated = (event) => {
+  if (event.detail) {
+    console.log('安全区域已更新:', event.detail);
+    // 可以在这里执行其他与安全区域相关的逻辑
+  }
+};
 
 onUnmounted(() => {
   // 清理键盘适配器
   destroyKeyboardAdapter();
+  
+  // 清理安全区域辅助工具
+  cleanupSafeArea();
+  
+  // 移除安全区域更新事件监听
+  window.removeEventListener('safe-area-updated', handleSafeAreaUpdated);
 });
 </script>
 
@@ -268,36 +289,51 @@ html, body {
 
 /* 为包含TabBar的常用页面类添加底部内边距（兼容旧页面样式） — 已由 .page-content 统一处理，这里移除避免重复间距 */
 
-/* 为有固定导航栏的页面内容区域添加顶部内边距 */
+/* 为有固定导航栏的页面内容区域添加顶部内边距 - 注释掉避免与main.css中的设置冲突 */
+/* 
 .category-content,
 .detail-content,
 .content,
 .login-content,
 .register-content {
   padding-top: calc(46px + env(safe-area-inset-top)) !important;
-  padding-top: calc(46px + constant(safe-area-inset-top)) !important; /* iOS 11.0 */
+  padding-top: calc(46px + constant(safe-area-inset-top)) !important;
 }
+*/
 
 /* 社区页面的特殊处理 */
 .page-with-fixed-navbar {
   padding-top: 8px !important;
 }
 
+/* 针对已确认有导航栏的安卓设备特殊处理 */
+.has-android-navbar .page-content {
+  padding-bottom: calc(66px + var(--android-navbar-height, 30px)) !important;
+}
+
 /* Android系统导航栏底部间距增强处理 */
 @supports not (padding-bottom: env(safe-area-inset-bottom)) {
-  .page-content {
+  /* 只有确认有导航栏的设备才添加额外间距 */
+  .has-android-navbar .page-content {
     /* 对于不支持safe-area的Android设备，使用更大的底部间距 */
-    padding-bottom: 82px !important;
+    padding-bottom: 96px !important;
   }
 }
 
 /* Android设备的额外底部间距处理 */
 @media screen and (min-resolution: 0.001dpcm) {
   @supports (-webkit-appearance: none) {
-    .page-content {
+    /* 只有确认有导航栏的设备才添加额外间距 */
+    .has-android-navbar .page-content {
       /* Android Chrome特殊处理，确保内容不被系统导航栏遮挡 */
-      padding-bottom: calc(66px + max(env(safe-area-inset-bottom, 0px), 8px)) !important;
+      padding-bottom: calc(66px + var(--android-navbar-height, 30px)) !important;
     }
   }
+}
+
+/* 移除多余的安卓底部导航栏样式，改为更精确的类选择器控制 */
+.android-device .page-content {
+  /* 默认不添加额外间距 */
+  padding-bottom: 66px;
 }
 </style> 

@@ -193,12 +193,13 @@ onMounted(() => {
 .category-page {
   min-height: 100vh;
   background-color: var(--background-color);
+  padding-top: calc(46px + var(--safe-area-inset-top));
 }
 
 .category-content {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 46px); /* 仅扣除顶部导航高度，底部间距由全局处理 */
+  height: calc(100vh - 46px - var(--safe-area-inset-top)); /* 扣除顶部导航高度和安全区域 */
 }
 
 .category-list {

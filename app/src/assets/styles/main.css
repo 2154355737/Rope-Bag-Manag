@@ -1,3 +1,6 @@
+/* 导入安全区域适配CSS */
+@import './safe-area.css';
+
 /* 主题变量 */
 :root {
   /* 主色调 */
@@ -113,7 +116,8 @@ ul, ol {
 .content, 
 .login-content, 
 .register-content {
-  padding-top: calc(46px + env(safe-area-inset-top, 0px) + 16px);
+  /* 移除额外的16px间距，只保留导航栏高度 */
+  padding-top: calc(46px + env(safe-area-inset-top, 0px));
 }
 
 /* 页面容器通用样式 - 为底部导航预留空间 */

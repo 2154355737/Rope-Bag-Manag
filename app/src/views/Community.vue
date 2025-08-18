@@ -1,8 +1,8 @@
 <template>
   <div class="community-page">
-    <van-nav-bar title="社区" fixed placeholder />
+    <van-nav-bar title="社区" fixed />
 
-    <div class="content page-with-fixed-navbar">
+    <div class="content">
       <!-- 公告栏 -->
       <div class="announcement" v-if="latestAnnouncement" @click="viewAnnouncements">
         <van-icon name="volume-o" class="announcement-icon" />
@@ -164,12 +164,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.community-page {
+  padding-top: calc(46px + var(--safe-area-inset-top));
+}
+
 .content { 
   padding: 12px; 
-  /* 顶部间距由全局样式统一处理，底部间距由全局 .page-content 统一处理 */
-  /* 注释：全局.content样式已自动添加了NavBar高度+16px间距的padding-top */
+  /* 底部间距由全局 .page-content 统一处理 */
 }
-.page-with-fixed-navbar { padding-top: 8px !important; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .tabs { display: flex; gap: 12px; }
 .tab { font-size: 14px; color: var(--text-color-light); cursor: pointer; }

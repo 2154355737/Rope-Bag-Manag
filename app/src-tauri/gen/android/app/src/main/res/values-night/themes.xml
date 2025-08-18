@@ -6,23 +6,20 @@
         <item name="android:windowFullscreen">false</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">default</item>
         
-        <!-- 支持透明系统栏 -->
+        <!-- 不使用透明系统栏，避免沉浸模式 -->
         <item name="android:windowTranslucentStatus">false</item>
         <item name="android:windowTranslucentNavigation">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         
-        <!-- 系统栏颜色设置 - 夜间模式使用更深的半透明背景 -->
-        <item name="android:statusBarColor">#CC000000</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 系统栏颜色设置 - 使用深色背景 -->
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
         
-        <!-- 确保应用内容可以正确处理系统栏覆盖 -->
-        <item name="android:fitsSystemWindows">false</item>
+        <!-- 设置fitsSystemWindows为true，确保内容不会被系统栏遮挡 -->
+        <item name="android:fitsSystemWindows">true</item>
         
         <!-- 状态栏内容颜色（夜间模式使用浅色图标） -->
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="o">false</item>
-        
-        <!-- 确保窗口可以扩展到系统栏下面，但内容会有正确的padding -->
-        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="p">shortEdges</item>
     </style>
 </resources>
