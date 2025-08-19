@@ -24,6 +24,8 @@ import { initializeStatusBar } from './utils/statusBar'
 import { addPlatformClass, initializeKeyboard } from './utils/platform'
 import { detectNavigationBar, setNavigationBarCSSVariables, watchNavigationBarChanges } from './utils/navigationBar'
 import { detectNavigationBarWithNativePlugin, watchNavigationBarWithNativePlugin } from './utils/navigationBarNative'
+import { initializeBackButton } from './utils/backButton'
+import BackButtonHandler from './components/BackButtonHandler'
 import NavigationDebugPanel from './components/NavigationDebugPanel'
 import './styles/safe-area.css'
 
@@ -42,6 +44,9 @@ const App: React.FC = () => {
       
       // 初始化键盘监听
       initializeKeyboard()
+      
+      // 初始化返回键监听器
+      initializeBackButton()
       
       // 检测并设置导航栏
                   // 优先使用原生插件检测
@@ -96,6 +101,7 @@ const App: React.FC = () => {
           v7_relativeSplatPath: true
         }}
       >
+        <BackButtonHandler />
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomeScreen />} />

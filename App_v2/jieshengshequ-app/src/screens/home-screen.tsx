@@ -166,7 +166,11 @@ const HomeScreen: React.FC = () => {
           </div>
           
           <div className="flex items-center">
-            <Button variant="ghost" size="icon">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => navigate('/messages')}
+            >
               <Bell size={20} />
             </Button>
           </div>
