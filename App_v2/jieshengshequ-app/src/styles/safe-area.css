@@ -15,21 +15,33 @@
   padding-right: env(safe-area-inset-right);
 }
 
-/* 自定义安全区域支持 - 改进版 */
+/* 自定义安全区域支持 - 自动检测模式 */
 .safe-area-container {
-  /* 自动检测模式：优先使用系统安全区域 */
+  /* 默认使用系统安全区域 */
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
-/* 手动配置模式：使用自定义边距 */
-:root:not([style*="--safe-area-auto-detect"]) .safe-area-container {
-  padding-top: max(env(safe-area-inset-top), var(--custom-safe-area-top, 0px));
-  padding-bottom: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
-  padding-left: max(env(safe-area-inset-left), var(--custom-safe-area-left, 0px));
-  padding-right: max(env(safe-area-inset-right), var(--custom-safe-area-right, 0px));
+/* 手动配置模式：使用CSS变量控制是否应用系统值 */
+.safe-area-container {
+  padding-top: calc(
+    var(--safe-area-system-top, env(safe-area-inset-top)) + 
+    var(--custom-safe-area-top, 0px)
+  );
+  padding-bottom: calc(
+    var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + 
+    var(--custom-safe-area-bottom, 0px)
+  );
+  padding-left: calc(
+    var(--safe-area-system-left, env(safe-area-inset-left)) + 
+    var(--custom-safe-area-left, 0px)
+  );
+  padding-right: calc(
+    var(--safe-area-system-right, env(safe-area-inset-right)) + 
+    var(--custom-safe-area-right, 0px)
+  );
 }
 
 /* 主内容区域 */
@@ -37,6 +49,8 @@
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  /* 确保主内容区域有底部间距，避免被底部导航栏遮挡 */
+  padding-bottom: 80px; /* 导航栏高度 + 安全区域 */
 }
 
 /* 现代化主内容区域 - 与安全区域配合 */
@@ -46,36 +60,69 @@
   -webkit-overflow-scrolling: touch;
   /* 确保与安全区域样式兼容 */
   position: relative;
+  /* 确保主内容区域有底部间距，避免被底部导航栏遮挡 */
+  /* 导航栏高度(64px) + 导航栏底部的安全区域（支持负值，可控制系统值）*/
+  padding-bottom: calc(64px + var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
 }
 
-/* 固定底部导航栏 */
+/* 固定底部导航栏 - 标准版本 */
 .fixed-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  /* 导航栏位置调整：向上偏移安全区域高度，让安全区域显示在导航栏下方（支持负值，可控制系统值）*/
+  bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
+  /* 移除导航栏内部的底部padding */
+  padding-bottom: 0;
 }
 
-/* 手动配置模式下的底部导航栏 */
-:root:not([style*="--safe-area-auto-detect"]) .fixed-bottom-nav {
-  padding-bottom: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
-}
-
-/* 现代化底部导航栏 */
+/* 现代化底部导航栏 - 改进版 */
 .modern-bottom-nav {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 50;
-  /* 默认使用系统安全区域 */
-  padding-bottom: env(safe-area-inset-bottom);
+  /* 导航栏位置调整：向上偏移安全区域高度，让安全区域显示在导航栏下方（支持负值，可控制系统值）*/
+  bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
+  /* 移除导航栏内部的底部padding */
+  padding-bottom: 0;
+  /* 设置变换原点为底部，确保移动时以底部为锚点 */
+  transform-origin: bottom;
 }
 
-/* 手动配置模式下的现代化底部导航栏 */
-:root:not([style*="--safe-area-auto-detect"]) .modern-bottom-nav {
-  padding-bottom: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
+/* Android手动模式强制覆盖 */
+.android-manual-safe-area .modern-bottom-nav,
+.android-manual-safe-area .fixed-bottom-nav {
+  /* Android手动模式：强制使用自定义值，完全忽略系统值 */
+  bottom: var(--custom-safe-area-bottom, 0px) !important;
+}
+
+.android-manual-safe-area .modern-main-content {
+  /* Android手动模式：主内容区域强制使用自定义值 */
+  padding-bottom: calc(64px + var(--custom-safe-area-bottom, 0px)) !important;
+}
+
+.android-manual-safe-area.keyboard-open .modern-main-content,
+.android-manual-safe-area.keyboard-open .main-content {
+  /* Android手动模式：键盘弹出时强制使用自定义值 */
+  padding-bottom: calc(64px + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
+}
+
+.android-manual-safe-area.keyboard-open .modern-bottom-nav,
+.android-manual-safe-area.keyboard-open .fixed-bottom-nav {
+  /* Android手动模式：键盘弹出时强制使用自定义值 */
+  bottom: calc(var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
+}
+
+/* 手动配置模式下的底部导航栏 - 移除重复的padding设置 */
+.fixed-bottom-nav,
+.modern-bottom-nav {
+  /* 确保所有底部导航栏都以底部为变换原点 */
+  transform-origin: bottom;
+  /* 导航栏的位置由bottom属性控制，不再使用padding-bottom */
 }
 
 /* App容器 */
@@ -100,17 +147,12 @@
   top: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-top);
+  height: calc(var(--safe-area-system-top, env(safe-area-inset-top)) + var(--custom-safe-area-top, 0px));
   background: rgba(255, 0, 0, 0.15);
   border-bottom: 2px dashed rgba(255, 0, 0, 0.6);
   z-index: 9999;
   pointer-events: none;
   transition: all 0.3s ease;
-}
-
-/* 手动配置模式下的预览顶部区域 */
-:root:not([style*="--safe-area-auto-detect"]) .safe-area-preview::before {
-  height: max(env(safe-area-inset-top), var(--custom-safe-area-top, 0px));
 }
 
 .safe-area-preview::after {
@@ -119,7 +161,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: env(safe-area-inset-bottom);
+  height: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
   background: rgba(255, 0, 0, 0.15);
   border-top: 2px dashed rgba(255, 0, 0, 0.6);
   z-index: 9999;
@@ -127,30 +169,31 @@
   transition: all 0.3s ease;
 }
 
-/* 手动配置模式下的预览底部区域 */
-:root:not([style*="--safe-area-auto-detect"]) .safe-area-preview::after {
-  height: max(env(safe-area-inset-bottom), var(--custom-safe-area-bottom, 0px));
-}
-
 /* 预览模式指示器 - 移除重复样式，由JS控制 */
 .safe-area-indicator {
   /* 样式由JS动态设置 */
 }
 
-/* 导航栏适配 */
+/* 导航栏适配 - 基于bottom定位（支持手动模式禁用系统值）*/
 .nav-none .fixed-bottom-nav,
 .nav-none .modern-bottom-nav {
-  padding-bottom: var(--custom-safe-area-bottom, 0px);
+  bottom: var(--custom-safe-area-bottom, 0px);
 }
 
 .nav-gesture .fixed-bottom-nav,
 .nav-gesture .modern-bottom-nav {
-  padding-bottom: max(var(--navigation-bar-height, 0px), var(--custom-safe-area-bottom, 0px));
+  bottom: max(
+    var(--navigation-bar-height, 0px), 
+    calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px))
+  );
 }
 
 .nav-buttons .fixed-bottom-nav,
 .nav-buttons .modern-bottom-nav {
-  padding-bottom: max(var(--navigation-bar-height, 0px), var(--custom-safe-area-bottom, 0px));
+  bottom: max(
+    var(--navigation-bar-height, 0px), 
+    calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px))
+  );
 }
 
 /* 键盘弹出时的适配 */
@@ -161,8 +204,8 @@
   max-height: calc(100vh - var(--keyboard-height, 0px));
   /* 确保可以滚动 */
   overflow-y: auto;
-  /* 移除底部padding，因为底部导航栏会被键盘推上去 */
-  padding-bottom: 0 !important;
+  /* 键盘弹出时，主内容区域的底部padding需要考虑：导航栏高度 + 安全区域 + 键盘高度（支持负值，可控制系统值）*/
+  padding-bottom: calc(64px + var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
 }
 
 /* 键盘弹出时，调整视口高度 */
@@ -180,11 +223,12 @@
   overflow: hidden; /* 防止整个页面滚动，只让主内容区域滚动 */
 }
 
-/* 键盘弹出时，底部导航栏需要上移 */
+/* 键盘弹出时，底部导航栏需要上移 - 以底部为锚点 */
 .keyboard-open .fixed-bottom-nav,
 .modern-keyboard-open .modern-bottom-nav {
-  transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
-  transition: transform 0.25s ease-out;
+  /* 使用bottom定位，在原有安全区域基础上再加上键盘高度（支持负值，可控制系统值）*/
+  bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
+  transition: bottom 0.25s ease-out;
 }
 
 /* 输入框聚焦时的样式增强 */
@@ -228,11 +272,18 @@ textarea:focus {
 }
 
 /* 手动配置模式下的Web平台特定处理 */
-:root:not([style*="--safe-area-auto-detect"]) .platform-web .safe-area-container {
+.platform-web .safe-area-container {
+  /* Web平台通常不需要系统安全区域，但支持自定义配置 */
   padding-top: var(--custom-safe-area-top, 0px);
   padding-bottom: var(--custom-safe-area-bottom, 0px);
   padding-left: var(--custom-safe-area-left, 0px);
   padding-right: var(--custom-safe-area-right, 0px);
+}
+
+/* Web平台的底部导航栏 */
+.platform-web .fixed-bottom-nav,
+.platform-web .modern-bottom-nav {
+  bottom: var(--custom-safe-area-bottom, 0px);
 }
 
 /* Android 特定的键盘适配 */
@@ -252,17 +303,16 @@ textarea:focus {
   /* outline: 2px dashed rgba(0, 255, 0, 0.3); */
 }
 
+.debug-mode .modern-bottom-nav {
+  /* 调试模式下显示底部导航栏边界 */
+  /* outline: 2px dashed rgba(0, 0, 255, 0.3); */
+}
+
 /* 响应式适配 */
 @media (orientation: landscape) {
   .safe-area-container {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-  
-  /* 手动配置模式下的横屏适配 */
-  :root:not([style*="--safe-area-auto-detect"]) .safe-area-container {
-    padding-left: max(env(safe-area-inset-left), var(--custom-safe-area-left, 0px));
-    padding-right: max(env(safe-area-inset-right), var(--custom-safe-area-right, 0px));
+    padding-left: calc(var(--safe-area-system-left, env(safe-area-inset-left)) + var(--custom-safe-area-left, 0px));
+    padding-right: calc(var(--safe-area-system-right, env(safe-area-inset-right)) + var(--custom-safe-area-right, 0px));
   }
   
   /* 横屏时键盘高度通常较小 */
@@ -274,15 +324,8 @@ textarea:focus {
   /* 横屏时的预览模式左右边距 */
   .safe-area-preview::before,
   .safe-area-preview::after {
-    left: env(safe-area-inset-left);
-    right: env(safe-area-inset-right);
-  }
-  
-  /* 手动配置模式下的横屏预览 */
-  :root:not([style*="--safe-area-auto-detect"]) .safe-area-preview::before,
-  :root:not([style*="--safe-area-auto-detect"]) .safe-area-preview::after {
-    left: max(env(safe-area-inset-left), var(--custom-safe-area-left, 0px));
-    right: max(env(safe-area-inset-right), var(--custom-safe-area-right, 0px));
+    left: calc(var(--safe-area-system-left, env(safe-area-inset-left)) + var(--custom-safe-area-left, 0px));
+    right: calc(var(--safe-area-system-right, env(safe-area-inset-right)) + var(--custom-safe-area-right, 0px));
   }
 }
 
@@ -293,38 +336,40 @@ textarea:focus {
   border-color: rgba(255, 255, 0, 0.6);
 }
 
-/* 键盘动画 */
+/* 键盘动画 - 基于bottom定位，考虑安全区域（支持负值，可控制系统值）*/
 @keyframes keyboard-show {
   from {
-    transform: translateY(0);
+    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
   }
   to {
-    transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
+    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
   }
 }
 
 @keyframes keyboard-hide {
   from {
-    transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
+    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
   }
   to {
-    transform: translateY(0);
+    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
   }
 }
 
-/* 键盘动画应用 */
-.keyboard-open .fixed-bottom-nav,
-.modern-keyboard-open .modern-bottom-nav {
+/* 键盘动画应用 - 优化为基于bottom定位 */
+.keyboard-animating-up .fixed-bottom-nav,
+.keyboard-animating-up .modern-bottom-nav {
   animation: keyboard-show 0.25s ease-out forwards;
 }
 
-.keyboard-hiding .fixed-bottom-nav,
-.keyboard-hiding .modern-bottom-nav {
+.keyboard-animating-down .fixed-bottom-nav,
+.keyboard-animating-down .modern-bottom-nav {
   animation: keyboard-hide 0.25s ease-out forwards;
 }
 
 /* 安全区域过渡动画 */
-.safe-area-container {
+.safe-area-container,
+.modern-bottom-nav,
+.fixed-bottom-nav {
   transition: padding 0.3s ease;
 }
 

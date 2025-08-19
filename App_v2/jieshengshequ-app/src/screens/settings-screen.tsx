@@ -31,6 +31,8 @@ const SettingsScreen: React.FC = () => {
     { name: '仅顶部', topMargin: 30, bottomMargin: 0, leftMargin: 0, rightMargin: 0, autoDetect: false },
     { name: '仅底部', topMargin: 0, bottomMargin: 30, leftMargin: 0, rightMargin: 0, autoDetect: false },
     { name: '全边距', topMargin: 20, bottomMargin: 20, leftMargin: 10, rightMargin: 10, autoDetect: false },
+    { name: '负顶部', topMargin: -20, bottomMargin: 0, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '负底部', topMargin: 0, bottomMargin: -20, leftMargin: 0, rightMargin: 0, autoDetect: false },
   ]
   
   // 应用预设
@@ -44,11 +46,34 @@ const SettingsScreen: React.FC = () => {
     })
   }
   
+  // 验证配置是否已保存
+  const isConfigSaved = () => {
+    try {
+      const saved = localStorage.getItem('jieshengshequ-safe-area-config')
+      if (saved) {
+        const savedConfig = JSON.parse(saved)
+        return (
+          savedConfig.topMargin === config.topMargin &&
+          savedConfig.bottomMargin === config.bottomMargin &&
+          savedConfig.leftMargin === config.leftMargin &&
+          savedConfig.rightMargin === config.rightMargin &&
+          savedConfig.autoDetect === config.autoDetect
+        )
+      }
+    } catch (error) {
+      console.error('验证配置保存状态失败:', error)
+    }
+    return false
+  }
+
   // 保存设置
   const saveSettings = () => {
+    // 手动触发配置保存
+    updateConfig({})
+    
     toast({
       title: "设置已保存",
-      description: "您的界面配置已成功保存",
+      description: "您的界面配置已成功保存，下次启动时会自动应用",
       duration: 3000,
     })
   }
@@ -80,10 +105,10 @@ const SettingsScreen: React.FC = () => {
             variant="ghost"
             size="sm"
             onClick={saveSettings}
-            className="text-primary"
+            className={isConfigSaved() ? "text-green-600" : "text-primary"}
           >
             <Save className="h-4 w-4 mr-1" />
-            保存
+            {isConfigSaved() ? "已保存" : "保存"}
           </Button>
         </div>
       </div>
@@ -192,11 +217,13 @@ const SettingsScreen: React.FC = () => {
                   <Slider
                     value={[config.topMargin]}
                     onValueChange={(value) => updateConfig({ topMargin: value[0] })}
+                    min={-50}
                     max={100}
                     step={5}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>-50px</span>
                     <span>0px</span>
                     <span>50px</span>
                     <span>100px</span>
@@ -212,11 +239,13 @@ const SettingsScreen: React.FC = () => {
                   <Slider
                     value={[config.bottomMargin]}
                     onValueChange={(value) => updateConfig({ bottomMargin: value[0] })}
+                    min={-50}
                     max={100}
                     step={5}
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>-50px</span>
                     <span>0px</span>
                     <span>50px</span>
                     <span>100px</span>
@@ -236,11 +265,13 @@ const SettingsScreen: React.FC = () => {
                     <Slider
                       value={[config.leftMargin]}
                       onValueChange={(value) => updateConfig({ leftMargin: value[0] })}
+                      min={-25}
                       max={50}
                       step={5}
                       className="w-full"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>-25px</span>
                       <span>0px</span>
                       <span>25px</span>
                       <span>50px</span>
@@ -256,11 +287,13 @@ const SettingsScreen: React.FC = () => {
                     <Slider
                       value={[config.rightMargin]}
                       onValueChange={(value) => updateConfig({ rightMargin: value[0] })}
+                      min={-25}
                       max={50}
                       step={5}
                       className="w-full"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>-25px</span>
                       <span>0px</span>
                       <span>25px</span>
                       <span>50px</span>
@@ -277,9 +310,11 @@ const SettingsScreen: React.FC = () => {
                 <strong>安全区域说明：</strong>
                 <ul className="mt-1 space-y-0.5">
                   <li>• 自动检测：根据设备类型自动调整界面边距</li>
-                  <li>• 手动配置：可以自定义上下左右的边距大小</li>
+                  <li>• 手动配置：完全禁用系统检测，仅使用自定义边距</li>
+                  <li>• 负值支持：使用负值可以减少或抵消边距</li>
                   <li>• 预览模式：显示安全区域边界，便于调试</li>
                   <li>• 横屏模式：左右边距在横屏时生效</li>
+                  <li>• Android设备：手动模式下完全忽略系统安全区域</li>
                   <li>• 适用于刘海屏、水滴屏等异形屏设备</li>
                 </ul>
               </AlertDescription>
@@ -359,7 +394,7 @@ const SettingsScreen: React.FC = () => {
         </Card>
 
         {/* 操作按钮 */}
-        <div className="flex gap-3 pb-8">
+        <div className="flex gap-3">
           <Button
             variant="outline"
             className="flex-1"
@@ -376,6 +411,29 @@ const SettingsScreen: React.FC = () => {
             保存设置
           </Button>
         </div>
+
+        {/* 配置状态提示 */}
+        <Card className="bg-muted/50">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground space-y-1">
+              <div className="flex items-center justify-between">
+                <span>配置保存状态:</span>
+                <span className={isConfigSaved() ? "text-green-600" : "text-orange-500"}>
+                  {isConfigSaved() ? "✅ 已保存" : "⏳ 未保存"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>自动保存:</span>
+                <span className="text-blue-600">✅ 已启用</span>
+              </div>
+              <div className="pt-2 text-xs opacity-70">
+                💡 配置将在下次应用启动时自动加载
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="pb-8"></div>
       </div>
     </div>
   )

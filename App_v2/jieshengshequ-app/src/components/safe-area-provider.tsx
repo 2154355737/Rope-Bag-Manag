@@ -41,47 +41,102 @@ interface SafeAreaProviderProps {
 
 export const SafeAreaProvider: React.FC<SafeAreaProviderProps> = ({ children }) => {
   const [config, setConfig] = useState<SafeAreaConfig>(() => {
-    const saved = localStorage.getItem('jieshengshequ-safe-area-config')
-    if (saved) {
-      try {
-        return { ...defaultConfig, ...JSON.parse(saved) }
-      } catch (error) {
-        console.error('解析安全域配置失败:', error)
-        return defaultConfig
+    // 从本地存储加载配置
+    try {
+      const saved = localStorage.getItem('jieshengshequ-safe-area-config')
+      if (saved) {
+        const parsedConfig = JSON.parse(saved) as Partial<SafeAreaConfig>
+        const loadedConfig = { ...defaultConfig, ...parsedConfig }
+        
+        // 应用启动时不自动开启预览模式
+        loadedConfig.previewMode = false
+        
+        console.log('🔧 从本地存储加载安全域配置:', loadedConfig)
+        return loadedConfig
       }
+    } catch (error) {
+      console.error('❌ 解析安全域配置失败:', error)
+      // 清除损坏的配置
+      localStorage.removeItem('jieshengshequ-safe-area-config')
     }
+    
+    console.log('🔧 使用默认安全域配置:', defaultConfig)
     return defaultConfig
   })
+
+  // 保存配置到本地存储
+  const saveConfigToStorage = (config: SafeAreaConfig) => {
+    try {
+      // 创建一个副本，不保存预览模式状态
+      const configToSave = { ...config, previewMode: false }
+      localStorage.setItem('jieshengshequ-safe-area-config', JSON.stringify(configToSave))
+      console.log('💾 安全域配置已保存到本地存储:', configToSave)
+    } catch (error) {
+      console.error('❌ 保存安全域配置失败:', error)
+    }
+  }
 
   // 应用安全域配置到CSS变量
   const applyConfig = (newConfig: SafeAreaConfig) => {
     const root = document.documentElement
     
-    if (newConfig.autoDetect) {
-      // 自动检测模式：清除自定义变量，让系统env()值生效
-      root.style.removeProperty('--custom-safe-area-top')
-      root.style.removeProperty('--custom-safe-area-bottom')
-      root.style.removeProperty('--custom-safe-area-left')
-      root.style.removeProperty('--custom-safe-area-right')
+    // 动态导入平台检测
+    import('@/utils/platform').then(({ isAndroid }) => {
+      const isAndroidPlatform = isAndroid()
       
-      // 设置标识变量，表示使用自动检测
-      root.style.setProperty('--safe-area-auto-detect', '1')
-    } else {
-      // 手动配置模式：设置自定义边距
-      root.style.setProperty('--custom-safe-area-top', `${newConfig.topMargin}px`)
-      root.style.setProperty('--custom-safe-area-bottom', `${newConfig.bottomMargin}px`)
-      root.style.setProperty('--custom-safe-area-left', `${newConfig.leftMargin}px`)
-      root.style.setProperty('--custom-safe-area-right', `${newConfig.rightMargin}px`)
-      
-      // 移除自动检测标识
-      root.style.removeProperty('--safe-area-auto-detect')
-    }
+      if (newConfig.autoDetect) {
+        // 自动检测模式：移除自定义变量，使用系统env()值
+        root.style.removeProperty('--custom-safe-area-top')
+        root.style.removeProperty('--custom-safe-area-bottom')
+        root.style.removeProperty('--custom-safe-area-left')
+        root.style.removeProperty('--custom-safe-area-right')
+        
+        // 恢复系统安全区域变量，让CSS使用默认的env()值
+        root.style.removeProperty('--safe-area-system-top')
+        root.style.removeProperty('--safe-area-system-bottom')
+        root.style.removeProperty('--safe-area-system-left')
+        root.style.removeProperty('--safe-area-system-right')
+        
+        console.log('🔄 自动检测模式：使用系统安全区域', { platform: isAndroidPlatform ? 'Android' : 'Other' })
+      } else {
+        // 手动配置模式：设置自定义边距，禁用系统安全区域
+        root.style.setProperty('--custom-safe-area-top', `${newConfig.topMargin}px`)
+        root.style.setProperty('--custom-safe-area-bottom', `${newConfig.bottomMargin}px`)
+        root.style.setProperty('--custom-safe-area-left', `${newConfig.leftMargin}px`)
+        root.style.setProperty('--custom-safe-area-right', `${newConfig.rightMargin}px`)
+        
+        // 在手动模式下，将系统安全区域设置为0，完全使用自定义值
+        // Android设备需要特别强制禁用系统值
+        root.style.setProperty('--safe-area-system-top', '0px')
+        root.style.setProperty('--safe-area-system-bottom', '0px')
+        root.style.setProperty('--safe-area-system-left', '0px')
+        root.style.setProperty('--safe-area-system-right', '0px')
+        
+        // Android特殊处理：添加强制覆盖标记
+        if (isAndroidPlatform) {
+          root.classList.add('android-manual-safe-area')
+          root.style.setProperty('--android-force-override', '1')
+          console.log('🤖 Android手动模式：强制禁用系统安全区域')
+        } else {
+          root.classList.remove('android-manual-safe-area')
+          root.style.removeProperty('--android-force-override')
+        }
+        
+        console.log('🔧 手动配置模式：禁用系统安全区域，使用自定义配置:', {
+          platform: isAndroidPlatform ? 'Android' : 'Other',
+          top: newConfig.topMargin,
+          bottom: newConfig.bottomMargin,
+          left: newConfig.leftMargin,
+          right: newConfig.rightMargin
+        })
+      }
+    }).catch(console.error)
     
     // 预览模式样式
     if (newConfig.previewMode) {
       document.body.classList.add('safe-area-preview')
       // 延迟添加预览指示器，确保CSS变量已生效
-      setTimeout(() => addPreviewIndicator(newConfig), 50)
+      setTimeout(() => addPreviewIndicator(newConfig), 100)
     } else {
       document.body.classList.remove('safe-area-preview')
       removePreviewIndicator()
@@ -175,22 +230,36 @@ export const SafeAreaProvider: React.FC<SafeAreaProviderProps> = ({ children }) 
     applyConfig(newConfig)
     
     // 保存到本地存储
-    localStorage.setItem('jieshengshequ-safe-area-config', JSON.stringify(newConfig))
+    saveConfigToStorage(newConfig)
   }
 
   // 重置配置
   const resetConfig = () => {
+    console.log('🔄 重置安全域配置为默认值')
     setConfig(defaultConfig)
     applyConfig(defaultConfig)
-    localStorage.removeItem('jieshengshequ-safe-area-config')
+    // 清除本地存储
+    try {
+      localStorage.removeItem('jieshengshequ-safe-area-config')
+      console.log('🗑️ 已清除本地存储的安全域配置')
+    } catch (error) {
+      console.error('❌ 清除本地存储配置失败:', error)
+    }
   }
 
   // 初始化时应用配置
   useEffect(() => {
-    applyConfig(config)
+    console.log('🚀 安全域提供者初始化，应用配置:', config)
+    
+    // 延迟应用配置，确保DOM完全准备好
+    const timeoutId = setTimeout(() => {
+      applyConfig(config)
+      console.log('✅ 安全域配置已应用到CSS')
+    }, 50)
     
     // 监听屏幕方向变化
     const handleOrientationChange = () => {
+      console.log('📱 屏幕方向变化，重新应用配置')
       setTimeout(() => applyConfig(config), 300) // 延迟重新应用，等待布局稳定
     }
     
@@ -199,11 +268,20 @@ export const SafeAreaProvider: React.FC<SafeAreaProviderProps> = ({ children }) 
     
     // 清理函数
     return () => {
+      clearTimeout(timeoutId)
       removePreviewIndicator()
       window.removeEventListener('orientationchange', handleOrientationChange)
       window.removeEventListener('resize', handleOrientationChange)
     }
   }, [])
+
+  // 当配置变化时重新应用（但不包括预览模式的临时变化）
+  useEffect(() => {
+    if (config) {
+      console.log('🔄 配置状态变化，重新应用:', config)
+      applyConfig(config)
+    }
+  }, [config.autoDetect, config.topMargin, config.bottomMargin, config.leftMargin, config.rightMargin])
 
   const value: SafeAreaContextType = {
     config,

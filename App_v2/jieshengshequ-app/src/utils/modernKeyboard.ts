@@ -223,6 +223,10 @@ class ModernKeyboardManager {
 
     // 添加键盘打开类
     document.body.classList.add('modern-keyboard-open')
+    
+    // 添加导航栏上移动画类
+    document.body.classList.add('keyboard-animating-up')
+    document.body.classList.remove('keyboard-animating-down')
 
     // 强制刷新滚动容器
     this.refreshScrollContainers()
@@ -260,6 +264,16 @@ class ModernKeyboardManager {
 
     // 移除键盘打开类
     document.body.classList.remove('modern-keyboard-open')
+    
+    // 添加导航栏下移动画类
+    document.body.classList.add('keyboard-animating-down')
+    document.body.classList.remove('keyboard-animating-up')
+    
+    // 动画完成后清理动画类
+    setTimeout(() => {
+      document.body.classList.remove('keyboard-animating-down')
+      document.body.classList.remove('keyboard-animating-up')
+    }, 300)
 
     // 刷新滚动容器，恢复默认高度
     this.refreshScrollContainers()
