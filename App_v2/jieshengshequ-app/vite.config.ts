@@ -14,6 +14,13 @@ export default defineConfig({
     port: 8082, // 使用8082端口
     strictPort: false, // 如果端口被占用，会自动尝试下一个可用端口
     open: true, // 自动打开浏览器
-    historyApiFallback: true, // 支持 history 路由模式
+    host: '0.0.0.0', // 允许外部访问
+    fs: {
+      strict: false // 允许访问工作区外的文件
+    }
+  },
+  // 优化构建
+  optimizeDeps: {
+    include: ['react', 'react-dom']
   },
 })

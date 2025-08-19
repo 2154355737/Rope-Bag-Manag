@@ -3,11 +3,20 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Home, Layers, PlusCircle, MessageSquare, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme-provider'
+import { useModernKeyboard } from '@/hooks/use-modern-keyboard'
 
 const Layout: React.FC = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { theme } = useTheme()
+  
+  // 使用现代化键盘处理
+  const keyboard = useModernKeyboard({
+    debug: import.meta.env.DEV, // 开发环境启用调试
+    onStateChange: (state) => {
+      console.log('🎹 键盘状态变化:', state)
+    }
+  })
   
   const navItems = [
     { icon: Home, label: '首页', path: '/home' },
@@ -18,13 +27,12 @@ const Layout: React.FC = () => {
   ]
 
   return (
-    <div className="app-container">
-      <div className="safe-area-container flex flex-col bg-background">
-        <main className="main-content pb-16">
-          <Outlet />
-        </main>
-        
-        <nav className="fixed-bottom-nav border-t bg-background z-10">
+    <div className={cn("modern-app-container bg-background", keyboard.isOpen && "modern-keyboard-open")}>
+      <main className="modern-main-content safe-area-container">
+        <Outlet />
+      </main>
+      
+      <nav className="modern-bottom-nav border-t bg-background">
         <div className="flex items-center justify-around h-16">
           {navItems.map((item, index) => {
             const isActive = location.pathname === item.path
@@ -56,9 +64,8 @@ const Layout: React.FC = () => {
               </button>
             )
           })}
-          </div>
-        </nav>
-      </div>
+        </div>
+      </nav>
     </div>
   )
 }

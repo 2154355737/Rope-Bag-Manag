@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import SplashScreen from './screens/splash-screen'
 import OnboardingScreen from './screens/onboarding-screen'
 import HomeScreen from './screens/home-screen'
@@ -27,6 +27,7 @@ import { detectNavigationBarWithNativePlugin, watchNavigationBarWithNativePlugin
 import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
 import NavigationDebugPanel from './components/NavigationDebugPanel'
+
 import './styles/safe-area.css'
 
 const App: React.FC = () => {
@@ -95,14 +96,8 @@ const App: React.FC = () => {
 
   return (
     <>
-      <Router
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true
-        }}
-      >
-        <BackButtonHandler />
-        <Routes>
+      <BackButtonHandler />
+      <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomeScreen />} />
             <Route path="home" element={<HomeScreen />} />
@@ -125,11 +120,13 @@ const App: React.FC = () => {
           <Route path="/register" element={<RegisterScreen />} />
           <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
           <Route path="/terms" element={<TermsScreen />} />
-        </Routes>
-      </Router>
+      </Routes>
       
       {/* 显示调试面板（包括生产环境，方便调试） */}
       <NavigationDebugPanel show={false} />
+      
+      {/* 键盘调试面板 */}
+      
     </>
   )
 }

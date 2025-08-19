@@ -25,11 +25,12 @@ const SettingsScreen: React.FC = () => {
   
   // 预设配置
   const presets = [
-    { name: '无边距', topMargin: 0, bottomMargin: 0, autoDetect: false },
-    { name: '标准边距', topMargin: 20, bottomMargin: 20, autoDetect: false },
-    { name: '大边距', topMargin: 40, bottomMargin: 40, autoDetect: false },
-    { name: '仅顶部', topMargin: 30, bottomMargin: 0, autoDetect: false },
-    { name: '仅底部', topMargin: 0, bottomMargin: 30, autoDetect: false },
+    { name: '无边距', topMargin: 0, bottomMargin: 0, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '标准边距', topMargin: 20, bottomMargin: 20, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '大边距', topMargin: 40, bottomMargin: 40, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '仅顶部', topMargin: 30, bottomMargin: 0, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '仅底部', topMargin: 0, bottomMargin: 30, leftMargin: 0, rightMargin: 0, autoDetect: false },
+    { name: '全边距', topMargin: 20, bottomMargin: 20, leftMargin: 10, rightMargin: 10, autoDetect: false },
   ]
   
   // 应用预设
@@ -37,6 +38,8 @@ const SettingsScreen: React.FC = () => {
     updateConfig({
       topMargin: preset.topMargin,
       bottomMargin: preset.bottomMargin,
+      leftMargin: preset.leftMargin,
+      rightMargin: preset.rightMargin,
       autoDetect: preset.autoDetect
     })
   }
@@ -219,6 +222,51 @@ const SettingsScreen: React.FC = () => {
                     <span>100px</span>
                   </div>
                 </div>
+                
+                {/* 左右边距（横屏模式） */}
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-muted-foreground">横屏模式边距</div>
+                  
+                  {/* 左侧边距 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">左侧边距</Label>
+                      <span className="text-sm text-muted-foreground">{config.leftMargin}px</span>
+                    </div>
+                    <Slider
+                      value={[config.leftMargin]}
+                      onValueChange={(value) => updateConfig({ leftMargin: value[0] })}
+                      max={50}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0px</span>
+                      <span>25px</span>
+                      <span>50px</span>
+                    </div>
+                  </div>
+                  
+                  {/* 右侧边距 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium">右侧边距</Label>
+                      <span className="text-sm text-muted-foreground">{config.rightMargin}px</span>
+                    </div>
+                    <Slider
+                      value={[config.rightMargin]}
+                      onValueChange={(value) => updateConfig({ rightMargin: value[0] })}
+                      max={50}
+                      step={5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>0px</span>
+                      <span>25px</span>
+                      <span>50px</span>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             )}
             
@@ -229,8 +277,9 @@ const SettingsScreen: React.FC = () => {
                 <strong>安全区域说明：</strong>
                 <ul className="mt-1 space-y-0.5">
                   <li>• 自动检测：根据设备类型自动调整界面边距</li>
-                  <li>• 手动配置：可以自定义顶部和底部的边距大小</li>
+                  <li>• 手动配置：可以自定义上下左右的边距大小</li>
                   <li>• 预览模式：显示安全区域边界，便于调试</li>
+                  <li>• 横屏模式：左右边距在横屏时生效</li>
                   <li>• 适用于刘海屏、水滴屏等异形屏设备</li>
                 </ul>
               </AlertDescription>
