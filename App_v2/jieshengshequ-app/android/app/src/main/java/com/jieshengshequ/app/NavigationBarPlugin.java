@@ -3,6 +3,7 @@ package com.jieshengshequ.app;
 import android.content.Context;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.graphics.Color;
 import android.graphics.Point;
 import android.os.Build;
 import android.provider.Settings;
@@ -104,7 +105,32 @@ public class NavigationBarPlugin extends Plugin {
             call.reject("获取导航栏信息失败: " + e.getMessage());
         }
     }
-    
+
+    // 新增：设置系统栏遮罩颜色
+    @PluginMethod
+    public void setScrimColors(PluginCall call) {
+        String status = call.getString("statusColor", null);
+        String nav = call.getString("navColor", null);
+        try {
+            int statusInt = parseColorOrDefault(status, 0);
+            int navInt = parseColorOrDefault(nav, 0);
+            MainActivity activity = (MainActivity) getActivity();
+            activity.setScrimColors(statusInt, navInt);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("设置遮罩颜色失败: " + e.getMessage());
+        }
+    }
+
+    private int parseColorOrDefault(String color, int def) {
+        if (color == null || color.trim().isEmpty()) return def;
+        try {
+            return Color.parseColor(color);
+        } catch (Exception ignore) {
+            return def;
+        }
+    }
+
     /**
      * 从系统资源获取导航栏高度
      */
@@ -126,14 +152,11 @@ public class NavigationBarPlugin extends Plugin {
     private int getNavigationType(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
-                // Android 10+ 可以检查导航栏模式
                 int navBarMode = Settings.Secure.getInt(
                     context.getContentResolver(),
                     "navigation_mode",
                     0
                 );
-                
-                // 0 = 传统导航, 1 = 双按钮导航, 2 = 手势导航
                 switch (navBarMode) {
                     case 0:
                     case 1:
@@ -141,50 +164,35 @@ public class NavigationBarPlugin extends Plugin {
                     case 2:
                         return 2; // 手势导航
                     default:
-                        return 1; // 默认按键导航
+                        return 1;
                 }
             } catch (Exception e) {
-                // 如果无法读取设置，根据其他信息判断
                 return hasPhysicalNavigationBar(context) ? 1 : 2;
             }
         } else {
-            // 旧版本Android，通常是按键导航
             return hasPhysicalNavigationBar(context) ? 1 : 1;
         }
     }
     
-    /**
-     * 检查是否有物理导航栏
-     */
     private boolean hasPhysicalNavigationBar(Context context) {
         boolean hasMenuKey = android.view.ViewConfiguration.get(context).hasPermanentMenuKey();
         boolean hasBackKey = android.view.KeyCharacterMap.deviceHasKey(android.view.KeyEvent.KEYCODE_BACK);
         return !hasMenuKey && !hasBackKey;
     }
     
-    /**
-     * 检查导航栏是否可见
-     */
     private boolean isNavigationBarVisible() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Android 11+
             try {
                 WindowInsets insets = getActivity().getWindow().getDecorView().getRootWindowInsets();
                 if (insets != null) {
                     return insets.isVisible(WindowInsets.Type.navigationBars());
                 }
             } catch (Exception e) {
-                // 降级处理
             }
         }
-        
-        // 默认认为可见
         return true;
     }
     
-    /**
-     * 检查是否为全屏模式
-     */
     private boolean isFullscreenMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
@@ -194,18 +202,12 @@ public class NavigationBarPlugin extends Plugin {
                     return insets != null && !insets.isVisible(WindowInsets.Type.systemBars());
                 }
             } catch (Exception e) {
-                // 降级处理
             }
         }
-        
-        // 检查传统全屏标志
         int flags = getActivity().getWindow().getDecorView().getSystemUiVisibility();
         return (flags & android.view.View.SYSTEM_UI_FLAG_FULLSCREEN) != 0;
     }
     
-    /**
-     * 检查设备是否有刘海屏
-     */
     private boolean hasNotch(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             try {
@@ -214,21 +216,13 @@ public class NavigationBarPlugin extends Plugin {
                     return true;
                 }
             } catch (Exception e) {
-                // 忽略异常
             }
         }
-        
-        // 检查厂商特定的刘海屏API
         return checkVendorNotch(context);
     }
-    
-    /**
-     * 检查厂商特定的刘海屏实现
-     */
+
     private boolean checkVendorNotch(Context context) {
         String brand = Build.BRAND.toLowerCase();
-        
-        // 小米
         if (brand.contains("xiaomi") || brand.contains("redmi")) {
             try {
                 Class<?> clazz = Class.forName("android.os.SystemProperties");
@@ -236,21 +230,16 @@ public class NavigationBarPlugin extends Plugin {
                 int hasNotch = (int) method.invoke(null, "ro.miui.notch", 0);
                 return hasNotch == 1;
             } catch (Exception e) {
-                // 忽略异常
             }
         }
-        
-        // 华为
         if (brand.contains("huawei") || brand.contains("honor")) {
             try {
                 Class<?> clazz = Class.forName("com.huawei.android.util.HwNotchSizeUtil");
                 java.lang.reflect.Method method = clazz.getMethod("hasNotchInScreen");
                 return (boolean) method.invoke(null);
             } catch (Exception e) {
-                // 忽略异常
             }
         }
-        
         return false;
     }
 } 

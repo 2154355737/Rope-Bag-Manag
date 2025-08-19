@@ -48,6 +48,8 @@ export interface NavigationBarPlugin {
    * 移除监听器
    */
   removeAllListeners(): Promise<void>
+  // 新增：设置系统栏遮罩颜色
+  setScrimColors(options: { statusColor?: string; navColor?: string }): Promise<void>
 }
 
 const NavigationBarPlugin = registerPlugin<NavigationBarPlugin>('NavigationBarPlugin', {

@@ -331,9 +331,6 @@ const SettingsScreen: React.FC = () => {
         {/* Android导航栏设置 */}
         <AndroidNavigationBarSettings />
 
-        {/* 键盘导航栏设置 */}
-        <KeyboardNavigationSettings />
-
         {/* 通知设置 */}
         <Card>
           <CardHeader>

@@ -1,5 +1,6 @@
 import { StatusBar, Style } from '@capacitor/status-bar'
 import { Capacitor } from '@capacitor/core'
+import NavigationBarPlugin from '@/plugins/NavigationBarPlugin'
 
 // 状态栏配置接口
 export interface StatusBarConfig {
@@ -67,6 +68,8 @@ export const applyStatusBarConfig = async (config: StatusBarConfig) => {
       // 然后设置背景颜色
       console.log('🎨 设置状态栏背景颜色:', config.backgroundColor)
       await StatusBar.setBackgroundColor({ color: config.backgroundColor })
+      // 同步顶部遮罩颜色 & CSS 变量
+      await setStatusBarScrimColor(config.backgroundColor)
     }
 
     // 设置可见性
@@ -186,7 +189,24 @@ export const setStatusBarColor = async (color: string, style?: 'dark' | 'light' 
     visible: true,
     overlaysWebView: false
   }
-  return await applyStatusBarConfig(config)
+  const ok = await applyStatusBarConfig(config)
+  if (ok && Capacitor.getPlatform() === 'android') {
+    await setStatusBarScrimColor(color)
+  }
+  return ok
+}
+
+// 新增：设置顶部遮罩颜色 + CSS 变量
+export const setStatusBarScrimColor = async (color: string) => {
+  try {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      await NavigationBarPlugin.setScrimColors({ statusColor: color })
+    }
+  } catch (e) {
+    console.warn('无法设置原生遮罩颜色，降级为 CSS 变量', e)
+  }
+  const root = document.documentElement
+  root.style.setProperty('--status-bar-scrim-color', color)
 }
 
 // 切换状态栏可见性

@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Smartphone, Navigation, Palette, Eye, EyeOff } from 'lucide-react'
+import { Smartphone, Palette } from 'lucide-react'
 import { isAndroid, isNative } from '@/utils/platform'
 import { 
   AndroidNavigationBarConfig,
@@ -12,7 +11,6 @@ import {
   applyAndroidNavigationBarConfig,
   applyAndroidNavBarPreset,
   setAndroidNavigationBarColor,
-  toggleAndroidNavigationBar,
   getAndroidNavigationBarHeight,
   hasHardwareNavigationButtons
 } from '@/utils/navigationBarNative'
@@ -56,7 +54,6 @@ export const AndroidNavigationBarSettings: React.FC = () => {
     setIsAndroidPlatform(androidPlatform)
     
     if (androidPlatform) {
-      // 检测设备特性（异步）
       loadDeviceInfo()
     }
   }, [])
@@ -81,13 +78,7 @@ export const AndroidNavigationBarSettings: React.FC = () => {
 
   const handleColorChange = async (color: string) => {
     setCurrentColor(color)
-    // 直接更新配置，这会触发handleConfigChange
     await handleConfigChange({ backgroundColor: color })
-  }
-
-  const handleToggleVisibility = async () => {
-    await toggleAndroidNavigationBar()
-    setConfig(prev => ({ ...prev, hidden: !prev.hidden }))
   }
 
   const colorPresets = [
@@ -129,25 +120,18 @@ export const AndroidNavigationBarSettings: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        
         {/* 设备信息显示 */}
         <div className="bg-muted/50 p-3 rounded-lg">
           <div className="text-xs text-muted-foreground space-y-1">
             <div className="flex justify-between">
               <span>导航类型:</span>
               <span className="text-blue-600">
-                {hasHardwareButtons ? "硬件按键" : "软件导航栏"}
+                {hasHardwareButtons ? '硬件按键' : '软件导航栏'}
               </span>
             </div>
             <div className="flex justify-between">
               <span>估算高度:</span>
               <span>{navBarHeight}px</span>
-            </div>
-            <div className="flex justify-between">
-              <span>当前状态:</span>
-              <span className={config.hidden ? "text-red-600" : "text-green-600"}>
-                {config.hidden ? "隐藏" : "显示"}
-              </span>
             </div>
             <div className="flex justify-between">
               <span>当前颜色:</span>
@@ -162,18 +146,6 @@ export const AndroidNavigationBarSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* 可见性控制 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-sm font-medium">显示导航栏</Label>
-            <p className="text-xs text-muted-foreground">控制导航栏的显示和隐藏</p>
-          </div>
-          <Switch 
-            checked={!config.hidden}
-            onCheckedChange={() => handleToggleVisibility()}
-          />
-        </div>
-
         <Separator />
 
         {/* 按钮样式选择 */}
@@ -183,7 +155,7 @@ export const AndroidNavigationBarSettings: React.FC = () => {
             {(['dark', 'light', 'default'] as const).map((style) => (
               <Button
                 key={style}
-                variant={config.buttonColor === style ? "default" : "outline"}
+                variant={config.buttonColor === style ? 'default' : 'outline'}
                 size="sm"
                 className="text-xs"
                 onClick={() => handleConfigChange({ buttonColor: style })}
@@ -192,20 +164,6 @@ export const AndroidNavigationBarSettings: React.FC = () => {
               </Button>
             ))}
           </div>
-        </div>
-
-        <Separator />
-
-        {/* 覆盖内容设置 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-sm font-medium">覆盖内容</Label>
-            <p className="text-xs text-muted-foreground">允许内容延伸到导航栏下方</p>
-          </div>
-          <Switch 
-            checked={config.overlaysContent}
-            onCheckedChange={(overlaysContent) => handleConfigChange({ overlaysContent })}
-          />
         </div>
 
         <Separator />
@@ -254,8 +212,6 @@ export const AndroidNavigationBarSettings: React.FC = () => {
           </div>
         </div>
 
-        <Separator />
-
         {/* 预设配置 */}
         <div className="space-y-3">
           <Label className="text-sm font-medium">快速预设</Label>
@@ -276,15 +232,13 @@ export const AndroidNavigationBarSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* 使用说明 */}
+        {/* 说明 */}
         <div className="bg-orange-50 p-3 rounded-lg">
           <p className="text-xs text-orange-800">
-            ⚠️ <strong>Android导航栏说明:</strong>
+            ⚠️ <strong>说明:</strong>
             <br />• 仅适用于软件导航栏（虚拟按键）
             <br />• 硬件按键设备无法自定义导航栏样式
             <br />• 沉浸式模式可隐藏导航栏创建全屏体验
-            <br />• 覆盖内容模式需要谨慎使用，避免内容被遮挡
-            <br />• 透明背景可与应用内容融合
           </p>
         </div>
 

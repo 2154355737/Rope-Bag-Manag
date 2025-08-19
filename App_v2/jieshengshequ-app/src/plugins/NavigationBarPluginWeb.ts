@@ -32,4 +32,20 @@ export class NavigationBarPluginWeb extends WebPlugin implements NavigationBarPl
   async removeAllListeners(): Promise<void> {
     return Promise.resolve()
   }
+
+  // 新增：Web 端空实现，同时同步 CSS 变量用于预览
+  async setScrimColors(options: { statusColor?: string; navColor?: string }): Promise<void> {
+    try {
+      const root = document.documentElement
+      if (options?.statusColor) {
+        root.style.setProperty('--status-bar-scrim-color', options.statusColor)
+      }
+      if (options?.navColor) {
+        root.style.setProperty('--android-nav-bar-color', options.navColor)
+      }
+    } catch (_) {
+      // ignore in web
+    }
+    return Promise.resolve()
+  }
 } 

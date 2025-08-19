@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Monitor, Eye, EyeOff, Palette } from 'lucide-react'
+import { Monitor, Palette } from 'lucide-react'
 import { isAndroid, isNative } from '@/utils/platform'
 import { 
   StatusBarConfig, 
@@ -32,7 +31,6 @@ export const StatusBarSettings: React.FC = () => {
     setIsNativePlatform(isNative())
     setIsAndroidPlatform(isAndroid())
     
-    // 获取当前状态栏信息
     if (isNative()) {
       loadCurrentStatusBarInfo()
     }
@@ -75,7 +73,6 @@ export const StatusBarSettings: React.FC = () => {
 
   const handleColorChange = async (color: string) => {
     setCurrentColor(color)
-    // 同时更新配置状态
     const updatedConfig = { ...config, backgroundColor: color }
     setConfig(updatedConfig)
     
@@ -124,14 +121,13 @@ export const StatusBarSettings: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        
         {/* 当前状态显示 */}
         <div className="bg-muted/50 p-3 rounded-lg">
           <div className="text-xs text-muted-foreground space-y-1">
             <div className="flex justify-between">
               <span>可见性:</span>
-              <span className={isStatusBarVisible ? "text-green-600" : "text-red-600"}>
-                {isStatusBarVisible ? "显示" : "隐藏"}
+              <span className={isStatusBarVisible ? 'text-green-600' : 'text-red-600'}>
+                {isStatusBarVisible ? '显示' : '隐藏'}
               </span>
             </div>
             <div className="flex justify-between">
@@ -147,18 +143,6 @@ export const StatusBarSettings: React.FC = () => {
           </div>
         </div>
 
-        {/* 可见性控制 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-sm font-medium">显示状态栏</Label>
-            <p className="text-xs text-muted-foreground">控制状态栏的显示和隐藏</p>
-          </div>
-          <Switch 
-            checked={config.visible}
-            onCheckedChange={(visible) => handleConfigChange({ visible })}
-          />
-        </div>
-
         <Separator />
 
         {/* 样式选择 */}
@@ -168,7 +152,7 @@ export const StatusBarSettings: React.FC = () => {
             {(['dark', 'light', 'default'] as const).map((style) => (
               <Button
                 key={style}
-                variant={config.style === style ? "default" : "outline"}
+                variant={config.style === style ? 'default' : 'outline'}
                 size="sm"
                 className="text-xs"
                 onClick={() => handleConfigChange({ style })}
@@ -181,20 +165,6 @@ export const StatusBarSettings: React.FC = () => {
 
         {isAndroidPlatform && (
           <>
-            <Separator />
-            
-            {/* Android专用设置 */}
-            <div className="flex items-center justify-between">
-              <div>
-                <Label className="text-sm font-medium">覆盖WebView</Label>
-                <p className="text-xs text-muted-foreground">允许内容延伸到状态栏下方</p>
-              </div>
-              <Switch 
-                checked={config.overlaysWebView || false}
-                onCheckedChange={(overlaysWebView) => handleConfigChange({ overlaysWebView })}
-              />
-            </div>
-
             <Separator />
 
             {/* 背景颜色设置 */}
@@ -275,7 +245,6 @@ export const StatusBarSettings: React.FC = () => {
             {isAndroidPlatform && (
               <>
                 <br />• Android设备支持自定义背景颜色
-                <br />• 覆盖WebView模式可让内容填满屏幕
               </>
             )}
           </p>

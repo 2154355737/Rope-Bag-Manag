@@ -113,7 +113,7 @@ export const applyAndroidNavigationBarConfig = async (config: AndroidNavigationB
     // 使用CSS变量和类来控制导航栏样式
     const root = document.documentElement
     
-    // 设置CSS变量
+    // 设置CSS变量（用于 CSS/遮罩联动）
     root.style.setProperty('--android-nav-bar-color', config.backgroundColor)
     root.style.setProperty('--android-nav-bar-button-style', config.buttonColor)
     root.style.setProperty('--android-nav-bar-hidden', config.hidden ? '1' : '0')

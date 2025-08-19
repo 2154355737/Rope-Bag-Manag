@@ -453,3 +453,16 @@ textarea:focus {
 .modern-keyboard-open .safe-area-container::after {
   display: none !important;
 } 
+
+/* 手动安全区模式：为自定义 top 安全区绘制填充层，避免出现透明带 */
+:root.android-manual-safe-area body.platform-android .safe-area-container::before {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--custom-safe-area-top, 0px);
+  background-color: var(--status-bar-scrim-color, #111111);
+  pointer-events: none;
+  z-index: 49;
+} 

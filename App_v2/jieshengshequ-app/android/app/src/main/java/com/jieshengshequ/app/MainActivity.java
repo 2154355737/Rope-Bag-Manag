@@ -108,16 +108,18 @@ public class MainActivity extends BridgeActivity {
         boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
         boolean navVisible = insets.isVisible(WindowInsetsCompat.Type.navigationBars());
 
-        // 顶部遮罩：跟随状态栏高度
+        // 顶部遮罩：跟随状态栏高度与颜色
         FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) statusBarScrimView.getLayoutParams();
         tlp.height = top;
         statusBarScrimView.setLayoutParams(tlp);
+        statusBarScrimView.setBackgroundColor(getWindow().getStatusBarColor());
         statusBarScrimView.setVisibility(top > 0 ? View.VISIBLE : View.GONE);
 
-        // 底部遮罩：仅在导航栏可见且键盘不可见时显示
+        // 底部遮罩：仅在导航栏可见且键盘不可见时显示，并跟随导航栏颜色
         FrameLayout.LayoutParams blp = (FrameLayout.LayoutParams) navigationBarScrimView.getLayoutParams();
         blp.height = navVisible ? bottom : 0;
         navigationBarScrimView.setLayoutParams(blp);
+        navigationBarScrimView.setBackgroundColor(getWindow().getNavigationBarColor());
         boolean shouldShowBottomScrim = navVisible && !imeVisible;
         navigationBarScrimView.setVisibility(shouldShowBottomScrim ? View.VISIBLE : View.GONE);
 
@@ -175,7 +177,10 @@ public class MainActivity extends BridgeActivity {
             FrameLayout.LayoutParams blp = (FrameLayout.LayoutParams) navigationBarScrimView.getLayoutParams();
             blp.height = navVisible ? bottom : 0;
             navigationBarScrimView.setLayoutParams(blp);
+            navigationBarScrimView.setBackgroundColor(getWindow().getNavigationBarColor());
             navigationBarScrimView.setVisibility((navVisible && !imeVisible) ? View.VISIBLE : View.GONE);
+            // 同步顶部遮罩颜色
+            statusBarScrimView.setBackgroundColor(getWindow().getStatusBarColor());
             return insets;
           }
         }
@@ -212,5 +217,21 @@ public class MainActivity extends BridgeActivity {
         getWindow().setNavigationBarContrastEnforced(false);
       } catch (Throwable ignored) {}
     }
+  }
+
+  // 供插件调用：设置顶部/底部遮罩颜色
+  public void setScrimColors(final int statusColor, final int navColor) {
+    runOnUiThread(() -> {
+      try {
+        if (statusBarScrimView != null && statusColor != 0) {
+          statusBarScrimView.setBackgroundColor(statusColor);
+        }
+        if (navigationBarScrimView != null && navColor != 0) {
+          navigationBarScrimView.setBackgroundColor(navColor);
+        }
+        View decor = getWindow().getDecorView();
+        ViewCompat.requestApplyInsets(decor);
+      } catch (Throwable ignored) {}
+    });
   }
 }
