@@ -1,0 +1,266 @@
+/* ==============================================
+   基于Web/CSS的系统栏适配方案 v2.0
+   支持自动检测和手动配置两种模式
+   ============================================== */
+
+/* ===== CSS变量定义 ===== */
+:root {
+  /* 系统原生安全区域 - 专用于设置页面，不受用户配置影响 */
+  --system-safe-area-top: env(safe-area-inset-top, 0px);
+  --system-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --system-safe-area-left: env(safe-area-inset-left, 0px);
+  --system-safe-area-right: env(safe-area-inset-right, 0px);
+  
+  /* 安全区域间距 - 支持自动检测和手动配置 */
+  --safe-area-inset-top: calc(
+    var(--safe-area-system-top, env(safe-area-inset-top, 0px)) + 
+    var(--custom-safe-area-top, 0px)
+  );
+  --safe-area-inset-bottom: calc(
+    var(--safe-area-system-bottom, env(safe-area-inset-bottom, 0px)) + 
+    var(--custom-safe-area-bottom, 0px)
+  );
+  --safe-area-inset-left: calc(
+    var(--safe-area-system-left, env(safe-area-inset-left, 0px)) + 
+    var(--custom-safe-area-left, 0px)
+  );
+  --safe-area-inset-right: calc(
+    var(--safe-area-system-right, env(safe-area-inset-right, 0px)) + 
+    var(--custom-safe-area-right, 0px)
+  );
+  
+  /* 背景颜色配置 */
+  --status-bar-bg: #ffffff;
+  --navigation-bar-bg: #ffffff;
+  
+  /* 键盘状态 */
+  --keyboard-visible: 0; /* 0 = hidden, 1 = visible */
+}
+
+/* Android手动模式强制覆盖 */
+.android-manual-safe-area {
+  --safe-area-inset-top: var(--custom-safe-area-top, 0px) !important;
+  --safe-area-inset-bottom: var(--custom-safe-area-bottom, 0px) !important;
+  --safe-area-inset-left: var(--custom-safe-area-left, 0px) !important;
+  --safe-area-inset-right: var(--custom-safe-area-right, 0px) !important;
+}
+
+/* ===== 全局容器适配 ===== */
+.safe-area-container {
+  min-height: 100vh;
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: calc(var(--safe-area-inset-bottom) * (1 - var(--keyboard-visible)));
+  position: relative;
+}
+
+/* ===== 系统栏背景填充 ===== */
+.status-bar-fill {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-area-inset-top);
+  background-color: var(--status-bar-bg);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.navigation-bar-fill {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--safe-area-inset-bottom) * (1 - var(--keyboard-visible)));
+  background-color: var(--navigation-bar-bg);
+  z-index: 9999;
+  pointer-events: none;
+  transition: height 0.25s ease-in-out;
+}
+
+/* ===== 内容区域安全适配 ===== */
+.content-safe-area {
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: calc(var(--safe-area-inset-bottom) * (1 - var(--keyboard-visible)));
+  min-height: calc(100vh - var(--safe-area-inset-top) - calc(var(--safe-area-inset-bottom) * (1 - var(--keyboard-visible))));
+}
+
+/* ===== 特殊场景适配 ===== */
+
+/* 全屏内容（如启动页、引导页） */
+.fullscreen-content {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+.fullscreen-content .content-area {
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+  height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+/* 固定底部导航栏 */
+.bottom-navigation {
+  position: fixed;
+  bottom: var(--safe-area-inset-bottom);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+/* 固定顶部导航栏 */
+.top-navigation {
+  position: fixed;
+  top: var(--safe-area-inset-top);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+/* 固定头部导航栏（用于sticky定位） */
+.sticky-header {
+  position: sticky;
+  top: var(--safe-area-inset-top);
+  z-index: 50;
+}
+
+/* 确保内容不被固定头部遮挡 */
+.header-offset {
+  padding-top: calc(var(--safe-area-inset-top) + 64px); /* 64px是头部高度 */
+}
+
+/* 专门用于应用页面的sticky头部 */
+.app-sticky-header {
+  position: sticky;
+  top: var(--safe-area-inset-top);
+  z-index: 10;
+}
+
+/* ===== 主题颜色预设 ===== */
+.theme-light {
+  --status-bar-bg: #ffffff;
+  --navigation-bar-bg: #ffffff;
+}
+
+.theme-dark {
+  --status-bar-bg: #000000;
+  --navigation-bar-bg: #000000;
+}
+
+.theme-primary {
+  --status-bar-bg: var(--primary-color, #2563eb);
+  --navigation-bar-bg: var(--primary-color, #2563eb);
+}
+
+.theme-transparent {
+  --status-bar-bg: transparent;
+  --navigation-bar-bg: transparent;
+}
+
+/* ===== 预览模式样式 ===== */
+.safe-area-preview::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-area-inset-top);
+  background: rgba(255, 0, 0, 0.15);
+  border-bottom: 2px dashed rgba(255, 0, 0, 0.6);
+  z-index: 9999;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.safe-area-preview::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-area-inset-bottom);
+  background: rgba(255, 0, 0, 0.15);
+  border-top: 2px dashed rgba(255, 0, 0, 0.6);
+  z-index: 9999;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+/* 深色模式下的预览样式 */
+.dark .safe-area-preview::before,
+.dark .safe-area-preview::after {
+  background: rgba(255, 255, 0, 0.15);
+  border-color: rgba(255, 255, 0, 0.6);
+}
+
+/* ===== 调试模式 ===== */
+.debug-safe-area .status-bar-fill {
+  background-color: rgba(255, 0, 0, 0.3) !important;
+  border-bottom: 2px solid red;
+}
+
+.debug-safe-area .navigation-bar-fill {
+  background-color: rgba(0, 255, 0, 0.3) !important;
+  border-top: 2px solid green;
+}
+
+.debug-safe-area .safe-area-container {
+  border: 2px dashed blue;
+}
+
+/* ===== 响应式适配 ===== */
+@media (orientation: landscape) {
+  .safe-area-container {
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+}
+
+/* ===== 键盘适配 ===== */
+.keyboard-visible {
+  --keyboard-visible: 1;
+}
+
+.keyboard-visible .navigation-bar-fill {
+  height: 0;
+  opacity: 0;
+}
+
+/* 键盘弹出时隐藏固定底部导航 */
+.keyboard-visible .fixed.bottom-0 {
+  transform: translateY(100%);
+  transition: transform 0.25s ease-in-out;
+}
+
+/* 键盘弹出时调整主内容区域 */
+.keyboard-visible main {
+  padding-bottom: 0 !important;
+}
+
+/* ===== 工具类 ===== */
+.pt-safe { padding-top: var(--safe-area-inset-top) !important; }
+.pb-safe { padding-bottom: var(--safe-area-inset-bottom) !important; }
+.pl-safe { padding-left: var(--safe-area-inset-left) !important; }
+.pr-safe { padding-right: var(--safe-area-inset-right) !important; }
+
+.mt-safe { margin-top: var(--safe-area-inset-top) !important; }
+.mb-safe { margin-bottom: var(--safe-area-inset-bottom) !important; }
+.ml-safe { margin-left: var(--safe-area-inset-left) !important; }
+.mr-safe { margin-right: var(--safe-area-inset-right) !important; }
+
+.h-safe { height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom)) !important; }
+.min-h-safe { min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom)) !important; }
+
+/* ===== 顶部导航栏适配 ===== */
+:root {
+  /* 顶部导航栏高度：安全区域 + 内容高度（56px + 24px padding） */
+  --top-navigation-height: calc(var(--safe-area-inset-top) + 80px);
+}
+
+/* 为固定顶部导航栏预留空间的工具类 */
+.pt-nav { padding-top: var(--top-navigation-height) !important; }
+.mt-nav { margin-top: var(--top-navigation-height) !important; } 

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import TopNavigation from '@/components/ui/top-navigation'
 
 type PublishType = 'resource' | 'post'
 
@@ -237,27 +238,36 @@ const PublishScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* 头部导航 */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b">
-        <div className="container max-w-2xl mx-auto">
-          <div className="flex items-center justify-between p-4">
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title="发布内容"
+        subtitle={publishType === 'resource' ? '分享资源' : '发布帖子'}
+        showBackButton
+        rightAction={
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
+            onClick={handlePublish}
+            disabled={!title || !content || isPublishing}
+            className="px-6"
           >
-            <ArrowLeft className="h-5 w-5" />
+            {isPublishing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                发布中...
+              </>
+            ) : (
+              <>
+                <Send size={16} className="mr-2" />
+                发布
+              </>
+            )}
           </Button>
-          <h1 className="text-lg font-semibold">
-            {publishType === 'resource' ? '发布资源' : '发布帖子'}
-          </h1>
-          <div className="w-10"></div>
-        </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* 发布类型选择 */}
-      <div className="container max-w-2xl mx-auto p-4 space-y-4">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        <div className="container max-w-2xl mx-auto p-4 space-y-6">
+        {/* 发布类型选择 */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">发布类型</CardTitle>
@@ -908,6 +918,7 @@ const PublishScreen: React.FC = () => {
           </div>
         </div>
       </div>
+      </div> {/* 结束内容区域 */}
 
       {/* 底部安全区域 */}
       <div className="h-16 safe-area-bottom" />

@@ -20,18 +20,12 @@ import RegisterScreen from './screens/register-screen'
 import ForgotPasswordScreen from './screens/forgot-password-screen'
 import TermsScreen from './screens/terms-screen'
 import Layout from './components/layout'
-import { initializeStatusBar } from './utils/statusBar'
-import { resetStatusBarToDefault } from './utils/statusBarDirectTest'
-import { addPlatformClass, isNative } from './utils/platform'
-import { initializeSimpleKeyboard } from './utils/simpleKeyboard'
-import { initializeKeyboardNavSettings } from './utils/keyboardNavSettings'
-import { detectNavigationBar, setNavigationBarCSSVariables, watchNavigationBarChanges, NavigationType } from './utils/navigationBar'
-import { getNavigationBarInfo, addNavigationBarListener, initializeAndroidNavigationBar } from './utils/navigationBarNative'
+import { initializePlatform } from './utils/platform'
 import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
-import NavigationDebugPanel from './components/NavigationDebugPanel'
+import { initializeSafeArea, setSafeAreaTheme, setSafeAreaDebug } from './utils/safeAreaManager'
 
-import './styles/safe-area.css'
+import './styles/safe-area-v2.css'
 
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true)
@@ -39,54 +33,27 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // 初始化平台适配
-    const initializePlatform = async () => {
-      // 添加平台类名
-      addPlatformClass()
+    const initializeApp = async () => {
+      // 初始化平台检测
+      initializePlatform()
       
-      // 初始化状态栏 - 使用强制重置确保非透明
-      console.log('🔧 正在初始化状态栏...')
-      await resetStatusBarToDefault()
-      await initializeStatusBar()
+      // 初始化安全区域管理器（纯CSS方案）
+      console.log('🔧 正在初始化安全区域管理器（纯CSS方案）...')
+      await initializeSafeArea()
       
-      // 初始化简化键盘监听
-      initializeSimpleKeyboard()
+      // 设置默认主题为浅色
+      setSafeAreaTheme('light')
       
-      // 初始化键盘导航栏设置
-      initializeKeyboardNavSettings()
+      // 调试模式默认关闭
+      setSafeAreaDebug(false)
       
       // 初始化返回键监听器
       initializeBackButton()
       
-      // 初始化Android导航栏
-      await initializeAndroidNavigationBar()
-      
-      // 检测并设置导航栏（降级方案）
-      const navInfo = await detectNavigationBar()
-      setNavigationBarCSSVariables(navInfo)
-      console.log('导航栏信息:', navInfo)
-      
-      // 启用调试样式（方便调试）
-      document.body.classList.add('debug-mode')
-      
-      // 监听导航栏变化
-      if (isNative()) {
-        await addNavigationBarListener((info) => {
-          console.log('📱 导航栏变化:', info)
-                     // 转换原生信息格式并应用
-           const appNavInfo = {
-             type: info.navigationType === 0 ? NavigationType.NONE : 
-                   info.navigationType === 1 ? NavigationType.BUTTONS : 
-                   NavigationType.GESTURE,
-             height: info.navigationBarHeight,
-             isVisible: info.isVisible,
-             hasHomeIndicator: info.navigationType === 2 && info.navigationBarHeight > 0
-           }
-          setNavigationBarCSSVariables(appNavInfo)
-        })
-      }
+      console.log('✅ 应用初始化完成')
     }
     
-    initializePlatform()
+    initializeApp()
 
     // 模拟启动页显示3秒
     const timer = setTimeout(() => {
@@ -141,11 +108,6 @@ const App: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
           <Route path="/terms" element={<TermsScreen />} />
       </Routes>
-      
-      {/* 显示调试面板（包括生产环境，方便调试） */}
-      <NavigationDebugPanel show={false} />
-      
-      {/* 键盘调试面板 */}
       
     </>
   )

@@ -106,30 +106,7 @@ public class NavigationBarPlugin extends Plugin {
         }
     }
 
-    // 新增：设置系统栏遮罩颜色
-    @PluginMethod
-    public void setScrimColors(PluginCall call) {
-        String status = call.getString("statusColor", null);
-        String nav = call.getString("navColor", null);
-        try {
-            int statusInt = parseColorOrDefault(status, 0);
-            int navInt = parseColorOrDefault(nav, 0);
-            MainActivity activity = (MainActivity) getActivity();
-            activity.setScrimColors(statusInt, navInt);
-            call.resolve();
-        } catch (Exception e) {
-            call.reject("设置遮罩颜色失败: " + e.getMessage());
-        }
-    }
-
-    private int parseColorOrDefault(String color, int def) {
-        if (color == null || color.trim().isEmpty()) return def;
-        try {
-            return Color.parseColor(color);
-        } catch (Exception ignore) {
-            return def;
-        }
-    }
+    // setScrimColors方法已被移除，因为不再需要复杂的系统栏处理
 
     /**
      * 从系统资源获取导航栏高度

@@ -13,27 +13,24 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onSkip }) => {
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 100) {
+      setProgress((oldProgress) => {
+        if (oldProgress === 100) {
           clearInterval(timer)
           return 100
         }
-        return prev + 3.33 // 3秒内完成
+        const diff = Math.random() * 10
+        return Math.min(oldProgress + diff, 100)
       })
-    }, 100)
-
-    const skipTimer = setTimeout(() => {
-      onSkip()
-    }, 3000)
+    }, 200)
 
     return () => {
       clearInterval(timer)
-      clearTimeout(skipTimer)
     }
-  }, [onSkip])
+  }, [])
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6">
+    <div className="fullscreen-content bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800">
+      <div className="content-area flex flex-col items-center justify-center text-white relative overflow-hidden">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -87,8 +84,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onSkip }) => {
           跳过 <ChevronRight size={16} className="ml-1" />
         </Button>
       </motion.div>
+      </div>
     </div>
   )
 }
 
-export default SplashScreen
+export default SplashScreen 

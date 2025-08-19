@@ -8,6 +8,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -158,27 +159,19 @@ const HomeScreen: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-10 bg-background border-b p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <Code size={24} className="text-primary mr-2" />
-            <h1 className="text-xl font-bold">结绳社区</h1>
-          </div>
-          
-          <div className="flex items-center">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={() => navigate('/messages')}
-            >
-              <Bell size={20} />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <TopNavigation
+        title="结绳社区"
+        subtitle="学习交流，共同进步"
+        showNotificationButton
+        showSearchButton
+        notificationCount={3}
+        onSearchClick={() => setSearchFocused(true)}
+      />
 
-      {/* 搜索框 */}
-      <div className="p-4">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        {/* 搜索框 */}
+        <div className="p-4">
         <div className="relative">
           <Input
             id="search-input"
@@ -535,6 +528,7 @@ const HomeScreen: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

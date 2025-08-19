@@ -9,29 +9,11 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
+    <!-- 简化的NoActionBar主题 - 移除所有系统栏配置 -->
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:windowBackground">@color/white</item>
-        <!-- 状态栏配置 - 使用白色背景而不是透明 -->
-        <item name="android:statusBarColor">@color/statusBarColor</item>
-        <item name="android:navigationBarColor">@color/navigationBarColor</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
-        <!-- 禁用透明模式，使用标准模式 -->
-        <item name="android:windowTranslucentStatus">false</item>
-        <item name="android:windowTranslucentNavigation">false</item>
-        <!-- 确保绘制系统栏背景 -->
-        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
-        <!-- 关闭系统对比度强制，避免系统加半透明遮罩导致看似透明/变色 -->
-        <item name="android:enforceStatusBarContrast">false</item>
-        <item name="android:enforceNavigationBarContrast">false</item>
-        <item name="android:navigationBarDividerColor">@color/transparent</item>
     </style>
 
-
-    <style name="AppTheme.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@drawable/splash</item>
-        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
-    </style>
 </resources>

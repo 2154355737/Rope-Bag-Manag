@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -148,21 +149,24 @@ async function fetchData() {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-10 bg-background border-b p-4">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft size={20} />
-          </Button>
-          
-          <h1 className="text-lg font-medium">帖子详情</h1>
-          
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal size={20} />
-          </Button>
-        </div>
-      </header>
+      <TopNavigation
+        title="帖子详情"
+        showBackButton
+        rightAction={
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Share2 size={20} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <MoreHorizontal size={20} />
+            </Button>
+          </div>
+        }
+      />
 
-      <ScrollArea className="flex-1">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        <ScrollArea className="flex-1">
         <div className="p-4">
           {/* 帖子内容 */}
           <Card>
@@ -406,6 +410,7 @@ async function fetchData() {
           </Card>
         </div>
       </ScrollArea>
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const CommunityScreen: React.FC = () => {
   const [activeTag, setActiveTag] = useState('all')
@@ -91,20 +92,18 @@ const CommunityScreen: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-10 bg-background border-b p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">社区</h1>
-          
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon">
-              <Search size={20} />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <TopNavigation
+        title="社区"
+        subtitle="与开发者交流分享"
+        showSearchButton
+        showNotificationButton
+        notificationCount={2}
+      />
 
-      {/* 标签导航 */}
-      <div className="border-b">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        {/* 标签导航 */}
+        <div className="border-b">
         <ScrollArea className="whitespace-nowrap">
           <div className="flex p-2">
             {tags.map((tag) => (
@@ -220,6 +219,7 @@ const CommunityScreen: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

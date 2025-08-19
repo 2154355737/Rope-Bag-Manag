@@ -12,10 +12,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/components/theme-provider'
 import { useSafeArea } from '@/components/safe-area-provider'
-import StatusBarSettings from '@/components/StatusBarSettings'
-import AndroidNavigationBarSettings from '@/components/AndroidNavigationBarSettings'
 import KeyboardNavigationSettings from '@/components/KeyboardNavigationSettings'
 import { toast } from '@/hooks/use-toast'
+import TopNavigation from '@/components/ui/top-navigation'
+
 
 const SettingsScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -93,30 +93,27 @@ const SettingsScreen: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-background">
-      {/* 头部导航 */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b">
-        <div className="flex items-center justify-between p-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">设置</h1>
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title="设置"
+        subtitle="个性化配置"
+        showBackButton
+        rightAction={
           <Button
             variant="ghost"
             size="sm"
             onClick={saveSettings}
-            className={isConfigSaved() ? "text-green-600" : "text-primary"}
+            className={`flex items-center gap-2 px-4 ${isConfigSaved() ? "text-green-600" : "text-primary"}`}
           >
-            <Save className="h-4 w-4 mr-1" />
+            <Save className="h-4 w-4" />
             {isConfigSaved() ? "已保存" : "保存"}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      <div className="container max-w-2xl mx-auto p-4 space-y-6">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav pb-4"> {/* 固定导航栏高度 + 安全区域 */}
+        <div className="container max-w-2xl mx-auto p-4 space-y-6">
         {/* 界面设置 */}
         <Card>
           <CardHeader>
@@ -325,12 +322,6 @@ const SettingsScreen: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* 状态栏设置 */}
-        <StatusBarSettings />
-
-        {/* Android导航栏设置 */}
-        <AndroidNavigationBarSettings />
-
         {/* 通知设置 */}
         <Card>
           <CardHeader>
@@ -442,7 +433,8 @@ const SettingsScreen: React.FC = () => {
           </CardContent>
         </Card>
         
-        <div className="pb-8"></div>
+          <div className="pb-8"></div>
+        </div>
       </div>
     </div>
   )

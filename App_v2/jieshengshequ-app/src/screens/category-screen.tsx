@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const CategoryScreen: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState('all')
@@ -66,61 +67,79 @@ const CategoryScreen: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-10 bg-background border-b p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">分类浏览</h1>
-          
+      <TopNavigation
+        title="分类"
+        subtitle="发现更多精彩内容"
+        showSearchButton
+        rightAction={
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Filter size={18} />
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Filter size={20} />
               </Button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent side="right" className="w-80">
               <SheetHeader>
                 <SheetTitle>筛选条件</SheetTitle>
               </SheetHeader>
-              <div className="py-6 space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">难度</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-primary-foreground">入门</Badge>
-                    <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-primary-foreground">中级</Badge>
-                    <Badge variant="outline" className="cursor-pointer hover:bg-primary hover:text-primary-foreground">高级</Badge>
+              <div className="mt-6 space-y-6">
+                <div>
+                  <Label className="text-base font-medium">难度等级</Label>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="beginner" />
+                      <Label htmlFor="beginner">入门</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="intermediate" />
+                      <Label htmlFor="intermediate">中级</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="advanced" />
+                      <Label htmlFor="advanced">高级</Label>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">热度</h3>
-                  <Slider defaultValue={[50]} max={100} step={1} />
-                </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-sm font-medium">时长</h3>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">1小时以内</span>
-                    <span className="text-sm">5小时以上</span>
+                <div>
+                  <Label className="text-base font-medium">时长范围</Label>
+                  <div className="mt-4">
+                    <Slider
+                      defaultValue={[0, 10]}
+                      max={10}
+                      step={0.5}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-sm text-muted-foreground mt-2">
+                      <span>0小时</span>
+                      <span>10小时+</span>
+                    </div>
                   </div>
-                  <Slider defaultValue={[0, 100]} max={100} step={1} />
                 </div>
                 
-                <div className="flex items-center space-x-2">
-                  <Switch id="only-favorite" />
-                  <Label htmlFor="only-favorite">只看收藏</Label>
-                </div>
-                
-                <div className="flex justify-end space-x-2 pt-4">
-                  <Button variant="outline">重置</Button>
-                  <Button>应用筛选</Button>
+                <div>
+                  <Label className="text-base font-medium">热度筛选</Label>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Switch id="hot" />
+                      <Label htmlFor="hot">热门内容</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch id="new" />
+                      <Label htmlFor="new">最新发布</Label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </SheetContent>
           </Sheet>
-        </div>
-      </header>
+        }
+      />
 
-      {/* 一级分类 */}
-      <div className="border-b overflow-x-auto">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        {/* 一级分类 */}
+        <div className="border-b overflow-x-auto">
         <div className="flex p-2 min-w-max">
           {categories.map((category) => (
             <Button
@@ -249,6 +268,7 @@ const CategoryScreen: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

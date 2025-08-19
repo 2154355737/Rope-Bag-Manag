@@ -1,14 +1,14 @@
 import { WebPlugin } from '@capacitor/core'
 import type { NavigationBarPlugin, NavigationBarInfo } from './NavigationBarPlugin'
+import type { PluginListenerHandle, ListenerCallback } from '@capacitor/core'
 
 export class NavigationBarPluginWeb extends WebPlugin implements NavigationBarPlugin {
-  
   async getNavigationBarInfo(): Promise<NavigationBarInfo> {
-    // Web端返回模拟数据
+    // Web平台返回空的导航栏信息
     return {
       hasNavigationBar: false,
       navigationBarHeight: 0,
-      navigationType: 0, // 无导航栏
+      navigationType: 0,
       isVisible: false,
       isFullscreen: false,
       orientation: 0,
@@ -21,31 +21,15 @@ export class NavigationBarPluginWeb extends WebPlugin implements NavigationBarPl
     }
   }
 
-  async addListener(
-    eventName: 'navigationBarChanged',
-    listenerFunc: (info: NavigationBarInfo) => void,
-  ): Promise<any> {
-    // Web端不支持监听
-    return Promise.resolve()
+  async addListener(eventName: string, listenerFunc: ListenerCallback): Promise<PluginListenerHandle> {
+    // Web平台不需要监听器，返回空的handle
+    return Promise.resolve({
+      remove: async () => {}
+    })
   }
 
   async removeAllListeners(): Promise<void> {
-    return Promise.resolve()
-  }
-
-  // 新增：Web 端空实现，同时同步 CSS 变量用于预览
-  async setScrimColors(options: { statusColor?: string; navColor?: string }): Promise<void> {
-    try {
-      const root = document.documentElement
-      if (options?.statusColor) {
-        root.style.setProperty('--status-bar-scrim-color', options.statusColor)
-      }
-      if (options?.navColor) {
-        root.style.setProperty('--android-nav-bar-color', options.navColor)
-      }
-    } catch (_) {
-      // ignore in web
-    }
+    // Web平台不需要移除监听器
     return Promise.resolve()
   }
 } 

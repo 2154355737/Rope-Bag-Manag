@@ -7,6 +7,7 @@ import { MessageCircle, Search, MoreVertical, Trash2, Pin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const MessagesScreen: React.FC = () => {
   const [activeSwipeId, setActiveSwipeId] = useState<number | null>(null)
@@ -260,16 +261,19 @@ const MessagesScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* 头部 */}
-      <div className="flex items-center justify-between p-4 border-b">
-        <h1 className="text-xl font-bold">消息</h1>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="h-5 w-5" />
-        </Button>
-      </div>
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title="消息"
+        subtitle={`${conversations.length} 个对话`}
+        showSearchButton
+        showMoreButton
+        onMoreClick={() => toast({ title: "更多选项", description: "功能开发中..." })}
+      />
 
-      {/* 搜索栏 */}
-      <div className="p-4">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        {/* 搜索栏 */}
+        <div className="p-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
@@ -314,6 +318,7 @@ const MessagesScreen: React.FC = () => {
           </div>
         </div>
       )}
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

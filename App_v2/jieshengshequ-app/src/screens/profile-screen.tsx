@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from '@/hooks/use-toast'
 import { useTheme } from '@/components/theme-provider'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -457,18 +458,36 @@ END:VCARD`
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
-      <header className="sticky top-0 z-10 bg-background border-b p-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold">个人中心</h1>
-          
-          <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
-            <Settings size={20} />
-          </Button>
-        </div>
-      </header>
+      <TopNavigation
+        title="个人中心"
+        subtitle={userProfile.level}
+        showSettingsButton
+        rightAction={
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={handleShare}
+            >
+              <Share2 size={20} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => navigate('/settings')}
+            >
+              <Settings size={20} />
+            </Button>
+          </div>
+        }
+      />
 
-      {/* 用户信息 */}
-      <div className="p-4 border-b">
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        {/* 用户信息 */}
+        <div className="p-4 border-b">
         <div className="flex items-start gap-4">
           <div className="flex flex-col items-center">
             <div className="relative flex-shrink-0">
@@ -1095,6 +1114,7 @@ END:VCARD`
           <canvas ref={qrCanvasRef} style={{ display: 'none' }} />
         </DialogContent>
       </Dialog>
+      </div> {/* 结束内容区域 */}
     </div>
   )
 }

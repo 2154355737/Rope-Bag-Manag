@@ -9,35 +9,12 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
-    // 启用边到边显示
     webContentsDebuggingEnabled: true
   },
   plugins: {
-    SplashScreen: {
-      launchShowDuration: 3000,
-      launchAutoHide: true,
-      backgroundColor: '#ffffffff',
-      androidSplashResourceName: 'splash',
-      androidScaleType: 'CENTER_CROP',
-      showSpinner: false,
-      androidSpinnerStyle: 'large',
-      iosSpinnerStyle: 'small',
-      spinnerColor: '#999999',
-      splashFullScreen: true,
-      splashImmersive: true,
-      layoutName: 'launch_screen',
-      useDialog: true,
-    },
-    StatusBar: {
-      style: 'DARK',
-      backgroundColor: '#ffffff',
-      androidStatusBarColor: '#ffffff',
-      overlaysWebView: false,
-    },
     Keyboard: {
-      resize: 'native',
-      style: 'dark',
-      resizeOnFullScreen: true,
+      resize: 'body',
+      resizeOnFullScreen: false,
     },
   },
 };
