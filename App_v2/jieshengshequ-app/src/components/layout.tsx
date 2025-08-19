@@ -31,7 +31,7 @@ const Layout: React.FC = () => {
       </div>
       
       {/* 底部导航栏 - 固定在底部，包含安全区域 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border pb-safe">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border pb-safe z-[9999]">
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
             const Icon = item.icon

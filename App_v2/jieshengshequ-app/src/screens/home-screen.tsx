@@ -208,7 +208,7 @@ const HomeScreen: React.FC = () => {
           )}
           {searchFocused && (
             <div
-              className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50 max-h-80 overflow-y-auto"
+              className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-[60] max-h-80 overflow-y-auto"
               onMouseEnter={() => setIsDropdownInteracting(true)}
               onMouseLeave={() => setIsDropdownInteracting(false)}
             >

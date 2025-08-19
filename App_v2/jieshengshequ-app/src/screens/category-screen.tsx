@@ -190,11 +190,11 @@ const CategoryScreen: React.FC = () => {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="absolute top-2 right-2 bg-background/50 backdrop-blur-sm rounded-full h-8 w-8"
+                        className="absolute top-2 right-2 bg-background/50 backdrop-blur-sm rounded-full h-8 w-8 z-10"
                       >
                         <Star size={16} className="text-yellow-500" />
                       </Button>
-                      <div className="absolute bottom-2 right-2">
+                      <div className="absolute bottom-2 right-2 z-10">
                         <Badge className="bg-background/50 backdrop-blur-sm text-foreground text-xs">
                           {resource.difficulty}
                         </Badge>

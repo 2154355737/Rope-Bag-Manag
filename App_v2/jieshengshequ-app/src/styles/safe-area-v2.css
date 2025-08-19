@@ -263,4 +263,23 @@
 
 /* 为固定顶部导航栏预留空间的工具类 */
 .pt-nav { padding-top: var(--top-navigation-height) !important; }
-.mt-nav { margin-top: var(--top-navigation-height) !important; } 
+.mt-nav { margin-top: var(--top-navigation-height) !important; }
+
+/* ===== Z-Index 层级体系 ===== */
+/* 
+  层级规划：
+  - z-[9999]: 底部导航栏 (确保始终在最上层，除了系统级弹窗)
+  - z-[200]: Toast/通知 (系统级消息，可以覆盖导航栏)
+  - z-[150]: Modal/Dialog (模态框，可以覆盖导航栏)
+  - z-[100]: 顶部导航栏
+  - z-[90]: Sheet/Drawer (侧边栏)
+  - z-[80]: Popover/Dropdown (弹出菜单)
+  - z-[70]: Tooltip (提示框)
+  - z-[60]: 搜索下拉框等页面级弹出内容
+  - z-[50]: 其他弹出内容
+  - z-[40]: 卡片内容层级
+  - z-[30]: 一般覆盖层
+  - z-[20]: 状态徽章等小元素
+  - z-[10]: 基础覆盖 (卡片内状态徽章、按钮等)
+  - z-[1]: 默认层级
+*/ 

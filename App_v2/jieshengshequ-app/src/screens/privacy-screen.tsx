@@ -259,7 +259,7 @@ const PrivacyScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* 头部导航 */}
-      <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b">
+              <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
         <div className="flex items-center justify-between p-4">
           <Button
             variant="ghost"
