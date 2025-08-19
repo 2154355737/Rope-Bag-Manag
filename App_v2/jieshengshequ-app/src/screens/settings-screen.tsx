@@ -12,6 +12,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 import { useTheme } from '@/components/theme-provider'
 import { useSafeArea } from '@/components/safe-area-provider'
+import StatusBarSettings from '@/components/StatusBarSettings'
+import AndroidNavigationBarSettings from '@/components/AndroidNavigationBarSettings'
+import KeyboardNavigationSettings from '@/components/KeyboardNavigationSettings'
 import { toast } from '@/hooks/use-toast'
 
 const SettingsScreen: React.FC = () => {
@@ -321,6 +324,15 @@ const SettingsScreen: React.FC = () => {
             </Alert>
           </CardContent>
         </Card>
+
+        {/* 状态栏设置 */}
+        <StatusBarSettings />
+
+        {/* Android导航栏设置 */}
+        <AndroidNavigationBarSettings />
+
+        {/* 键盘导航栏设置 */}
+        <KeyboardNavigationSettings />
 
         {/* 通知设置 */}
         <Card>

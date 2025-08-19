@@ -10,12 +10,10 @@ const Layout: React.FC = () => {
   const navigate = useNavigate()
   const { theme } = useTheme()
   
-  // 使用现代化键盘处理
+  // 使用简化键盘处理
   const keyboard = useModernKeyboard({
-    debug: import.meta.env.DEV, // 开发环境启用调试
-    onStateChange: (state) => {
-      console.log('🎹 键盘状态变化:', state)
-    }
+    enabled: true,
+    debounceMs: 100
   })
   
   const navItems = [

@@ -15,14 +15,7 @@
   padding-right: env(safe-area-inset-right);
 }
 
-/* 自定义安全区域支持 - 自动检测模式 */
-.safe-area-container {
-  /* 默认使用系统安全区域 */
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
+/* 移除重复的安全区域规则，避免双重padding造成白色区域 */
 
 /* 手动配置模式：使用CSS变量控制是否应用系统值 */
 .safe-area-container {
@@ -76,6 +69,11 @@
   bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
   /* 移除导航栏内部的底部padding */
   padding-bottom: 0;
+  
+  /* 默认显示状态 - 移除过渡动画避免抽搐 */
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 /* 现代化底部导航栏 - 改进版 */
@@ -91,6 +89,11 @@
   padding-bottom: 0;
   /* 设置变换原点为底部，确保移动时以底部为锚点 */
   transform-origin: bottom;
+  
+  /* 默认显示状态 - 移除过渡动画避免抽搐 */
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 /* Android手动模式强制覆盖 */
@@ -107,15 +110,41 @@
 
 .android-manual-safe-area.keyboard-open .modern-main-content,
 .android-manual-safe-area.keyboard-open .main-content {
-  /* Android手动模式：键盘弹出时强制使用自定义值 */
-  padding-bottom: calc(64px + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
+  /* Android手动模式：键盘弹出时导航栏已隐藏，移除额外padding避免白色区域 */
+  padding-bottom: var(--custom-safe-area-bottom, 0px) !important;
 }
 
 .android-manual-safe-area.keyboard-open .modern-bottom-nav,
 .android-manual-safe-area.keyboard-open .fixed-bottom-nav {
-  /* Android手动模式：键盘弹出时强制使用自定义值 */
-  bottom: calc(var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
+  /* Android手动模式：键盘弹出时隐藏导航栏 */
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transform: translateY(100%) !important;
 }
+
+/* Android导航栏背景颜色控制 - 已禁用，避免白色区域 */
+/* .platform-android::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--actual-nav-bar-height, 48px) + var(--custom-safe-area-bottom, 0px));
+  background-color: var(--android-nav-bar-color, #ffffff);
+  z-index: 49;
+  pointer-events: none;
+} */
+
+/* 隐藏导航栏时不显示背景 - 已禁用 */
+/* .hide-navigation-bar.platform-android::after {
+  display: none;
+} */
+
+/* 键盘弹出时调整背景位置 - 已禁用 */
+/* .keyboard-open.platform-android::after,
+.modern-keyboard-open.platform-android::after {
+  bottom: var(--keyboard-height, 0px);
+} */
 
 /* 手动配置模式下的底部导航栏 - 移除重复的padding设置 */
 .fixed-bottom-nav,
@@ -197,21 +226,38 @@
 }
 
 /* 键盘弹出时的适配 */
+/* 键盘弹出时主内容区域的处理 */
 .keyboard-open .main-content,
 .keyboard-open .modern-main-content {
-  /* 确保主内容区域的高度正确计算，考虑键盘高度 */
-  height: calc(100vh - var(--keyboard-height, 0px));
-  max-height: calc(100vh - var(--keyboard-height, 0px));
+  /* 移除强制高度设置，让内容自然流动 */
+  /* height: calc(100vh - var(--keyboard-height, 0px)); */
+  /* max-height: calc(100vh - var(--keyboard-height, 0px)); */
   /* 确保可以滚动 */
   overflow-y: auto;
-  /* 键盘弹出时，主内容区域的底部padding需要考虑：导航栏高度 + 安全区域 + 键盘高度（支持负值，可控制系统值）*/
+  /* 确保内容区域能够正确滚动到聚焦的输入框 */
+  scroll-behavior: smooth;
+}
+
+/* 默认行为：导航栏隐藏时的主内容区域padding */
+.keyboard-open .main-content,
+.keyboard-open .modern-main-content,
+.hide-nav-on-keyboard.keyboard-open .main-content,
+.hide-nav-on-keyboard.keyboard-open .modern-main-content {
+  /* 键盘弹出时导航栏已隐藏，移除额外padding避免白色区域 */
+  padding-bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px)) !important;
+}
+
+/* 保持显示导航栏时的主内容区域padding */
+.keep-nav-on-keyboard.keyboard-open .main-content,
+.keep-nav-on-keyboard.keyboard-open .modern-main-content {
+  /* 键盘弹出时导航栏上移，需要考虑导航栏高度 + 安全区域 + 键盘高度 */
   padding-bottom: calc(64px + var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px)) !important;
 }
 
 /* 键盘弹出时，调整视口高度 */
 .keyboard-open,
 .modern-keyboard-open {
-  --viewport-height: calc(100vh - var(--keyboard-height, 0px));
+  --viewport-height: 100vh; /* 移除键盘高度计算，让内容自然流动 */
 }
 
 /* 键盘弹出时的页面容器调整 */
@@ -223,12 +269,42 @@
   overflow: hidden; /* 防止整个页面滚动，只让主内容区域滚动 */
 }
 
-/* 键盘弹出时，底部导航栏需要上移 - 以底部为锚点 */
+/* 防止键盘弹出时出现异常遮挡区域 - 移除强制背景色 */
+.keyboard-open,
+.modern-keyboard-open {
+  /* 移除强制背景色，避免白色区域 */
+}
+
+.keyboard-open .safe-area-container,
+.modern-keyboard-open .safe-area-container {
+  /* 移除可能导致黑色区域的高度限制 */
+  height: auto !important;
+  min-height: 100vh;
+  /* 移除背景色设置，避免白色区域 */
+  /* 确保内容不会被压缩造成空白 */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 键盘弹出时的导航栏行为 - 简化版本，避免动画冲突 */
+
+/* 默认行为：隐藏导航栏 */
 .keyboard-open .fixed-bottom-nav,
-.modern-keyboard-open .modern-bottom-nav {
-  /* 使用bottom定位，在原有安全区域基础上再加上键盘高度（支持负值，可控制系统值）*/
+.modern-keyboard-open .modern-bottom-nav,
+.hide-nav-on-keyboard.keyboard-open .fixed-bottom-nav,
+.hide-nav-on-keyboard.modern-keyboard-open .modern-bottom-nav {
+  /* 完全隐藏导航栏 - 移除复杂动画 */
+  display: none !important;
+}
+
+/* 可选行为：保持显示导航栏（上移到键盘上方）*/
+.keep-nav-on-keyboard.keyboard-open .fixed-bottom-nav,
+.keep-nav-on-keyboard.modern-keyboard-open .modern-bottom-nav {
+  /* 使用bottom定位，在原有安全区域基础上再加上键盘高度 */
   bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
-  transition: bottom 0.25s ease-out;
+  /* 移除动画，直接显示 */
+  display: block !important;
 }
 
 /* 输入框聚焦时的样式增强 */
@@ -237,14 +313,15 @@ textarea:focus {
   scroll-margin-bottom: 100px; /* 确保有足够的滚动边距 */
 }
 
-/* 表单容器的键盘适配 */
+/* 表单容器的键盘适配 - 移除padding避免白色区域 */
 .form-container {
-  transition: padding-bottom 0.25s ease-out;
+  /* 移除过渡动画，避免布局抖动 */
 }
 
 .keyboard-open .form-container,
 .modern-keyboard-open .form-container {
-  padding-bottom: var(--keyboard-height, 0px);
+  /* 移除键盘高度padding，避免白色区域 */
+  padding-bottom: 0;
 }
 
 /* 滚动容器的键盘适配 */
@@ -336,35 +413,9 @@ textarea:focus {
   border-color: rgba(255, 255, 0, 0.6);
 }
 
-/* 键盘动画 - 基于bottom定位，考虑安全区域（支持负值，可控制系统值）*/
-@keyframes keyboard-show {
-  from {
-    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
-  }
-  to {
-    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
-  }
-}
+/* 键盘动画 - 已禁用，避免抽搐问题 */
 
-@keyframes keyboard-hide {
-  from {
-    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px) + var(--keyboard-height, 0px));
-  }
-  to {
-    bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px));
-  }
-}
-
-/* 键盘动画应用 - 优化为基于bottom定位 */
-.keyboard-animating-up .fixed-bottom-nav,
-.keyboard-animating-up .modern-bottom-nav {
-  animation: keyboard-show 0.25s ease-out forwards;
-}
-
-.keyboard-animating-down .fixed-bottom-nav,
-.keyboard-animating-down .modern-bottom-nav {
-  animation: keyboard-hide 0.25s ease-out forwards;
-}
+/* 键盘动画应用 - 已禁用 */
 
 /* 安全区域过渡动画 */
 .safe-area-container,

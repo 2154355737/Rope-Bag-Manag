@@ -5,6 +5,7 @@
 
 import { Capacitor } from '@capacitor/core'
 import { Keyboard } from '@capacitor/keyboard'
+import { forceStatusBarRefresh } from './statusBar'
 
 interface KeyboardState {
   isOpen: boolean
@@ -29,6 +30,7 @@ class ModernKeyboardManager {
   private resizeObserver?: ResizeObserver
   private focusedElement: HTMLElement | null = null
   private callbacks: Set<(state: KeyboardState) => void> = new Set()
+  private _statusBarRefreshed: boolean = false
 
   constructor() {
     this.initialize()
@@ -218,35 +220,29 @@ class ModernKeyboardManager {
   private handleKeyboardShow(keyboardHeight: number) {
     console.log('⌨️ 键盘显示，高度:', keyboardHeight)
 
+    // 更新状态
+    this.state.isOpen = true
+    this.state.height = keyboardHeight
+
     // 更新CSS变量
     this.updateCSSVariables(keyboardHeight)
 
-    // 添加键盘打开类
+    // 添加键盘打开类 - 只通过CSS控制，避免JS强制操作DOM
     document.body.classList.add('modern-keyboard-open')
+    document.body.classList.add('keyboard-open')
     
-    // 添加导航栏上移动画类
-    document.body.classList.add('keyboard-animating-up')
-    document.body.classList.remove('keyboard-animating-down')
+    // 移除所有冲突的动画类
+    document.body.classList.remove('keyboard-animating-up', 'keyboard-animating-down')
 
-    // 强制刷新滚动容器
-    this.refreshScrollContainers()
-
-    // 优化内容区域，移除多余空白 - 多次调用确保彻底优化
-    setTimeout(() => {
-      this.optimizeContentArea()
-    }, 100)
+    // 通知回调 - 简化处理
+    this.notifyCallbacks()
     
-    // 再次优化，确保DOM更新后的最终状态
-    setTimeout(() => {
-      this.optimizeContentArea()
-    }, 300)
-
-    // 处理当前焦点元素
-    if (this.focusedElement) {
-      // 延迟确保元素可见，让CSS变量和布局先更新
-      setTimeout(() => {
-        this.ensureElementVisible(this.focusedElement!, keyboardHeight)
-      }, 150) // 延迟稍微增加，确保优化完成
+    // 只在原生平台且必要时刷新状态栏，减少频率
+    if (Capacitor.isNativePlatform() && !this._statusBarRefreshed) {
+      this._statusBarRefreshed = true
+      forceStatusBarRefresh().catch(error => {
+        console.error('❌ 状态栏刷新失败:', error)
+      })
     }
 
     // 通知回调
@@ -259,115 +255,41 @@ class ModernKeyboardManager {
   private handleKeyboardHide() {
     console.log('⌨️ 键盘隐藏')
 
+    // 更新状态
+    this.state.isOpen = false
+    this.state.height = 0
+
     // 更新CSS变量
     this.updateCSSVariables(0)
 
-    // 移除键盘打开类
-    document.body.classList.remove('modern-keyboard-open')
+    // 移除键盘相关类 - 只通过CSS控制
+    document.body.classList.remove('modern-keyboard-open', 'keyboard-open')
     
-    // 添加导航栏下移动画类
-    document.body.classList.add('keyboard-animating-down')
-    document.body.classList.remove('keyboard-animating-up')
-    
-    // 动画完成后清理动画类
-    setTimeout(() => {
-      document.body.classList.remove('keyboard-animating-down')
-      document.body.classList.remove('keyboard-animating-up')
-    }, 300)
+    // 移除所有动画类，避免冲突
+    document.body.classList.remove('keyboard-animating-up', 'keyboard-animating-down')
 
-    // 刷新滚动容器，恢复默认高度
-    this.refreshScrollContainers()
+    // 重置状态栏刷新标志
+    this._statusBarRefreshed = false
 
     // 通知回调
     this.notifyCallbacks()
   }
 
   /**
-   * 刷新滚动容器
+   * 刷新滚动容器 - 简化版本，避免频繁DOM操作
    */
   private refreshScrollContainers() {
-    // 查找所有滚动容器并强制重新计算
-    const scrollContainers = document.querySelectorAll('.modern-main-content, .scroll-container, .main-content')
-    
-    // 获取修正后的视口高度
-    let viewportHeight = window.innerHeight
-    if (viewportHeight > 10000 && window.screen?.height) {
-      viewportHeight = window.screen.height
-    }
-    if (viewportHeight > 3000 || viewportHeight < 400) {
-      viewportHeight = 800
-    }
-    
-    const keyboardHeight = this.state.height
-    const availableHeight = viewportHeight - keyboardHeight
-    
-    scrollContainers.forEach(container => {
-      const element = container as HTMLElement
-      
-      // 强制设置正确的高度，不依赖CSS变量
-      if (this.state.isOpen) {
-        element.style.height = `${availableHeight}px`
-        element.style.maxHeight = `${availableHeight}px`
-        element.style.overflowY = 'auto'
-        element.style.paddingBottom = '0px' // 移除额外的padding避免空白
-        element.style.boxSizing = 'border-box' // 确保边框盒模型
-        
-        // 🔥 关键：强制限制直接子元素的高度，防止子元素撑开滚动区域
-        const directChildren = Array.from(element.children) as HTMLElement[]
-        directChildren.forEach(child => {
-          const childMaxHeight = availableHeight - 10 // 留10px缓冲
-          child.style.maxHeight = `${childMaxHeight}px`
-          child.style.height = `${childMaxHeight}px` // 强制固定高度
-          child.style.minHeight = 'unset' // 移除min-height
-          child.style.overflowY = 'auto'
-          console.log('🔧 强制限制直接子元素高度:', {
-            childClass: child.className,
-            强制高度: `${childMaxHeight}px`,
-            note: '移除min-h-screen等异常CSS'
-          })
-        })
-        
-        console.log('🔄 强制设置滚动容器高度:', {
-          container: element.className,
-          height: `${availableHeight}px`,
-          viewportHeight,
-          keyboardHeight,
-          scrollHeight: element.scrollHeight,
-          clientHeight: element.clientHeight,
-          note: '已移除padding-bottom避免空白区域'
-        })
-      } else {
-        // 键盘隐藏时恢复默认
-        element.style.height = ''
-        element.style.maxHeight = ''
-        element.style.overflowY = ''
-        element.style.paddingBottom = ''
-        element.style.boxSizing = ''
-        element.style.minHeight = ''
-        
-        // 🔥 关键修复：同时恢复所有子元素的样式
-        const directChildren = Array.from(element.children) as HTMLElement[]
-        directChildren.forEach(child => {
-          child.style.height = '' // 恢复高度
-          child.style.maxHeight = '' // 恢复最大高度
-          child.style.minHeight = '' // 恢复最小高度
-          child.style.overflowY = '' // 恢复滚动
-          
-          console.log('🔄 恢复子元素样式:', {
-            childClass: child.className,
-            note: '恢复到原始CSS状态'
-          })
-        })
-        
-        console.log('🔄 恢复滚动容器和子元素默认状态:', element.className)
-      }
-    })
+    // 禁用强制DOM操作，只更新CSS变量让CSS处理
+    console.log('🔧 键盘状态更新，依赖CSS处理布局')
   }
 
   /**
-   * 强力优化内容区域，彻底移除空白区域
+   * 简化的内容区域优化 - 避免强制DOM操作
    */
   private optimizeContentArea() {
+    // 禁用强制DOM操作，让CSS处理布局
+    console.log('🔧 内容区域优化跳过，依赖CSS处理')
+  }
     const scrollContainers = document.querySelectorAll('.modern-main-content, .scroll-container, .main-content')
     
     scrollContainers.forEach(container => {

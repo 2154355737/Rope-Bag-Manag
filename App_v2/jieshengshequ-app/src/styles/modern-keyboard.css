@@ -86,10 +86,10 @@
   box-sizing: border-box;
 }
 
-/* 键盘打开时的底部导航栏 */
+/* 键盘打开时的底部导航栏 - 与safe-area.css保持一致，使用bottom定位 */
 .modern-keyboard-open .modern-bottom-nav {
-  /* 向上移动到键盘上方 */
-  transform: translateY(calc(-1 * var(--keyboard-height)));
+  /* 不使用transform，由safe-area.css的bottom定位统一处理 */
+  /* transform: translateY(calc(-1 * var(--keyboard-height))); */
 }
 
 /* 输入元素的现代化样式 */
@@ -120,8 +120,8 @@
 /* 响应式设计 */
 @media (orientation: landscape) {
   .modern-keyboard-open .modern-main-content {
-    /* 横屏时的特殊处理 */
-    padding-bottom: 20px;
+    /* 横屏时移除额外padding，避免白色区域 */
+    padding-bottom: 0;
   }
 }
 
@@ -151,13 +151,15 @@
   }
 }
 
-/* 动画类 */
+/* 动画类 - 与safe-area.css保持一致，禁用transform动画 */
 .keyboard-animating-up .modern-bottom-nav {
-  animation: keyboard-slide-up var(--keyboard-transition) ease-out forwards;
+  /* animation: keyboard-slide-up var(--keyboard-transition) ease-out forwards; */
+  /* 由safe-area.css统一处理动画 */
 }
 
 .keyboard-animating-down .modern-bottom-nav {
-  animation: keyboard-slide-down var(--keyboard-transition) ease-out forwards;
+  /* animation: keyboard-slide-down var(--keyboard-transition) ease-out forwards; */
+  /* 由safe-area.css统一处理动画 */
 }
 
 

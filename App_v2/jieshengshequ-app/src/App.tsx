@@ -21,9 +21,11 @@ import ForgotPasswordScreen from './screens/forgot-password-screen'
 import TermsScreen from './screens/terms-screen'
 import Layout from './components/layout'
 import { initializeStatusBar } from './utils/statusBar'
-import { addPlatformClass, initializeKeyboard } from './utils/platform'
-import { detectNavigationBar, setNavigationBarCSSVariables, watchNavigationBarChanges } from './utils/navigationBar'
-import { detectNavigationBarWithNativePlugin, watchNavigationBarWithNativePlugin } from './utils/navigationBarNative'
+import { addPlatformClass, isNative } from './utils/platform'
+import { initializeSimpleKeyboard } from './utils/simpleKeyboard'
+import { initializeKeyboardNavSettings } from './utils/keyboardNavSettings'
+import { detectNavigationBar, setNavigationBarCSSVariables, watchNavigationBarChanges, NavigationType } from './utils/navigationBar'
+import { getNavigationBarInfo, addNavigationBarListener, initializeAndroidNavigationBar } from './utils/navigationBarNative'
 import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
 import NavigationDebugPanel from './components/NavigationDebugPanel'
@@ -43,27 +45,42 @@ const App: React.FC = () => {
       // 初始化状态栏
       await initializeStatusBar()
       
-      // 初始化键盘监听
-      initializeKeyboard()
+      // 初始化简化键盘监听
+      initializeSimpleKeyboard()
+      
+      // 初始化键盘导航栏设置
+      initializeKeyboardNavSettings()
       
       // 初始化返回键监听器
       initializeBackButton()
       
-      // 检测并设置导航栏
-                  // 优先使用原生插件检测
-            const navInfo = await detectNavigationBarWithNativePlugin()
-            setNavigationBarCSSVariables(navInfo)
-            console.log('导航栏信息:', navInfo)
+      // 初始化Android导航栏
+      await initializeAndroidNavigationBar()
+      
+      // 检测并设置导航栏（降级方案）
+      const navInfo = await detectNavigationBar()
+      setNavigationBarCSSVariables(navInfo)
+      console.log('导航栏信息:', navInfo)
       
       // 启用调试样式（方便调试）
       document.body.classList.add('debug-mode')
       
       // 监听导航栏变化
-                  // 监听导航栏变化
-            watchNavigationBarWithNativePlugin((newNavInfo) => {
-              setNavigationBarCSSVariables(newNavInfo)
-              console.log('导航栏变化:', newNavInfo)
-            })
+      if (isNative()) {
+        await addNavigationBarListener((info) => {
+          console.log('📱 导航栏变化:', info)
+                     // 转换原生信息格式并应用
+           const appNavInfo = {
+             type: info.navigationType === 0 ? NavigationType.NONE : 
+                   info.navigationType === 1 ? NavigationType.BUTTONS : 
+                   NavigationType.GESTURE,
+             height: info.navigationBarHeight,
+             isVisible: info.isVisible,
+             hasHomeIndicator: info.navigationType === 2 && info.navigationBarHeight > 0
+           }
+          setNavigationBarCSSVariables(appNavInfo)
+        })
+      }
     }
     
     initializePlatform()

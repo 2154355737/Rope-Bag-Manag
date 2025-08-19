@@ -6,6 +6,7 @@ import './globals.css'
 import './styles/safe-area.css'
 import './styles/theme.css'
 import './styles/modern-keyboard.css'
+import './styles/statusbar-fix.css'
 import { ThemeProvider } from './components/theme-provider.tsx'
 import { Toaster } from './components/ui/toaster.tsx'
 import { SafeAreaProvider } from './components/safe-area-provider.tsx'
@@ -14,7 +15,7 @@ import { SafeAreaProvider } from './components/safe-area-provider.tsx'
 import { addPlatformClass } from './utils/platform.ts'
 import { initializeBackButton } from './utils/backButton.ts'
 // 导入现代化键盘管理器（自动初始化）
-import './utils/modernKeyboard'
+import './utils/simpleKeyboard'
 
 // 添加平台类名
 addPlatformClass()
