@@ -25,13 +25,13 @@ const Layout: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-background">
       {/* 主内容区域 - 添加安全区域适配 */}
       <div className="flex-1 overflow-hidden">
-        <main className="h-full overflow-y-auto pb-16"> {/* 为底部导航留出空间 */}
+        <main className="h-full overflow-y-auto pb-16 scroll-container"> {/* 为底部导航留出空间 */}
           <Outlet />
         </main>
       </div>
       
       {/* 底部导航栏 - 固定在底部，包含安全区域 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border pb-safe z-[9999]">
+      <div className="fixed bottom-0 left-0 right-0 bg-background border-t border-border pb-safe z-[9999] bottom-navigation">
         <div className="flex items-center justify-around h-16">
           {navItems.map((item) => {
             const Icon = item.icon

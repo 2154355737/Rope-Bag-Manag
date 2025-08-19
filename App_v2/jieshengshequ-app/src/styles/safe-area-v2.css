@@ -35,6 +35,7 @@
   
   /* 键盘状态 */
   --keyboard-visible: 0; /* 0 = hidden, 1 = visible */
+  --keyboard-height: 0px; /* 实际键盘高度，由Capacitor插件提供 */
 }
 
 /* Android手动模式强制覆盖 */
@@ -230,15 +231,39 @@
   opacity: 0;
 }
 
-/* 键盘弹出时隐藏固定底部导航 */
-.keyboard-visible .fixed.bottom-0 {
+/* 底部导航栏的显示/隐藏动画 */
+.bottom-navigation {
+  transform: translateY(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 键盘弹出时隐藏固定底部导航栏 */
+.keyboard-visible .bottom-navigation {
   transform: translateY(100%);
-  transition: transform 0.25s ease-in-out;
 }
 
 /* 键盘弹出时调整主内容区域 */
 .keyboard-visible main {
   padding-bottom: 0 !important;
+}
+
+/* 键盘弹出时调整滚动容器 */
+.keyboard-visible .scroll-container {
+  padding-bottom: 0 !important;
+  max-height: calc(100vh - var(--keyboard-height, 0px));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 为键盘弹出时的布局调整添加过渡动画 */
+main, .scroll-container {
+  transition: padding-bottom 0.25s ease-in-out, max-height 0.25s ease-in-out;
+}
+
+/* 输入框获得焦点时的样式调整 */
+input:focus, textarea:focus {
+  scroll-margin-top: 20px;
+  scroll-margin-bottom: 20px;
 }
 
 /* ===== 工具类 ===== */
