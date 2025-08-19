@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主色调 -->
+    <color name="colorPrimary">#2563eb</color>
+    <color name="colorPrimaryDark">#1d4ed8</color>
+    <color name="colorAccent">#3b82f6</color>
+    
+    <!-- 状态栏和导航栏颜色 -->
+    <color name="statusBarColor">#ffffff</color>
+    <color name="navigationBarColor">#ffffff</color>
+    
+    <!-- 基础颜色 -->
+    <color name="white">#ffffff</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    
+    <!-- 主题相关颜色 -->
+    <color name="background_light">#ffffff</color>
+    <color name="background_dark">#000000</color>
+    <color name="surface_light">#f8fafc</color>
+    <color name="surface_dark">#1f2937</color>
+</resources> 

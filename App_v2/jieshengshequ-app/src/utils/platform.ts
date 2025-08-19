@@ -75,14 +75,12 @@ export const initializeKeyboard = () => {
     document.body.classList.add('keyboard-open')
     document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`)
     
-    // 强制更新主内容区域的滚动属性
+    // 交给系统 resize 处理，移除二次高度缩短，避免键盘上方出现额外空白
     const mainContent = document.querySelector('.main-content') as HTMLElement
     if (mainContent) {
-      // 确保主内容区域可以滚动
-      mainContent.style.overflowY = 'auto'
-      mainContent.style.height = `calc(100vh - ${keyboardHeight}px)`
-      mainContent.style.maxHeight = `calc(100vh - ${keyboardHeight}px)`
-      console.log('已设置主内容区域滚动属性')
+      mainContent.style.overflowY = ''
+      mainContent.style.height = ''
+      mainContent.style.maxHeight = ''
     }
     
     console.log('键盘即将显示，高度:', keyboardHeight)

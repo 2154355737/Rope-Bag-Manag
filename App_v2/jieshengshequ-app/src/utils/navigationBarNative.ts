@@ -132,6 +132,18 @@ export const applyAndroidNavigationBarConfig = async (config: AndroidNavigationB
       document.body.classList.add('show-navigation-bar')
       document.body.classList.remove('hide-navigation-bar')
     }
+
+    // 同步到平台类，用于 CSS 画底部背景层
+    if (typeof document !== 'undefined') {
+      const hasAndroidClass = document.body.classList.contains('platform-android')
+      if (hasAndroidClass) {
+        if (config.hidden) {
+          document.body.classList.remove('show-navigation-bar')
+        } else {
+          document.body.classList.add('show-navigation-bar')
+        }
+      }
+    }
     
     if (config.overlaysContent) {
       document.body.classList.add('navigation-overlays-content')

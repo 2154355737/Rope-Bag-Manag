@@ -21,6 +21,7 @@ import ForgotPasswordScreen from './screens/forgot-password-screen'
 import TermsScreen from './screens/terms-screen'
 import Layout from './components/layout'
 import { initializeStatusBar } from './utils/statusBar'
+import { resetStatusBarToDefault } from './utils/statusBarDirectTest'
 import { addPlatformClass, isNative } from './utils/platform'
 import { initializeSimpleKeyboard } from './utils/simpleKeyboard'
 import { initializeKeyboardNavSettings } from './utils/keyboardNavSettings'
@@ -42,7 +43,9 @@ const App: React.FC = () => {
       // 添加平台类名
       addPlatformClass()
       
-      // 初始化状态栏
+      // 初始化状态栏 - 使用强制重置确保非透明
+      console.log('🔧 正在初始化状态栏...')
+      await resetStatusBarToDefault()
       await initializeStatusBar()
       
       // 初始化简化键盘监听

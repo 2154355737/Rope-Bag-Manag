@@ -123,7 +123,7 @@
 }
 
 /* Android导航栏背景颜色控制 - 已禁用，避免白色区域 */
-/* .platform-android::after {
+/* .platform-android.show-navigation-bar::after {
   content: '';
   position: fixed;
   bottom: 0;
@@ -133,6 +133,9 @@
   background-color: var(--android-nav-bar-color, #ffffff);
   z-index: 49;
   pointer-events: none;
+}
+.keyboard-open.platform-android.show-navigation-bar::after {
+  display: none !important;
 } */
 
 /* 隐藏导航栏时不显示背景 - 已禁用 */
@@ -242,9 +245,10 @@
 .keyboard-open .main-content,
 .keyboard-open .modern-main-content,
 .hide-nav-on-keyboard.keyboard-open .main-content,
-.hide-nav-on-keyboard.keyboard-open .modern-main-content {
-  /* 键盘弹出时导航栏已隐藏，移除额外padding避免白色区域 */
-  padding-bottom: calc(var(--safe-area-system-bottom, env(safe-area-inset-bottom)) + var(--custom-safe-area-bottom, 0px)) !important;
+.hide-nav-on-keyboard.keyboard-open .modern-main-content,
+.keyboard-open .pb-16 {
+  /* 键盘弹出时移除底部padding，避免键盘上方出现白色遮罩 */
+  padding-bottom: 0 !important;
 }
 
 /* 保持显示导航栏时的主内容区域padding */
@@ -280,7 +284,8 @@
   /* 移除可能导致黑色区域的高度限制 */
   height: auto !important;
   min-height: 100vh;
-  /* 移除背景色设置，避免白色区域 */
+  /* 键盘打开时清除底部 padding，避免键盘上方出现白块 */
+  padding-bottom: 0 !important;
   /* 确保内容不会被压缩造成空白 */
   flex: 1;
   display: flex;
@@ -428,4 +433,23 @@ textarea:focus {
 .safe-area-preview::before,
 .safe-area-preview::after {
   transition: all 0.3s ease;
+} 
+
+/* 手动安全区模式：为自定义 bottom 安全区绘制填充层，避免出现透明带 */
+:root.android-manual-safe-area body.platform-android .safe-area-container::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--custom-safe-area-bottom, 0px);
+  background-color: var(--android-nav-bar-color, #111111);
+  pointer-events: none;
+  z-index: 49;
+}
+
+/* 键盘期隐藏底部自定义填充层，避免与键盘重叠产生色条 */
+.keyboard-open .safe-area-container::after,
+.modern-keyboard-open .safe-area-container::after {
+  display: none !important;
 } 

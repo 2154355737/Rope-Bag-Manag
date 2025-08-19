@@ -14,7 +14,7 @@ export const defaultStatusBarConfig: StatusBarConfig = {
   style: 'dark',
   backgroundColor: '#ffffff',
   visible: true,
-  overlaysWebView: false
+  overlaysWebView: false // 确保不使用覆盖模式
 }
 
 // 获取当前状态栏信息
@@ -60,14 +60,13 @@ export const applyStatusBarConfig = async (config: StatusBarConfig) => {
 
     // 设置背景颜色 (仅Android)
     if (Capacitor.getPlatform() === 'android') {
+      // 先设置overlaysWebView，这个设置会影响背景颜色的显示效果
+      console.log('📱 设置状态栏覆盖WebView:', config.overlaysWebView)
+      await StatusBar.setOverlaysWebView({ overlay: config.overlaysWebView || false })
+      
+      // 然后设置背景颜色
       console.log('🎨 设置状态栏背景颜色:', config.backgroundColor)
       await StatusBar.setBackgroundColor({ color: config.backgroundColor })
-      
-      // 设置是否覆盖WebView (仅Android)
-      if (config.overlaysWebView !== undefined) {
-        console.log('📱 设置状态栏覆盖WebView:', config.overlaysWebView)
-        await StatusBar.setOverlaysWebView({ overlay: config.overlaysWebView })
-      }
     }
 
     // 设置可见性
