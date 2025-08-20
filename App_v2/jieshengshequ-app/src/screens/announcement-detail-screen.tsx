@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -25,210 +25,49 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 import { getAnnouncementRecommendations } from '@/utils/recommendations'
+import { getAnnouncement } from '../api/announcements'
+import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
 
 const AnnouncementDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
-  
-  // 模拟公告数据
-  const announcement = {
-    id: parseInt(id || '1'),
-    title: '重要通知：结绳社区服务升级维护公告',
-    type: 'important', // important, info, warning, update
-    priority: 'high', // high, medium, low
-    author: {
-      name: '结绳社区官方',
-      avatar: 'https://i.pravatar.cc/150?img=6',
-      role: '管理员',
-      verified: true,
-    },
-    content: `各位用户：
+  const [loading, setLoading] = useState(true)
 
-为了给大家提供更好的服务体验，结绳社区将进行系统升级维护。现将相关事宜通知如下：
+  // 公告数据（初始为空，挂载后加载）
+  const [announcement, setAnnouncement] = useState<any>(null)
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
 
-## 维护时间
-**2025年1月20日 02:00 - 06:00 (UTC+8)**
-
-## 维护内容
-1. **服务器性能优化**
-   - 提升响应速度
-   - 增强系统稳定性
-   - 优化数据库查询效率
-
-2. **新功能上线**
-   - 智能推荐系统
-   - 实时消息通知
-   - 个性化主题设置
-
-3. **Bug修复**
-   - 修复已知的界面显示问题
-   - 解决文件上传偶发失败
-   - 优化移动端适配
-
-## 影响范围
-维护期间，以下功能将暂时不可用：
-- 用户登录/注册
-- 内容发布与编辑
-- 文件上传下载
-- 实时消息推送
-
-## 注意事项
-- 请在维护开始前保存好您的工作内容
-- 维护期间请勿尝试登录，以免造成数据异常
-- 如遇紧急问题，请联系客服邮箱：support@jieshengshequ.com
-
-## 补偿措施
-为感谢大家的理解与支持，维护完成后所有用户将获得：
-- 7天VIP体验权限
-- 专属纪念徽章
-- 社区积分奖励
-
-感谢大家的理解与支持！
-
-结绳社区运营团队  
-2025年1月15日`,
-    publishDate: '2025-01-15',
-    effectiveDate: '2025-01-20',
-    expiryDate: '2025-01-25',
-    tags: ['系统维护', '重要通知', '服务升级'],
-    views: 5680,
-    likes: 234,
-    comments: 45,
-    isPinned: true,
-    attachments: [
-      {
-        name: '维护详细说明.pdf',
-        size: '2.1 MB',
-        url: '#'
+  // 加载公告详情
+  useEffect(() => {
+    if (!id) {
+      navigate('/home', { replace: true })
+      return
+    }
+    const load = async () => {
+      try {
+        setLoading(true)
+        const a = await getAnnouncement(parseInt(id || '1'))
+        setAnnouncement(a)
+        
+        // 加载相关推荐
+        const recommendations = await getAnnouncementRecommendations(a.id, a.tags || [])
+        setRecommendedItems(recommendations)
+        
+        setLoading(false)
+      } catch (e) {
+        console.warn(e)
+        setLoading(false)
       }
-    ],
-    relatedLinks: [
-      {
-        title: '用户服务协议更新说明',
-        url: '#',
-        description: '查看最新的用户服务协议变更内容'
-      },
-      {
-        title: '常见问题解答',
-        url: '#',
-        description: '维护期间可能遇到的问题及解决方案'
-      }
-    ]
-  }
+    }
+    load()
+  }, [id])
 
   // 获取相关推荐
-  const recommendedItems = getAnnouncementRecommendations(announcement.id, announcement.tags)
+  // const recommendedItems = getAnnouncementRecommendations(announcement?.id || 0, announcement?.tags || [])
 
-  // 模拟评论数据
-  const comments: Comment[] = [
-    {
-      id: 1,
-      author: {
-        name: '社区用户',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-      },
-      content: '感谢官方的及时通知，请问维护期间数据会丢失吗？',
-      time: '1小时前',
-      likes: 5,
-      isLiked: false,
-      replies: [
-        {
-          id: 101,
-          author: {
-            name: '结绳社区官方',
-            avatar: 'https://i.pravatar.cc/150?img=6',
-            verified: true,
-          },
-          content: '不会的，所有用户数据都会完全保留，请放心！',
-          time: '30分钟前',
-          likes: 12,
-          isLiked: true,
-        }
-      ]
-    },
-    {
-      id: 2,
-      author: {
-        name: '开发者小王',
-        avatar: 'https://i.pravatar.cc/150?img=3',
-      },
-      content: '新功能很期待！希望智能推荐系统能更精准一些。',
-      time: '3小时前',
-      likes: 8,
-      isLiked: false,
-    },
-    {
-      id: 3,
-      author: {
-        name: '活跃用户',
-        avatar: 'https://i.pravatar.cc/150?img=4',
-      },
-      content: '终于要更新了！期待已久的功能升级，社区越来越好了！',
-      time: '4小时前',
-      likes: 15,
-      isLiked: true,
-    },
-    {
-      id: 4,
-      author: {
-        name: '程序员李四',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-      },
-      content: '维护时间能不能安排在深夜进行，这样对白天使用的影响比较小。',
-      time: '5小时前',
-      likes: 12,
-      isLiked: false,
-      replies: [
-        {
-          id: 401,
-          author: {
-            name: '结绳社区官方',
-            avatar: 'https://i.pravatar.cc/150?img=6',
-            verified: true,
-          },
-          content: '感谢建议！我们会考虑在使用量较低的时段进行维护。',
-          time: '2小时前',
-          likes: 8,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 5,
-      author: {
-        name: '新手小白',
-        avatar: 'https://i.pravatar.cc/150?img=7',
-      },
-      content: '作为新用户，很喜欢这个社区的氛围！期待新功能上线。',
-      time: '6小时前',
-      likes: 6,
-      isLiked: false,
-    },
-    {
-      id: 6,
-      author: {
-        name: '资深开发者',
-        avatar: 'https://i.pravatar.cc/150?img=8',
-      },
-      content: '希望新版本能解决一些性能问题，整体体验还是很不错的。',
-      time: '昨天',
-      likes: 20,
-      isLiked: true,
-    },
-    {
-      id: 7,
-      author: {
-        name: '产品经理小张',
-        avatar: 'https://i.pravatar.cc/150?img=9',
-      },
-      content: '从产品角度来看，这次更新的功能都很实用，用户体验会有很大提升。',
-      time: '昨天',
-      likes: 14,
-      isLiked: false,
-    }
-  ]
+  const [comments, setComments] = useState<Comment[]>([])
 
   // 格式化数字
   const formatNumber = (num: number) => {
@@ -292,50 +131,44 @@ const AnnouncementDetailScreen: React.FC = () => {
   }
 
   // 评论区事件处理
-  const handleSubmitComment = (content: string) => {
-    console.log('新评论:', content)
-    toast({
-      title: "反馈已提交",
-      description: "感谢您的反馈，我们会认真处理"
-    })
+  const handleSubmitComment = async (content: string) => {
+    if (!announcement) return
+    await apiCreateComment('Post', announcement.id, content)
+    toast({ title: '反馈已提交', description: '感谢您的反馈，我们会认真处理' })
   }
 
-  const handleSubmitReply = (commentId: number, content: string) => {
-    console.log('回复评论:', commentId, content)
-    toast({
-      title: "回复发送成功",
-      description: "您的回复已发布"
-    })
+  const handleSubmitReply = async (commentId: number, content: string) => {
+    await apiReplyComment(commentId, content)
+    toast({ title: '回复发送成功', description: '您的回复已发布' })
   }
 
-  const handleLikeComment = (commentId: number) => {
-    console.log('点赞评论:', commentId)
-    toast({
-      title: "操作成功",
-      description: "已点赞/取消点赞"
-    })
+  const handleLikeComment = async (commentId: number) => {
+    await apiLikeComment(commentId, true)
+    toast({ title: '操作成功', description: '已点赞/取消点赞' })
   }
 
   const handleReportComment = (commentId: number) => {
     console.log('举报评论:', commentId)
   }
 
-  // 处理分享
   const handleShare = () => {
-    toast({
-      title: "分享链接已复制",
-      description: "可以分享给更多朋友了",
-      duration: 2000,
-    })
+    toast({ title: '分享链接已复制', description: '可以分享给更多朋友了', duration: 2000 })
   }
 
-  // 处理举报
-  const handleReport = () => {
-    toast({
-      title: "举报已提交",
-      description: "我们会尽快处理您的举报",
-      duration: 2000,
-    })
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <span className="text-sm text-muted-foreground">正在加载公告...</span>
+      </div>
+    )
+  }
+
+  if (!announcement) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <span className="text-sm text-muted-foreground">未找到该公告</span>
+      </div>
+    )
   }
 
   const announcementStyle = getAnnouncementStyle(announcement.type)
@@ -395,22 +228,21 @@ const AnnouncementDetailScreen: React.FC = () => {
                     </Badge>
                   </div>
                   <h2 className="text-xl font-bold mb-3">{announcement.title}</h2>
-                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <Avatar className="h-8 w-8 mr-2">
-                        <AvatarImage src={announcement.author.avatar} />
-                        <AvatarFallback>{announcement.author.name[0]}</AvatarFallback>
+                        <AvatarImage src={announcement.author?.avatar} />
+                        <AvatarFallback>{(announcement.author?.name || '系')[0]}</AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="flex items-center">
-                          <span className="font-medium text-sm">{announcement.author.name}</span>
-                          {announcement.author.verified && (
+                          <span className="font-medium text-sm">{announcement.author?.name || '系统公告'}</span>
+                          {announcement.author?.verified && (
                             <CheckCircle size={14} className="ml-1 text-blue-500" />
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {announcement.author.role} • {announcement.publishDate}
+                          {(announcement.author?.role || '系统')} • {announcement.publishDate}
                         </div>
                       </div>
                     </div>
@@ -448,70 +280,81 @@ const AnnouncementDetailScreen: React.FC = () => {
           <Card className="mb-4">
             <CardContent className="p-4">
               <div className="prose prose-sm max-w-none">
-                {announcement.content.split('\n\n').map((section, idx) => {
-                  if (section.startsWith('## ')) {
+                {announcement.content && announcement.content.trim() ? (
+                  announcement.content.split('\n').map((line: string, idx: number) => {
+                    const trimmedLine = line.trim()
+                    if (!trimmedLine) return <div key={idx} className="h-2" />
+                    
+                    // 检查是否是URL
+                    if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
+                      return (
+                        <div key={idx} className="my-3 break-all">
+                          <a 
+                            href={trimmedLine} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-500 hover:text-blue-600 underline break-all"
+                          >
+                            {trimmedLine}
+                          </a>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是标题
+                    if (trimmedLine.startsWith('## ')) {
+                      return (
+                        <h3 key={idx} className="text-lg font-semibold mt-6 mb-3 first:mt-0 break-words">
+                          {trimmedLine.replace('## ', '')}
+                        </h3>
+                      )
+                    }
+                    
+                    // 检查是否是强调文本
+                    if (trimmedLine.startsWith('**') && trimmedLine.endsWith('**')) {
+                      return (
+                        <div key={idx} className="bg-muted p-3 rounded-md my-3">
+                          <p className="font-medium text-sm break-words">
+                            {trimmedLine.replace(/\*\*/g, '')}
+                          </p>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是列表项
+                    if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ')) {
+                      return (
+                        <div key={idx} className="ml-4 my-1">
+                          <span className="text-sm break-words">
+                            • {trimmedLine.substring(2).trim()}
+                          </span>
+                        </div>
+                      )
+                    }
+                    
+                    // 普通文本段落
                     return (
-                      <h3 key={idx} className="text-lg font-semibold mt-6 mb-3 first:mt-0">
-                        {section.replace('## ', '')}
-                      </h3>
-                    )
-                  } else if (section.startsWith('**') && section.endsWith('**')) {
-                    return (
-                      <div key={idx} className="bg-muted p-3 rounded-md my-3">
-                        <p className="font-medium text-sm">
-                          {section.replace(/\*\*/g, '')}
-                        </p>
-                      </div>
-                    )
-                  } else if (section.includes('- ')) {
-                    return (
-                      <ul key={idx} className="list-disc list-inside space-y-1 my-3">
-                        {section.split('\n').map((line, lineIdx) => 
-                          line.trim().startsWith('- ') && (
-                            <li key={lineIdx} className="text-sm ml-2">
-                              {line.trim().substring(2)}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    )
-                  } else if (section.includes('\n   - ')) {
-                    const lines = section.split('\n')
-                    return (
-                      <div key={idx} className="my-3">
-                        <p className="font-medium text-sm mb-2">{lines[0]}</p>
-                        <ul className="list-disc list-inside space-y-1 ml-4">
-                          {lines.slice(1).map((line, lineIdx) => 
-                            line.trim().startsWith('- ') && (
-                              <li key={lineIdx} className="text-sm">
-                                {line.trim().substring(2)}
-                              </li>
-                            )
-                          )}
-                        </ul>
-                      </div>
-                    )
-                  } else {
-                    return (
-                      <p key={idx} className="text-sm my-3">
-                        {section}
+                      <p key={idx} className="text-sm my-3 break-words whitespace-pre-wrap">
+                        {trimmedLine}
                       </p>
                     )
-                  }
-                })}
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">暂无公告内容</p>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* 附件下载 */}
-          {announcement.attachments.length > 0 && (
+          {/* 附件下载 - 后端暂未提供，保留结构 */}
+          {Array.isArray(announcement.attachments) && announcement.attachments.length > 0 && (
             <Card className="mb-4">
               <CardHeader>
                 <CardTitle className="text-lg">相关附件</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <div className="space-y-3">
-                  {announcement.attachments.map((attachment, idx) => (
+                  {announcement.attachments.map((attachment: any, idx: number) => (
                     <div key={idx} className="flex items-center justify-between p-3 border rounded-md">
                       <div className="flex items-center">
                         <FileText size={16} className="text-muted-foreground mr-2" />
@@ -531,15 +374,15 @@ const AnnouncementDetailScreen: React.FC = () => {
             </Card>
           )}
 
-          {/* 相关链接 */}
-          {announcement.relatedLinks.length > 0 && (
+          {/* 相关链接 - 后端暂未提供，保留结构 */}
+          {Array.isArray(announcement.relatedLinks) && announcement.relatedLinks.length > 0 && (
             <Card className="mb-4">
               <CardHeader>
                 <CardTitle className="text-lg">相关链接</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <div className="space-y-3">
-                  {announcement.relatedLinks.map((link, idx) => (
+                  {announcement.relatedLinks.map((link: any, idx: number) => (
                     <div key={idx} className="p-3 border rounded-md">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -561,19 +404,21 @@ const AnnouncementDetailScreen: React.FC = () => {
           )}
 
           {/* 标签 */}
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap gap-2">
-                {announcement.tags.map((tag, idx) => (
-                  <Badge key={idx} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {Array.isArray(announcement.tags) && announcement.tags.length > 0 && (
+            <Card className="mb-4">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap gap-2">
+                  {announcement.tags.map((tag: string, idx: number) => (
+                    <Badge key={idx} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          {/* 统计信息 */}
+          {/* 统计信息 - 后端暂不提供，置 0 */}
           <Card className="mb-4">
             <CardContent className="p-3">
               <div className="grid grid-cols-3 gap-3 text-center">
@@ -581,21 +426,21 @@ const AnnouncementDetailScreen: React.FC = () => {
                   <div className="flex items-center justify-center mb-1">
                     <Eye size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-base font-bold">{formatNumber(announcement.views)}</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.views || 0)}</div>
                   <div className="text-[10px] text-muted-foreground">浏览量</div>
                 </div>
                 <div>
                   <div className="flex items-center justify-center mb-1">
                     <ThumbsUp size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-base font-bold">{formatNumber(announcement.likes)}</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.likes || 0)}</div>
                   <div className="text-[10px] text-muted-foreground">点赞数</div>
                 </div>
                 <div>
                   <div className="flex items-center justify-center mb-1">
                     <MessageSquare size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-base font-bold">{formatNumber(announcement.comments)}</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.comments || 0)}</div>
                   <div className="text-[10px] text-muted-foreground">评论数</div>
                 </div>
               </div>
@@ -605,10 +450,10 @@ const AnnouncementDetailScreen: React.FC = () => {
           {/* 操作按钮 */}
           <InteractionButtons
             buttons={[
-              createThumbsUpButton(announcement.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+              createThumbsUpButton((announcement.likes || 0) + (isLiked ? 1 : 0), isLiked, handleLike),
               createShareButton(handleShare),
               createBookmarkButton(undefined, isBookmarked, handleBookmark),
-              createReportButton(handleReport)
+              createReportButton(() => {})
             ]}
             className="mb-4"
             compact={true}
@@ -639,7 +484,7 @@ const AnnouncementDetailScreen: React.FC = () => {
       <div className="p-4">
         <CommentSection
           comments={comments}
-          totalCount={announcement.comments}
+          totalCount={announcement.comments || 0}
           onSubmitComment={handleSubmitComment}
           onSubmitReply={handleSubmitReply}
           onLikeComment={handleLikeComment}

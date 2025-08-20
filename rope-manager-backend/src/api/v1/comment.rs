@@ -6,6 +6,9 @@ use crate::middleware::auth::AuthenticatedUser;
 use serde::{Deserialize};
 use actix_web::HttpRequest;
 use crate::utils::auth_helper::AuthHelper;
+use crate::services::user_action_service::UserActionService;
+use crate::repositories::user_action_repo::UserActionRepository;
+use crate::models::user_action::CreateUserActionRequest;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -24,6 +27,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(like_comment)
             .service(dislike_comment)
             .service(check_comment_like_status)
+            .service(helpful_comment)
             .service(pin_comment)
     );
     
@@ -460,6 +464,39 @@ async fn batch_delete_comments_delete(
     auth_user: AuthenticatedUser,
 ) -> impl Responder {
     do_batch_delete_comments(req.into_inner(), comment_service, auth_user).await
+}
+
+// 评论“有用”投票（幂等切换），记录到 user_actions（action_type=Helpful）
+#[post("/{comment_id}/helpful")]
+async fn helpful_comment(
+    path: web::Path<i32>,
+    auth_user: AuthenticatedUser,
+    http_req: HttpRequest,
+) -> impl Responder {
+    let comment_id = path.into_inner();
+    let conn = match crate::repositories::get_connection() { Ok(c) => c, Err(e) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &e.to_string())) };
+    let repo = UserActionRepository::new(std::sync::Arc::new(tokio::sync::Mutex::new(conn)));
+    let service = UserActionService::new(repo);
+
+    // 查询是否已有有用投票
+    let mut params = crate::models::user_action::UserActionQueryParams { page: Some(1), page_size: Some(1), user_id: Some(auth_user.id), action_type: Some("Helpful".to_string()), target_type: Some("Comment".to_string()), target_id: Some(comment_id), start_time: None, end_time: None };
+    let (existing, _) = match service.get_user_actions(&params).await { Ok(x) => x, Err(e) => return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &e.to_string())) };
+
+    if existing.is_empty() {
+        let ip = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+        let ua = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+        let req = CreateUserActionRequest { user_id: Some(auth_user.id), action_type: "Helpful".to_string(), target_type: Some("Comment".to_string()), target_id: Some(comment_id), details: None, ip_address: ip, user_agent: ua };
+        match service.log_user_action(&req).await {
+            Ok(_) => HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({"active": true}))),
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &e.to_string()))
+        }
+    } else {
+        // 删除该记录（toggle off）
+        match service.delete_user_action(existing[0].id).await {
+            Ok(_) => HttpResponse::Ok().json(ApiResponse::success(serde_json::json!({"active": false}))),
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &e.to_string()))
+        }
+    }
 }
 
 // 点赞评论

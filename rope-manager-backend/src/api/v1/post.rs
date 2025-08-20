@@ -51,6 +51,19 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/{id}/like-status")
                     .route(web::get().to(check_like_status))
             )
+            .service(
+                web::resource("/{id}/bookmark")
+                    .route(web::post().to(bookmark_post))
+                    .route(web::delete().to(unbookmark_post))
+            )
+            .service(
+                web::resource("/{id}/bookmark-status")
+                    .route(web::get().to(check_bookmark_status))
+            )
+            .service(
+                web::resource("/{id}/report")
+                    .route(web::post().to(report_post))
+            )
     );
 }
 
@@ -492,4 +505,82 @@ async fn check_like_status(
         Ok(liked) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"liked": liked}}))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
     }
+} 
+
+// 书签实现（简单表驱动）
+async fn bookmark_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    _post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    use rusqlite::{Connection, params};
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute("CREATE TABLE IF NOT EXISTS post_favorites (user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, post_id))", [])
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute("INSERT OR IGNORE INTO post_favorites (user_id, post_id) VALUES (?, ?)", params![user.id, post_id])
+        .map_err(|e| actix_web::error::ErrorBadRequest(e.to_string()))?;
+    let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM post_favorites WHERE post_id = ?", params![post_id], |r| r.get(0))
+        .unwrap_or(0);
+    conn.execute("UPDATE posts SET comment_count = comment_count WHERE id = ?", params![post_id]).ok();
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "message":"success", "data": {"favorite_count": cnt}})))
+}
+
+async fn unbookmark_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    _post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    use rusqlite::{Connection, params};
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute("CREATE TABLE IF NOT EXISTS post_favorites (user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, post_id))", [])
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute("DELETE FROM post_favorites WHERE user_id = ? AND post_id = ?", params![user.id, post_id])
+        .map_err(|e| actix_web::error::ErrorBadRequest(e.to_string()))?;
+    let cnt: i32 = conn.query_row("SELECT COUNT(*) FROM post_favorites WHERE post_id = ?", params![post_id], |r| r.get(0))
+        .unwrap_or(0);
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "message":"success", "data": {"favorite_count": cnt}})))
+}
+
+async fn check_bookmark_status(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    _post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    use rusqlite::{Connection, params};
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    conn.execute("CREATE TABLE IF NOT EXISTS post_favorites (user_id INTEGER NOT NULL, post_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, post_id))", [])
+        .ok();
+    let liked: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM post_favorites WHERE user_id = ? AND post_id = ?)", params![user.id, post_id], |r| r.get(0)).unwrap_or(false);
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "message":"success", "data": {"favorited": liked}})))
+} 
+
+async fn report_post(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let post_id = path.into_inner();
+    let ip = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+    let ua = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    let ua_service = http_req.app_data::<web::Data<crate::services::user_action_service::UserActionService>>().cloned();
+    if let Some(svc) = ua_service {
+        let req = crate::models::user_action::CreateUserActionRequest {
+            user_id: Some(user.id),
+            action_type: "Report".to_string(),
+            target_type: Some("Post".to_string()),
+            target_id: Some(post_id),
+            details: None,
+            ip_address: ip,
+            user_agent: ua,
+        };
+        let _ = svc.log_user_action(&req).await;
+    }
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "message":"success"})))
 } 

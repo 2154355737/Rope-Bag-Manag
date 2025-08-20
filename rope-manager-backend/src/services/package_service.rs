@@ -8,6 +8,7 @@ use crate::repositories::subscription_repo::SubscriptionRepository;
 use crate::services::email_service::EmailService;
 use crate::services::download_security_service::DownloadSecurityService;
 use crate::models::download_security::DownloadSecurityConfig;
+use rusqlite::params;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use crate::services::notification_service::NotificationService;
@@ -567,9 +568,89 @@ impl PackageService {
         Ok(cnt)
     }
 
-    pub async fn unlike_package(&self, user_id: i32, package_id: i32) -> anyhow::Result<i32> {
-        let cnt = self.package_repo.unlike_package(user_id, package_id).await?;
+    pub async fn unlike_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
+        let conn = crate::repositories::get_connection()?;
+        
+        // 检查是否已点赞
+        let is_liked: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM package_likes WHERE user_id = ? AND package_id = ?)",
+            params![user_id, package_id],
+            |row| row.get(0),
+        )?;
+        
+        if !is_liked {
+            return Err(anyhow::anyhow!("Have not liked this package"));
+        }
+        
+        // 删除点赞记录
+        conn.execute(
+            "DELETE FROM package_likes WHERE user_id = ? AND package_id = ?",
+            params![user_id, package_id],
+        )?;
+        
+        // 返回当前点赞总数
+        let cnt: i32 = conn.query_row(
+            "SELECT like_count FROM packages WHERE id = ?", 
+            params![package_id], 
+            |r| r.get(0)
+        ).unwrap_or(0);
+        
         Ok(cnt)
+    }
+
+    // 收藏资源包
+    pub async fn favorite_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
+        let conn = crate::repositories::get_connection()?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS package_favorites (user_id INTEGER NOT NULL, package_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, package_id))",
+            [],
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO package_favorites (user_id, package_id) VALUES (?, ?)",
+            params![user_id, package_id],
+        )?;
+        let cnt: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM package_favorites WHERE package_id = ?",
+            params![package_id],
+            |r| r.get(0),
+        )?;
+        conn.execute("UPDATE packages SET favorite_count = ? WHERE id = ?", params![cnt, package_id])?;
+        Ok(cnt)
+    }
+
+    // 取消收藏资源包
+    pub async fn unfavorite_package(&self, user_id: i32, package_id: i32) -> Result<i32> {
+        let conn = crate::repositories::get_connection()?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS package_favorites (user_id INTEGER NOT NULL, package_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, package_id))",
+            [],
+        )?;
+        conn.execute(
+            "DELETE FROM package_favorites WHERE user_id = ? AND package_id = ?",
+            params![user_id, package_id],
+        )?;
+        let cnt: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM package_favorites WHERE package_id = ?",
+            params![package_id],
+            |r| r.get(0),
+        )?;
+        conn.execute("UPDATE packages SET favorite_count = ? WHERE id = ?", params![cnt, package_id])?;
+        Ok(cnt)
+    }
+
+    // 检查收藏状态
+    pub async fn check_favorite_status(&self, user_id: i32, package_id: i32) -> Result<bool> {
+        let conn = crate::repositories::get_connection()?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS package_favorites (user_id INTEGER NOT NULL, package_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY (user_id, package_id))",
+            [],
+        )?;
+        let exists: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM package_favorites WHERE user_id = ? AND package_id = ?)",
+            params![user_id, package_id],
+            |r| r.get(0),
+        )?;
+        Ok(exists)
     }
 
     pub async fn check_like_status(&self, user_id: i32, package_id: i32) -> anyhow::Result<bool> {

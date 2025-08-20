@@ -11,10 +11,27 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8082, // 使用8082端口
+    port: 8002, // 使用8002端口
     strictPort: false, // 如果端口被占用，会自动尝试下一个可用端口
     open: true, // 自动打开浏览器
     host: '0.0.0.0', // 允许外部访问
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:15201',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      '/uploads': {
+        target: 'http://127.0.0.1:15201',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+      '/health': {
+        target: 'http://127.0.0.1:15201',
+        changeOrigin: true,
+        rewrite: (path) => path,
+      },
+    },
     fs: {
       strict: false // 允许访问工作区外的文件
     }

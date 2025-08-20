@@ -11,20 +11,33 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/unread-count", web::get().to(unread_count))
             .route("/{id}/read", web::post().to(mark_read))
             .route("/mark-all-read", web::post().to(mark_all_read))
+            // 别名：对齐前端
+            .route("/count", web::get().to(unread_count))
+            .route("/read-all", web::post().to(mark_all_read))
     );
 }
 
-async fn list_notifications(q: web::Query<NotificationQuery>, svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
-    match svc.list(user.id, q.into_inner()).await {
-        Ok(list) => HttpResponse::Ok().json(json!({"code":0, "data": {"list": list}})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+async fn list_notifications(q: web::Query<NotificationQuery>, svc: web::Data<NotificationService>, user: Option<AuthenticatedUser>) -> HttpResponse {
+    if let Some(user) = user {
+        match svc.list(user.id, q.into_inner()).await {
+            Ok(list) => HttpResponse::Ok().json(json!({"code":0, "data": {"list": list}})),
+            Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+        }
+    } else {
+        // 未登录返回空列表
+        HttpResponse::Ok().json(json!({"code":0, "data": {"list": []}}))
     }
 }
 
-async fn unread_count(svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
-    match svc.unread_count(user.id).await {
-        Ok(count) => HttpResponse::Ok().json(json!({"code":0, "data": {"count": count}})),
-        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+async fn unread_count(svc: web::Data<NotificationService>, user: Option<AuthenticatedUser>) -> HttpResponse {
+    if let Some(user) = user {
+        match svc.unread_count(user.id).await {
+            Ok(count) => HttpResponse::Ok().json(json!({"code":0, "data": {"count": count}})),
+            Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+        }
+    } else {
+        // 未登录返回0
+        HttpResponse::Ok().json(json!({"code":0, "data": {"count": 0}}))
     }
 }
 

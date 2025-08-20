@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Search, Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, X, Eye, Download, Calendar } from 'lucide-react'
@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TopNavigation from '@/components/ui/top-navigation'
+import { getUnreadCount } from '../api/notifications'
+import { trendingKeywords, suggestKeywords } from '../api/search'
+import { fetchFeed } from '../api/feed'
 import { useNavigation } from '@/contexts/NavigationContext'
 
 const HomeScreen: React.FC = () => {
@@ -17,9 +20,12 @@ const HomeScreen: React.FC = () => {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [isDropdownInteracting, setIsDropdownInteracting] = useState(false)
+  const [hotKeywords, setHotKeywords] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [unread, setUnread] = useState(0)
   
   // 获取当前活跃的标签页
-  const activeTab = getActiveTab('home', 'home')
+  const activeTab = getActiveTab('home', 'posts')
 
   // 格式化日期显示
   const formatDate = (dateString: string) => {
@@ -68,98 +74,47 @@ const HomeScreen: React.FC = () => {
     { icon: Bookmark, label: '我的收藏', color: 'bg-indigo-100 dark:bg-indigo-900' },
   ]
 
-  const allContent = [
-    // 公告
-    {
-      id: 1,
-      type: 'announcement',
-      title: '🎉 结绳社区2025年新春活动开始啦！',
-      description: '参与社区活动，赢取丰厚奖品！分享你的学习心得，获得积分奖励。',
-      tags: ['公告', '活动', '2025'],
-      author: {
-        name: '社区管理员',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-      },
-      likes: 528,
-      comments: 89,
-      views: 1250,
-      date: '2025-01-15',
-      isTop: true,
-      isHot: true,
-    },
-    // 帖子
-    {
-      id: 2,
-      type: 'post',
-      title: '结绳语言学习心得分享',
-      description: '从零基础到熟练掌握，我的结绳语言学习之路总结',
-      tags: ['学习心得', '经验分享'],
-      author: {
-        name: '张同学',
-        avatar: 'https://i.pravatar.cc/150?img=2',
-      },
-      likes: 156,
-      comments: 23,
-      views: 890,
-      date: '2025-01-14',
-      isTop: false,
-      isHot: true,
-    },
-    {
-      id: 3,
-      type: 'post',
-      title: '如何优雅地处理结绳语言中的异步操作',
-      description: '深入探讨异步编程的最佳实践和常见陷阱',
-      tags: ['异步编程', '最佳实践'],
-      author: {
-        name: '李开发',
-        avatar: 'https://i.pravatar.cc/150?img=3',
-      },
-      likes: 89,
-      comments: 15,
-      views: 456,
-      date: '2025-01-13',
-      isTop: false,
-      isHot: false,
-    },
-    // 资源
-    {
-      id: 4,
-      type: 'resource',
-      title: '结绳语言完整开发工具包 v2.1',
-      description: '包含编译器、调试器、代码格式化工具等完整开发环境',
-      tags: ['开发工具', 'v2.1', '编译器'],
-      author: {
-        name: '工具开发组',
-        avatar: 'https://i.pravatar.cc/150?img=4',
-      },
-      likes: 342,
-      comments: 67,
-      views: 2340,
-      downloads: 856,
-      date: '2025-01-12',
-      isTop: false,
-      isHot: true,
-    },
-    {
-      id: 5,
-      type: 'resource',
-      title: '结绳语言标准库文档 PDF版',
-      description: '官方标准库完整文档，支持离线阅读，包含所有API说明',
-      tags: ['文档', 'PDF', '标准库'],
-      author: {
-        name: '文档团队',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-      },
-      likes: 198,
-      comments: 34,
-      views: 1120,
-      downloads: 324,
-      date: '2025-01-10',
-      isTop: false,
-      isHot: false,
-    },
-  ]
+  const [allContent, setAllContent] = useState<any[]>([])
+
+  useEffect(() => {
+    const loadFeed = async () => {
+      const data = await fetchFeed({ page: 1, pageSize: 20 })
+      const mapped = (data.items || []).map((i: any) => ({
+        id: i.id,
+        type: i.type || i.item_type,
+        title: i.title,
+        description: i.description,
+        tags: i.tags || [],
+        author: i.author || { name: '用户', avatar: '' },
+        likes: i.stats?.likes || 0,
+        comments: i.stats?.comments || 0,
+        views: i.stats?.views || 0,
+        downloads: i.stats?.downloads || 0,
+        date: i.created_at || i.publishedAt,
+        isTop: i.is_pinned || false,
+        isHot: i.is_featured || false,
+      }))
+      setAllContent(mapped)
+    }
+    loadFeed()
+  }, [])
+
+  useEffect(() => {
+    // 加载热门搜索
+    trendingKeywords().then(setHotKeywords).catch(() => setHotKeywords([]))
+    getUnreadCount().then(setUnread).catch(() => setUnread(0))
+  }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchValue.trim()) {
+        suggestKeywords(searchValue.trim()).then(setSuggestions).catch(() => setSuggestions([]))
+      } else {
+        setSuggestions([])
+      }
+    }, 250)
+    return () => clearTimeout(t)
+  }, [searchValue])
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
@@ -168,8 +123,8 @@ const HomeScreen: React.FC = () => {
         title="结绳社区"
         subtitle="学习交流，共同进步"
         showNotificationButton
+        notificationCount={unread}
         showSearchButton
-        notificationCount={3}
         onSearchClick={() => setSearchFocused(true)}
       />
 
@@ -220,7 +175,7 @@ const HomeScreen: React.FC = () => {
             <div className="mb-4">
               <h3 className="text-sm font-medium mb-2">热门搜索</h3>
               <div className="flex flex-wrap gap-2">
-                {['结绳入门', '数据结构', '项目实战', '性能优化', '面试题'].map((tag) => (
+                {(hotKeywords.length ? hotKeywords : ['结绳入门','数据结构','项目实战','性能优化','面试题']).map((tag) => (
                   <Badge 
                     key={tag}
                     variant="outline" 
@@ -240,18 +195,18 @@ const HomeScreen: React.FC = () => {
             <div>
               <h3 className="text-sm font-medium mb-2">搜索历史</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
-                {['结绳语言基础教程', '如何优化结绳代码'].map((history) => (
-                  <div 
-                    key={history}
+                {(suggestions.length ? suggestions : ['结绳语言基础教程','如何优化结绳代码']).map((s) => (
+                  <div
+                    key={s}
                     className="flex items-center cursor-pointer hover:bg-accent rounded-md p-2 -m-2 transition-colors"
                     onClick={() => {
-                      setSearchValue(history)
+                      setSearchValue(s)
                       setSearchFocused(false)
                       setIsDropdownInteracting(false)
                     }}
                   >
                     <Clock size={14} className="mr-2" />
-                    <span>{history}</span>
+                    <span>{s}</span>
                   </div>
                 ))}
               </div>
@@ -287,7 +242,7 @@ const HomeScreen: React.FC = () => {
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab('home', value)} className="w-full">
           <TabsList className="grid grid-cols-3 mb-4">
             <TabsTrigger value="posts">帖子</TabsTrigger>
-            <TabsTrigger value="home">首页</TabsTrigger>
+            <TabsTrigger value="announcements">公告</TabsTrigger>
             <TabsTrigger value="resources">资源</TabsTrigger>
           </TabsList>
           
@@ -318,33 +273,41 @@ const HomeScreen: React.FC = () => {
                       </Avatar>
                       <span className="text-sm">{card.author.name}</span>
                       <div className="ml-auto flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          帖子
+                                              <Badge variant="outline" className="text-xs">
+                        帖子
+                      </Badge>
+                      {card.isTop && (
+                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
+                          <Pin size={10} className="mr-1" />
+                          置顶
                         </Badge>
-                        {card.isTop && (
-                          <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                            <Pin size={10} className="mr-1" />
-                            置顶
-                          </Badge>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    
-                    <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                    <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                    
+                  </div>
+                  
+                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
+                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
+                  
+                  {/* 标签区域 - 只在有标签时显示 */}
+                  {(card.tags && card.tags.length > 0) || card.isHot ? (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags.map((tag, idx) => (
+                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
                         <Badge key={idx} variant="outline" className="text-xs">
                           {tag}
                         </Badge>
                       ))}
-                      {card.isHot && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Zap size={12} className="mr-1" /> 热门
+                      {card.tags && card.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          +{card.tags.length - 3}
                         </Badge>
                       )}
-                    </div>
+                      {card.isHot && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                          <Star size={12} className="mr-1" /> 精华
+                        </Badge>
+                      )}
+                      </div>
+                    ) : null}
                   </CardContent>
                   
                   <CardFooter className="p-4 pt-3 border-t">
@@ -368,8 +331,8 @@ const HomeScreen: React.FC = () => {
             ))}
           </TabsContent>
           
-          <TabsContent value="home" className="space-y-4">
-            {allContent
+          <TabsContent value="announcements" className="space-y-4">
+            {allContent.filter(item => item.type === 'announcement')
               .sort((a, b) => {
                 // 置顶的卡片排在前面
                 if (a.isTop && !b.isTop) return -1
@@ -395,33 +358,41 @@ const HomeScreen: React.FC = () => {
                       </Avatar>
                       <span className="text-sm">{card.author.name}</span>
                       <div className="ml-auto flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {card.type === 'announcement' ? '公告' : card.type === 'post' ? '帖子' : '资源'}
+                                              <Badge variant="outline" className="text-xs">
+                        公告
+                      </Badge>
+                      {card.isTop && (
+                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
+                          <Pin size={10} className="mr-1" />
+                          置顶
                         </Badge>
-                        {card.isTop && (
-                          <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                            <Pin size={10} className="mr-1" />
-                            置顶
-                          </Badge>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    
-                    <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                    <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                    
+                  </div>
+                  
+                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
+                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
+                  
+                  {/* 标签区域 - 只在有标签时显示 */}
+                  {(card.tags && card.tags.length > 0) || card.isHot ? (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags.map((tag, idx) => (
+                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
                         <Badge key={idx} variant="outline" className="text-xs">
                           {tag}
                         </Badge>
                       ))}
-                      {card.isHot && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Zap size={12} className="mr-1" /> 热门
+                      {card.tags && card.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          +{card.tags.length - 3}
                         </Badge>
                       )}
-                    </div>
+                      {card.isHot && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                          <Star size={12} className="mr-1" /> 精华
+                        </Badge>
+                      )}
+                      </div>
+                    ) : null}
                   </CardContent>
                   
                   <CardFooter className="p-4 pt-3 border-t">
@@ -478,33 +449,41 @@ const HomeScreen: React.FC = () => {
                       </Avatar>
                       <span className="text-sm">{card.author.name}</span>
                       <div className="ml-auto flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          资源
+                                              <Badge variant="secondary" className="text-xs">
+                        资源
+                      </Badge>
+                      {card.isTop && (
+                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
+                          <Pin size={10} className="mr-1" />
+                          置顶
                         </Badge>
-                        {card.isTop && (
-                          <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                            <Pin size={10} className="mr-1" />
-                            置顶
-                          </Badge>
-                        )}
-                      </div>
+                      )}
                     </div>
-                    
-                    <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                    <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                    
+                  </div>
+                  
+                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
+                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
+                  
+                  {/* 标签区域 - 只在有标签时显示 */}
+                  {(card.tags && card.tags.length > 0) || card.isHot ? (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags.map((tag, idx) => (
+                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
                         <Badge key={idx} variant="outline" className="text-xs">
                           {tag}
                         </Badge>
                       ))}
-                      {card.isHot && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Zap size={12} className="mr-1" /> 热门
+                      {card.tags && card.tags.length > 3 && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          +{card.tags.length - 3}
                         </Badge>
                       )}
-                    </div>
+                      {card.isHot && (
+                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                          <Star size={12} className="mr-1" /> 精华
+                        </Badge>
+                      )}
+                      </div>
+                    ) : null}
                   </CardContent>
                   
                   <CardFooter className="p-4 pt-3 border-t">

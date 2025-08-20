@@ -43,7 +43,7 @@ impl CommentRepository {
         }
         
         if let Some(t) = target_type {
-            where_clauses.push("target_type = ?");
+            where_clauses.push("LOWER(target_type) = LOWER(?)");
             params_values.push(Box::new(t.to_string()));
         }
         

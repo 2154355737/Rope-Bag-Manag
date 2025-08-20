@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -21,6 +21,8 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 import { getPostRecommendations } from '@/utils/recommendations'
+import { getPost, toggleLikePost, toggleBookmarkPost, reportPost } from '../api/posts'
+import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
 
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -28,323 +30,161 @@ const PostDetailScreen: React.FC = () => {
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [allComments, setAllComments] = useState<Comment[]>([])
   const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
-  
-  // 模拟帖子数据
-  const post = {
-    id: parseInt(id || '1'),
-    author: {
-      name: '王五',
-      avatar: 'https://i.pravatar.cc/150?img=3',
-      verified: true,
-    },
-    content: '刚完成了一个结绳语言的移动应用项目，分享一些开发过程中的经验和踩过的坑。\n\n首先，结绳语言的异步处理机制非常强大，但需要注意内存管理问题。在开发过程中，我发现如果不正确处理异步任务的取消，很容易导致内存泄漏。\n\n其次，结绳语言的UI渲染性能优化有几个关键点：\n1. 减少不必要的重渲染\n2. 使用虚拟列表处理大量数据\n3. 图片懒加载和缓存\n\n最后，结绳语言的调试工具非常好用，强烈推荐大家尝试！',
-    images: [
-      'https://images.unsplash.com/photo-1551033406-611cf9a28f67?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGNvZGluZ3xlbnwwfHwwfHx8MA%3D%3D',
-      'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww'
-    ],
-    code: `// 结绳语言异步任务示例
-async function fetchData() {
-  try {
-    const response = await api.get('/data');
-    return response.data;
-  } catch (error) {
-    console.error('Error:', error);
-    return null;
-  }
-}`,
-    tags: ['移动开发', '项目分享', '经验总结', '踩坑记录', '结绳实战'],
-    likes: 78,
-    comments: 156, // 增加评论总数以演示分页
-    views: 1250,
-    time: '昨天 14:30',
-    publishDate: '2025-01-14',
-  }
-  
-  // 模拟初始评论数据（第一页）
-  const initialComments: Comment[] = [
-    {
-      id: 1,
-      author: {
-        name: '张三',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-      },
-      content: '非常感谢分享！我也在学习结绳语言，这些经验对我很有帮助。',
-      time: '昨天 15:20',
-      likes: 12,
-      isLiked: false,
-      replies: [
-        {
-          id: 101,
-          author: {
-            name: '王五',
-            avatar: 'https://i.pravatar.cc/150?img=3',
-          },
-          content: '不客气，希望对你有所帮助！',
-          time: '昨天 15:45',
-          likes: 3,
-          isLiked: true,
-        }
-      ]
-    },
-    {
-      id: 2,
-      author: {
-        name: '李四',
-        avatar: 'https://i.pravatar.cc/150?img=2',
-      },
-      content: '关于内存泄漏的问题，你有没有更具体的解决方案？我的项目中也遇到了类似问题。',
-      time: '昨天 16:10',
-      likes: 8,
-      isLiked: true,
-      replies: []
-    },
-    {
-      id: 3,
-      author: {
-        name: '赵六',
-        avatar: 'https://i.pravatar.cc/150?img=4',
-      },
-      content: '结绳语言的调试工具确实很强大，特别是性能分析功能，帮我解决了很多优化问题。',
-      time: '昨天 18:05',
-      likes: 5,
-      isLiked: false,
-      replies: [
-        {
-          id: 301,
-          author: {
-            name: '王五',
-            avatar: 'https://i.pravatar.cc/150?img=3',
-          },
-          content: '是的，性能分析工具非常好用，尤其是内存分析功能。',
-          time: '昨天 18:30',
-          likes: 2,
-          isLiked: false,
-        },
-        {
-          id: 302,
-          author: {
-            name: '张三',
-            avatar: 'https://i.pravatar.cc/150?img=1',
-          },
-          content: '请问这个工具在哪里可以下载到？',
-          time: '昨天 19:15',
-          likes: 1,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 4,
-      author: {
-        name: '小明',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-      },
-      content: '这个教程写得很详细，我按照步骤实现了一个简单的应用，效果不错！',
-      time: '今天 09:15',
-      likes: 15,
-      isLiked: false,
-      replies: []
-    },
-    {
-      id: 5,
-      author: {
-        name: '开发者小李',
-        avatar: 'https://i.pravatar.cc/150?img=6',
-      },
-      content: '能否分享一下你在项目中使用的第三方库？我正在选择合适的组件库。',
-      time: '今天 10:30',
-      likes: 7,
-      isLiked: true,
-      replies: [
-        {
-          id: 501,
-          author: {
-            name: '王五',
-            avatar: 'https://i.pravatar.cc/150?img=3',
-          },
-          content: '我主要使用了 UI Kit 和 Animation Library，都很好用。',
-          time: '今天 11:00',
-          likes: 4,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 6,
-      author: {
-        name: '程序小白',
-        avatar: 'https://i.pravatar.cc/150?img=7',
-      },
-      content: '刚开始学编程，这个教程对我来说有些深度，但还是学到了很多。希望有更多基础入门的内容。',
-      time: '今天 12:15',
-      likes: 9,
-      isLiked: false,
-      replies: []
-    },
-    {
-      id: 7,
-      author: {
-        name: '资深开发者',
-        avatar: 'https://i.pravatar.cc/150?img=8',
-      },
-      content: '作者提到的性能优化技巧很实用，特别是关于内存管理的部分。我在生产环境中也遇到过类似问题。',
-      time: '今天 13:45',
-      likes: 25,
-      isLiked: true,
-      replies: [
-        {
-          id: 701,
-          author: {
-            name: '王五',
-            avatar: 'https://i.pravatar.cc/150?img=3',
-          },
-          content: '能分享一下你在生产环境中的具体解决方案吗？',
-          time: '今天 14:00',
-          likes: 6,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 8,
-      author: {
-        name: '前端攻城狮',
-        avatar: 'https://i.pravatar.cc/150?img=9',
-      },
-      content: '结绳语言在移动端的表现确实不错，我们团队也在考虑迁移到这个技术栈。请问有推荐的学习路径吗？',
-      time: '今天 15:30',
-      likes: 14,
-      isLiked: false,
-      replies: []
-    },
-    {
-      id: 9,
-      author: {
-        name: '技术爱好者',
-        avatar: 'https://i.pravatar.cc/150?img=10',
-      },
-      content: '感谢分享！特别是关于调试工具的介绍，之前一直不知道有这么好用的功能。',
-      time: '今天 16:20',
-      likes: 8,
-      isLiked: true,
-      replies: []
-    },
-    {
-      id: 10,
-      author: {
-        name: '学习中的菜鸟',
-        avatar: 'https://i.pravatar.cc/150?img=11',
-      },
-      content: '代码示例很清晰，我照着敲了一遍，确实帮助理解。希望能看到更多这样的实战案例。',
-      time: '今天 17:10',
-      likes: 11,
-      isLiked: false,
-      replies: [
-        {
-          id: 1001,
-          author: {
-            name: '张三',
-            avatar: 'https://i.pravatar.cc/150?img=1',
-          },
-          content: '我也是这样学习的，实践出真知！',
-          time: '今天 17:30',
-          likes: 3,
-          isLiked: false,
-        }
-      ]
-    }
-  ]
 
-  // 模拟分页加载评论数据
+  // 占位数据
+  const initialPost = {
+    id: parseInt(id || '1'),
+    title: '加载中...',
+    author: {
+      name: '加载中...',
+      avatar: '',
+      verified: false,
+    },
+    content: '正在加载帖子内容...',
+    images: [],
+    code: undefined,
+    tags: [],
+    likes: 0,
+    comments: 156,
+    views: 2340,
+    time: '',
+    publishDate: ''
+  }
+
+  const [post, setPost] = useState(initialPost)
+
+  // 模拟评论数据生成函数
   const generateMockComments = (page: number): Comment[] => {
     const comments: Comment[] = []
-    const startId = (page - 1) * 10 + 100 // 从ID 100开始生成新评论
+    const startId = (page - 1) * 10 + 1
     
     for (let i = 0; i < 10; i++) {
       const commentId = startId + i
-      const authorIndex = (commentId % 8) + 1
+      const authors = ['技术专家', '前端开发者', '全栈工程师', '产品经理', '设计师', 'DevOps工程师']
+      const contents = [
+        '写得非常好，受益匪浅！',
+        '这个解决方案很实用，感谢分享。',
+        '有个问题想请教，在实际项目中遇到性能瓶颈怎么办？',
+        '代码示例很清晰，学到了新技巧。',
+        '建议补充一些错误处理的内容。',
+        '期待更多这样的高质量内容！'
+      ]
       
       comments.push({
         id: commentId,
         author: {
-          name: `用户${commentId}`,
-          avatar: `https://i.pravatar.cc/150?img=${authorIndex}`,
+          name: authors[Math.floor(Math.random() * authors.length)],
+          avatar: `https://i.pravatar.cc/150?img=${commentId}`,
+          verified: Math.random() > 0.7
         },
-        content: `这是第${page}页的第${i + 1}条评论。感谢作者的精彩分享，我从中学到了很多有用的知识和技巧！`,
+        content: contents[Math.floor(Math.random() * contents.length)],
         time: `${Math.floor(Math.random() * 24)}小时前`,
-        likes: Math.floor(Math.random() * 20),
-        isLiked: Math.random() > 0.7,
-        replies: Math.random() > 0.8 ? [
-          {
-            id: commentId * 10 + 1,
-            author: {
-              name: `回复者${commentId}`,
-              avatar: `https://i.pravatar.cc/150?img=${(authorIndex % 8) + 1}`,
-            },
-            content: `对评论${commentId}的回复，很有道理！`,
-            time: `${Math.floor(Math.random() * 12)}小时前`,
-            likes: Math.floor(Math.random() * 5),
-            isLiked: Math.random() > 0.8,
-          }
-        ] : []
+        likes: Math.floor(Math.random() * 50),
+        isLiked: Math.random() > 0.8,
+        replies: []
       })
     }
     
     return comments
   }
 
-  // 获取相关推荐
-  const recommendedItems = getPostRecommendations(post.id, post.tags)
+  useEffect(() => {
+    // 加载帖子详情和相关数据
+    const load = async () => {
+      try {
+        const p = await getPost(parseInt(id || '1'))
+        const updatedPost = {
+          id: p.id,
+          title: p.title || '帖子标题',
+          author: { name: p.author?.name || p.author_name || '用户', avatar: p.author?.avatar || '' , verified: false },
+          content: p.content || p.title,
+          images: [],
+          code: undefined,
+          tags: p.tags || [],
+          likes: p.like_count || 0,
+          comments: p.comment_count || 0,
+          views: p.view_count || 0,
+          time: new Date(p.created_at || p.publishDate || Date.now()).toLocaleString('zh-CN'),
+          publishDate: new Date(p.created_at || p.publishDate || Date.now()).toLocaleDateString('zh-CN')
+        }
+        setPost(updatedPost)
+        
+        // 加载相关推荐
+        const recommendations = await getPostRecommendations(p.id, p.tags || [])
+        setRecommendedItems(recommendations)
+        
+        // 加载第一页评论
+        const cr = await apiGetComments('post', p.id, 1, 10)
+        const mapped = (cr.list || []).map((c: any) => ({
+          id: c.id,
+          author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+          content: c.content,
+          time: c.created_at || '',
+          likes: c.likes || 0,
+          isLiked: false,
+          replies: []
+        }))
+        setAllComments(mapped)
+        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      } catch (e) {
+        console.warn(e)
+      }
+    }
+    load()
+  }, [id])
 
-  // 初始化评论数据
-  React.useEffect(() => {
-    console.log('初始化评论数据，数量:', initialComments.length)
-    setAllComments(initialComments)
-  }, [])
-
-  // 模拟分页加载评论
+  // 加载更多评论 - 使用真实API
   const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
     setIsLoadingComments(true)
     
-    // 模拟网络延迟
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const newComments = generateMockComments(page)
-    
-    // 模拟没有更多评论的情况（假设总共有15页）
-    if (page >= 15) {
-      setHasMoreComments(false)
+    try {
+      const cr = await apiGetComments('post', post.id, page, 10)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: c.created_at || '',
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: []
+      }))
+      
+      setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
+      setIsLoadingComments(false)
+      return mapped
+    } catch (error) {
+      console.error('加载评论失败:', error)
+      // 如果API失败，回退到模拟数据
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      const newComments = generateMockComments(page)
+      if (page >= 15) {
+        setHasMoreComments(false)
+      }
+      setIsLoadingComments(false)
+      return newComments
     }
-    
-    setIsLoadingComments(false)
-    return newComments
   }
 
   // 评论区事件处理
-  const handleSubmitComment = (content: string) => {
-    console.log('新评论:', content)
-    toast({
-      title: "评论发送成功",
-      description: "您的评论已发布"
-    })
+  const handleSubmitComment = async (content: string) => {
+    await apiCreateComment('Post', post.id, content)
+    const cr = await apiGetComments('post', post.id, 1, 10)
+    const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: c.created_at || '', likes: c.likes || 0, isLiked: false }))
+    setAllComments(mapped)
+    toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
 
-  const handleSubmitReply = (commentId: number, content: string) => {
-    console.log('回复评论:', commentId, content)
-    toast({
-      title: "回复发送成功",
-      description: "您的回复已发布"
-    })
+  const handleSubmitReply = async (commentId: number, content: string) => {
+    await apiReplyComment(commentId, content)
+    toast({ title: '回复发送成功', description: '您的回复已发布' })
   }
 
-  const handleLikeComment = (commentId: number) => {
-    console.log('点赞评论:', commentId)
-    toast({
-      title: "操作成功",
-      description: "已点赞/取消点赞"
-    })
+  const handleLikeComment = async (commentId: number) => {
+    await apiLikeComment(commentId, true)
+    toast({ title: '操作成功', description: '已点赞/取消点赞' })
   }
 
   const handleReportComment = (commentId: number) => {
@@ -359,23 +199,17 @@ async function fetchData() {
   }
 
   // 处理点赞
-  const handleLike = () => {
+  const handleLike = async () => {
+    await toggleLikePost(post.id)
     setIsLiked(!isLiked)
-    toast({
-      title: isLiked ? "已取消点赞" : "点赞成功",
-      description: isLiked ? "已取消对此帖子的点赞" : "感谢您的支持",
-      duration: 2000,
-    })
+    toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消对此帖子的点赞' : '感谢您的支持', duration: 2000 })
   }
 
   // 处理收藏
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
+    await toggleBookmarkPost(post.id)
     setIsBookmarked(!isBookmarked)
-    toast({
-      title: isBookmarked ? "已取消收藏" : "收藏成功",
-      description: isBookmarked ? "已从收藏夹中移除" : "已添加到您的收藏夹",
-      duration: 2000,
-    })
+    toast({ title: isBookmarked ? '已取消收藏' : '收藏成功', description: isBookmarked ? '已从收藏夹中移除' : '已添加到您的收藏夹', duration: 2000 })
   }
 
   // 处理分享
@@ -388,12 +222,9 @@ async function fetchData() {
   }
 
   // 处理举报
-  const handleReport = () => {
-    toast({
-      title: "举报已提交",
-      description: "我们会尽快处理您的举报",
-      duration: 2000,
-    })
+  const handleReport = async () => {
+    await reportPost(post.id)
+    toast({ title: '举报已提交', description: '我们会尽快处理您的举报', duration: 2000 })
   }
 
   return (
@@ -443,11 +274,48 @@ async function fetchData() {
               </div>
               
               <div className="space-y-4">
-                {post.content.split('\n\n').map((paragraph, idx) => (
-                  <p key={idx} className="text-sm">
-                    {paragraph}
-                  </p>
-                ))}
+                {post.content && post.content.trim() ? (
+                  post.content.split('\n').map((line, idx) => {
+                    const trimmedLine = line.trim()
+                    if (!trimmedLine) return <div key={idx} className="h-2" />
+                    
+                    // 检查是否是URL
+                    if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
+                      return (
+                        <div key={idx} className="break-all">
+                          <a 
+                            href={trimmedLine} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-500 hover:text-blue-600 underline break-all"
+                          >
+                            {trimmedLine}
+                          </a>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是列表项
+                    if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+                      return (
+                        <div key={idx} className="ml-4">
+                          <span className="text-sm break-words">
+                            • {trimmedLine.substring(1).trim()}
+                          </span>
+                        </div>
+                      )
+                    }
+                    
+                    // 普通文本段落
+                    return (
+                      <p key={idx} className="text-sm break-words whitespace-pre-wrap">
+                        {trimmedLine}
+                      </p>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">暂无内容</p>
+                )}
               </div>
               
               {post.code && (

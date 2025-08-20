@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Filter, ChevronDown, Star, Clock, Zap, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,63 +11,40 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import TopNavigation from '@/components/ui/top-navigation'
 import { useNavigation } from '@/contexts/NavigationContext'
+import { getCategories } from '../api/categories'
+import { getResources } from '../api/resources'
 
 const CategoryScreen: React.FC = () => {
   const { getActiveTab, setActiveTab } = useNavigation()
-  const [activeCategory, setActiveCategory] = useState('all')
+  const [activeCategory, setActiveCategory] = useState<string|number>('all')
+  const [categories, setCategories] = useState<{id:string|number; name:string}[]>([{ id: 'all', name: '全部' }])
+  const [resources, setResources] = useState<any[]>([])
   
   // 获取当前活跃的显示模式
   const activeDisplayMode = getActiveTab('category', 'grid')
   
-  const categories = [
-    { id: 'all', name: '全部' },
-    { id: 'basic', name: '基础语法' },
-    { id: 'advanced', name: '高级特性' },
-    { id: 'project', name: '实战项目' },
-    { id: 'algorithm', name: '算法' },
-    { id: 'interview', name: '面试题' },
-  ]
-  
+  useEffect(() => {
+    // 加载分类
+    getCategories().then((list) => setCategories([{ id: 'all', name: '全部' }, ...list])).catch(() => setCategories([{ id: 'all', name: '全部' }]))
+    // 初始加载资源
+    loadResources('all')
+  }, [])
 
-  
-  const resources = [
-    {
-      id: 1,
-      title: '结绳语言基础语法详解',
-      difficulty: '入门',
-      duration: '2小时',
-      tags: ['语法', '入门'],
-      image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y29kaW5nfGVufDB8fDB8fHww',
-      hot: 98,
-    },
-    {
-      id: 2,
-      title: '结绳异步编程实战',
-      difficulty: '中级',
-      duration: '3.5小时',
-      tags: ['异步', '中级'],
-      image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww',
-      hot: 76,
-    },
-    {
-      id: 3,
-      title: '结绳高性能应用开发',
-      difficulty: '高级',
-      duration: '5小时',
-      tags: ['性能', '高级'],
-      image: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29kaW5nfGVufDB8fDB8fHww',
-      hot: 120,
-    },
-    {
-      id: 4,
-      title: '结绳移动应用开发教程',
-      difficulty: '中级',
-      duration: '4小时',
-      tags: ['移动', '实战'],
-      image: 'https://images.unsplash.com/photo-1551033406-611cf9a28f67?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGNvZGluZ3xlbnwwfHwwfHx8MA%3D%3D',
-      hot: 85,
-    },
-  ]
+  const loadResources = async (cat: string|number) => {
+    const params: any = { page: 1, pageSize: 20 }
+    if (cat !== 'all') params.category_id = cat
+    const data = await getResources(params)
+    const list = (data.list || data.items || []).map((r: any) => ({
+      id: r.id,
+      title: r.name || r.title,
+      difficulty: '',
+      duration: '',
+      tags: r.tags || [],
+      image: (r.screenshots && r.screenshots[0]) || '',
+      hot: r.download_count || r.like_count || 0,
+    }))
+    setResources(list)
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
@@ -151,7 +128,10 @@ const CategoryScreen: React.FC = () => {
               key={category.id}
               variant={activeCategory === category.id ? "default" : "ghost"}
               className="rounded-full text-sm px-4"
-              onClick={() => setActiveCategory(category.id)}
+              onClick={() => {
+                setActiveCategory(category.id)
+                loadResources(category.id)
+              }}
             >
               {category.name}
             </Button>

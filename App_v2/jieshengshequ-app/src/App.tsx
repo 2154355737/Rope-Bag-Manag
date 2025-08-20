@@ -7,9 +7,8 @@ import CategoryScreen from './screens/category-screen'
 import CommunityScreen from './screens/community-screen'
 import MessagesScreen from './screens/messages-screen'
 import ProfileScreen from './screens/profile-screen'
-import PostDetailScreen from './screens/post-detail-screen'
-import ResourceDetailScreen from './screens/resource-detail-screen'
-import AnnouncementDetailScreen from './screens/announcement-detail-screen'
+import UniversalDetailScreen from './screens/universal-detail-screen'
+import AnnouncementRedirect from './screens/announcement-redirect'
 import PublishScreen from './screens/publish-screen'
 import SettingsScreen from './screens/settings-screen'
 import EditProfileScreen from './screens/edit-profile-screen'
@@ -17,6 +16,7 @@ import MyContentScreen from './screens/my-content-screen'
 import HelpScreen from './screens/help-screen'
 import AboutScreen from './screens/about-screen'
 import PrivacyScreen from './screens/privacy-screen'
+import SearchScreen from './screens/search-screen'
 import LoginScreen from './screens/login-screen'
 import RegisterScreen from './screens/register-screen'
 import ForgotPasswordScreen from './screens/forgot-password-screen'
@@ -130,15 +130,17 @@ const App: React.FC = () => {
             <Route path="messages" element={<MessagesScreen />} />
             <Route path="profile" element={<ProfileScreen />} />
             <Route path="publish" element={<PublishScreen />} />
-            <Route path="post/:id" element={<PostDetailScreen />} />
-            <Route path="resource/:id" element={<ResourceDetailScreen />} />
-            <Route path="announcement/:id" element={<AnnouncementDetailScreen />} />
+            <Route path="post/:id" element={<UniversalDetailScreen />} />
+            <Route path="resource/:id" element={<UniversalDetailScreen />} />
+            <Route path="announcement" element={<AnnouncementRedirect />} />
+            <Route path="announcement/:id" element={<UniversalDetailScreen />} />
             <Route path="settings" element={<SettingsScreen />} />
             <Route path="edit-profile" element={<EditProfileScreen />} />
             <Route path="my-content" element={<MyContentScreen />} />
             <Route path="help" element={<HelpScreen />} />
             <Route path="about" element={<AboutScreen />} />
             <Route path="privacy" element={<PrivacyScreen />} />
+            <Route path="search" element={<SearchScreen />} />
           </Route>
           
           {/* 认证相关页面 */}

@@ -21,6 +21,7 @@ pub mod public;
 // 新增通知模块
 pub mod notification;
 pub mod storage;
+pub mod search;
 
 use actix_web::web;
 
@@ -44,7 +45,8 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(download_security::configure_routes)
         .configure(security_management::configure_routes)
         .configure(notification::configure_routes)
-        .configure(storage::configure_routes);
+        .configure(storage::configure_routes)
+        .configure(search::configure_routes);
 
     // 添加公共API路由
     public::public_routes(cfg);

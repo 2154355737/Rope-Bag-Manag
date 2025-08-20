@@ -34,6 +34,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(web::resource("/verify-code").route(web::post().to(verify_code)))
             .service(web::resource("/reset-request").route(web::post().to(reset_request)))
             .service(web::resource("/reset-password").route(web::post().to(reset_password)))
+            // 别名：对齐前端
+            .service(web::resource("/forgot-password").route(web::post().to(reset_request)))
     );
 }
 

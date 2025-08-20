@@ -429,7 +429,15 @@ impl PackageRepository {
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
-                Ok(list) => list,
+                Ok(mut list) => {
+                    // 为每个package获取标签
+                    for package in &mut list {
+                        if let Ok(tags) = Self::get_tags_for_package_internal(&conn, package.id) {
+                            package.tags = Some(tags);
+                        }
+                    }
+                    list
+                },
                 Err(e) => {
                     log::error!("❌ collect packages failed: {}", e);
                     return Err(e.into());

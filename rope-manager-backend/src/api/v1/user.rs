@@ -65,6 +65,36 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::delete().to(delete_user))
             )
     );
+
+    // 新增：/me 别名集合
+    cfg.service(
+        web::scope("/me")
+            .service(
+                web::resource("")
+                    .route(web::get().to(get_current_user_profile))
+                    .route(web::put().to(update_current_user_profile))
+            )
+            .service(
+                web::resource("/stats")
+                    .route(web::get().to(get_my_stats))
+            )
+            .service(
+                web::resource("/weekly-report")
+                    .route(web::get().to(get_my_weekly_report))
+            )
+            .service(
+                web::resource("/resources")
+                    .route(web::get().to(get_my_resources))
+            )
+            .service(
+                web::resource("/posts")
+                    .route(web::get().to(get_my_posts))
+            )
+            .service(
+                web::resource("/comments")
+                    .route(web::get().to(get_my_comments))
+            )
+    );
 }
 
 async fn get_users(
@@ -511,4 +541,43 @@ async fn get_my_likes_stats(
             "view_by_type": {"post": 0}
         }
     })))
+} 
+
+// 新增：我的统计
+async fn get_my_stats(
+    http_req: HttpRequest,
+    post_service: web::Data<PostService>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let posts: i64 = conn.query_row("SELECT COUNT(*) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let resources: i64 = conn.query_row("SELECT COUNT(*) FROM packages WHERE author = (SELECT username FROM users WHERE id = ?)", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let views: i64 = conn.query_row("SELECT COALESCE(SUM(view_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let likes: i64 = conn.query_row("SELECT COALESCE(SUM(like_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"posts": posts, "resources": resources, "views": views, "likes": likes}})))
+}
+
+// 新增：我的周报（占位）
+async fn get_my_weekly_report(
+    _http_req: HttpRequest,
+) -> Result<HttpResponse, actix_web::Error> {
+    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"summary": "本周活跃良好", "highlights": []}})))
+}
+
+// 新增：我的帖子
+async fn get_my_posts(
+    http_req: HttpRequest,
+    query: web::Query<serde_json::Value>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let page = query.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    let page_size = query.get("pageSize").and_then(|v| v.as_u64()).unwrap_or(10) as i32;
+    let params = crate::models::PostQueryParams { page: Some((page as u32)), page_size: Some((page_size as u32)), category_id: None, author_id: Some(user.id), status: None, search: None, tags: None, is_pinned: None, is_featured: None };
+    match post_service.get_posts(params).await {
+        Ok(resp) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": resp}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
 } 

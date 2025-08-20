@@ -5,6 +5,24 @@ use crate::models::ApiResponse;
 use crate::services::package_storage_service::{PackageStorageService, StorageStats, CleanupResult};
 use crate::middleware::auth::AuthenticatedUser;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
+
+#[derive(Deserialize)]
+pub struct PresignRequest {
+    pub filename: String,
+    #[serde(rename = "contentType")]
+    pub content_type: Option<String>,
+    pub scope: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct PresignResponseBody {
+    #[serde(rename = "uploadUrl")]
+    pub upload_url: String,
+    #[serde(rename = "publicUrl")]
+    pub public_url: Option<String>,
+    pub headers: std::collections::HashMap<String, String>,
+}
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
@@ -16,6 +34,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(get_storage_stats)
             .service(cleanup_storage)
     );
+    // 上传预签名（对齐前端约定，复用现有 /storage/upload）
+    cfg.service(presign_upload);
 }
 
 #[derive(Deserialize)]
@@ -34,6 +54,21 @@ pub struct UploadResponse {
 #[derive(Deserialize)]
 pub struct FilePathRequest {
     pub file_path: String,
+}
+
+// 统一的“预签名”接口：前端拿到 uploadUrl 后，直接以 multipart/form-data 向该地址上传
+// 返回的 publicUrl 需在上传完成后由 /storage/upload 响应中的 download_url 获取
+#[actix_web::post("/uploads/presign")]
+async fn presign_upload(
+    _req: web::Json<PresignRequest>,
+    _auth_user: AuthenticatedUser,
+) -> Result<HttpResponse> {
+    let body = PresignResponseBody {
+        upload_url: "/api/v1/storage/upload".to_string(),
+        public_url: None,
+        headers: std::collections::HashMap::new(),
+    };
+    Ok(HttpResponse::Ok().json(ApiResponse::success(body)))
 }
 
 // 上传文件到AList存储 - 所有文件将被存储在 /image/结绳社区/ 目录下

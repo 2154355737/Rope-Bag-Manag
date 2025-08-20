@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -27,6 +27,8 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 import { getResourceRecommendations } from '@/utils/recommendations'
+import { getResource, getResourceComments, createResourceComment, toggleLikeResource, toggleBookmarkResource, reportResource, downloadResource } from '../api/resources'
+import { replyComment as apiReplyComment, likeComment as apiLikeComment, getComments as apiGetComments } from '../api/comments'
 
 const ResourceDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -36,8 +38,8 @@ const ResourceDetailScreen: React.FC = () => {
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
   
-  // 模拟资源数据
-  const resource = {
+  // 资源数据（占位，挂载后加载）
+  const [resource, setResource] = useState<any>({
     id: parseInt(id || '1'),
     title: 'React Native 开发工具包',
     version: 'v2.1.0',
@@ -73,145 +75,78 @@ const ResourceDetailScreen: React.FC = () => {
       'TypeScript >= 4.8.0'
     ],
     safetyStatus: 'verified'
-  }
+  })
 
-  // 获取相关推荐
-  const recommendedItems = getResourceRecommendations(resource.id, resource.tags)
-  
-  // 模拟评论数据（包含原评价内容）
-  const comments: Comment[] = [
-    {
-      id: 1,
-      author: {
-        name: '张开发',
-        avatar: 'https://i.pravatar.cc/150?img=1',
-      },
-      content: '非常棒的工具包！组件质量很高，文档也很详细。已经在我的项目中使用了，效果很好。',
-      time: '2025-01-12',
-      likes: 23,
-      isLiked: false,
-    },
-    {
-      id: 2,
-      author: {
-        name: '李前端',
-        avatar: 'https://i.pravatar.cc/150?img=2',
-      },
-      content: '整体不错，但是某些组件的API设计还可以优化。希望下个版本能改进。',
-      time: '2025-01-08',
-      likes: 12,
-      isLiked: false,
-    },
-    {
-      id: 3,
-      author: {
-        name: '王开发',
-        avatar: 'https://i.pravatar.cc/150?img=3',
-        verified: true,
-      },
-      content: '这个工具包真的很实用！TypeScript支持做得很好，文档也很全面。',
-      time: '2天前',
-      likes: 15,
-      isLiked: true,
-      replies: [
-        {
-          id: 101,
-          author: {
-            name: '李前端',
-            avatar: 'https://i.pravatar.cc/150?img=2',
-          },
-          content: '同感！特别是组件库部分，节省了很多开发时间。',
-          time: '1天前',
-          likes: 8,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 4,
-      author: {
-        name: '赵设计',
-        avatar: 'https://i.pravatar.cc/150?img=4',
-      },
-      content: 'UI组件设计很不错，但是希望能增加更多的主题样式选项。',
-      time: '3天前',
-      likes: 12,
-      isLiked: false,
-    },
-    {
-      id: 5,
-      author: {
-        name: '程序员小张',
-        avatar: 'https://i.pravatar.cc/150?img=5',
-      },
-      content: '这个组件库真的太好用了！集成简单，样式美观，强烈推荐给所有前端开发者。',
-      time: '昨天',
-      likes: 28,
-      isLiked: true,
-      rating: 5,
-      helpful: 15
-    },
-    {
-      id: 6,
-      author: {
-        name: 'React爱好者',
-        avatar: 'https://i.pravatar.cc/150?img=6',
-      },
-      content: '文档写得很清楚，示例代码也很实用。唯一的建议是希望能提供更多的使用场景案例。',
-      time: '昨天',
-      likes: 18,
-      isLiked: false,
-      rating: 4,
-      helpful: 12
-    },
-    {
-      id: 7,
-      author: {
-        name: '全栈工程师',
-        avatar: 'https://i.pravatar.cc/150?img=7',
-      },
-      content: '很好的资源包！TypeScript类型定义完善，对开发体验的提升很大。',
-      time: '2天前',
-      likes: 22,
-      isLiked: true,
-      rating: 5,
-      helpful: 18,
-      replies: [
-        {
-          id: 701,
-          author: {
-            name: '前端新手',
-            avatar: 'https://i.pravatar.cc/150?img=8',
-          },
-          content: '作为新手，这个资源包帮了我很大忙！',
-          time: '1天前',
-          likes: 5,
-          isLiked: false,
-        }
-      ]
-    },
-    {
-      id: 8,
-      author: {
-        name: '移动端开发',
-        avatar: 'https://i.pravatar.cc/150?img=9',
-      },
-      content: '移动端适配做得很好，响应式设计很赞。期待看到更多移动端专用组件。',
-      time: '3天前',
-      likes: 16,
-      isLiked: false,
-      rating: 4,
-      helpful: 10
+  const [comments, setComments] = useState<Comment[]>([])
+  const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const r = await getResource(parseInt(id || '1'))
+        setResource({
+          id: r.id,
+          title: r.name || r.title,
+          author: { name: r.author || '开发者', avatar: '', verified: false },
+          description: r.description || '',
+          downloadUrl: r.file_url,
+          fileSize: r.file_size?.toString() || '0',
+          downloadCount: r.download_count || 0,
+          likes: r.like_count || 0,
+          views: r.view_count || 0,
+          rating: r.rating || 4.5,
+          reviewCount: r.review_count || 0,
+          tags: r.tags || [],
+          publishDate: new Date(r.created_at || Date.now()).toLocaleDateString('zh-CN'),
+          lastUpdated: new Date(r.updated_at || r.created_at || Date.now()).toLocaleDateString('zh-CN'),
+          version: r.version || '1.0.0',
+          category: r.category?.name || '其他',
+          screenshots: r.screenshots || [],
+          files: r.files || [],
+          requirements: r.requirements || [],
+          safetyStatus: r.safety_status || 'unknown',
+          authorStats: {
+            totalResources: 12,
+            totalDownloads: 8500,
+            rating: 4.6
+          }
+        })
+        
+        // 加载相关推荐
+        const recommendations = await getResourceRecommendations(r.id, r.tags || [])
+        setRecommendedItems(recommendations)
+        
+        // 加载评论
+        const cr = await apiGetComments('resource', r.id, 1, 10)
+        const mapped = (cr.list || []).map((c: any) => ({
+          id: c.id,
+          author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+          content: c.content,
+          time: c.created_at || '',
+          likes: c.likes || 0,
+          isLiked: false
+        }))
+        setComments(mapped)
+        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      } catch (e) {
+        console.warn(e)
+      }
     }
-  ]
-
+    load()
+  }, [id])
+  
+  // 获取相关推荐
+  // const recommendedItems = getResourceRecommendations(resource.id, resource.tags)
+  
   // 格式化文件大小
   const formatFileSize = (bytes: string) => {
     return bytes
   }
 
   // 格式化数字
-  const formatNumber = (num: number) => {
+  const formatNumber = (num: number | undefined | null) => {
+    if (num == null || isNaN(num)) return '0'
     if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
@@ -220,51 +155,38 @@ const ResourceDetailScreen: React.FC = () => {
   // 处理下载
   const handleDownload = async () => {
     setIsDownloading(true)
-    setDownloadProgress(0)
-    
-    // 模拟下载进度
-    const interval = setInterval(() => {
-      setDownloadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsDownloading(false)
-          toast({
-            title: "下载完成",
-            description: "资源已成功下载到您的设备",
-            duration: 3000,
-          })
-          return 100
-        }
-        return prev + Math.random() * 15
-      })
-    }, 200)
+    setDownloadProgress(20)
+    try {
+      const url = await downloadResource(resource.id)
+      setDownloadProgress(80)
+      window.location.href = url
+      setDownloadProgress(100)
+    } catch (e) {
+      toast({ title: '下载失败', description: (e as any)?.message || '请稍后再试', variant: 'destructive' })
+    } finally {
+      setTimeout(() => setIsDownloading(false), 800)
+    }
   }
 
 
 
   // 评论区事件处理
-  const handleSubmitComment = (content: string) => {
-    console.log('新评论:', content)
-    toast({
-      title: "评论发送成功",
-      description: "您的评论已发布"
-    })
+  const handleSubmitComment = async (content: string) => {
+    await createResourceComment(resource.id, content)
+    const cr = await getResourceComments(resource.id, 1, 10)
+    const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: c.created_at || '', likes: c.likes || 0, isLiked: false }))
+    setComments(mapped)
+    toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
 
-  const handleSubmitReply = (commentId: number, content: string) => {
-    console.log('回复评论:', commentId, content)
-    toast({
-      title: "回复发送成功",
-      description: "您的回复已发布"
-    })
+  const handleSubmitReply = async (commentId: number, content: string) => {
+    await apiReplyComment(commentId, content)
+    toast({ title: '回复发送成功', description: '您的回复已发布' })
   }
 
-  const handleLikeComment = (commentId: number) => {
-    console.log('点赞评论:', commentId)
-    toast({
-      title: "操作成功",
-      description: "已点赞/取消点赞"
-    })
+  const handleLikeComment = async (commentId: number) => {
+    await apiLikeComment(commentId, true)
+    toast({ title: '操作成功', description: '已点赞/取消点赞' })
   }
 
   const handleReportComment = (commentId: number) => {
@@ -272,23 +194,17 @@ const ResourceDetailScreen: React.FC = () => {
   }
 
   // 处理点赞
-  const handleLike = () => {
+  const handleLike = async () => {
+    await toggleLikeResource(resource.id)
     setIsLiked(!isLiked)
-    toast({
-      title: isLiked ? "已取消点赞" : "点赞成功",
-      description: isLiked ? "已取消对此资源的点赞" : "感谢您的支持",
-      duration: 2000,
-    })
+    toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消对此资源的点赞' : '感谢您的支持', duration: 2000 })
   }
 
   // 处理收藏
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
+    await toggleBookmarkResource(resource.id)
     setIsBookmarked(!isBookmarked)
-    toast({
-      title: isBookmarked ? "已取消收藏" : "收藏成功",
-      description: isBookmarked ? "已从收藏夹中移除" : "已添加到您的收藏夹",
-      duration: 2000,
-    })
+    toast({ title: isBookmarked ? '已取消收藏' : '收藏成功', description: isBookmarked ? '已从收藏夹中移除' : '已添加到您的收藏夹', duration: 2000 })
   }
 
   // 处理分享
@@ -301,12 +217,9 @@ const ResourceDetailScreen: React.FC = () => {
   }
 
   // 处理举报
-  const handleReport = () => {
-    toast({
-      title: "举报已提交",
-      description: "我们会尽快处理您的举报",
-      duration: 2000,
-    })
+  const handleReport = async () => {
+    await reportResource(resource.id)
+    toast({ title: '举报已提交', description: '我们会尽快处理您的举报', duration: 2000 })
   }
 
 
@@ -335,21 +248,21 @@ const ResourceDetailScreen: React.FC = () => {
       {/* 内容区域 - 为固定导航栏留出空间 */}
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         <ScrollArea className="flex-1">
-        <div className="p-4">
+        <div className="p-4 space-y-4 content-container">
           {/* 资源基本信息 */}
-          <Card className="mb-4">
+          <Card>
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center">
-                  <Avatar className="h-12 w-12 mr-3">
+                <div className="flex items-center flex-1 min-w-0">
+                  <Avatar className="h-12 w-12 mr-3 flex-shrink-0">
                     <AvatarImage src={resource.author.avatar} />
                     <AvatarFallback>{resource.author.name[0]}</AvatarFallback>
                   </Avatar>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center">
-                      <span className="font-medium">{resource.author.name}</span>
+                      <span className="font-medium text-overflow-protection truncate">{resource.author.name}</span>
                       {resource.author.verified && (
-                        <CheckCircle size={16} className="ml-1 text-blue-500" />
+                        <CheckCircle size={16} className="ml-1 text-blue-500 flex-shrink-0" />
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -357,12 +270,12 @@ const ResourceDetailScreen: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">
                   {resource.category}
                 </Badge>
               </div>
 
-              <h2 className="text-xl font-bold mb-2">{resource.title}</h2>
+              <h2 className="text-xl font-bold mb-2 text-overflow-protection">{resource.title}</h2>
               <div className="flex items-center mb-3">
                 <Badge variant="outline" className="text-xs mr-2">
                   {resource.version}
@@ -412,7 +325,7 @@ const ResourceDetailScreen: React.FC = () => {
 
           {/* 截图展示 */}
           {resource.screenshots.length > 0 && (
-            <Card className="mb-4">
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg">预览截图</CardTitle>
               </CardHeader>
@@ -432,44 +345,114 @@ const ResourceDetailScreen: React.FC = () => {
           )}
 
           {/* 详细描述 */}
-          <Card className="mb-4">
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">详细介绍</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="space-y-3">
-                {resource.description.split('\n\n').map((paragraph, idx) => (
-                  <div key={idx}>
-                    {paragraph.includes('•') ? (
-                      <ul className="list-disc list-inside space-y-1 text-sm">
-                        {paragraph.split('\n').map((line, lineIdx) => (
-                          line.trim().startsWith('•') && (
-                            <li key={lineIdx} className="ml-2">
-                              {line.trim().substring(1).trim()}
-                            </li>
-                          )
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm">{paragraph}</p>
-                    )}
-                  </div>
-                ))}
+            <CardContent className="p-4 pt-0 content-container">
+              <div className="space-y-3 text-overflow-protection">
+                {resource.description && resource.description.trim() ? (
+                  resource.description.split('\n').map((line, idx) => {
+                    const trimmedLine = line.trim()
+                    if (!trimmedLine) return <div key={idx} className="h-2" />
+                    
+                    // 检查是否是URL
+                    if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
+                      return (
+                        <div key={idx} className="my-3">
+                          <span className="text-sm text-muted-foreground block mb-1">预览图：</span>
+                          <a 
+                            href={trimmedLine} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-500 hover:text-blue-600 underline url-break block"
+                          >
+                            {trimmedLine}
+                          </a>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是代码路径（包含特殊字符的文件路径）
+                    if (trimmedLine.includes('java') && (trimmedLine.includes('.') || trimmedLine.includes('/'))) {
+                      return (
+                        <div key={idx} className="my-3 p-3 bg-muted rounded-md">
+                          <span className="text-sm font-mono text-overflow-protection break-all">
+                            {trimmedLine}
+                          </span>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是特殊标记（★、@等）
+                    if (trimmedLine.startsWith('★') || trimmedLine.startsWith('@')) {
+                      return (
+                        <div key={idx} className="my-2 p-2 bg-orange-50 border-l-4 border-orange-200 rounded-r">
+                          <span className="text-sm font-medium text-orange-800 text-overflow-protection">
+                            {trimmedLine}
+                          </span>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是方法标题（以"方法"开头）
+                    if (trimmedLine.startsWith('方法') || trimmedLine.includes('方法')) {
+                      return (
+                        <div key={idx} className="my-3">
+                          <h4 className="text-base font-semibold text-primary text-overflow-protection">
+                            {trimmedLine}
+                          </h4>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是代码示例（包含code、class等关键词）
+                    if (trimmedLine.toLowerCase().includes('code') || trimmedLine.includes('class') || trimmedLine.includes('()')) {
+                      return (
+                        <div key={idx} className="my-2 p-3 bg-slate-100 rounded border">
+                          <code className="text-sm font-mono text-overflow-protection break-all">
+                            {trimmedLine}
+                          </code>
+                        </div>
+                      )
+                    }
+                    
+                    // 检查是否是列表项
+                    if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-')) {
+                      return (
+                        <div key={idx} className="ml-4 my-1">
+                          <span className="text-sm text-overflow-protection">
+                            {trimmedLine.substring(1).trim()}
+                          </span>
+                        </div>
+                      )
+                    }
+                    
+                    // 普通文本段落
+                    return (
+                      <p key={idx} className="text-sm long-text text-overflow-protection leading-relaxed">
+                        {trimmedLine}
+                      </p>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">暂无详细介绍</p>
+                )}
               </div>
             </CardContent>
           </Card>
 
           {/* 系统要求 */}
-          <Card className="mb-4">
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">系统要求</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
+            <CardContent className="p-4 pt-0 content-container">
               <ul className="space-y-2">
                 {resource.requirements.map((req, idx) => (
-                  <li key={idx} className="flex items-center text-sm">
-                    <CheckCircle size={14} className="text-green-500 mr-2" />
-                    {req}
+                  <li key={idx} className="flex items-start text-sm">
+                    <CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                    <span className="text-overflow-protection">{req}</span>
                   </li>
                 ))}
               </ul>
@@ -477,24 +460,21 @@ const ResourceDetailScreen: React.FC = () => {
           </Card>
 
           {/* 文件列表 */}
-          <Card className="mb-4">
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">包含文件</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
+            <CardContent className="p-4 pt-0 content-container">
               <div className="space-y-3">
                 {resource.files.map((file, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 border rounded-md">
-                    <div className="flex items-center">
-                      <FileText size={16} className="text-muted-foreground mr-2" />
-                      <div>
-                        <div className="font-medium text-sm">{file.name}</div>
-                        <div className="text-xs text-muted-foreground">{file.size}</div>
+                  <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded border">
+                    <div className="flex items-center flex-1 min-w-0">
+                      <FileText size={16} className="text-blue-500 mr-2 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm text-overflow-protection truncate">{file.name}</div>
+                        <div className="text-xs text-muted-foreground">{file.type} • {file.size}</div>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {file.type}
-                    </Badge>
                   </div>
                 ))}
               </div>
@@ -502,7 +482,7 @@ const ResourceDetailScreen: React.FC = () => {
           </Card>
 
           {/* 下载按钮 */}
-          <Card className="mb-4">
+          <Card>
             <CardContent className="p-4">
               {isDownloading ? (
                 <div className="space-y-3">
@@ -535,7 +515,6 @@ const ResourceDetailScreen: React.FC = () => {
               createBookmarkButton(undefined, isBookmarked, handleBookmark),
               createReportButton(handleReport)
             ]}
-            className="mb-4"
             compact={true}
           />
 
@@ -545,22 +524,22 @@ const ResourceDetailScreen: React.FC = () => {
             items={recommendedItems}
             currentItemId={resource.id}
             maxItems={6}
-            className="mt-6"
             onMoreClick={() => navigate('/category')}
           />
 
           {/* 评论区 */}
           <CommentSection
             comments={comments}
-            totalCount={156}
+            totalCount={comments.length}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
             onLikeComment={handleLikeComment}
             onReportComment={handleReportComment}
+            hasMoreComments={hasMoreComments}
+            isLoadingComments={false} // Set to false as comments are now loaded in useEffect
             placeholder="发表评论..."
             maxLength={200}
             initialCommentsToShow={5}
-            className="mt-6"
           />
         </div>
       </ScrollArea>

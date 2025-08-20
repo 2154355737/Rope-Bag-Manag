@@ -20,10 +20,14 @@ struct AppLaunchReq { user_id: Option<i32>, device_id: Option<String>, app_versi
 pub fn public_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/public")
-            .service(get_public_comments)
             .service(get_public_banners)
-            .service(app_launch)
+            .service(get_public_announcements)
+            .service(get_public_announcement_detail)
     );
+
+    // 顶层别名，便于前端直接访问 /announcements 与 /announcements/{id}
+    cfg.service(get_public_announcements);
+    cfg.service(get_public_announcement_detail);
 }
 
 #[post("/app/launch")]
@@ -69,22 +73,30 @@ async fn get_public_comments(
     }
 }
 
-#[get("/banners")]
-async fn get_public_banners(
-    admin_service: web::Data<AdminService>,
-) -> HttpResponse {
+#[get("/public/banners")]
+async fn get_public_banners(admin_service: web::Data<AdminService>) -> HttpResponse {
     match admin_service.get_active_banners().await {
-        Ok(banners) => HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": banners
-        })),
-        Err(e) => {
-            log::error!("获取活动轮播图失败: {}", e);
-            HttpResponse::InternalServerError().json(json!({
-                "code": 500,
-                "message": "获取轮播图失败"
-            }))
-        }
+        Ok(banners) => HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": banners })),
+        Err(_) => HttpResponse::InternalServerError().json(json!({"code":500, "message":"获取轮播图失败"})),
+    }
+}
+
+// 新增：公开公告列表
+#[get("/announcements")]
+async fn get_public_announcements(admin_service: web::Data<AdminService>) -> HttpResponse {
+    match admin_service.get_active_announcements().await {
+        Ok(list) => HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list} })),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+// 新增：公开公告详情
+#[get("/announcements/{id}")]
+async fn get_public_announcement_detail(path: web::Path<i32>, admin_service: web::Data<AdminService>) -> HttpResponse {
+    let id = path.into_inner();
+    match admin_service.get_announcement_by_id(id).await {
+        Ok(Some(a)) => HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": a })),
+        Ok(None) => HttpResponse::NotFound().json(json!({"code":404, "message":"公告不存在"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
     }
 } 

@@ -8,6 +8,8 @@ use crate::repositories::system_repo::SystemRepository;
 use crate::require_auth;
 use crate::utils::auth_helper::AuthHelper;
 use futures_util::StreamExt;
+use crate::services::user_action_service::UserActionService;
+use crate::models::user_action::CreateUserActionRequest;
 
 
 #[derive(Debug, Deserialize, Clone)]
@@ -87,6 +89,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_package_comments))
             )
             .service(
+                web::resource("/{id}/report")
+                    .route(web::post().to(report_package))
+            )
+            .service(
                 web::resource("/{id}/review")
                     .route(web::post().to(review_resource))
             )
@@ -99,7 +105,164 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/{id}/like-status")
                     .route(web::get().to(check_like_status))
             )
+            .service(
+                web::resource("/{id}/bookmark")
+                    .route(web::post().to(favorite_package_handler))
+                    .route(web::delete().to(unfavorite_package_handler))
+            )
+            .service(
+                web::resource("/{id}/bookmark-status")
+                    .route(web::get().to(check_favorite_status_handler))
+            )
     );
+
+    // 新增：/resources 别名，映射到与 /packages 相同的处理器
+    cfg.service(
+        web::scope("/resources")
+            .service(
+                web::resource("")
+                    .route(web::get().to(get_packages))
+            )
+            .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_package))
+                    .route(web::put().to(update_package))
+                    .route(web::delete().to(delete_package))
+            )
+            .service(
+                web::resource("/{id}/download")
+                    .route(web::get().to(download_package))
+            )
+            .service(
+                web::resource("/{id}/comments")
+                    .route(web::get().to(get_package_comments))
+                    .route(web::post().to(create_resource_comment))
+            )
+            .service(
+                web::resource("/{id}/report")
+                    .route(web::post().to(report_package))
+            )
+            .service(
+                web::resource("/{id}/like")
+                    .route(web::post().to(like_package))
+                    .route(web::delete().to(unlike_package))
+            )
+            .service(
+                web::resource("/{id}/like-status")
+                    .route(web::get().to(check_like_status))
+            )
+            .service(
+                web::resource("/{id}/bookmark")
+                    .route(web::post().to(favorite_package_handler))
+                    .route(web::delete().to(unfavorite_package_handler))
+            )
+            .service(
+                web::resource("/{id}/bookmark-status")
+                    .route(web::get().to(check_favorite_status_handler))
+            )
+    );
+}
+
+// 审核资源请求结构
+#[derive(Debug, Deserialize)]
+pub struct ReviewResourceRequest {
+    pub status: String,      // "approved" 或 "rejected"
+    pub comment: Option<String>, // 审核备注
+}
+
+// 新增：创建资源评论请求体
+#[derive(Debug, Deserialize)]
+struct CreateCommentBody { content: String, parent_id: Option<i32> }
+
+// 新增：举报请求体
+#[derive(Debug, Deserialize)]
+struct ReportBody { reason: Option<String> }
+
+// 新增：为资源创建评论（/resources/{id}/comments POST）
+async fn create_resource_comment(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    body: web::Json<CreateCommentBody>,
+    comment_service: web::Data<CommentService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let resource_id = path.into_inner();
+    match comment_service.create_comment(
+        user.id,
+        "Package".to_string(),
+        resource_id,
+        body.content.clone(),
+        body.parent_id,
+    ).await {
+        Ok(comment) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": comment}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+// 新增：举报资源（/packages/{id}/report、/resources/{id}/report）
+async fn report_package(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    body: web::Json<ReportBody>,
+    ua_service: web::Data<UserActionService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let id = path.into_inner();
+    let ip = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+    let ua = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    let req = CreateUserActionRequest {
+        user_id: Some(user.id),
+        action_type: "Report".to_string(),
+        target_type: Some("Package".to_string()),
+        target_id: Some(id),
+        details: body.reason.clone(),
+        ip_address: ip,
+        user_agent: ua,
+    };
+    match ua_service.log_user_action(&req).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success"}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
+}
+
+// 新增：收藏/取消收藏/状态
+async fn favorite_package_handler(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let id = path.into_inner();
+    match package_service.favorite_package(user.id, id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"favorite_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+async fn unfavorite_package_handler(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let id = path.into_inner();
+    match package_service.unfavorite_package(user.id, id).await {
+        Ok(count) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"favorite_count": count}}))),
+        Err(e) => Ok(HttpResponse::BadRequest().json(json!({"code":400, "message": e.to_string()})))
+    }
+}
+
+async fn check_favorite_status_handler(
+    http_req: HttpRequest,
+    path: web::Path<i32>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    let id = path.into_inner();
+    match package_service.check_favorite_status(user.id, id).await {
+        Ok(is_fav) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"favorited": is_fav}}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
 }
 
 async fn get_top_downloads(query: web::Query<TopQuery>, package_service: web::Data<PackageService>) -> Result<HttpResponse, actix_web::Error> {
@@ -116,13 +279,6 @@ async fn get_top_likes(query: web::Query<TopQuery>, package_service: web::Data<P
         Ok(list) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"list": list}}))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
     }
-}
-
-// 审核资源请求结构
-#[derive(Debug, Deserialize)]
-pub struct ReviewResourceRequest {
-    pub status: String,      // "approved" 或 "rejected"
-    pub comment: Option<String>, // 审核备注
 }
 
 // 审核资源（管理员和元老可用）

@@ -1,0 +1,868 @@
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { 
+  ArrowLeft, Share2, MoreHorizontal, Bookmark, Download, 
+  Heart, MessageSquare, Eye, Star, CheckCircle, Shield, Hash,
+  FileText, ChevronDown, Loader2, Calendar, User, Tag
+} from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { toast } from '@/hooks/use-toast'
+
+import TopNavigation from '@/components/ui/top-navigation'
+import CommentSection, { Comment } from '@/components/comment-section'
+import RelatedRecommendations from '@/components/related-recommendations'
+import InteractionButtons, { 
+  createLikeButton, 
+  createShareButton, 
+  createBookmarkButton, 
+  createReportButton 
+} from '@/components/ui/interaction-buttons'
+
+// API imports
+import { getPost } from '../api/posts'
+import { getResource } from '../api/resources'
+import { getAnnouncement } from '../api/announcements'
+import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
+import { getPostRecommendations, getResourceRecommendations, getAnnouncementRecommendations } from '@/utils/recommendations'
+
+// 通用详情项目类型
+type ItemType = 'post' | 'resource' | 'announcement'
+
+// 通用详情数据接口
+interface UniversalDetailItem {
+  id: number
+  type: ItemType
+  title: string
+  author: {
+    name: string
+    avatar: string
+    verified?: boolean
+  }
+  content?: string
+  description?: string
+  tags: string[]
+  stats: {
+    likes: number
+    comments: number
+    views: number
+    downloads?: number
+    rating?: number
+  }
+  publishDate: string
+  category?: string
+  
+  // 资源特有字段
+  version?: string
+  fileSize?: string
+  downloadUrl?: string
+  files?: Array<{ name: string; size: string; type: string }>
+  requirements?: string[]
+  screenshots?: string[]
+  safetyStatus?: string
+  
+  // 帖子特有字段
+  images?: string[]
+  code?: string
+  
+  // 公告特有字段
+  priority?: 'low' | 'medium' | 'high'
+  validUntil?: string
+}
+
+const UniversalDetailScreen: React.FC = () => {
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  
+  // 从当前路径推断类型
+  const getCurrentType = (): ItemType => {
+    const path = window.location.pathname
+    if (path.includes('/post/')) return 'post'
+    if (path.includes('/resource/')) return 'resource'
+    if (path.includes('/announcement/')) return 'announcement'
+    return 'post' // 默认值
+  }
+  
+  const type = getCurrentType()
+  
+  const [item, setItem] = useState<UniversalDetailItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
+  
+  // 交互状态
+  const [isLiked, setIsLiked] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [downloadProgress, setDownloadProgress] = useState(0)
+
+  // 格式化数字
+  const formatNumber = (num: number | undefined | null) => {
+    if (num == null || isNaN(num)) return '0'
+    if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+    return num.toString()
+  }
+
+  // 获取页面标题
+  const getPageTitle = () => {
+    switch (type) {
+      case 'post': return '帖子详情'
+      case 'resource': return '资源详情'
+      case 'announcement': return '公告详情'
+      default: return '详情'
+    }
+  }
+
+  // 获取数据
+  useEffect(() => {
+    const loadData = async () => {
+      if (!type || !id) return
+      
+      try {
+        setLoading(true)
+        let data: any
+        let recommendations: any[] = []
+        
+        switch (type) {
+          case 'post':
+            data = await getPost(parseInt(id))
+            recommendations = await getPostRecommendations(data.id, data.tags || [])
+            setItem({
+              id: data.id,
+              type: 'post',
+              title: data.title || data.content?.substring(0, 50) + '...',
+              author: { 
+                name: data.author?.name || data.author_name || '用户', 
+                avatar: data.author?.avatar || '', 
+                verified: false 
+              },
+              content: data.content,
+              tags: data.tags || [],
+              stats: {
+                likes: data.like_count || 0,
+                comments: data.comment_count || 0,
+                views: data.view_count || 0
+              },
+              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
+              images: data.images || [],
+              code: data.code
+            })
+            break
+            
+          case 'resource':
+            data = await getResource(parseInt(id))
+            recommendations = await getResourceRecommendations(data.id, data.tags || [])
+            setItem({
+              id: data.id,
+              type: 'resource',
+              title: data.name || data.title,
+              author: { 
+                name: data.author || '开发者', 
+                avatar: '', 
+                verified: false 
+              },
+              description: data.description || '',
+              tags: data.tags || [],
+              stats: {
+                likes: data.like_count || 0,
+                comments: data.comment_count || 0,
+                views: data.view_count || 0,
+                downloads: data.download_count || 0,
+                rating: data.rating || 4.5
+              },
+              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
+              category: data.category?.name || '其他',
+              version: data.version || '1.0.0',
+              fileSize: data.file_size?.toString() || '0',
+              downloadUrl: data.file_url,
+              files: data.files || [],
+              requirements: data.requirements || [],
+              screenshots: data.screenshots || [],
+              safetyStatus: data.safety_status || 'unknown'
+            })
+            break
+            
+          case 'announcement':
+            data = await getAnnouncement(parseInt(id))
+            recommendations = await getAnnouncementRecommendations(data.id, data.tags || [])
+            setItem({
+              id: data.id,
+              type: 'announcement',
+              title: data.title,
+              author: { 
+                name: data.author || '系统公告', 
+                avatar: '', 
+                verified: true 
+              },
+              content: data.content,
+              tags: data.tags || [],
+              stats: {
+                likes: 0,
+                comments: data.comment_count || 0,
+                views: data.view_count || 0
+              },
+              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
+              priority: data.priority || 'medium',
+              validUntil: data.valid_until
+            })
+            break
+        }
+        
+        setRecommendedItems(recommendations)
+        
+        // 加载评论
+        const targetType = type === 'resource' ? 'package' : type
+        const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10)
+        const mapped = (cr.list || []).map((c: any) => ({
+          id: c.id,
+          author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+          content: c.content,
+          time: c.created_at || '',
+          likes: c.likes || 0,
+          isLiked: false,
+          replies: []
+        }))
+        setComments(mapped)
+        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+        
+      } catch (error) {
+        console.error('加载详情失败:', error)
+        toast({
+          title: "加载失败",
+          description: "无法加载详情信息，请稍后重试",
+          variant: "destructive"
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadData()
+  }, [type, id])
+
+  // 交互事件处理
+  const handleLike = () => {
+    setIsLiked(!isLiked)
+    toast({ 
+      title: isLiked ? '已取消点赞' : '点赞成功', 
+      description: isLiked ? '已取消点赞' : '感谢您的支持', 
+      duration: 2000 
+    })
+  }
+
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked)
+    toast({ 
+      title: isBookmarked ? '已取消收藏' : '收藏成功', 
+      description: isBookmarked ? '已从收藏夹中移除' : '已添加到您的收藏夹', 
+      duration: 2000 
+    })
+  }
+
+  const handleShare = () => {
+    toast({
+      title: "分享链接已复制",
+      description: "可以分享给更多朋友了",
+      duration: 2000,
+    })
+  }
+
+  const handleReport = () => {
+    toast({
+      title: "举报已提交",
+      description: "我们会尽快处理您的举报",
+      duration: 2000,
+    })
+  }
+
+  const handleDownload = async () => {
+    if (item?.type !== 'resource') return
+    
+    setIsDownloading(true)
+    setDownloadProgress(20)
+    
+    try {
+      // 模拟下载过程
+      for (let i = 20; i <= 100; i += 20) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        setDownloadProgress(i)
+      }
+      
+      toast({
+        title: "下载完成",
+        description: `${item.title} 已下载到您的设备`,
+        duration: 3000,
+      })
+    } catch (error) {
+      toast({
+        title: "下载失败",
+        description: "请检查网络连接后重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsDownloading(false)
+      setDownloadProgress(0)
+    }
+  }
+
+  const handleSubmitComment = async (content: string) => {
+    if (!item) return
+    
+    try {
+      const targetType = item.type === 'resource' ? 'Package' : 
+                        item.type === 'post' ? 'Post' : 'Announcement'
+      await apiCreateComment(targetType as any, item.id, content)
+      
+      // 重新加载评论
+      const cr = await apiGetComments(item.type === 'resource' ? 'package' : item.type as any, item.id, 1, 10)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: c.created_at || '',
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: []
+      }))
+      setComments(mapped)
+      
+      toast({ title: '评论发送成功', description: '您的评论已发布' })
+    } catch (error) {
+      toast({ title: '评论发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
+  }
+
+  const handleSubmitReply = async (commentId: number, content: string) => {
+    try {
+      await apiReplyComment(commentId, content)
+      toast({ title: '回复发送成功', description: '您的回复已发布' })
+    } catch (error) {
+      toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
+  }
+
+  const handleLikeComment = async (commentId: number) => {
+    try {
+      await apiLikeComment(commentId, true)
+      toast({ title: '点赞成功' })
+    } catch (error) {
+      toast({ title: '点赞失败', description: '请稍后重试', variant: 'destructive' })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <TopNavigation title={getPageTitle()} showBackButton />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <TopNavigation title={getPageTitle()} showBackButton />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-lg font-medium mb-2">内容不存在</h2>
+            <p className="text-muted-foreground mb-4">该内容可能已被删除或不存在</p>
+            <Button onClick={() => navigate(-1)}>返回上一页</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-background pb-16">
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title={getPageTitle()}
+        showBackButton
+        rightAction={
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleBookmark}>
+              <Bookmark size={20} className={isBookmarked ? 'fill-current' : ''} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
+              <Share2 size={20} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <MoreHorizontal size={20} />
+            </Button>
+          </div>
+        }
+      />
+
+      {/* 内容区域 */}
+      <div className="pt-nav">
+        <ScrollArea className="flex-1">
+          <div className="p-4 space-y-4 content-container">
+            
+            {/* 基本信息 */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center flex-1 min-w-0">
+                    <Avatar className="h-12 w-12 mr-3 flex-shrink-0">
+                      <AvatarImage src={item.author.avatar} />
+                      <AvatarFallback>{item.author.name[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center">
+                        <span className="font-medium text-overflow-protection truncate">{item.author.name}</span>
+                        {item.author.verified && (
+                          <CheckCircle size={16} className="ml-1 text-blue-500 flex-shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        发布于 {item.publishDate}
+                      </div>
+                    </div>
+                  </div>
+                  {item.category && (
+                    <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">
+                      {item.category}
+                    </Badge>
+                  )}
+                  {item.priority && (
+                    <Badge 
+                      variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'default' : 'secondary'} 
+                      className="text-xs flex-shrink-0 ml-2"
+                    >
+                      {item.priority === 'high' ? '重要' : item.priority === 'medium' ? '普通' : '一般'}
+                    </Badge>
+                  )}
+                </div>
+
+                <h2 className="text-xl font-bold mb-2 text-overflow-protection">{item.title}</h2>
+                
+                {/* 版本信息（仅资源） */}
+                {item.type === 'resource' && item.version && (
+                  <div className="flex items-center mb-3">
+                    <Badge variant="outline" className="text-xs mr-2">
+                      {item.version}
+                    </Badge>
+                    <div className="flex items-center">
+                      <Star size={14} className="text-yellow-500 mr-1" />
+                      <span className="text-sm font-medium">{item.stats.rating}</span>
+                      <span className="text-xs text-muted-foreground ml-1">(0 评价)</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 安全状态（仅资源） */}
+                {item.type === 'resource' && (
+                  <Alert className="mb-4">
+                    <Shield size={16} />
+                    <AlertDescription>
+                      此资源已通过安全检测，可放心下载使用
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* 标签 */}
+                {item.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {item.tags.map((tag, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs">
+                        <Hash size={10} className="mr-1" /> {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* 统计信息卡片 */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-around">
+                  {item.stats.downloads !== undefined && (
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-primary">{formatNumber(item.stats.downloads)}</div>
+                      <div className="text-xs text-muted-foreground">下载量</div>
+                    </div>
+                  )}
+                  {item.stats.downloads !== undefined && <div className="h-8 w-px bg-border"></div>}
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-primary">{formatNumber(item.stats.views)}</div>
+                    <div className="text-xs text-muted-foreground">浏览量</div>
+                  </div>
+                  <div className="h-8 w-px bg-border"></div>
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-primary">{formatNumber(item.stats.likes)}</div>
+                    <div className="text-xs text-muted-foreground">点赞数</div>
+                  </div>
+                  {item.stats.comments !== undefined && (
+                    <>
+                      <div className="h-8 w-px bg-border"></div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-primary">{formatNumber(item.stats.comments)}</div>
+                        <div className="text-xs text-muted-foreground">评论数</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 内容详情渲染 */}
+            <ContentRenderer item={item} />
+
+            {/* 下载按钮（仅资源） */}
+            {item.type === 'resource' && (
+              <Card>
+                <CardContent className="p-4">
+                  {isDownloading ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">下载中...</span>
+                        <span className="text-sm">{Math.round(downloadProgress)}%</span>
+                      </div>
+                      <Progress value={downloadProgress} className="w-full" />
+                    </div>
+                  ) : (
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      onClick={handleDownload}
+                    >
+                      <Download size={18} className="mr-2" />
+                      免费下载 ({item.fileSize})
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* 操作按钮 */}
+            <InteractionButtons
+              buttons={[
+                createLikeButton(item.stats.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+                createShareButton(handleShare),
+                createBookmarkButton(undefined, isBookmarked, handleBookmark),
+                createReportButton(handleReport)
+              ]}
+              compact={true}
+            />
+
+            {/* 评论区 */}
+            <CommentSection
+              comments={comments}
+              totalCount={item.stats.comments}
+              onSubmitComment={handleSubmitComment}
+              onSubmitReply={handleSubmitReply}
+              onLikeComment={handleLikeComment}
+              onReportComment={(commentId) => console.log('举报评论:', commentId)}
+              hasMoreComments={hasMoreComments}
+              isLoadingComments={false}
+              placeholder="发表评论..."
+              maxLength={200}
+              initialCommentsToShow={5}
+            />
+
+            {/* 相关推荐 */}
+            <RelatedRecommendations
+              title={`相关${item.type === 'post' ? '帖子' : item.type === 'resource' ? '资源' : '公告'}推荐`}
+              items={recommendedItems}
+              currentItemId={item.id}
+              maxItems={3}
+              showMoreButton={true}
+              compact={true}
+              onMoreClick={() => navigate('/category')}
+            />
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  )
+}
+
+// 内容渲染组件
+const ContentRenderer: React.FC<{ item: UniversalDetailItem }> = ({ item }) => {
+  const renderContent = (content: string) => {
+    return content.split('\n').map((line, idx) => {
+      const trimmedLine = line.trim()
+      if (!trimmedLine) return <div key={idx} className="h-2" />
+      
+      // 检查是否是URL
+      if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
+        return (
+          <div key={idx} className="my-3">
+            <span className="text-sm text-muted-foreground block mb-1">链接：</span>
+            <a 
+              href={trimmedLine} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm text-blue-500 hover:text-blue-600 underline url-break block"
+            >
+              {trimmedLine}
+            </a>
+          </div>
+        )
+      }
+      
+      // 检查是否是代码路径
+      if (trimmedLine.includes('java') && (trimmedLine.includes('.') || trimmedLine.includes('/'))) {
+        return (
+          <div key={idx} className="my-3 p-3 bg-muted rounded-md">
+            <span className="text-sm font-mono text-overflow-protection break-all">
+              {trimmedLine}
+            </span>
+          </div>
+        )
+      }
+      
+      // 检查是否是特殊标记
+      if (trimmedLine.startsWith('★') || trimmedLine.startsWith('@')) {
+        return (
+          <div key={idx} className="my-2 p-2 bg-orange-50 border-l-4 border-orange-200 rounded-r">
+            <span className="text-sm font-medium text-orange-800 text-overflow-protection">
+              {trimmedLine}
+            </span>
+          </div>
+        )
+      }
+      
+      // 检查是否是方法标题
+      if (trimmedLine.startsWith('方法') || trimmedLine.includes('方法')) {
+        return (
+          <div key={idx} className="my-3">
+            <h4 className="text-base font-semibold text-primary text-overflow-protection">
+              {trimmedLine}
+            </h4>
+          </div>
+        )
+      }
+      
+      // 检查是否是代码示例
+      if (trimmedLine.toLowerCase().includes('code') || trimmedLine.includes('class') || trimmedLine.includes('()')) {
+        return (
+          <div key={idx} className="my-2 p-3 bg-slate-100 rounded border">
+            <code className="text-sm font-mono text-overflow-protection break-all">
+              {trimmedLine}
+            </code>
+          </div>
+        )
+      }
+      
+      // 检查是否是列表项
+      if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-')) {
+        return (
+          <div key={idx} className="ml-4 my-1">
+            <span className="text-sm text-overflow-protection">
+              {trimmedLine.substring(1).trim()}
+            </span>
+          </div>
+        )
+      }
+      
+      // 普通文本段落
+      return (
+        <p key={idx} className="text-sm long-text text-overflow-protection leading-relaxed">
+          {trimmedLine}
+        </p>
+      )
+    })
+  }
+
+  switch (item.type) {
+    case 'post':
+      return (
+        <>
+          {/* 帖子内容 */}
+          {item.content && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">帖子内容</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 content-container">
+                <div className="space-y-3 text-overflow-protection">
+                  {renderContent(item.content)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 代码展示 */}
+          {item.code && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">代码示例</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm">
+                  <code>{item.code}</code>
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 图片展示 */}
+          {item.images && item.images.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">图片</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="grid grid-cols-1 gap-3">
+                  {item.images.map((image, idx) => (
+                    <img
+                      key={idx}
+                      src={image}
+                      alt={`图片 ${idx + 1}`}
+                      className="rounded-md w-full h-48 object-cover"
+                    />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )
+
+    case 'resource':
+      return (
+        <>
+          {/* 截图展示 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">预览截图</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              {item.screenshots && item.screenshots.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {item.screenshots.map((screenshot, idx) => (
+                    <img
+                      key={idx}
+                      src={screenshot}
+                      alt={`Screenshot ${idx + 1}`}
+                      className="rounded-md w-full h-48 object-cover"
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="text-sm">暂无预览截图</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 详细描述 */}
+          {item.description && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">详细介绍</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 content-container">
+                <div className="space-y-3 text-overflow-protection">
+                  {renderContent(item.description)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 系统要求 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">系统要求</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 content-container">
+              {item.requirements && item.requirements.length > 0 ? (
+                <ul className="space-y-2">
+                  {item.requirements.map((req, idx) => (
+                    <li key={idx} className="flex items-start text-sm">
+                      <CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                      <span className="text-overflow-protection">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="text-sm">暂无系统要求</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 文件列表 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">包含文件</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 content-container">
+              {item.files && item.files.length > 0 ? (
+                <div className="space-y-3">
+                  {item.files.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded border">
+                      <div className="flex items-center flex-1 min-w-0">
+                        <FileText size={16} className="text-blue-500 mr-2 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm text-overflow-protection truncate">{file.name}</div>
+                          <div className="text-xs text-muted-foreground">{file.type} • {file.size}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <span className="text-sm">暂无文件信息</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )
+
+    case 'announcement':
+      return (
+        <>
+          {/* 公告内容 */}
+          {item.content && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">公告内容</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 content-container">
+                <div className="space-y-3 text-overflow-protection">
+                  {renderContent(item.content)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* 有效期 */}
+          {item.validUntil && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center text-sm text-muted-foreground">
+                  <Calendar size={16} className="mr-2" />
+                  有效期至：{new Date(item.validUntil).toLocaleDateString('zh-CN')}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )
+
+    default:
+      return null
+  }
+}
+
+export default UniversalDetailScreen 

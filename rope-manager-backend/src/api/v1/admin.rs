@@ -324,6 +324,10 @@ pub fn configure_user_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/announcements")
             .service(
+                web::resource("/{id}")
+                    .route(web::get().to(get_public_announcement))
+            )
+            .service(
                 web::resource("/active")
                     .route(web::get().to(get_active_announcements))
             )
@@ -987,6 +991,30 @@ async fn get_active_announcements(
             "code": 0,
             "message": "success",
             "data": { "list": list }
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("获取公告失败: {}", e)
+        })))
+    }
+} 
+
+// 获取单个公告详情 (公开)
+async fn get_public_announcement(
+    path: web::Path<i32>,
+    admin_service: web::Data<AdminService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let announcement_id = path.into_inner();
+    
+    match admin_service.get_announcement_by_id(announcement_id).await {
+        Ok(Some(announcement)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": announcement
+        }))),
+        Ok(None) => Ok(HttpResponse::NotFound().json(json!({
+            "code": 404,
+            "message": "公告不存在"
         }))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
