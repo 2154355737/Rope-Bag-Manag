@@ -19,12 +19,22 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
 import CommentSection, { Comment } from '@/components/comment-section'
+import RelatedRecommendations from '@/components/related-recommendations'
+import InteractionButtons, { 
+  createLikeButton, 
+  createBookmarkButton, 
+  createShareButton, 
+  createReportButton 
+} from '@/components/ui/interaction-buttons'
+import { getResourceRecommendations } from '@/utils/recommendations'
 
 const ResourceDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [isLiked, setIsLiked] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
   
   // 模拟资源数据
   const resource = {
@@ -64,8 +74,9 @@ const ResourceDetailScreen: React.FC = () => {
     ],
     safetyStatus: 'verified'
   }
-  
 
+  // 获取相关推荐
+  const recommendedItems = getResourceRecommendations(resource.id, resource.tags)
   
   // 模拟评论数据（包含原评价内容）
   const comments: Comment[] = [
@@ -260,6 +271,44 @@ const ResourceDetailScreen: React.FC = () => {
     console.log('举报评论:', commentId)
   }
 
+  // 处理点赞
+  const handleLike = () => {
+    setIsLiked(!isLiked)
+    toast({
+      title: isLiked ? "已取消点赞" : "点赞成功",
+      description: isLiked ? "已取消对此资源的点赞" : "感谢您的支持",
+      duration: 2000,
+    })
+  }
+
+  // 处理收藏
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked)
+    toast({
+      title: isBookmarked ? "已取消收藏" : "收藏成功",
+      description: isBookmarked ? "已从收藏夹中移除" : "已添加到您的收藏夹",
+      duration: 2000,
+    })
+  }
+
+  // 处理分享
+  const handleShare = () => {
+    toast({
+      title: "分享链接已复制",
+      description: "可以分享给更多朋友了",
+      duration: 2000,
+    })
+  }
+
+  // 处理举报
+  const handleReport = () => {
+    toast({
+      title: "举报已提交",
+      description: "我们会尽快处理您的举报",
+      duration: 2000,
+    })
+  }
+
 
 
   return (
@@ -327,18 +376,18 @@ const ResourceDetailScreen: React.FC = () => {
               </div>
 
               {/* 统计信息 */}
-              <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="text-center">
-                  <div className="text-lg font-bold">{formatNumber(resource.downloadCount)}</div>
-                  <div className="text-xs text-muted-foreground">下载量</div>
+                  <div className="text-base font-bold">{formatNumber(resource.downloadCount)}</div>
+                  <div className="text-[10px] text-muted-foreground">下载量</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold">{formatNumber(resource.views)}</div>
-                  <div className="text-xs text-muted-foreground">浏览量</div>
+                  <div className="text-base font-bold">{formatNumber(resource.views)}</div>
+                  <div className="text-[10px] text-muted-foreground">浏览量</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold">{formatNumber(resource.likes)}</div>
-                  <div className="text-xs text-muted-foreground">点赞数</div>
+                  <div className="text-base font-bold">{formatNumber(resource.likes)}</div>
+                  <div className="text-[10px] text-muted-foreground">点赞数</div>
                 </div>
               </div>
 
@@ -479,28 +528,26 @@ const ResourceDetailScreen: React.FC = () => {
 
 
           {/* 操作按钮 */}
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-4 gap-2">
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Heart size={18} className="mb-1" />
-                  <span className="text-xs">点赞</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Share2 size={18} className="mb-1" />
-                  <span className="text-xs">分享</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Bookmark size={18} className="mb-1" />
-                  <span className="text-xs">收藏</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Flag size={18} className="mb-1" />
-                  <span className="text-xs">举报</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <InteractionButtons
+            buttons={[
+              createLikeButton(resource.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+              createShareButton(handleShare),
+              createBookmarkButton(undefined, isBookmarked, handleBookmark),
+              createReportButton(handleReport)
+            ]}
+            className="mb-4"
+            compact={true}
+          />
+
+          {/* 相关推荐 */}
+          <RelatedRecommendations
+            title="相关资源推荐"
+            items={recommendedItems}
+            currentItemId={resource.id}
+            maxItems={6}
+            className="mt-6"
+            onMoreClick={() => navigate('/category')}
+          />
 
           {/* 评论区 */}
           <CommentSection
@@ -513,7 +560,7 @@ const ResourceDetailScreen: React.FC = () => {
             placeholder="发表评论..."
             maxLength={200}
             initialCommentsToShow={5}
-            className="mt-4"
+            className="mt-6"
           />
         </div>
       </ScrollArea>

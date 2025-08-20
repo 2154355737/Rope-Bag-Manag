@@ -13,6 +13,14 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
 import CommentSection, { Comment } from '@/components/comment-section'
+import RelatedRecommendations from '@/components/related-recommendations'
+import InteractionButtons, { 
+  createLikeButton, 
+  createBookmarkButton, 
+  createShareButton, 
+  createReportButton 
+} from '@/components/ui/interaction-buttons'
+import { getPostRecommendations } from '@/utils/recommendations'
 
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -20,6 +28,8 @@ const PostDetailScreen: React.FC = () => {
   const [isLoadingComments, setIsLoadingComments] = useState(false)
   const [allComments, setAllComments] = useState<Comment[]>([])
   const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [isLiked, setIsLiked] = useState(false)
+  const [isBookmarked, setIsBookmarked] = useState(false)
   
   // 模拟帖子数据
   const post = {
@@ -285,6 +295,9 @@ async function fetchData() {
     return comments
   }
 
+  // 获取相关推荐
+  const recommendedItems = getPostRecommendations(post.id, post.tags)
+
   // 初始化评论数据
   React.useEffect(() => {
     console.log('初始化评论数据，数量:', initialComments.length)
@@ -343,6 +356,44 @@ async function fetchData() {
     if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
+  }
+
+  // 处理点赞
+  const handleLike = () => {
+    setIsLiked(!isLiked)
+    toast({
+      title: isLiked ? "已取消点赞" : "点赞成功",
+      description: isLiked ? "已取消对此帖子的点赞" : "感谢您的支持",
+      duration: 2000,
+    })
+  }
+
+  // 处理收藏
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked)
+    toast({
+      title: isBookmarked ? "已取消收藏" : "收藏成功",
+      description: isBookmarked ? "已从收藏夹中移除" : "已添加到您的收藏夹",
+      duration: 2000,
+    })
+  }
+
+  // 处理分享
+  const handleShare = () => {
+    toast({
+      title: "分享链接已复制",
+      description: "可以分享给更多朋友了",
+      duration: 2000,
+    })
+  }
+
+  // 处理举报
+  const handleReport = () => {
+    toast({
+      title: "举报已提交",
+      description: "我们会尽快处理您的举报",
+      duration: 2000,
+    })
   }
 
   return (
@@ -435,22 +486,22 @@ async function fetchData() {
               </div>
             </CardContent>
             
-            <CardFooter className="p-4 pt-3 border-t">
-              <div className="flex items-center text-muted-foreground text-xs space-x-4">
+            <CardFooter className="p-3 pt-2 border-t border-border/50">
+              <div className="flex items-center text-muted-foreground text-[10px] space-x-3">
                 <div className="flex items-center">
-                  <Calendar size={14} className="mr-1" />
+                  <Calendar size={10} className="mr-1" />
                   {post.publishDate}
                 </div>
                 <div className="flex items-center">
-                  <Eye size={14} className="mr-1" />
+                  <Eye size={10} className="mr-1" />
                   {formatNumber(post.views)}
                 </div>
                 <div className="flex items-center">
-                  <Heart size={14} className="mr-1" />
+                  <Heart size={10} className="mr-1" />
                   {formatNumber(post.likes)}
                 </div>
                 <div className="flex items-center">
-                  <MessageSquare size={14} className="mr-1" />
+                  <MessageSquare size={10} className="mr-1" />
                   {formatNumber(post.comments)}
                 </div>
               </div>
@@ -458,28 +509,26 @@ async function fetchData() {
           </Card>
 
           {/* 操作按钮 */}
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-4 gap-2">
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Heart size={18} className="mb-1" />
-                  <span className="text-xs">点赞</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Share2 size={18} className="mb-1" />
-                  <span className="text-xs">分享</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Bookmark size={18} className="mb-1" />
-                  <span className="text-xs">收藏</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Flag size={18} className="mb-1" />
-                  <span className="text-xs">举报</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <InteractionButtons
+            buttons={[
+              createLikeButton(post.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+              createShareButton(handleShare),
+              createBookmarkButton(undefined, isBookmarked, handleBookmark),
+              createReportButton(handleReport)
+            ]}
+            className="mb-4"
+            compact={true}
+          />
+
+          {/* 相关推荐 */}
+          <RelatedRecommendations
+            title="相关推荐"
+            items={recommendedItems}
+            currentItemId={post.id}
+            maxItems={6}
+            className="mt-6"
+            onMoreClick={() => navigate('/community')}
+          />
 
           {/* 评论区 */}
           <CommentSection
@@ -496,7 +545,7 @@ async function fetchData() {
             maxLength={200}
             initialCommentsToShow={5}
             pageSize={10}
-            className="mt-4"
+            className="mt-6"
           />
         </div>
       </ScrollArea>

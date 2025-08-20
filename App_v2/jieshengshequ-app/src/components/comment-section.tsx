@@ -123,15 +123,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const shouldShowMoreButton = !showAllComments && comments.length > initialCommentsToShow
   const shouldShowLoadMoreButton = showAllComments && hasMoreComments && onLoadMoreComments
 
-  // 调试信息
-  console.log('CommentSection 状态:', {
-    commentsLength: comments.length,
-    initialCommentsToShow,
-    showAllComments,
-    shouldShowMoreButton,
-    shouldShowLoadMoreButton,
-    displayedCommentsLength: displayedComments.length
-  })
+  // 调试信息 (开发环境)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('CommentSection 状态:', {
+      commentsLength: comments.length,
+      initialCommentsToShow,
+      showAllComments,
+      shouldShowMoreButton,
+      shouldShowLoadMoreButton,
+      displayedCommentsLength: displayedComments.length
+    })
+  }
 
   // 提交评论
   const handleSubmitComment = () => {
@@ -238,36 +240,36 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                 {comment.content}
               </p>
               
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5">
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className={`h-6 px-2 text-xs ${comment.isLiked ? 'text-primary' : 'text-muted-foreground'}`}
+                  variant={comment.isLiked ? "like-active" : "like"} 
+                  size="compact" 
+                  className="text-[10px]"
                   onClick={() => handleLikeComment(comment.id)}
                 >
-                  <ThumbsUp size={12} className="mr-1" /> 
+                  <ThumbsUp size={10} className="mr-0.5" /> 
                   {comment.likes}
                 </Button>
                 
                 {!isReply && (
                   <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-6 px-2 text-xs text-muted-foreground"
+                    variant="minimal" 
+                    size="compact" 
+                    className="text-[10px]"
                     onClick={() => setShowReplyInput(showReplyInput === comment.id ? null : comment.id)}
                   >
-                    <MessageSquare size={12} className="mr-1" /> 
+                    <MessageSquare size={10} className="mr-0.5" /> 
                     回复
                   </Button>
                 )}
                 
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 px-2 text-xs text-muted-foreground"
+                  variant="report" 
+                  size="compact" 
+                  className="text-[10px]"
                   onClick={() => handleReportComment(comment.id)}
                 >
-                  <Flag size={12} className="mr-1" /> 
+                  <Flag size={10} className="mr-0.5" /> 
                   举报
                 </Button>
               </div>
@@ -354,10 +356,12 @@ const CommentSection: React.FC<CommentSectionProps> = ({
               {comments.reduce((acc, comment) => acc + (comment.replies?.length || 0), 0)} 条回复
             </span>
           )}
-          {/* 调试信息 */}
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-            显示: {displayedComments.length}/{comments.length}
-          </span>
+          {/* 调试信息 (仅开发环境显示) */}
+          {process.env.NODE_ENV === 'development' && (
+            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+              显示: {displayedComments.length}/{comments.length}
+            </span>
+          )}
         </div>
       </div>
 

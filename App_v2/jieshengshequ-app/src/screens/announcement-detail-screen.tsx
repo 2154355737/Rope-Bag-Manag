@@ -17,6 +17,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
 import CommentSection, { Comment } from '@/components/comment-section'
+import RelatedRecommendations from '@/components/related-recommendations'
+import InteractionButtons, { 
+  createThumbsUpButton, 
+  createBookmarkButton, 
+  createShareButton, 
+  createReportButton 
+} from '@/components/ui/interaction-buttons'
+import { getAnnouncementRecommendations } from '@/utils/recommendations'
 
 const AnnouncementDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -109,6 +117,9 @@ const AnnouncementDetailScreen: React.FC = () => {
       }
     ]
   }
+
+  // 获取相关推荐
+  const recommendedItems = getAnnouncementRecommendations(announcement.id, announcement.tags)
 
   // 模拟评论数据
   const comments: Comment[] = [
@@ -307,6 +318,24 @@ const AnnouncementDetailScreen: React.FC = () => {
 
   const handleReportComment = (commentId: number) => {
     console.log('举报评论:', commentId)
+  }
+
+  // 处理分享
+  const handleShare = () => {
+    toast({
+      title: "分享链接已复制",
+      description: "可以分享给更多朋友了",
+      duration: 2000,
+    })
+  }
+
+  // 处理举报
+  const handleReport = () => {
+    toast({
+      title: "举报已提交",
+      description: "我们会尽快处理您的举报",
+      duration: 2000,
+    })
   }
 
   const announcementStyle = getAnnouncementStyle(announcement.type)
@@ -546,66 +575,44 @@ const AnnouncementDetailScreen: React.FC = () => {
 
           {/* 统计信息 */}
           <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-3 gap-4 text-center">
+            <CardContent className="p-3">
+              <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
                   <div className="flex items-center justify-center mb-1">
-                    <Eye size={16} className="text-muted-foreground mr-1" />
+                    <Eye size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-lg font-bold">{formatNumber(announcement.views)}</div>
-                  <div className="text-xs text-muted-foreground">浏览量</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.views)}</div>
+                  <div className="text-[10px] text-muted-foreground">浏览量</div>
                 </div>
                 <div>
                   <div className="flex items-center justify-center mb-1">
-                    <ThumbsUp size={16} className="text-muted-foreground mr-1" />
+                    <ThumbsUp size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-lg font-bold">{formatNumber(announcement.likes)}</div>
-                  <div className="text-xs text-muted-foreground">点赞数</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.likes)}</div>
+                  <div className="text-[10px] text-muted-foreground">点赞数</div>
                 </div>
                 <div>
                   <div className="flex items-center justify-center mb-1">
-                    <MessageSquare size={16} className="text-muted-foreground mr-1" />
+                    <MessageSquare size={12} className="text-muted-foreground mr-1" />
                   </div>
-                  <div className="text-lg font-bold">{formatNumber(announcement.comments)}</div>
-                  <div className="text-xs text-muted-foreground">评论数</div>
+                  <div className="text-base font-bold">{formatNumber(announcement.comments)}</div>
+                  <div className="text-[10px] text-muted-foreground">评论数</div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* 操作按钮 */}
-          <Card className="mb-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-4 gap-2">
-                <Button 
-                  variant={isLiked ? "default" : "ghost"} 
-                  size="sm" 
-                  className="flex flex-col items-center p-2"
-                  onClick={handleLike}
-                >
-                  <ThumbsUp size={18} className="mb-1" />
-                  <span className="text-xs">点赞</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Share2 size={18} className="mb-1" />
-                  <span className="text-xs">分享</span>
-                </Button>
-                <Button 
-                  variant={isBookmarked ? "default" : "ghost"} 
-                  size="sm" 
-                  className="flex flex-col items-center p-2"
-                  onClick={handleBookmark}
-                >
-                  <Bookmark size={18} className="mb-1" />
-                  <span className="text-xs">收藏</span>
-                </Button>
-                <Button variant="ghost" size="sm" className="flex flex-col items-center p-2">
-                  <Flag size={18} className="mb-1" />
-                  <span className="text-xs">举报</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <InteractionButtons
+            buttons={[
+              createThumbsUpButton(announcement.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+              createShareButton(handleShare),
+              createBookmarkButton(undefined, isBookmarked, handleBookmark),
+              createReportButton(handleReport)
+            ]}
+            className="mb-4"
+            compact={true}
+          />
 
           {/* 重要提醒 */}
           <Alert className="mb-4">
@@ -616,6 +623,17 @@ const AnnouncementDetailScreen: React.FC = () => {
           </Alert>
         </div>
       </ScrollArea>
+
+      {/* 相关推荐 */}
+      <div className="p-4">
+        <RelatedRecommendations
+          title="相关公告推荐"
+          items={recommendedItems}
+          currentItemId={announcement.id}
+          maxItems={6}
+          onMoreClick={() => navigate('/home')}
+        />
+      </div>
 
       {/* 评论区 */}
       <div className="p-4">
