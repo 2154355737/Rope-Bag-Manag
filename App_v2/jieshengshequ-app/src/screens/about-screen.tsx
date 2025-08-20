@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Code, Heart, Users, Zap, Shield, Globe, Star, ExternalLink, Github, Mail, Award, Calendar, Download, Smartphone } from 'lucide-react'
+import { Code, Heart, Users, Zap, Shield, Globe, Star, ExternalLink, Github, Mail, Award, Calendar, Download, Smartphone } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from '@/hooks/use-toast'
+import TopNavigation from '@/components/ui/top-navigation'
 
 const AboutScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -111,23 +112,16 @@ const AboutScreen: React.FC = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* 头部导航 */}
-              <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-sm border-b">
-        <div className="flex items-center justify-between p-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">关于应用</h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="flex flex-col min-h-screen bg-background pb-16">
+      {/* 顶部导航 */}
+      <TopNavigation
+        title="关于应用"
+        showBackButton
+        onBackClick={() => navigate(-1)}
+      />
 
-      <div className="container max-w-2xl mx-auto p-4 space-y-6">
+      <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        <div className="container max-w-2xl mx-auto p-4 space-y-6">
         {/* 应用信息 */}
         <Card>
           <CardContent className="p-6 text-center">
@@ -395,6 +389,7 @@ const AboutScreen: React.FC = () => {
 
         {/* 底部安全区域 */}
         <div className="h-8" />
+        </div>
       </div>
     </div>
   )

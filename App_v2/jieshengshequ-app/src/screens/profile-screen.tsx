@@ -335,16 +335,16 @@ END:VCARD`
         status: 'rejected' as const,
       },
       {
-        id: 5,
-        title: 'React Native组件集合',
+        id: 6,
+        title: 'Vue.js工具集合',
         image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
         likes: 0,
         downloads: 0,
         status: 'rejected' as const,
       },
       {
-        id: 5,
-        title: 'React Native组件集合',
+        id: 7,
+        title: 'TypeScript开发套件',
         image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
         likes: 0,
         downloads: 0,
@@ -371,7 +371,7 @@ END:VCARD`
         status: 'pending' as const,
       },
       {
-        id: 6,
+        id: 8,
         title: '结绳语言最佳实践分享',
         image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=500&auto=format&fit=crop&q=60',
         author: '程序员小王',
@@ -382,7 +382,7 @@ END:VCARD`
     ],
     comments: [
       {
-        id: 5,
+        id: 9,
         postTitle: '结绳语言新手入门指南',
         content: '这个教程写得很详细，对新手很友好！',
         author: '张三',
@@ -390,7 +390,7 @@ END:VCARD`
         time: '2小时前',
       },
       {
-        id: 6,
+        id: 10,
         postTitle: 'Capacitor跨平台开发实践',
         content: '感谢分享，解决了我的问题',
         author: '李四',

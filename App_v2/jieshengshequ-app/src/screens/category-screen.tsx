@@ -10,9 +10,14 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import TopNavigation from '@/components/ui/top-navigation'
+import { useNavigation } from '@/contexts/NavigationContext'
 
 const CategoryScreen: React.FC = () => {
+  const { getActiveTab, setActiveTab } = useNavigation()
   const [activeCategory, setActiveCategory] = useState('all')
+  
+  // 获取当前活跃的显示模式
+  const activeDisplayMode = getActiveTab('category', 'grid')
   
   const categories = [
     { id: 'all', name: '全部' },
@@ -158,7 +163,7 @@ const CategoryScreen: React.FC = () => {
 
       {/* 内容标签页 */}
       <div className="p-4 flex-1">
-        <Tabs defaultValue="grid" className="w-full">
+        <Tabs value={activeDisplayMode} onValueChange={(value) => setActiveTab('category', value)} className="w-full">
           <div className="flex justify-between items-center mb-4">
             <span className="text-sm text-muted-foreground">共 {resources.length} 个资源</span>
             <TabsList>

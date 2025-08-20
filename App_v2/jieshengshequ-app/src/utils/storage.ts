@@ -9,7 +9,7 @@ const STORAGE_KEYS = {
   THEME: 'jieshengshequ_theme',
 } as const
 
-export class StorageManager {
+export default class StorageManager {
   /**
    * 检查是否是首次启动
    */
@@ -137,6 +137,51 @@ export class StorageManager {
       console.warn('无法清除应用数据:', error)
     }
   }
-}
 
-export default StorageManager 
+  // 导航状态管理
+  static saveNavigationState(state: { [key: string]: any }) {
+    try {
+      localStorage.setItem('app_navigation_state', JSON.stringify(state))
+    } catch (error) {
+      console.warn('保存导航状态失败:', error)
+    }
+  }
+
+  static getNavigationState(): { [key: string]: any } {
+    try {
+      const state = localStorage.getItem('app_navigation_state')
+      return state ? JSON.parse(state) : {}
+    } catch (error) {
+      console.warn('获取导航状态失败:', error)
+      return {}
+    }
+  }
+
+  static saveActiveTab(page: string, tab: string) {
+    try {
+      const state = this.getNavigationState()
+      state[`${page}_active_tab`] = tab
+      this.saveNavigationState(state)
+    } catch (error) {
+      console.warn('保存活跃标签失败:', error)
+    }
+  }
+
+  static getActiveTab(page: string, defaultTab: string = 'home'): string {
+    try {
+      const state = this.getNavigationState()
+      return state[`${page}_active_tab`] || defaultTab
+    } catch (error) {
+      console.warn('获取活跃标签失败:', error)
+      return defaultTab
+    }
+  }
+
+  static clearNavigationState() {
+    try {
+      localStorage.removeItem('app_navigation_state')
+    } catch (error) {
+      console.warn('清除导航状态失败:', error)
+    }
+  }
+} 

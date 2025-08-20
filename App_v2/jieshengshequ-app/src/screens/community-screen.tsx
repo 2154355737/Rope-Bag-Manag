@@ -9,9 +9,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import TopNavigation from '@/components/ui/top-navigation'
+import { useNavigation } from '@/contexts/NavigationContext'
 
 const CommunityScreen: React.FC = () => {
+  const { getActiveTab, setActiveTab } = useNavigation()
   const [activeTag, setActiveTag] = useState('all')
+  
+  // 获取当前活跃的标签页
+  const activeTab = getActiveTab('community', 'all')
   
   const tags = [
     { id: 'all', name: '全部' },
@@ -122,7 +127,7 @@ const CommunityScreen: React.FC = () => {
 
       {/* 内容标签页 */}
       <div className="p-4 flex-1">
-        <Tabs defaultValue="all" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab('community', value)} className="w-full">
           <TabsList className="grid grid-cols-3 mb-4">
             <TabsTrigger value="all">全部</TabsTrigger>
             <TabsTrigger value="following">关注</TabsTrigger>

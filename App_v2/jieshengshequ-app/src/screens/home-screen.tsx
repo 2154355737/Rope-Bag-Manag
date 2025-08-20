@@ -9,12 +9,17 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TopNavigation from '@/components/ui/top-navigation'
+import { useNavigation } from '@/contexts/NavigationContext'
 
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate()
+  const { getActiveTab, setActiveTab } = useNavigation()
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [isDropdownInteracting, setIsDropdownInteracting] = useState(false)
+  
+  // 获取当前活跃的标签页
+  const activeTab = getActiveTab('home', 'home')
 
   // 格式化日期显示
   const formatDate = (dateString: string) => {
@@ -279,7 +284,7 @@ const HomeScreen: React.FC = () => {
 
       {/* 内容标签页 */}
       <div className="px-4 flex-1">
-        <Tabs defaultValue="home" className="w-full">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab('home', value)} className="w-full">
           <TabsList className="grid grid-cols-3 mb-4">
             <TabsTrigger value="posts">帖子</TabsTrigger>
             <TabsTrigger value="home">首页</TabsTrigger>

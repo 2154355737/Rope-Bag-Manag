@@ -27,6 +27,7 @@ import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
 import { initializeSafeArea, setSafeAreaTheme, setSafeAreaDebug } from './utils/safeAreaManager'
 import StorageManager from './utils/storage'
+import { NavigationProvider } from './contexts/NavigationContext'
 
 import './styles/safe-area-v2.css'
 
@@ -64,6 +65,12 @@ const App: React.FC = () => {
         console.log(`📱 应用启动信息:`)
         console.log(`   - 是否首次启动: ${isFirstLaunch}`)
         console.log(`   - 启动次数: ${launchCount}`)
+        
+        // 仅在首次启动时重置导航状态
+        if (isFirstLaunch) {
+          console.log('🔄 首次启动，重置导航状态')
+          StorageManager.clearNavigationState()
+        }
         
         setShowOnboarding(isFirstLaunch)
         setIsInitialized(true)
@@ -112,7 +119,7 @@ const App: React.FC = () => {
 
   // 主应用界面
   return (
-    <>
+    <NavigationProvider>
       <BackButtonHandler />
       <Routes>
           <Route path="/" element={<Layout />}>
@@ -140,8 +147,7 @@ const App: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
           <Route path="/terms" element={<TermsScreen />} />
       </Routes>
-      
-    </>
+    </NavigationProvider>
   )
 }
 

@@ -104,29 +104,46 @@ const MessagesScreen: React.FC = () => {
     const [dragX, setDragX] = useState(0)
     const [showDelete, setShowDelete] = useState(false)
     const [showPin, setShowPin] = useState(false)
+    const [isDragging, setIsDragging] = useState(false)
+
+    const handleDragStart = () => {
+      setIsDragging(true)
+    }
 
     const handleDrag = (event: any, info: PanInfo) => {
-      const newX = Math.max(-80, Math.min(80, info.offset.x))
+      // 增加拖拽阻力，减少灵敏度
+      const resistance = 0.7
+      const newX = Math.max(-100, Math.min(100, info.offset.x * resistance))
       setDragX(newX)
-      setShowDelete(newX < -40)
-      setShowPin(newX > 40)
+      
+      // 提高显示按钮的阈值
+      setShowDelete(newX < -60)
+      setShowPin(newX > 60)
     }
 
     const handleDragEnd = (event: any, info: PanInfo) => {
-      if (info.offset.x < -60) {
-        // 左滑超过60px，显示删除按钮
-        setDragX(-80)
+      setIsDragging(false)
+      const velocity = info.velocity.x
+      const offset = info.offset.x
+      
+      // 提高触发阈值，并考虑滑动速度
+      const deleteThreshold = velocity < -500 ? -50 : -80  // 快速滑动时降低阈值
+      const pinThreshold = velocity > 500 ? 50 : 80
+      
+      if (offset < deleteThreshold) {
+        // 左滑触发删除
+        setDragX(-100)
         setShowDelete(true)
         setShowPin(false)
         onActivate(conversation.id)
-      } else if (info.offset.x > 60) {
-        // 右滑超过60px，显示置顶按钮
-        setDragX(80)
+      } else if (offset > pinThreshold) {
+        // 右滑触发置顶
+        setDragX(100)
         setShowPin(true)
         setShowDelete(false)
         onActivate(conversation.id)
       } else {
-        // 回弹
+        // 回弹到原位
         setDragX(0)
         setShowDelete(false)
         setShowPin(false)
@@ -169,9 +186,9 @@ const MessagesScreen: React.FC = () => {
       <div className="relative overflow-hidden">
         {/* 置顶按钮背景 */}
         <div 
-          className={`absolute inset-y-0 left-0 w-20 ${
+          className={`absolute inset-y-0 left-0 w-24 ${
             conversation.pinned ? 'bg-orange-500' : 'bg-blue-500'
-          } flex items-center justify-center transition-opacity duration-200 ${
+          } flex items-center justify-center transition-all duration-300 ease-out ${
             showPin ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -187,7 +204,7 @@ const MessagesScreen: React.FC = () => {
 
         {/* 删除按钮背景 */}
         <div 
-          className={`absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center transition-opacity duration-200 ${
+          className={`absolute inset-y-0 right-0 w-24 bg-red-500 flex items-center justify-center transition-all duration-300 ease-out ${
             showDelete ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -204,16 +221,32 @@ const MessagesScreen: React.FC = () => {
         {/* 可滑动的对话卡片 */}
         <motion.div
           drag="x"
-          dragConstraints={{ left: -80, right: 80 }}
-          dragElastic={0.1}
+          dragConstraints={{ left: -100, right: 100 }}
+          dragElastic={0.05}  // 降低弹性，减少抖动
+          dragMomentum={false}  // 禁用拖拽惯性，提高控制性
+          dragDirectionLock={true}  // 锁定拖拽方向，避免意外滑动
+          onDragStart={handleDragStart}
           onDrag={handleDrag}
           onDragEnd={handleDragEnd}
           animate={{ x: dragX }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          transition={{ 
+            type: "spring", 
+            stiffness: 400,  // 提高刚度，减少弹跳
+            damping: 40,     // 增加阻尼，减少振动
+            mass: 0.8        // 降低质量，提高响应速度
+          }}
           className="relative z-10"
         >
           <Card className="m-2 cursor-pointer hover:bg-muted/50 transition-colors border-none">
-            <CardContent className="p-4" onClick={resetPosition}>
+            <CardContent 
+              className="p-4" 
+              onClick={(e) => {
+                // 防止拖拽时触发点击
+                if (!isDragging) {
+                  resetPosition()
+                }
+              }}
+            >
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <Avatar>
