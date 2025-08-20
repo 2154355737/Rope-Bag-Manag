@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Send, ThumbsUp, MessageSquare, Flag, MoreHorizontal, Star
+  Send, ThumbsUp, MessageSquare, Flag, MoreHorizontal, Star, ChevronDown, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,10 +32,15 @@ interface CommentSectionProps {
   onSubmitReply?: (commentId: number, content: string) => void
   onLikeComment?: (commentId: number) => void
   onReportComment?: (commentId: number) => void
+  onLoadMoreComments?: (page: number) => Promise<Comment[]>
   placeholder?: string
   maxLength?: number
   className?: string
   showReplyCount?: boolean
+  pageSize?: number
+  initialCommentsToShow?: number
+  hasMoreComments?: boolean
+  isLoadingComments?: boolean
 }
 
 const CommentSection: React.FC<CommentSectionProps> = ({
@@ -45,15 +50,88 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   onSubmitReply,
   onLikeComment,
   onReportComment,
+  onLoadMoreComments,
   placeholder = "发表评论...",
   maxLength = 200,
   className = "",
-  showReplyCount = true
+  showReplyCount = true,
+  pageSize = 10,
+  initialCommentsToShow = 5,
+  hasMoreComments = false,
+  isLoadingComments = false
 }) => {
   const [commentText, setCommentText] = useState('')
   const [replyText, setReplyText] = useState('')
   const [showReplyInput, setShowReplyInput] = useState<number | null>(null)
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set())
+  const [displayedComments, setDisplayedComments] = useState<Comment[]>([])
+  const [showAllComments, setShowAllComments] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  // 初始化显示的评论
+  useEffect(() => {
+    if (comments.length === 0) {
+      setDisplayedComments([])
+      setShowAllComments(false)
+      return
+    }
+
+    // 初始只显示指定数量的评论
+    if (!showAllComments) {
+      setDisplayedComments(comments.slice(0, initialCommentsToShow))
+    } else {
+      setDisplayedComments(comments)
+    }
+  }, [comments, showAllComments, initialCommentsToShow])
+
+  // 加载更多评论
+  const handleLoadMoreComments = async () => {
+    if (isLoadingMore || !onLoadMoreComments) return
+
+    setIsLoadingMore(true)
+    try {
+      const nextPage = currentPage + 1
+      const newComments = await onLoadMoreComments(nextPage)
+      
+      if (newComments.length > 0) {
+        setDisplayedComments(prev => [...prev, ...newComments])
+        setCurrentPage(nextPage)
+      }
+    } catch (error) {
+      toast({
+        title: "加载失败",
+        description: "评论加载失败，请重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
+  // 展开显示所有已有的评论
+  const handleShowMoreComments = () => {
+    if (comments.length <= initialCommentsToShow) return
+    
+    if (!showAllComments) {
+      setDisplayedComments(comments)
+      setShowAllComments(true)
+    }
+  }
+
+  // 计算是否需要显示"查看更多"按钮  
+  const shouldShowMoreButton = !showAllComments && comments.length > initialCommentsToShow
+  const shouldShowLoadMoreButton = showAllComments && hasMoreComments && onLoadMoreComments
+
+  // 调试信息
+  console.log('CommentSection 状态:', {
+    commentsLength: comments.length,
+    initialCommentsToShow,
+    showAllComments,
+    shouldShowMoreButton,
+    shouldShowLoadMoreButton,
+    displayedCommentsLength: displayedComments.length
+  })
 
   // 提交评论
   const handleSubmitComment = () => {
@@ -270,11 +348,17 @@ const CommentSection: React.FC<CommentSectionProps> = ({
         <h3 className="text-lg font-medium">
           评论 {totalCount !== undefined ? `(${totalCount})` : `(${comments.length})`}
         </h3>
-        {showReplyCount && comments.length > 0 && (
-          <span className="text-sm text-muted-foreground">
-            {comments.reduce((acc, comment) => acc + (comment.replies?.length || 0), 0)} 条回复
+        <div className="flex items-center gap-2">
+          {showReplyCount && comments.length > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {comments.reduce((acc, comment) => acc + (comment.replies?.length || 0), 0)} 条回复
+            </span>
+          )}
+          {/* 调试信息 */}
+          <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+            显示: {displayedComments.length}/{comments.length}
           </span>
-        )}
+        </div>
       </div>
 
       {/* 评论输入框 */}
@@ -324,7 +408,111 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             </CardContent>
           </Card>
         ) : (
-          comments.map((comment) => renderComment(comment))
+          <>
+            <AnimatePresence mode="popLayout">
+              {displayedComments.map((comment) => renderComment(comment))}
+            </AnimatePresence>
+
+            {/* 查看更多评论按钮 */}
+            {shouldShowMoreButton && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex justify-center pt-4"
+              >
+                <Button
+                  variant="outline"
+                  onClick={handleShowMoreComments}
+                  className="group hover:bg-primary/5 transition-colors"
+                  disabled={isLoadingComments}
+                >
+                  <ChevronDown size={16} className="mr-2 group-hover:animate-bounce transition-transform" />
+                  查看更多评论 ({comments.length - initialCommentsToShow} 条)
+                </Button>
+              </motion.div>
+            )}
+
+            {/* 加载更多评论按钮 */}
+            {shouldShowLoadMoreButton && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center pt-4"
+              >
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-border to-transparent mb-4" />
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMoreComments}
+                  disabled={isLoadingMore || isLoadingComments}
+                  className="group hover:bg-primary/5 transition-colors min-w-32"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                      加载中...
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={16} className="mr-2 group-hover:animate-bounce transition-transform" />
+                      加载更多评论
+                    </>
+                  )}
+                </Button>
+                <div className="text-xs text-muted-foreground mt-2">
+                  {hasMoreComments ? '还有更多精彩评论' : ''}
+                </div>
+              </motion.div>
+            )}
+
+            {/* 加载状态指示器 */}
+            {isLoadingComments && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex justify-center py-6"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 size={20} className="animate-spin text-primary" />
+                    <span className="text-sm">正在加载评论...</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <motion.div
+                        key={i}
+                        className="w-2 h-2 bg-primary/30 rounded-full"
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [0.3, 1, 0.3]
+                        }}
+                        transition={{
+                          duration: 1,
+                          repeat: Infinity,
+                          delay: i * 0.2
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* 无更多评论提示 */}
+            {showAllComments && !hasMoreComments && comments.length > initialCommentsToShow && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center py-6"
+              >
+                <div className="w-full h-px bg-gradient-to-r from-transparent via-border to-transparent mb-4" />
+                <div className="text-center text-muted-foreground">
+                  <MessageSquare size={24} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">已显示全部评论</p>
+                  <p className="text-xs mt-1">感谢大家的热情参与 🎉</p>
+                </div>
+              </motion.div>
+            )}
+          </>
         )}
       </div>
     </div>

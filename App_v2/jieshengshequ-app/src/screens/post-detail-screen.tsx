@@ -17,6 +17,9 @@ import CommentSection, { Comment } from '@/components/comment-section'
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
+  const [allComments, setAllComments] = useState<Comment[]>([])
+  const [hasMoreComments, setHasMoreComments] = useState(true)
   
   // 模拟帖子数据
   const post = {
@@ -43,14 +46,14 @@ async function fetchData() {
 }`,
     tags: ['移动开发', '项目分享', '经验总结', '踩坑记录', '结绳实战'],
     likes: 78,
-    comments: 23,
+    comments: 156, // 增加评论总数以演示分页
     views: 1250,
     time: '昨天 14:30',
     publishDate: '2025-01-14',
   }
   
-  // 模拟评论数据
-  const comments: Comment[] = [
+  // 模拟初始评论数据（第一页）
+  const initialComments: Comment[] = [
     {
       id: 1,
       author: {
@@ -121,8 +124,190 @@ async function fetchData() {
           isLiked: false,
         }
       ]
+    },
+    {
+      id: 4,
+      author: {
+        name: '小明',
+        avatar: 'https://i.pravatar.cc/150?img=5',
+      },
+      content: '这个教程写得很详细，我按照步骤实现了一个简单的应用，效果不错！',
+      time: '今天 09:15',
+      likes: 15,
+      isLiked: false,
+      replies: []
+    },
+    {
+      id: 5,
+      author: {
+        name: '开发者小李',
+        avatar: 'https://i.pravatar.cc/150?img=6',
+      },
+      content: '能否分享一下你在项目中使用的第三方库？我正在选择合适的组件库。',
+      time: '今天 10:30',
+      likes: 7,
+      isLiked: true,
+      replies: [
+        {
+          id: 501,
+          author: {
+            name: '王五',
+            avatar: 'https://i.pravatar.cc/150?img=3',
+          },
+          content: '我主要使用了 UI Kit 和 Animation Library，都很好用。',
+          time: '今天 11:00',
+          likes: 4,
+          isLiked: false,
+        }
+      ]
+    },
+    {
+      id: 6,
+      author: {
+        name: '程序小白',
+        avatar: 'https://i.pravatar.cc/150?img=7',
+      },
+      content: '刚开始学编程，这个教程对我来说有些深度，但还是学到了很多。希望有更多基础入门的内容。',
+      time: '今天 12:15',
+      likes: 9,
+      isLiked: false,
+      replies: []
+    },
+    {
+      id: 7,
+      author: {
+        name: '资深开发者',
+        avatar: 'https://i.pravatar.cc/150?img=8',
+      },
+      content: '作者提到的性能优化技巧很实用，特别是关于内存管理的部分。我在生产环境中也遇到过类似问题。',
+      time: '今天 13:45',
+      likes: 25,
+      isLiked: true,
+      replies: [
+        {
+          id: 701,
+          author: {
+            name: '王五',
+            avatar: 'https://i.pravatar.cc/150?img=3',
+          },
+          content: '能分享一下你在生产环境中的具体解决方案吗？',
+          time: '今天 14:00',
+          likes: 6,
+          isLiked: false,
+        }
+      ]
+    },
+    {
+      id: 8,
+      author: {
+        name: '前端攻城狮',
+        avatar: 'https://i.pravatar.cc/150?img=9',
+      },
+      content: '结绳语言在移动端的表现确实不错，我们团队也在考虑迁移到这个技术栈。请问有推荐的学习路径吗？',
+      time: '今天 15:30',
+      likes: 14,
+      isLiked: false,
+      replies: []
+    },
+    {
+      id: 9,
+      author: {
+        name: '技术爱好者',
+        avatar: 'https://i.pravatar.cc/150?img=10',
+      },
+      content: '感谢分享！特别是关于调试工具的介绍，之前一直不知道有这么好用的功能。',
+      time: '今天 16:20',
+      likes: 8,
+      isLiked: true,
+      replies: []
+    },
+    {
+      id: 10,
+      author: {
+        name: '学习中的菜鸟',
+        avatar: 'https://i.pravatar.cc/150?img=11',
+      },
+      content: '代码示例很清晰，我照着敲了一遍，确实帮助理解。希望能看到更多这样的实战案例。',
+      time: '今天 17:10',
+      likes: 11,
+      isLiked: false,
+      replies: [
+        {
+          id: 1001,
+          author: {
+            name: '张三',
+            avatar: 'https://i.pravatar.cc/150?img=1',
+          },
+          content: '我也是这样学习的，实践出真知！',
+          time: '今天 17:30',
+          likes: 3,
+          isLiked: false,
+        }
+      ]
     }
   ]
+
+  // 模拟分页加载评论数据
+  const generateMockComments = (page: number): Comment[] => {
+    const comments: Comment[] = []
+    const startId = (page - 1) * 10 + 100 // 从ID 100开始生成新评论
+    
+    for (let i = 0; i < 10; i++) {
+      const commentId = startId + i
+      const authorIndex = (commentId % 8) + 1
+      
+      comments.push({
+        id: commentId,
+        author: {
+          name: `用户${commentId}`,
+          avatar: `https://i.pravatar.cc/150?img=${authorIndex}`,
+        },
+        content: `这是第${page}页的第${i + 1}条评论。感谢作者的精彩分享，我从中学到了很多有用的知识和技巧！`,
+        time: `${Math.floor(Math.random() * 24)}小时前`,
+        likes: Math.floor(Math.random() * 20),
+        isLiked: Math.random() > 0.7,
+        replies: Math.random() > 0.8 ? [
+          {
+            id: commentId * 10 + 1,
+            author: {
+              name: `回复者${commentId}`,
+              avatar: `https://i.pravatar.cc/150?img=${(authorIndex % 8) + 1}`,
+            },
+            content: `对评论${commentId}的回复，很有道理！`,
+            time: `${Math.floor(Math.random() * 12)}小时前`,
+            likes: Math.floor(Math.random() * 5),
+            isLiked: Math.random() > 0.8,
+          }
+        ] : []
+      })
+    }
+    
+    return comments
+  }
+
+  // 初始化评论数据
+  React.useEffect(() => {
+    console.log('初始化评论数据，数量:', initialComments.length)
+    setAllComments(initialComments)
+  }, [])
+
+  // 模拟分页加载评论
+  const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
+    setIsLoadingComments(true)
+    
+    // 模拟网络延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    const newComments = generateMockComments(page)
+    
+    // 模拟没有更多评论的情况（假设总共有15页）
+    if (page >= 15) {
+      setHasMoreComments(false)
+    }
+    
+    setIsLoadingComments(false)
+    return newComments
+  }
 
   // 评论区事件处理
   const handleSubmitComment = (content: string) => {
@@ -298,14 +483,19 @@ async function fetchData() {
 
           {/* 评论区 */}
           <CommentSection
-            comments={comments}
+            comments={allComments}
             totalCount={post.comments}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
             onLikeComment={handleLikeComment}
             onReportComment={handleReportComment}
+            onLoadMoreComments={handleLoadMoreComments}
+            hasMoreComments={hasMoreComments}
+            isLoadingComments={isLoadingComments}
             placeholder="发表评论..."
             maxLength={200}
+            initialCommentsToShow={5}
+            pageSize={10}
             className="mt-4"
           />
         </div>

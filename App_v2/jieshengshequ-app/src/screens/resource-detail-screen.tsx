@@ -126,6 +126,71 @@ const ResourceDetailScreen: React.FC = () => {
       time: '3天前',
       likes: 12,
       isLiked: false,
+    },
+    {
+      id: 5,
+      author: {
+        name: '程序员小张',
+        avatar: 'https://i.pravatar.cc/150?img=5',
+      },
+      content: '这个组件库真的太好用了！集成简单，样式美观，强烈推荐给所有前端开发者。',
+      time: '昨天',
+      likes: 28,
+      isLiked: true,
+      rating: 5,
+      helpful: 15
+    },
+    {
+      id: 6,
+      author: {
+        name: 'React爱好者',
+        avatar: 'https://i.pravatar.cc/150?img=6',
+      },
+      content: '文档写得很清楚，示例代码也很实用。唯一的建议是希望能提供更多的使用场景案例。',
+      time: '昨天',
+      likes: 18,
+      isLiked: false,
+      rating: 4,
+      helpful: 12
+    },
+    {
+      id: 7,
+      author: {
+        name: '全栈工程师',
+        avatar: 'https://i.pravatar.cc/150?img=7',
+      },
+      content: '很好的资源包！TypeScript类型定义完善，对开发体验的提升很大。',
+      time: '2天前',
+      likes: 22,
+      isLiked: true,
+      rating: 5,
+      helpful: 18,
+      replies: [
+        {
+          id: 701,
+          author: {
+            name: '前端新手',
+            avatar: 'https://i.pravatar.cc/150?img=8',
+          },
+          content: '作为新手，这个资源包帮了我很大忙！',
+          time: '1天前',
+          likes: 5,
+          isLiked: false,
+        }
+      ]
+    },
+    {
+      id: 8,
+      author: {
+        name: '移动端开发',
+        avatar: 'https://i.pravatar.cc/150?img=9',
+      },
+      content: '移动端适配做得很好，响应式设计很赞。期待看到更多移动端专用组件。',
+      time: '3天前',
+      likes: 16,
+      isLiked: false,
+      rating: 4,
+      helpful: 10
     }
   ]
 
@@ -447,6 +512,7 @@ const ResourceDetailScreen: React.FC = () => {
             onReportComment={handleReportComment}
             placeholder="发表评论..."
             maxLength={200}
+            initialCommentsToShow={5}
             className="mt-4"
           />
         </div>

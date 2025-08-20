@@ -147,6 +147,75 @@ const AnnouncementDetailScreen: React.FC = () => {
       time: '3小时前',
       likes: 8,
       isLiked: false,
+    },
+    {
+      id: 3,
+      author: {
+        name: '活跃用户',
+        avatar: 'https://i.pravatar.cc/150?img=4',
+      },
+      content: '终于要更新了！期待已久的功能升级，社区越来越好了！',
+      time: '4小时前',
+      likes: 15,
+      isLiked: true,
+    },
+    {
+      id: 4,
+      author: {
+        name: '程序员李四',
+        avatar: 'https://i.pravatar.cc/150?img=5',
+      },
+      content: '维护时间能不能安排在深夜进行，这样对白天使用的影响比较小。',
+      time: '5小时前',
+      likes: 12,
+      isLiked: false,
+      replies: [
+        {
+          id: 401,
+          author: {
+            name: '结绳社区官方',
+            avatar: 'https://i.pravatar.cc/150?img=6',
+            verified: true,
+          },
+          content: '感谢建议！我们会考虑在使用量较低的时段进行维护。',
+          time: '2小时前',
+          likes: 8,
+          isLiked: false,
+        }
+      ]
+    },
+    {
+      id: 5,
+      author: {
+        name: '新手小白',
+        avatar: 'https://i.pravatar.cc/150?img=7',
+      },
+      content: '作为新用户，很喜欢这个社区的氛围！期待新功能上线。',
+      time: '6小时前',
+      likes: 6,
+      isLiked: false,
+    },
+    {
+      id: 6,
+      author: {
+        name: '资深开发者',
+        avatar: 'https://i.pravatar.cc/150?img=8',
+      },
+      content: '希望新版本能解决一些性能问题，整体体验还是很不错的。',
+      time: '昨天',
+      likes: 20,
+      isLiked: true,
+    },
+    {
+      id: 7,
+      author: {
+        name: '产品经理小张',
+        avatar: 'https://i.pravatar.cc/150?img=9',
+      },
+      content: '从产品角度来看，这次更新的功能都很实用，用户体验会有很大提升。',
+      time: '昨天',
+      likes: 14,
+      isLiked: false,
     }
   ]
 
@@ -559,6 +628,7 @@ const AnnouncementDetailScreen: React.FC = () => {
           onReportComment={handleReportComment}
           placeholder="对此公告有疑问或建议..."
           maxLength={200}
+          initialCommentsToShow={5}
         />
       </div>
       </div> {/* 结束内容区域 */}
