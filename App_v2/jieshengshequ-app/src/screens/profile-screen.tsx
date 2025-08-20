@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download } from 'lucide-react'
+import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download, FileText, MessageSquare, ChevronDown } from 'lucide-react'
 import QRCodeLib from 'qrcode'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -23,9 +23,7 @@ const ProfileScreen: React.FC = () => {
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   
-  // 编辑状态管理
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
+
   
   // 分享和二维码状态管理
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -34,6 +32,9 @@ const ProfileScreen: React.FC = () => {
   const [isGeneratingQR, setIsGeneratingQR] = useState(false)
   const [qrContentType, setQrContentType] = useState<'url' | 'vcard'>('url')
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
+  
+  // 周报折叠状态
+  const [isWeeklyReportExpanded, setIsWeeklyReportExpanded] = useState(false)
   
   // 用户资料状态
   const [userProfile, setUserProfile] = useState({
@@ -47,15 +48,7 @@ const ProfileScreen: React.FC = () => {
     skills: ['结绳语言', 'React', 'TypeScript', '移动开发', 'Tailwind CSS', 'Node.js', 'Python', 'UI设计']
   })
   
-  // 编辑表单状态
-  const [editForm, setEditForm] = useState({
-    name: userProfile.name,
-    bio: userProfile.bio,
-    email: userProfile.email,
-    location: userProfile.location,
-    website: userProfile.website,
-    skills: userProfile.skills.join(', ')
-  })
+
   
   // 格式化数字显示
   const formatNumber = (num: number) => {
@@ -94,26 +87,7 @@ const ProfileScreen: React.FC = () => {
     }
   }
   
-  // 处理编辑对话框打开
-  const handleEditClick = () => {
-    setEditForm({
-      name: userProfile.name,
-      bio: userProfile.bio,
-      email: userProfile.email,
-      location: userProfile.location,
-      website: userProfile.website,
-      skills: userProfile.skills.join(', ')
-    })
-    setIsEditDialogOpen(true)
-  }
-  
-  // 处理表单输入变化
-  const handleFormChange = (field: string, value: string) => {
-    setEditForm(prev => ({
-      ...prev,
-      [field]: value
-    }))
-  }
+
 
   // 生成个人资料链接
   const generateProfileLink = () => {
@@ -313,52 +287,7 @@ END:VCARD`
     }
   }
   
-  // 处理保存
-  const handleSave = async () => {
-    if (!editForm.name.trim()) {
-      toast({
-        title: "保存失败",
-        description: "用户名不能为空",
-        variant: "destructive",
-        duration: 3000,
-      })
-      return
-    }
-    
-    setIsSaving(true)
-    
-    try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // 更新用户资料
-      setUserProfile(prev => ({
-        ...prev,
-        name: editForm.name,
-        bio: editForm.bio,
-        email: editForm.email,
-        location: editForm.location,
-        website: editForm.website,
-        skills: editForm.skills.split(',').map(s => s.trim()).filter(s => s)
-      }))
-      
-      setIsEditDialogOpen(false)
-      toast({
-        title: "保存成功",
-        description: "您的个人资料已更新",
-        duration: 3000,
-      })
-    } catch (error) {
-      toast({
-        title: "保存失败",
-        description: "请稍后重试",
-        variant: "destructive",
-        duration: 3000,
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }
+
   
   const userStats = {
     posts: 12,
@@ -396,6 +325,22 @@ END:VCARD`
         likes: 36,
         downloads: 89,
         status: 'pending' as const,
+      },
+      {
+        id: 5,
+        title: 'React Native组件集合',
+        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
+        likes: 0,
+        downloads: 0,
+        status: 'rejected' as const,
+      },
+      {
+        id: 5,
+        title: 'React Native组件集合',
+        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
+        likes: 0,
+        downloads: 0,
+        status: 'rejected' as const,
       },
       {
         id: 5,
@@ -538,137 +483,15 @@ END:VCARD`
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold">{userProfile.name}</h2>
-              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex items-center" onClick={handleEditClick}>
-                    <Edit size={14} className="mr-1" /> 编辑
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-sm w-[calc(100vw-3rem)] rounded-xl p-0 overflow-hidden shadow-xl left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
-                  <div className="p-6">
-                  <DialogHeader className="pb-2">
-                    <DialogTitle className="text-center text-lg">编辑个人资料</DialogTitle>
-                    <DialogDescription className="text-center text-sm">
-                      修改您的个人信息和偏好设置
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-5 py-2">
-                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="name" className="text-sm font-medium text-foreground">用户名 <span className="text-red-500">*</span></Label>
-                        <Input
-                          id="name"
-                          value={editForm.name}
-                          onChange={(e) => handleFormChange('name', e.target.value)}
-                          maxLength={20}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-                          placeholder="请输入用户名"
-                        />
-                        <div className="text-xs text-muted-foreground text-right">
-                          {editForm.name.length}/20
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="bio" className="text-sm font-medium text-foreground">个人简介</Label>
-                        <Textarea
-                          id="bio"
-                          value={editForm.bio}
-                          onChange={(e) => handleFormChange('bio', e.target.value)}
-                          maxLength={100}
-                          rows={3}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors resize-none"
-                          placeholder="介绍一下你自己..."
-                        />
-                        <div className="text-xs text-muted-foreground text-right">
-                          {editForm.bio.length}/100
-                        </div>
-                      </div>
-                    </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex items-center" 
+                onClick={() => navigate('/edit-profile')}
+              >
+                <Edit size={14} className="mr-1" /> 编辑
+              </Button>
 
-                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium text-foreground">邮箱地址</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={editForm.email}
-                          onChange={(e) => handleFormChange('email', e.target.value)}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-                          placeholder="your@email.com"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="location" className="text-sm font-medium text-foreground">所在地</Label>
-                        <Input
-                          id="location"
-                          value={editForm.location}
-                          onChange={(e) => handleFormChange('location', e.target.value)}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-                          placeholder="北京市"
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="website" className="text-sm font-medium text-foreground">个人网站</Label>
-                        <Input
-                          id="website"
-                          type="url"
-                          value={editForm.website}
-                          onChange={(e) => handleFormChange('website', e.target.value)}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-                          placeholder="https://your-website.com"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-muted/30 rounded-lg p-4 space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="skills" className="text-sm font-medium text-foreground">技能标签</Label>
-                        <Input
-                          id="skills"
-                          value={editForm.skills}
-                          onChange={(e) => handleFormChange('skills', e.target.value)}
-                          className="rounded-lg border-2 focus:border-primary focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-                          placeholder="React, TypeScript, 移动开发"
-                        />
-                        <div className="text-xs text-muted-foreground">
-                          💡 用逗号分隔多个技能，将显示为标签
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-3 pt-4 border-t border-border/50">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsEditDialogOpen(false)}
-                      disabled={isSaving}
-                      className="rounded-lg px-6 hover:bg-muted/80 transition-colors"
-                    >
-                      取消
-                    </Button>
-                    <Button 
-                      onClick={handleSave} 
-                      disabled={isSaving}
-                      className="rounded-lg px-6 bg-primary hover:bg-primary/90 transition-all duration-200 shadow-sm hover:shadow-md"
-                    >
-                      {isSaving ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          保存中...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={14} className="mr-2" />
-                          保存更改
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
             </div>
             <p className="text-muted-foreground text-sm mb-3">{userProfile.bio}</p>
             
@@ -705,31 +528,25 @@ END:VCARD`
           </div>
         </div>
         
-        <div className="grid grid-cols-4 mt-4 text-center">
-          <div>
-            <div className="font-bold">{formatNumber(userStats.posts)}</div>
-            <div className="text-xs text-muted-foreground">帖子</div>
-          </div>
-          <div>
-            <div className="font-bold">{formatNumber(userStats.resources)}</div>
-            <div className="text-xs text-muted-foreground">资源</div>
-          </div>
-          <div>
-            <div className="font-bold">{formatNumber(userStats.views)}</div>
-            <div className="text-xs text-muted-foreground">浏览</div>
-          </div>
-          <div>
-            <div className="font-bold">{formatNumber(userStats.likes)}</div>
-            <div className="text-xs text-muted-foreground">点赞</div>
-          </div>
-        </div>
+
       </div>
 
       {/* 我的周报 */}
       <div className="p-4 border-b">
-        <h3 className="text-lg font-medium mb-3">我的周报</h3>
+        <div 
+          className="flex items-center justify-between cursor-pointer mb-3"
+          onClick={() => setIsWeeklyReportExpanded(!isWeeklyReportExpanded)}
+        >
+          <h3 className="text-lg font-medium">我的周报</h3>
+          <motion.div
+            animate={{ rotate: isWeeklyReportExpanded ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronDown size={20} className="text-muted-foreground" />
+          </motion.div>
+        </div>
         
-        {/* 今日活跃度 */}
+        {/* 今日活跃度 - 始终显示 */}
         <div className="mb-4 p-3 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -750,79 +567,237 @@ END:VCARD`
           </div>
         </div>
         
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <Card>
-            <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{weeklyReportData.totalPosts}</div>
-              <div className="text-xs text-muted-foreground">总发布</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{weeklyReportData.completedProjects}</div>
-              <div className="text-xs text-muted-foreground">完成项目</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3 text-center">
-              <div className="text-2xl font-bold text-primary">{weeklyReportData.currentStreak}</div>
-              <div className="text-xs text-muted-foreground">连续活跃</div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card className="mb-4">
-          <CardContent className="p-3">
-            <h4 className="text-sm font-medium mb-2">本周发布</h4>
-            <div className="flex items-end h-20 gap-1">
-              {weeklyReportData.weeklyPosts.map((posts, index) => (
-                <div 
-                  key={index}
-                  className="flex-1 bg-primary rounded-t"
-                  style={{ 
-                    height: `${(posts / 4) * 100}%`,
-                    opacity: posts ? undefined : 0.3
-                  }}
-                />
-              ))}
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>一</span>
-              <span>二</span>
-              <span>三</span>
-              <span>四</span>
-              <span>五</span>
-              <span>六</span>
-              <span>日</span>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <h4 className="text-sm font-medium mb-2">成就徽章</h4>
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {weeklyReportData.achievements.map((achievement) => (
-            <div key={achievement.id} className="flex flex-col items-center min-w-[60px]">
-              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-1">
-                <span className="text-2xl">{achievement.icon}</span>
+        {/* 可折叠的详细内容 */}
+        <motion.div
+          initial={false}
+          animate={{ 
+            height: isWeeklyReportExpanded ? 'auto' : 0,
+            opacity: isWeeklyReportExpanded ? 1 : 0
+          }}
+          transition={{ duration: 0.3 }}
+          className="overflow-hidden"
+        >
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <Card>
+              <CardContent className="p-3 text-center">
+                <div className="text-2xl font-bold text-primary">{weeklyReportData.totalPosts}</div>
+                <div className="text-xs text-muted-foreground">总发布</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 text-center">
+                <div className="text-2xl font-bold text-primary">{weeklyReportData.completedProjects}</div>
+                <div className="text-xs text-muted-foreground">内容浏览量</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3 text-center">
+                <div className="text-2xl font-bold text-primary">{weeklyReportData.currentStreak}</div>
+                <div className="text-xs text-muted-foreground">连续签到</div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <Card className="mb-4">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium">本周发布</h4>
+                <div className="text-xs text-muted-foreground">
+                  总计: {weeklyReportData.weeklyPosts.reduce((sum, posts) => sum + posts, 0)} 篇
+                </div>
               </div>
-              <div className="text-xs text-center">{achievement.name}</div>
-            </div>
-          ))}
-        </div>
+              
+                          {/* 图表容器 - 独立区域，不会影响上方标题 */}
+              <div className="relative">
+                {/* 纯柱状图区域 */}
+                <div className="flex items-end h-16 gap-1 mb-2">
+                  {weeklyReportData.weeklyPosts.map((posts, index) => {
+                    // 限制最大高度，确保不会超出容器
+                    const maxDisplayValue = Math.max(...weeklyReportData.weeklyPosts)
+                    const height = maxDisplayValue > 0 ? (posts / maxDisplayValue) * 90 : 0 // 恢复到90%
+                    
+                    return (
+                      <motion.div
+                        key={`bar-${index}`}
+                        className="flex-1 relative"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ 
+                          delay: index * 0.1, 
+                          duration: 0.6,
+                          ease: "easeOut"
+                        }}
+                      >
+                        {/* 柱子容器 */}
+                        <div className="relative w-full h-16 flex items-end justify-center">
+                          <div className="w-8 h-full relative flex items-end">
+                          {/* 背景柱子 */}
+                          <div className="absolute bottom-0 w-full h-full bg-muted/20 rounded-t" />
+                          
+                          {/* 数据柱子 */}
+                          <motion.div
+                            className="relative w-full rounded-t overflow-hidden"
+                            style={{ 
+                              backgroundColor: posts > 0 ? 'hsl(var(--primary))' : 'transparent'
+                            }}
+                            initial={{ height: 0 }}
+                            animate={{ height: `${height}%` }}
+                            transition={{ 
+                              delay: 0.3 + index * 0.1, 
+                              duration: 0.8,
+                              ease: "easeOut"
+                            }}
+                          >
+                            {/* 轻微的光泽效果 */}
+                            {posts > 0 && (
+                              <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white/15" />
+                            )}
+                            
+                            {/* 顶部高光 */}
+                            {posts > 0 && (
+                              <div className="absolute top-0 left-0 right-0 h-0.5 bg-white/40 rounded-t" />
+                            )}
+                          </motion.div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+                
+                {/* 日期和数值标签区域 - 独立在柱状图下方 */}
+                <div className="flex gap-1 mb-3">
+                  {weeklyReportData.weeklyPosts.map((posts, index) => {
+                    const dayNames = ['一', '二', '三', '四', '五', '六', '日']
+                    
+                    return (
+                      <motion.div
+                        key={`label-${index}`}
+                        className="flex-1 text-xs text-center"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{
+                          delay: 0.8 + index * 0.05,
+                          duration: 0.3
+                        }}
+                      >
+                        <div className="text-muted-foreground font-medium mb-1">
+                          {dayNames[index]}
+                        </div>
+                        <motion.div
+                          className={posts > 0 ? "text-primary font-bold" : "text-muted-foreground/50"}
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{
+                            delay: 1.0 + index * 0.1,
+                            duration: 0.4
+                          }}
+                        >
+                          ({posts})
+                        </motion.div>
+                      </motion.div>
+                    )
+                  })}
+                </div>
+              
+                {/* 图例和统计信息 */}
+                <div className="flex items-center justify-between pt-3 border-t border-border/50">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-primary"></div>
+                      <span>发布量</span>
+                    </div>
+                  </div>
+                  <motion.div
+                    className="text-xs text-muted-foreground"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.5, duration: 0.5 }}
+                  >
+                    平均: {(weeklyReportData.weeklyPosts.reduce((sum, posts) => sum + posts, 0) / 7).toFixed(1)} 篇/天
+                  </motion.div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <h4 className="text-sm font-medium mb-2">成就徽章</h4>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {weeklyReportData.achievements.map((achievement) => (
+              <div key={achievement.id} className="flex flex-col items-center min-w-[60px]">
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-1">
+                  <span className="text-2xl">{achievement.icon}</span>
+                </div>
+                <div className="text-xs text-center">{achievement.name}</div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </div>
 
       {/* 内容管理 */}
       <div className="p-4 flex-1">
+        {/* 内容管理快捷入口 */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate('/my-content?tab=resources')}
+            >
+              <CardContent className="p-4 text-center">
+                <BookOpen size={24} className="mx-auto mb-2 text-primary" />
+                <div className="text-lg font-bold">{userContent.resources.length}</div>
+                <div className="text-xs text-muted-foreground">我的资源</div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate('/my-content?tab=posts')}
+            >
+              <CardContent className="p-4 text-center">
+                <FileText size={24} className="mx-auto mb-2 text-primary" />
+                <div className="text-lg font-bold">{userContent.posts.length}</div>
+                <div className="text-xs text-muted-foreground">我的帖子</div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Card 
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => navigate('/my-content?tab=comments')}
+            >
+              <CardContent className="p-4 text-center">
+                <MessageSquare size={24} className="mx-auto mb-2 text-primary" />
+                <div className="text-lg font-bold">{userContent.comments.length}</div>
+                <div className="text-xs text-muted-foreground">我的评论</div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
         <Tabs defaultValue="resources" className="w-full">
           <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="resources">我的资源</TabsTrigger>
-            <TabsTrigger value="posts">帖子</TabsTrigger>
-            <TabsTrigger value="comments">评论</TabsTrigger>
+            <TabsTrigger value="resources">资源预览</TabsTrigger>
+            <TabsTrigger value="posts">帖子预览</TabsTrigger>
+            <TabsTrigger value="comments">评论预览</TabsTrigger>
           </TabsList>
           
           <TabsContent value="resources" className="mt-0">
             <div className="grid grid-cols-2 gap-3">
-              {userContent.resources.map((resource) => (
+              {userContent.resources.slice(0, 4).map((resource) => (
                 <motion.div
                   key={resource.id}
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -857,11 +832,25 @@ END:VCARD`
                 </motion.div>
               ))}
             </div>
+            
+            {userContent.resources.length > 4 && (
+              <div className="text-center mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/my-content?tab=resources')}
+                  className="w-full"
+                >
+                  查看全部 {userContent.resources.length} 个资源
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="posts" className="mt-0">
             <div className="grid grid-cols-2 gap-3">
-              {userContent.posts.map((post) => (
+              {userContent.posts.slice(0, 4).map((post) => (
                 <motion.div
                   key={post.id}
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -893,11 +882,25 @@ END:VCARD`
                 </motion.div>
               ))}
             </div>
+            
+            {userContent.posts.length > 4 && (
+              <div className="text-center mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/my-content?tab=posts')}
+                  className="w-full"
+                >
+                  查看全部 {userContent.posts.length} 个帖子
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="comments" className="mt-0">
             <div className="space-y-3">
-              {userContent.comments.map((comment) => (
+              {userContent.comments.slice(0, 4).map((comment) => (
                 <motion.div
                   key={comment.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -923,6 +926,20 @@ END:VCARD`
                 </motion.div>
               ))}
             </div>
+            
+            {userContent.comments.length > 4 && (
+              <div className="text-center mt-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate('/my-content?tab=comments')}
+                  className="w-full"
+                >
+                  查看全部 {userContent.comments.length} 条评论
+                  <ChevronRight size={14} className="ml-1" />
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

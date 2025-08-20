@@ -137,8 +137,8 @@ const CommunityScreen: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: index * 0.1 }}
               >
-                <Card>
-                  <CardContent className="p-4">
+                <Card className="overflow-hidden">
+                  <CardContent className="p-4 min-w-0">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
                         <Avatar className="h-8 w-8 mr-2">
@@ -158,30 +158,36 @@ const CommunityScreen: React.FC = () => {
                     <p className="text-sm mb-3">{post.content}</p>
                     
                     {post.code && (
-                      <div className="bg-muted p-3 rounded-md mb-3 overflow-x-auto">
-                        <pre className="text-xs">
-                          <code>{post.code}</code>
-                        </pre>
+                      <div className="bg-muted p-3 rounded-md mb-3 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <pre className="text-xs whitespace-pre-wrap break-words min-w-0">
+                            <code className="block break-words">{post.code}</code>
+                          </pre>
+                        </div>
                       </div>
                     )}
                     
                     {post.images && post.images.length > 0 && (
-                      <div className={`grid ${post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-3`}>
-                        {post.images.map((image, idx) => (
-                          <img
-                            key={idx}
-                            src={image}
-                            alt={`Post image ${idx + 1}`}
-                            className="rounded-md w-full h-40 object-cover"
-                          />
-                        ))}
+                      <div className="mb-3 w-full overflow-hidden">
+                        <div className={`grid ${post.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 w-full`}>
+                          {post.images.map((image, idx) => (
+                            <div key={idx} className="min-w-0 overflow-hidden">
+                              <img
+                                src={image}
+                                alt={`Post image ${idx + 1}`}
+                                className="rounded-md w-full h-40 object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                     
-                    <div className="flex flex-wrap gap-1 mb-1">
+                    <div className="flex flex-wrap gap-1 mb-1 w-full overflow-hidden">
                       {post.tags.map((tag, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs flex items-center">
-                          <Hash size={10} className="mr-1" /> {tag}
+                        <Badge key={idx} variant="outline" className="text-xs flex items-center shrink-0">
+                          <Hash size={10} className="mr-1" /> 
+                          <span className="truncate max-w-16">{tag}</span>
                         </Badge>
                       ))}
                     </div>

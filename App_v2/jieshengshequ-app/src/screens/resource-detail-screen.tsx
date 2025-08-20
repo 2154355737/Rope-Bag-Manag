@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   ArrowLeft, Download, Heart, MessageSquare, Share2, Bookmark, 
-  MoreHorizontal, Send, Flag, Hash, ThumbsUp, ThumbsDown, 
+  MoreHorizontal, Flag, Hash, ThumbsUp, ThumbsDown, 
   Star, FileText, Package, Shield, Calendar, Eye, AlertTriangle,
   ExternalLink, Copy, CheckCircle
 } from 'lucide-react'
@@ -11,22 +11,18 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Textarea } from '@/components/ui/textarea'
+
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import CommentSection, { Comment } from '@/components/comment-section'
 
 const ResourceDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [commentText, setCommentText] = useState('')
-  const [showReviewForm, setShowReviewForm] = useState(false)
-  const [reviewText, setReviewText] = useState('')
-  const [reviewRating, setReviewRating] = useState(5)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
   
@@ -69,18 +65,20 @@ const ResourceDetailScreen: React.FC = () => {
     safetyStatus: 'verified'
   }
   
-  // 模拟评价数据
-  const reviews = [
+
+  
+  // 模拟评论数据（包含原评价内容）
+  const comments: Comment[] = [
     {
       id: 1,
       author: {
         name: '张开发',
         avatar: 'https://i.pravatar.cc/150?img=1',
       },
-      rating: 5,
       content: '非常棒的工具包！组件质量很高，文档也很详细。已经在我的项目中使用了，效果很好。',
       time: '2025-01-12',
-      helpful: 23,
+      likes: 23,
+      isLiked: false,
     },
     {
       id: 2,
@@ -88,10 +86,46 @@ const ResourceDetailScreen: React.FC = () => {
         name: '李前端',
         avatar: 'https://i.pravatar.cc/150?img=2',
       },
-      rating: 4,
       content: '整体不错，但是某些组件的API设计还可以优化。希望下个版本能改进。',
       time: '2025-01-08',
-      helpful: 12,
+      likes: 12,
+      isLiked: false,
+    },
+    {
+      id: 3,
+      author: {
+        name: '王开发',
+        avatar: 'https://i.pravatar.cc/150?img=3',
+        verified: true,
+      },
+      content: '这个工具包真的很实用！TypeScript支持做得很好，文档也很全面。',
+      time: '2天前',
+      likes: 15,
+      isLiked: true,
+      replies: [
+        {
+          id: 101,
+          author: {
+            name: '李前端',
+            avatar: 'https://i.pravatar.cc/150?img=2',
+          },
+          content: '同感！特别是组件库部分，节省了很多开发时间。',
+          time: '1天前',
+          likes: 8,
+          isLiked: false,
+        }
+      ]
+    },
+    {
+      id: 4,
+      author: {
+        name: '赵设计',
+        avatar: 'https://i.pravatar.cc/150?img=4',
+      },
+      content: 'UI组件设计很不错，但是希望能增加更多的主题样式选项。',
+      time: '3天前',
+      likes: 12,
+      isLiked: false,
     }
   ]
 
@@ -130,51 +164,38 @@ const ResourceDetailScreen: React.FC = () => {
     }, 200)
   }
 
-  // 提交评价
-  const handleSubmitReview = () => {
-    if (reviewText.trim()) {
-      toast({
-        title: "评价已提交",
-        description: "感谢您的评价，审核通过后将显示",
-        duration: 3000,
-      })
-      setReviewText('')
-      setReviewRating(5)
-      setShowReviewForm(false)
-    }
+
+
+  // 评论区事件处理
+  const handleSubmitComment = (content: string) => {
+    console.log('新评论:', content)
+    toast({
+      title: "评论发送成功",
+      description: "您的评论已发布"
+    })
   }
 
-  // 提交评论
-  const handleSubmitComment = () => {
-    if (commentText.trim()) {
-      toast({
-        title: "评论已提交",
-        description: "您的评论已提交成功",
-        duration: 3000,
-      })
-      setCommentText('')
-    }
+  const handleSubmitReply = (commentId: number, content: string) => {
+    console.log('回复评论:', commentId, content)
+    toast({
+      title: "回复发送成功",
+      description: "您的回复已发布"
+    })
   }
 
-  // 渲染星级评分
-  const renderStars = (rating: number, size = 16, interactive = false, onRate?: (rating: number) => void) => {
-    return (
-      <div className="flex items-center">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            size={size}
-            className={`${
-              star <= rating 
-                ? 'fill-yellow-400 text-yellow-400' 
-                : 'text-gray-300'
-            } ${interactive ? 'cursor-pointer hover:text-yellow-400' : ''}`}
-            onClick={interactive && onRate ? () => onRate(star) : undefined}
-          />
-        ))}
-      </div>
-    )
+  const handleLikeComment = (commentId: number) => {
+    console.log('点赞评论:', commentId)
+    toast({
+      title: "操作成功",
+      description: "已点赞/取消点赞"
+    })
   }
+
+  const handleReportComment = (commentId: number) => {
+    console.log('举报评论:', commentId)
+  }
+
+
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
@@ -233,9 +254,9 @@ const ResourceDetailScreen: React.FC = () => {
                   {resource.version}
                 </Badge>
                 <div className="flex items-center mr-3">
-                  {renderStars(Math.floor(resource.rating))}
-                  <span className="text-sm text-muted-foreground ml-1">
-                    {resource.rating} ({resource.reviewCount})
+                  <Star size={16} className="fill-yellow-400 text-yellow-400 mr-1" />
+                  <span className="text-sm text-muted-foreground">
+                    {resource.rating} ({resource.reviewCount} 评价)
                   </span>
                 </div>
               </div>
@@ -390,77 +411,7 @@ const ResourceDetailScreen: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* 用户评价 */}
-          <Card className="mb-4">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">用户评价</CardTitle>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowReviewForm(true)}
-              >
-                写评价
-              </Button>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {showReviewForm && (
-                <div className="mb-4 p-4 border rounded-md">
-                  <div className="mb-3">
-                    <label className="text-sm font-medium mb-2 block">评分</label>
-                    {renderStars(reviewRating, 20, true, setReviewRating)}
-                  </div>
-                  <Textarea
-                    placeholder="分享您的使用体验..."
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    className="mb-3"
-                    maxLength={500}
-                  />
-                  <div className="flex justify-end gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setShowReviewForm(false)}
-                    >
-                      取消
-                    </Button>
-                    <Button 
-                      size="sm"
-                      onClick={handleSubmitReview}
-                    >
-                      提交评价
-                    </Button>
-                  </div>
-                </div>
-              )}
 
-              <div className="space-y-4">
-                {reviews.map((review) => (
-                  <div key={review.id} className="border-b pb-4 last:border-b-0">
-                    <div className="flex items-start">
-                      <Avatar className="h-8 w-8 mr-2">
-                        <AvatarImage src={review.author.avatar} />
-                        <AvatarFallback>{review.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="font-medium text-sm">{review.author.name}</div>
-                          <div className="text-xs text-muted-foreground">{review.time}</div>
-                        </div>
-                        <div className="flex items-center mb-2">
-                          {renderStars(review.rating, 14)}
-                        </div>
-                        <p className="text-sm mb-2">{review.content}</p>
-                        <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground">
-                          <ThumbsUp size={12} className="mr-1" /> 有用 ({review.helpful})
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
 
           {/* 操作按钮 */}
           <Card className="mb-4">
@@ -486,30 +437,18 @@ const ResourceDetailScreen: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* 评论输入框 */}
-          <Card className="mt-4">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <Input
-                  placeholder="发表评论..."
-                  className="flex-1"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  maxLength={200}
-                />
-                <Button 
-                  disabled={!commentText.trim()}
-                  onClick={handleSubmitComment}
-                >
-                  <Send size={16} className="mr-1" />
-                  发送
-                </Button>
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">
-                {commentText.length}/200 字符
-              </div>
-            </CardContent>
-          </Card>
+          {/* 评论区 */}
+          <CommentSection
+            comments={comments}
+            totalCount={156}
+            onSubmitComment={handleSubmitComment}
+            onSubmitReply={handleSubmitReply}
+            onLikeComment={handleLikeComment}
+            onReportComment={handleReportComment}
+            placeholder="发表评论..."
+            maxLength={200}
+            className="mt-4"
+          />
         </div>
       </ScrollArea>
       </div> {/* 结束内容区域 */}

@@ -32,6 +32,7 @@ class SafeAreaManager {
   
   private isInitialized = false
   private keyboardObserver: ResizeObserver | null = null
+  private scrollTimeout: number | null = null
 
   /**
    * 初始化安全区域管理器
@@ -277,16 +278,158 @@ class SafeAreaManager {
    */
   private ensureActiveElementVisible(): void {
     const activeElement = document.activeElement as HTMLElement
-    if (activeElement && this.isInputElement(activeElement)) {
-      // 延迟一点时间让键盘完全弹出，然后滚动到输入框
-      setTimeout(() => {
-        activeElement.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-          inline: 'nearest'
-        })
-      }, 300)
+    if (!activeElement || !this.isInputElement(activeElement)) {
+      return
     }
+
+    // 清除之前的滚动超时，防止重复滚动
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout)
+    }
+
+    // 延迟一点时间让键盘完全弹出和布局稳定
+    this.scrollTimeout = setTimeout(() => {
+      this.smoothScrollToElement(activeElement)
+      this.scrollTimeout = null
+    }, 200) as unknown as number
+  }
+
+  /**
+   * 智能滚动到指定元素，避免不必要的页面跳动
+   */
+  private smoothScrollToElement(element: HTMLElement): void {
+    // 再次检查元素是否仍然是活动元素（防止在延迟期间焦点发生变化）
+    if (document.activeElement !== element) {
+      console.log('🔄 元素焦点已变化，跳过滚动')
+      return
+    }
+
+    const rect = element.getBoundingClientRect()
+    const scrollContainer = this.findScrollContainer(element)
+    
+    if (!scrollContainer) {
+      console.warn('⚠️ 未找到滚动容器')
+      return
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect()
+    const topNavHeight = this.getTopNavigationHeight()
+    const bottomNavHeight = 64 // 底部导航栏高度
+    const keyboardHeight = this.getKeyboardHeight()
+    
+    // 计算可视区域 (考虑键盘高度)
+    const viewportHeight = window.innerHeight
+    const effectiveViewportHeight = keyboardHeight > 0 ? viewportHeight - keyboardHeight : viewportHeight
+    
+    const visibleTop = Math.max(containerRect.top, 0) + topNavHeight + 10 // 10px 缓冲
+    const visibleBottom = Math.min(containerRect.bottom, effectiveViewportHeight) - bottomNavHeight - 10 // 10px 缓冲
+    const visibleHeight = visibleBottom - visibleTop
+    
+    // 如果可视区域太小，不进行滚动
+    if (visibleHeight < 100) {
+      console.log('⚠️ 可视区域太小，跳过滚动', { visibleHeight })
+      return
+    }
+    
+    // 检查元素是否已经在可视区域内
+    const elementTop = rect.top
+    const elementBottom = rect.bottom
+    const elementHeight = rect.height
+    
+    // 如果元素完全在可视区域内，无需滚动
+    if (elementTop >= visibleTop && elementBottom <= visibleBottom) {
+      console.log('✅ 输入框已在可视区域内，无需滚动', {
+        elementTop, elementBottom, visibleTop, visibleBottom
+      })
+      return
+    }
+
+    // 计算最小滚动距离
+    let scrollOffset = 0
+    
+    if (elementTop < visibleTop) {
+      // 元素在可视区域上方，需要向上滚动
+      scrollOffset = elementTop - visibleTop
+    } else if (elementBottom > visibleBottom) {
+      // 元素在可视区域下方，需要向下滚动
+      scrollOffset = elementBottom - visibleBottom
+      
+      // 如果元素太高，优先显示顶部
+      if (elementHeight > visibleHeight) {
+        scrollOffset = elementTop - visibleTop
+      }
+    }
+
+    // 如果滚动距离太小，不进行滚动
+    if (Math.abs(scrollOffset) < 10) {
+      console.log('📏 滚动距离太小，跳过滚动', { scrollOffset })
+      return
+    }
+
+    const newScrollTop = scrollContainer.scrollTop + scrollOffset
+    
+    // 确保滚动位置在有效范围内
+    const maxScrollTop = scrollContainer.scrollHeight - scrollContainer.clientHeight
+    const finalScrollTop = Math.max(0, Math.min(newScrollTop, maxScrollTop))
+
+    // 执行平滑滚动
+    scrollContainer.scrollTo({
+      top: finalScrollTop,
+      behavior: 'smooth'
+    })
+
+    console.log('📍 智能滚动到输入框', {
+      elementRect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+      visibleArea: { top: visibleTop, bottom: visibleBottom, height: visibleHeight },
+      scrollOffset,
+      finalScrollTop,
+      keyboardHeight,
+      viewportHeight: effectiveViewportHeight
+    })
+  }
+
+  /**
+   * 查找元素的滚动容器
+   */
+  private findScrollContainer(element: HTMLElement): HTMLElement | null {
+    let parent = element.parentElement
+    
+    while (parent) {
+      const style = window.getComputedStyle(parent)
+      const overflow = style.overflow + style.overflowY + style.overflowX
+      
+      if (/(auto|scroll)/.test(overflow)) {
+        return parent
+      }
+      
+      // 检查是否是我们的主要滚动容器
+      if (parent.classList.contains('scroll-container') || parent.tagName === 'MAIN') {
+        return parent
+      }
+      
+      parent = parent.parentElement
+    }
+    
+    // 如果没找到，返回document.documentElement
+    return document.documentElement
+  }
+
+  /**
+   * 获取顶部导航栏高度
+   */
+  private getTopNavigationHeight(): number {
+    const topNavHeight = getComputedStyle(document.documentElement)
+      .getPropertyValue('--top-navigation-height')
+    return topNavHeight ? parseInt(topNavHeight) : 80
+  }
+
+  /**
+   * 获取当前键盘高度
+   */
+  private getKeyboardHeight(): number {
+    const keyboardHeight = getComputedStyle(document.documentElement)
+      .getPropertyValue('--keyboard-height')
+    return keyboardHeight ? parseInt(keyboardHeight) : 0
   }
 
   /**
@@ -321,6 +464,12 @@ class SafeAreaManager {
     if (this.keyboardObserver) {
       this.keyboardObserver.disconnect()
       this.keyboardObserver = null
+    }
+    
+    // 清理滚动超时
+    if (this.scrollTimeout) {
+      clearTimeout(this.scrollTimeout)
+      this.scrollTimeout = null
     }
     
     // 清理Capacitor Keyboard监听器

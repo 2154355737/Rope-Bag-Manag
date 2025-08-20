@@ -102,10 +102,12 @@
   }
 }
 
-/* 滚动条美化 */
+/* 隐藏滚动条但保持滚动功能 */
+/* 适用于Webkit浏览器（Chrome、Safari、Edge等） */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 0px;
+  height: 0px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-track {
@@ -113,10 +115,81 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 20px;
+  background: transparent;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.3);
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 适用于Firefox */
+* {
+  scrollbar-width: none;
+}
+
+/* 确保所有滚动容器都隐藏滚动条 */
+.scroll-container,
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto,
+main {
+  /* Webkit浏览器 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scroll-container::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-x-auto::-webkit-scrollbar,
+main::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 针对特定组件的滚动条隐藏 */
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* 确保Tabs组件内的滚动区域也隐藏滚动条 */
+[data-radix-scroll-area-viewport] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[data-radix-scroll-area-viewport]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* 隐藏所有可能的滚动条 */
+div[style*="overflow"],
+div[class*="overflow"],
+section,
+article,
+aside,
+nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+div[style*="overflow"]::-webkit-scrollbar,
+div[class*="overflow"]::-webkit-scrollbar,
+section::-webkit-scrollbar,
+article::-webkit-scrollbar,
+aside::-webkit-scrollbar,
+nav::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }

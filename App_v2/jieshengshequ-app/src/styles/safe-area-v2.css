@@ -266,6 +266,18 @@ input:focus, textarea:focus {
   scroll-margin-bottom: 20px;
 }
 
+/* 优化滚动容器的滚动行为，避免页面跳动 */
+.scroll-container {
+  scroll-behavior: auto; /* 避免自动平滑滚动与我们的智能滚动冲突 */
+}
+
+/* 键盘弹出时确保滚动容器的稳定性 */
+.keyboard-visible .scroll-container {
+  /* 使用transform而不是height变化，避免布局重排 */
+  transform: translateY(0);
+  will-change: transform;
+}
+
 /* ===== 工具类 ===== */
 .pt-safe { padding-top: var(--safe-area-inset-top) !important; }
 .pb-safe { padding-bottom: var(--safe-area-inset-bottom) !important; }

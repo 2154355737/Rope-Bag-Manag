@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
-  ArrowLeft, Share2, Bookmark, MoreHorizontal, Send, Flag, 
+  ArrowLeft, Share2, Bookmark, MoreHorizontal, Flag, 
   AlertTriangle, Info, CheckCircle, Clock, ExternalLink, 
   ThumbsUp, MessageSquare, Bell, Pin, Eye, Calendar,
   FileText, Download, Link as LinkIcon
@@ -11,17 +11,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import CommentSection, { Comment } from '@/components/comment-section'
 
 const AnnouncementDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [feedbackText, setFeedbackText] = useState('')
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
   
@@ -111,6 +110,46 @@ const AnnouncementDetailScreen: React.FC = () => {
     ]
   }
 
+  // 模拟评论数据
+  const comments: Comment[] = [
+    {
+      id: 1,
+      author: {
+        name: '社区用户',
+        avatar: 'https://i.pravatar.cc/150?img=1',
+      },
+      content: '感谢官方的及时通知，请问维护期间数据会丢失吗？',
+      time: '1小时前',
+      likes: 5,
+      isLiked: false,
+      replies: [
+        {
+          id: 101,
+          author: {
+            name: '结绳社区官方',
+            avatar: 'https://i.pravatar.cc/150?img=6',
+            verified: true,
+          },
+          content: '不会的，所有用户数据都会完全保留，请放心！',
+          time: '30分钟前',
+          likes: 12,
+          isLiked: true,
+        }
+      ]
+    },
+    {
+      id: 2,
+      author: {
+        name: '开发者小王',
+        avatar: 'https://i.pravatar.cc/150?img=3',
+      },
+      content: '新功能很期待！希望智能推荐系统能更精准一些。',
+      time: '3小时前',
+      likes: 8,
+      isLiked: false,
+    }
+  ]
+
   // 格式化数字
   const formatNumber = (num: number) => {
     if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
@@ -172,16 +211,33 @@ const AnnouncementDetailScreen: React.FC = () => {
     })
   }
 
-  // 提交反馈
-  const handleSubmitFeedback = () => {
-    if (feedbackText.trim()) {
-      toast({
-        title: "反馈已提交",
-        description: "感谢您的反馈，我们会认真处理",
-        duration: 3000,
-      })
-      setFeedbackText('')
-    }
+  // 评论区事件处理
+  const handleSubmitComment = (content: string) => {
+    console.log('新评论:', content)
+    toast({
+      title: "反馈已提交",
+      description: "感谢您的反馈，我们会认真处理"
+    })
+  }
+
+  const handleSubmitReply = (commentId: number, content: string) => {
+    console.log('回复评论:', commentId, content)
+    toast({
+      title: "回复发送成功",
+      description: "您的回复已发布"
+    })
+  }
+
+  const handleLikeComment = (commentId: number) => {
+    console.log('点赞评论:', commentId)
+    toast({
+      title: "操作成功",
+      description: "已点赞/取消点赞"
+    })
+  }
+
+  const handleReportComment = (commentId: number) => {
+    console.log('举报评论:', commentId)
   }
 
   const announcementStyle = getAnnouncementStyle(announcement.type)
@@ -492,22 +548,18 @@ const AnnouncementDetailScreen: React.FC = () => {
         </div>
       </ScrollArea>
 
-      {/* 反馈输入框 */}
-      <div className="sticky bottom-16 border-t bg-background p-2 flex items-center">
-        <Input
+      {/* 评论区 */}
+      <div className="p-4">
+        <CommentSection
+          comments={comments}
+          totalCount={announcement.comments}
+          onSubmitComment={handleSubmitComment}
+          onSubmitReply={handleSubmitReply}
+          onLikeComment={handleLikeComment}
+          onReportComment={handleReportComment}
           placeholder="对此公告有疑问或建议..."
-          className="mr-2"
-          value={feedbackText}
-          onChange={(e) => setFeedbackText(e.target.value)}
           maxLength={200}
         />
-        <Button 
-          size="icon" 
-          disabled={!feedbackText.trim()}
-          onClick={handleSubmitFeedback}
-        >
-          <Send size={18} />
-        </Button>
       </div>
       </div> {/* 结束内容区域 */}
     </div>
