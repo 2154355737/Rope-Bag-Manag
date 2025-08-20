@@ -141,9 +141,9 @@ const UniversalDetailScreen: React.FC = () => {
               type: 'post',
               title: data.title || data.content?.substring(0, 50) + '...',
               author: { 
-                name: data.author?.name || data.author_name || '用户', 
-                avatar: data.author?.avatar || '', 
-                verified: false 
+                name: (typeof data.author === 'string' ? data.author : data.author?.name) || data.author_name || '用户', 
+                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
+                verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
               },
               content: data.content,
               tags: data.tags || [],
@@ -166,9 +166,9 @@ const UniversalDetailScreen: React.FC = () => {
               type: 'resource',
               title: data.name || data.title,
               author: { 
-                name: data.author || '开发者', 
-                avatar: '', 
-                verified: false 
+                name: (typeof data.author === 'string' ? data.author : data.author?.name) || '开发者', 
+                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
+                verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
               },
               description: data.description || '',
               tags: data.tags || [],
@@ -199,9 +199,9 @@ const UniversalDetailScreen: React.FC = () => {
               type: 'announcement',
               title: data.title,
               author: { 
-                name: data.author || '系统公告', 
-                avatar: '', 
-                verified: true 
+                name: (typeof data.author === 'string' ? data.author : data.author?.name) || '系统公告', 
+                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
+                verified: (typeof data.author === 'object' ? data.author?.verified : true) || true 
               },
               content: data.content,
               tags: data.tags || [],
@@ -385,6 +385,23 @@ const UniversalDetailScreen: React.FC = () => {
     )
   }
 
+  // 调试检查：确保author是正确的对象结构
+  if (item.author && typeof item.author !== 'object') {
+    console.error('Author is not an object:', item.author)
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <TopNavigation title={getPageTitle()} showBackButton />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h2 className="text-lg font-medium mb-2">数据格式错误</h2>
+            <p className="text-muted-foreground mb-4">作者信息格式不正确</p>
+            <Button onClick={() => navigate(-1)}>返回上一页</Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
@@ -417,13 +434,13 @@ const UniversalDetailScreen: React.FC = () => {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center flex-1 min-w-0">
                     <Avatar className="h-12 w-12 mr-3 flex-shrink-0">
-                      <AvatarImage src={item.author.avatar} />
-                      <AvatarFallback>{item.author.name[0]}</AvatarFallback>
+                                              <AvatarImage src={item.author?.avatar || ''} />
+                      <AvatarFallback>{item.author?.name?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center">
-                        <span className="font-medium text-overflow-protection truncate">{item.author.name}</span>
-                        {item.author.verified && (
+                        <span className="font-medium text-overflow-protection truncate">{item.author?.name || '用户'}</span>
+                        {item.author?.verified && (
                           <CheckCircle size={16} className="ml-1 text-blue-500 flex-shrink-0" />
                         )}
                       </div>
