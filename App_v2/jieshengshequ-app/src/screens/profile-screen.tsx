@@ -41,7 +41,7 @@ const ProfileScreen: React.FC = () => {
   const { logout } = useAuth()
   
   // 数据加载状态
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false) // 新增：头像上传状态
   
@@ -68,19 +68,6 @@ const ProfileScreen: React.FC = () => {
   // 周报折叠状态
   const [isWeeklyReportExpanded, setIsWeeklyReportExpanded] = useState(false)
   
-  // 用户资料状态
-  const [userProfile, setUserProfile] = useState({
-    name: '程序员小王',
-    bio: '结绳语言爱好者，专注移动开发',
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    level: 'Lv.3 进阶开发者',
-    email: 'xiaowang@example.com',
-    location: '北京市',
-    website: 'https://github.com/xiaowang',
-    skills: ['结绳语言', 'React', 'TypeScript', '移动开发', 'Tailwind CSS', 'Node.js', 'Python', 'UI设计']
-  })
-  
-
   
   // 格式化数字显示
   const formatNumber = (num: number) => {
@@ -130,7 +117,7 @@ const ProfileScreen: React.FC = () => {
   // 生成个人资料链接
   const generateProfileLink = () => {
     const baseUrl = window.location.origin
-    const profileId = (currentUser?.username || currentUser?.nickname || userProfile.name).toLowerCase().replace(/\s+/g, '-')
+    const profileId = (currentUser?.username || currentUser?.nickname || 'user').toLowerCase().replace(/\s+/g, '-')
     return `${baseUrl}/profile/${profileId}`
   }
 
@@ -185,12 +172,12 @@ const ProfileScreen: React.FC = () => {
       if (qrContentType === 'vcard') {
         qrContent = `BEGIN:VCARD
 VERSION:3.0
-FN:${userProfile.name}
+FN:${currentUser?.nickname || '用户'}
 ORG:结绳社区
-TITLE:${userProfile.level}
-EMAIL:${userProfile.email}
+TITLE:${activityStats?.level || '用户'}
+EMAIL:${currentUser?.email || 'user@example.com'}
 URL:${profileLink}
-NOTE:${userProfile.bio}
+NOTE:${currentUser?.bio || ''}
 END:VCARD`
       }
 
@@ -243,7 +230,7 @@ END:VCARD`
       // 创建下载链接
       const link = document.createElement('a')
       link.href = qrCodeDataUrl
-      link.download = `${userProfile.name}-个人二维码.png`
+      link.download = `${currentUser?.nickname || '用户'}-个人二维码.png`
       
       // 触发下载
       document.body.appendChild(link)
@@ -285,8 +272,8 @@ END:VCARD`
   const nativeShare = async () => {
     const profileLink = generateProfileLink()
     const shareData = {
-      title: `${userProfile.name} - 结绳社区`,
-      text: `来看看 ${userProfile.name} 在结绳社区的个人资料`,
+      title: `${currentUser?.nickname || '用户'} - 结绳社区`,
+      text: `来看看 ${currentUser?.nickname || '用户'} 在结绳社区的个人资料`,
       url: profileLink
     }
 
@@ -416,12 +403,98 @@ END:VCARD`
     loadUserData()
   }, [])
 
-  return (
+  // 加载骨架屏组件
+  const ProfileSkeleton = () => (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
       <TopNavigation
         title="个人中心"
-        subtitle={activityStats?.level || userProfile.level}
+        subtitle="加载中..."
+        showSettingsButton
+        rightAction={
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              disabled
+            >
+              <RefreshCw size={20} className="animate-spin" />
+            </Button>
+          </div>
+        }
+      />
+
+      {/* 主要内容区域 */}
+      <div className="pt-nav flex-1 overflow-y-auto">
+        {/* 个人信息卡片骨架 */}
+        <div className="p-4 border-b">
+          <div className="flex items-start gap-4">
+            <div className="flex flex-col items-center">
+              <div className="relative flex-shrink-0">
+                <div className="h-20 w-20 rounded-full bg-muted animate-pulse"></div>
+              </div>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <div className="h-6 bg-muted rounded animate-pulse w-32"></div>
+                <div className="h-8 bg-muted rounded animate-pulse w-20"></div>
+              </div>
+              
+              <div className="h-4 bg-muted rounded animate-pulse w-48 mt-3"></div>
+              
+              <div className="flex items-center mb-3 mt-3">
+                <div className="h-6 bg-muted rounded animate-pulse w-24"></div>
+              </div>
+              
+              {/* 技能标签骨架 */}
+              <div className="flex flex-wrap gap-2">
+                {[1,2,3,4].map((i) => (
+                  <div key={i} className="h-6 bg-muted rounded animate-pulse w-16"></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 统计数据骨架 */}
+        <div className="grid grid-cols-4 gap-4 p-4 border-b">
+          {[1,2,3,4].map((i) => (
+            <div key={i} className="text-center">
+              <div className="h-6 bg-muted rounded animate-pulse w-8 mx-auto mb-1"></div>
+              <div className="h-4 bg-muted rounded animate-pulse w-12 mx-auto"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* 周报卡片骨架 */}
+        <div className="p-4 space-y-4">
+          <div className="h-48 bg-muted rounded-lg animate-pulse"></div>
+          
+          {/* 内容预览骨架 */}
+          <div className="h-64 bg-muted rounded-lg animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+  )
+
+  // 如果正在加载，显示骨架屏
+  if (isLoading) {
+    return <ProfileSkeleton />
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="flex flex-col min-h-screen bg-background pb-16"
+    >
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title="个人中心"
+        subtitle={activityStats?.level || '用户'}
         showSettingsButton
         rightAction={
           <div className="flex items-center gap-1">
@@ -462,8 +535,8 @@ END:VCARD`
           <div className="flex flex-col items-center">
             <div className="relative flex-shrink-0">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={currentUser?.avatar_url || userProfile.avatar} />
-                <AvatarFallback>{currentUser?.nickname || currentUser?.username || userProfile.name[0]}</AvatarFallback>
+                <AvatarImage src={currentUser?.avatar_url || 'https://via.placeholder.com/150'} />
+                <AvatarFallback>{currentUser?.nickname || currentUser?.username || '用户'[0]}</AvatarFallback>
               </Avatar>
               <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background disabled:opacity-50 disabled:cursor-not-allowed">
                 {isUpdating ? (
@@ -512,7 +585,7 @@ END:VCARD`
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{currentUser?.nickname || currentUser?.username || userProfile.name}</h2>
+              <h2 className="text-xl font-bold">{currentUser?.nickname || currentUser?.username || '用户'}</h2>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -523,12 +596,12 @@ END:VCARD`
               </Button>
 
             </div>
-            <p className="text-muted-foreground text-sm mb-3">{currentUser?.bio || userProfile.bio}</p>
+            <p className="text-muted-foreground text-sm mb-3">{currentUser?.bio || ''}</p>
             
             {/* 等级标签 */}
             <div className="flex items-center mb-3">
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-medium">
-                {activityStats?.level || userProfile.level}
+                {activityStats?.level || '用户'}
               </Badge>
             </div>
             
@@ -545,7 +618,7 @@ END:VCARD`
                       : Array.isArray(currentUser.skills) ? currentUser.skills : []
                   }
                   if (skillsArray.length === 0) {
-                    skillsArray = userProfile.skills // 使用默认技能
+                    skillsArray = ['技能1', '技能2', '技能3'] // 使用默认技能
                   }
                   
                   return skillsArray.slice(0, 6).map((skill, index) => (
@@ -566,7 +639,7 @@ END:VCARD`
                       : Array.isArray(currentUser.skills) ? currentUser.skills : []
                   }
                   if (skillsArray.length === 0) {
-                    skillsArray = userProfile.skills
+                    skillsArray = ['技能1', '技能2', '技能3']
                   }
                   
                   return skillsArray.length > 6 && (
@@ -1053,8 +1126,8 @@ END:VCARD`
               <div className="w-16 h-16 mx-auto mb-3 bg-primary/10 rounded-full flex items-center justify-center">
                 <Share2 size={24} className="text-primary" />
               </div>
-              <h3 className="font-medium mb-2">{userProfile.name}</h3>
-              <p className="text-sm text-muted-foreground mb-4">{userProfile.bio}</p>
+              <h3 className="font-medium mb-2">{currentUser?.nickname || currentUser?.username || '用户'}</h3>
+              <p className="text-sm text-muted-foreground mb-4">{currentUser?.bio || ''}</p>
             </div>
             
             <div className="space-y-3">
@@ -1117,7 +1190,7 @@ END:VCARD`
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                扫描二维码查看 {userProfile.name} 的个人资料
+                扫描二维码查看 {currentUser?.nickname || currentUser?.username || '用户'} 的个人资料
               </p>
             </div>
             
@@ -1165,11 +1238,11 @@ END:VCARD`
                   </div>
                 ) : (
                   <>
-                    <div><span className="font-medium">姓名：</span>{currentUser?.nickname || currentUser?.username || userProfile.name}</div>
-                    <div><span className="font-medium">等级：</span>{activityStats?.level || userProfile.level}</div>
-                    <div><span className="font-medium">邮箱：</span>{currentUser?.email || userProfile.email}</div>
+                    <div><span className="font-medium">姓名：</span>{currentUser?.nickname || currentUser?.username || '用户'}</div>
+                    <div><span className="font-medium">等级：</span>{activityStats?.level || '用户'}</div>
+                    <div><span className="font-medium">邮箱：</span>{currentUser?.email || 'user@example.com'}</div>
                     <div><span className="font-medium">链接：</span>{generateProfileLink()}</div>
-                    <div><span className="font-medium">简介：</span>{currentUser?.bio || userProfile.bio}</div>
+                    <div><span className="font-medium">简介：</span>{currentUser?.bio || ''}</div>
                   </>
                 )}
               </div>
@@ -1204,12 +1277,12 @@ END:VCARD`
             </div>
           </div>
           
-          {/* 隐藏的canvas用于生成二维码 */}
-          <canvas ref={qrCanvasRef} style={{ display: 'none' }} />
-        </DialogContent>
-      </Dialog>
-      </div> {/* 结束内容区域 */}
-    </div>
+                  {/* 隐藏的canvas用于生成二维码 */}
+        <canvas ref={qrCanvasRef} style={{ display: 'none' }} />
+      </DialogContent>
+    </Dialog>
+    </div> {/* 结束 pt-nav div */}
+    </motion.div>
   )
 }
 
