@@ -30,7 +30,7 @@ interface NavigationProviderProps {
 export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children }) => {
   const [navigationState, setNavigationState] = useState<NavigationState>({
     homeActiveTab: 'home',
-    categoryActiveTab: 'grid',
+    categoryActiveTab: 'list',
     communityActiveTab: 'all'
   })
 
@@ -38,7 +38,7 @@ export const NavigationProvider: React.FC<NavigationProviderProps> = ({ children
   useEffect(() => {
     const savedState = {
       homeActiveTab: StorageManager.getActiveTab('home', 'home'),
-      categoryActiveTab: StorageManager.getActiveTab('category', 'grid'),
+      categoryActiveTab: StorageManager.getActiveTab('category', 'list'),
       communityActiveTab: StorageManager.getActiveTab('community', 'all')
     }
     setNavigationState(savedState)

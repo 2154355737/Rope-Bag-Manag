@@ -22,14 +22,19 @@ import RegisterScreen from './screens/register-screen'
 import ForgotPasswordScreen from './screens/forgot-password-screen'
 import TermsScreen from './screens/terms-screen'
 import Layout from './components/layout'
+import ProtectedRoute from './components/ProtectedRoute'
 import { initializePlatform } from './utils/platform'
 import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
 import { initializeSafeArea, setSafeAreaTheme, setSafeAreaDebug } from './utils/safeAreaManager'
 import StorageManager from './utils/storage'
 import { NavigationProvider } from './contexts/NavigationContext'
+import { AuthProvider } from './contexts/AuthContext'
 
 import './styles/safe-area-v2.css'
+
+// 导入后端连接测试工具（仅在开发环境下运行）
+import './utils/backendTest'
 
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true)
@@ -119,24 +124,25 @@ const App: React.FC = () => {
 
   // 主应用界面
   return (
-    <NavigationProvider>
-      <BackButtonHandler />
-      <Routes>
+    <AuthProvider>
+      <NavigationProvider>
+        <BackButtonHandler />
+        <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomeScreen />} />
             <Route path="home" element={<HomeScreen />} />
             <Route path="category" element={<CategoryScreen />} />
             <Route path="community" element={<CommunityScreen />} />
-            <Route path="messages" element={<MessagesScreen />} />
-            <Route path="profile" element={<ProfileScreen />} />
-            <Route path="publish" element={<PublishScreen />} />
+            <Route path="messages" element={<ProtectedRoute><MessagesScreen /></ProtectedRoute>} />
+            <Route path="profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
+            <Route path="publish" element={<ProtectedRoute><PublishScreen /></ProtectedRoute>} />
             <Route path="post/:id" element={<UniversalDetailScreen />} />
             <Route path="resource/:id" element={<UniversalDetailScreen />} />
             <Route path="announcement" element={<AnnouncementRedirect />} />
             <Route path="announcement/:id" element={<UniversalDetailScreen />} />
-            <Route path="settings" element={<SettingsScreen />} />
-            <Route path="edit-profile" element={<EditProfileScreen />} />
-            <Route path="my-content" element={<MyContentScreen />} />
+            <Route path="settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
+            <Route path="edit-profile" element={<ProtectedRoute><EditProfileScreen /></ProtectedRoute>} />
+            <Route path="my-content" element={<ProtectedRoute><MyContentScreen /></ProtectedRoute>} />
             <Route path="help" element={<HelpScreen />} />
             <Route path="about" element={<AboutScreen />} />
             <Route path="privacy" element={<PrivacyScreen />} />
@@ -149,7 +155,8 @@ const App: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
           <Route path="/terms" element={<TermsScreen />} />
       </Routes>
-    </NavigationProvider>
+      </NavigationProvider>
+    </AuthProvider>
   )
 }
 

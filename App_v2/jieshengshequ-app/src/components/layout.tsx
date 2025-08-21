@@ -14,7 +14,7 @@ const Layout: React.FC = () => {
     { path: '/home', icon: Home, label: '首页' },
     { path: '/category', icon: Layers, label: '分类' },
     { path: '/publish', icon: PlusCircle, label: '发布' },
-    { path: '/messages', icon: MessageSquare, label: '消息' },
+    { path: '/messages', icon: MessageSquare, label: '通知' },
     { path: '/profile', icon: User, label: '我的' },
   ]
 

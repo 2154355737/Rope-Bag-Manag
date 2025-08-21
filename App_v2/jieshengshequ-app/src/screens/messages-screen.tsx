@@ -1,357 +1,442 @@
 import React, { useState, useEffect } from 'react'
-import { motion, PanInfo } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { MessageCircle, Search, MoreVertical, Trash2, Pin } from 'lucide-react'
+import { Bell, Search, MoreVertical, Check, CheckCheck, Loader2, ExternalLink, Trash2, Settings, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { 
+  getNotifications, 
+  markAsRead,
+  markAllAsRead,
+  getUnreadCount,
+  Notification,
+  NotificationQuery
+} from '@/api/notifications'
 
 const MessagesScreen: React.FC = () => {
-  const [activeSwipeId, setActiveSwipeId] = useState<number | null>(null)
-  const [conversations, setConversations] = useState([
-    {
-      id: 1,
-      name: '张三',
-      avatar: '/api/placeholder/40/40',
-      lastMessage: '你好，关于React的问题...',
-      time: '2分钟前',
-      unread: 2,
-      online: true,
-      pinned: false
-    },
-    {
-      id: 2,
-      name: '李四',
-      avatar: '/api/placeholder/40/40',
-      lastMessage: '项目进展如何？',
-      time: '1小时前',
-      unread: 0,
-      online: false,
-      pinned: false
-    },
-    {
-      id: 3,
-      name: 'JavaScript交流群',
-      avatar: '/api/placeholder/40/40',
-      lastMessage: '王五: 有人用过Next.js吗？',
-      time: '3小时前',
-      unread: 5,
-      online: false,
-      isGroup: true,
-      pinned: true
-    },
-    {
-      id: 4,
-      name: '前端开发者社区',
-      avatar: '/api/placeholder/40/40',
-      lastMessage: '新的技术分享已发布',
-      time: '昨天',
-      unread: 1,
-      online: false,
-      isGroup: true,
-      pinned: false
-    }
-  ])
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [showClearDialog, setShowClearDialog] = useState(false)
 
-  // 删除对话
-  const deleteConversation = (id: number) => {
-    const conversation = conversations.find(conv => conv.id === id)
-    setConversations(prev => prev.filter(conv => conv.id !== id))
-    
-    toast({
-      title: "对话已删除",
-      description: `已删除与 ${conversation?.name} 的对话`,
-      variant: "default"
-    })
+  // 加载通知列表
+  useEffect(() => {
+    loadNotifications()
+    loadUnreadCount()
+  }, [])
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true)
+      const params: NotificationQuery = { page: 1, size: 50 }
+      const data = await getNotifications(params)
+      setNotifications(data.list || [])
+    } catch (error: any) {
+      console.error('Failed to load notifications:', error)
+      if (error.message !== '未授权，请重新登录') {
+        toast({
+          title: "加载失败",
+          description: "无法加载通知列表",
+          variant: "destructive"
+        })
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // 置顶/取消置顶对话
-  const togglePinConversation = (id: number) => {
-    const conversation = conversations.find(conv => conv.id === id)
-    setConversations(prev => 
-      prev.map(conv => 
-        conv.id === id 
-          ? { ...conv, pinned: !conv.pinned }
-          : conv
+  const loadUnreadCount = async () => {
+    try {
+      const data = await getUnreadCount()
+      setUnreadCount(data.count || 0)
+    } catch (error) {
+      console.error('Failed to load unread count:', error)
+    }
+  }
+
+  // 标记单个通知为已读
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await markAsRead(id)
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === id 
+            ? { ...notification, is_read: true }
+            : notification
+        )
       )
-    )
-    
-    toast({
-      title: conversation?.pinned ? "取消置顶" : "置顶成功",
-      description: `${conversation?.pinned ? '已取消置顶' : '已置顶'} ${conversation?.name}`,
-      variant: "default"
-    })
+      setUnreadCount(prev => Math.max(0, prev - 1))
+      
+      toast({
+        title: "已标记为已读",
+        description: "通知已标记为已读",
+      })
+    } catch (error: any) {
+      console.error('Mark as read failed:', error)
+      toast({
+        title: "操作失败",
+        description: error.message || "标记已读失败",
+        variant: "destructive"
+      })
+    }
   }
 
-  // 对话排序：置顶的在前面
-  const sortedConversations = [...conversations].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1
-    if (!a.pinned && b.pinned) return 1
-    return 0
-  })
-
-  // 侧滑组件
-  const SwipeableConversation: React.FC<{ 
-    conversation: any, 
-    onDelete: (id: number) => void,
-    onTogglePin: (id: number) => void,
-    isActive: boolean,
-    onActivate: (id: number | null) => void
-  }> = ({ conversation, onDelete, onTogglePin, isActive, onActivate }) => {
-    const [dragX, setDragX] = useState(0)
-    const [showDelete, setShowDelete] = useState(false)
-    const [showPin, setShowPin] = useState(false)
-    const [isDragging, setIsDragging] = useState(false)
-
-    const handleDragStart = () => {
-      setIsDragging(true)
+  // 标记所有通知为已读
+  const handleMarkAllAsRead = async () => {
+    if (unreadCount === 0) {
+      toast({
+        title: "提示",
+        description: "没有未读通知",
+      })
+      return
     }
 
-    const handleDrag = (event: any, info: PanInfo) => {
-      // 增加拖拽阻力，减少灵敏度
-      const resistance = 0.7
-      const newX = Math.max(-100, Math.min(100, info.offset.x * resistance))
-      setDragX(newX)
+    try {
+      setBulkActionLoading(true)
+      await markAllAsRead()
+      setNotifications(prev => 
+        prev.map(notification => ({ ...notification, is_read: true }))
+      )
+      setUnreadCount(0)
       
-      // 提高显示按钮的阈值
-      setShowDelete(newX < -60)
-      setShowPin(newX > 60)
+      toast({
+        title: "全部已读",
+        description: "所有通知已标记为已读",
+      })
+    } catch (error: any) {
+      console.error('Mark all as read failed:', error)
+      toast({
+        title: "操作失败",
+        description: error.message || "标记全部已读失败",
+        variant: "destructive"
+      })
+    } finally {
+      setBulkActionLoading(false)
     }
+  }
 
-    const handleDragEnd = (event: any, info: PanInfo) => {
-      setIsDragging(false)
-      const velocity = info.velocity.x
-      const offset = info.offset.x
+  // 清理已读通知
+  const handleClearRead = async () => {
+    const readNotifications = notifications.filter(n => n.is_read)
+    
+    try {
+      setBulkActionLoading(true)
+      // 这里暂时只在前端移除，后端可能需要添加批量删除API
+      setNotifications(prev => prev.filter(n => !n.is_read))
       
-      // 提高触发阈值，并考虑滑动速度
-      const deleteThreshold = velocity < -500 ? -50 : -80  // 快速滑动时降低阈值
-      const pinThreshold = velocity > 500 ? 50 : 80
-      
-      if (offset < deleteThreshold) {
-        // 左滑触发删除
-        setDragX(-100)
-        setShowDelete(true)
-        setShowPin(false)
-        onActivate(conversation.id)
-      } else if (offset > pinThreshold) {
-        // 右滑触发置顶
-        setDragX(100)
-        setShowPin(true)
-        setShowDelete(false)
-        onActivate(conversation.id)
-      } else {
-        // 回弹到原位
-        setDragX(0)
-        setShowDelete(false)
-        setShowPin(false)
-        onActivate(null)
-      }
+      toast({
+        title: "清理完成",
+        description: `已清理 ${readNotifications.length} 条已读通知`,
+      })
+    } catch (error: any) {
+      console.error('Clear read failed:', error)
+      toast({
+        title: "操作失败",
+        description: error.message || "清理失败",
+        variant: "destructive"
+      })
+    } finally {
+      setBulkActionLoading(false)
+      setShowClearDialog(false)
     }
+  }
 
-    const handleDelete = () => {
-      onDelete(conversation.id)
-      setDragX(0)
-      setShowDelete(false)
-      onActivate(null)
+  // 检查是否有已读通知可清理
+  const readNotificationsCount = notifications.filter(n => n.is_read).length
+
+  // 格式化时间
+  const formatTime = (timeStr: string) => {
+    const time = new Date(timeStr)
+    const now = new Date()
+    const diffInMs = now.getTime() - time.getTime()
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+    const diffInHours = Math.floor(diffInMinutes / 60)
+    const diffInDays = Math.floor(diffInHours / 24)
+
+    if (diffInMinutes < 1) return '刚刚'
+    if (diffInMinutes < 60) return `${diffInMinutes}分钟前`
+    if (diffInHours < 24) return `${diffInHours}小时前`
+    if (diffInDays === 1) return '昨天'
+    if (diffInDays < 7) return `${diffInDays}天前`
+    
+    return time.toLocaleDateString()
+  }
+
+  // 过滤通知
+  const filteredNotifications = notifications.filter(notification =>
+    notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    notification.content.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // 获取通知类型图标
+  const getNotificationIcon = (type?: string) => {
+    switch (type) {
+      case 'ResourceApproved':
+        return '✅'
+      case 'CommentReceived':
+        return '💬'
+      case 'SystemNotification':
+        return '🔔'
+      default:
+        return '📢'
     }
+  }
 
-    const handleTogglePin = () => {
-      onTogglePin(conversation.id)
-      setDragX(0)
-      setShowPin(false)
-      onActivate(null)
+  // 处理通知点击
+  const handleNotificationClick = (notification: Notification) => {
+    // 如果未读，标记为已读
+    if (!notification.is_read) {
+      handleMarkAsRead(notification.id)
     }
-
-    // 监听外部状态变化，重置当前组件
-    useEffect(() => {
-      if (!isActive) {
-        setDragX(0)
-        setShowDelete(false)
-        setShowPin(false)
-      }
-    }, [isActive])
-
-    // 重置到原始状态
-    const resetPosition = () => {
-      setDragX(0)
-      setShowDelete(false)
-      setShowPin(false)
-      onActivate(null)
+    
+    // 如果有链接，跳转
+    if (notification.link) {
+      // 这里可以根据需要处理内部路由或外部链接
+      console.log('Navigate to:', notification.link)
     }
-
-    return (
-      <div className="relative overflow-hidden">
-        {/* 置顶按钮背景 */}
-        <div 
-          className={`absolute inset-y-0 left-0 w-24 ${
-            conversation.pinned ? 'bg-orange-500' : 'bg-blue-500'
-          } flex items-center justify-center transition-all duration-300 ease-out ${
-            showPin ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleTogglePin}
-            className="text-white hover:bg-opacity-80"
-          >
-            <Pin size={20} className={conversation.pinned ? 'rotate-45' : ''} />
-          </Button>
-        </div>
-
-        {/* 删除按钮背景 */}
-        <div 
-          className={`absolute inset-y-0 right-0 w-24 bg-red-500 flex items-center justify-center transition-all duration-300 ease-out ${
-            showDelete ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDelete}
-            className="text-white hover:bg-red-600 hover:text-white"
-          >
-            <Trash2 size={20} />
-          </Button>
-        </div>
-
-        {/* 可滑动的对话卡片 */}
-        <motion.div
-          drag="x"
-          dragConstraints={{ left: -100, right: 100 }}
-          dragElastic={0.05}  // 降低弹性，减少抖动
-          dragMomentum={false}  // 禁用拖拽惯性，提高控制性
-          dragDirectionLock={true}  // 锁定拖拽方向，避免意外滑动
-          onDragStart={handleDragStart}
-          onDrag={handleDrag}
-          onDragEnd={handleDragEnd}
-          animate={{ x: dragX }}
-          transition={{ 
-            type: "spring", 
-            stiffness: 400,  // 提高刚度，减少弹跳
-            damping: 40,     // 增加阻尼，减少振动
-            mass: 0.8        // 降低质量，提高响应速度
-          }}
-          className="relative z-10"
-        >
-          <Card className="m-2 cursor-pointer hover:bg-muted/50 transition-colors border-none">
-            <CardContent 
-              className="p-4" 
-              onClick={(e) => {
-                // 防止拖拽时触发点击
-                if (!isDragging) {
-                  resetPosition()
-                }
-              }}
-            >
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <Avatar>
-                    <AvatarImage src={conversation.avatar} alt={conversation.name} />
-                    <AvatarFallback>
-                      {conversation.isGroup ? (
-                        <MessageCircle className="h-4 w-4" />
-                      ) : (
-                        conversation.name.charAt(0)
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  {conversation.online && !conversation.isGroup && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-background"></div>
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <h3 className="font-medium truncate">{conversation.name}</h3>
-                      {conversation.pinned && (
-                        <Pin size={14} className="ml-1 text-orange-500 rotate-45 flex-shrink-0" />
-                      )}
-                    </div>
-                    <span className="text-xs text-muted-foreground">{conversation.time}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate mt-1">
-                    {conversation.lastMessage}
-                  </p>
-                </div>
-                
-                {conversation.unread > 0 && (
-                  <Badge variant="destructive" className="ml-2">
-                    {conversation.unread}
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-    )
   }
 
   return (
     <div className="flex flex-col h-full bg-background">
       {/* 顶部导航栏 */}
       <TopNavigation
-        title="消息"
-        subtitle={`${conversations.length} 个对话`}
+        title="通知"
+        subtitle={loading ? "加载中..." : `${notifications.length} 条通知${unreadCount > 0 ? `，${unreadCount} 条未读` : ''}`}
         showSearchButton
-        showMoreButton
-        onMoreClick={() => toast({ title: "更多选项", description: "功能开发中..." })}
+        rightAction={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-9 w-9"
+                disabled={bulkActionLoading}
+              >
+                {bulkActionLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MoreVertical size={20} />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={20} className="w-48 z-[80]">
+              <DropdownMenuItem 
+                onClick={handleMarkAllAsRead}
+                disabled={unreadCount === 0 || bulkActionLoading}
+                className="flex items-center"
+              >
+                <CheckCheck className="mr-2 h-4 w-4" />
+                一键已读 {unreadCount > 0 && `(${unreadCount})`}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => setShowClearDialog(true)}
+                disabled={readNotificationsCount === 0 || bulkActionLoading}
+                className="flex items-center"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                清理已读 {readNotificationsCount > 0 && `(${readNotificationsCount})`}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="flex items-center"
+                onClick={() => toast({ title: "通知设置", description: "功能开发中..." })}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                通知设置
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
       />
 
       {/* 内容区域 - 为固定导航栏留出空间 */}
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         {/* 搜索栏 */}
-        <div className="p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            id="messages-search"
-            name="messageSearch"
-            placeholder="搜索对话..."
-            className="pl-10"
-            autoComplete="search"
-          />
-        </div>
-      </div>
-
-      {/* 对话列表 */}
-      <div 
-        className="flex-1 overflow-y-auto"
-        onClick={(e) => {
-          // 点击空白区域重置所有滑动状态
-          if (e.target === e.currentTarget) {
-            setActiveSwipeId(null)
-          }
-        }}
-      >
-        {sortedConversations.map((conversation) => (
-          <SwipeableConversation
-            key={conversation.id}
-            conversation={conversation}
-            onDelete={deleteConversation}
-            onTogglePin={togglePinConversation}
-            isActive={activeSwipeId === conversation.id}
-            onActivate={setActiveSwipeId}
-          />
-        ))}
-      </div>
-
-      {/* 空状态 */}
-      {conversations.length === 0 && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <MessageCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">暂无消息</h3>
-            <p className="text-muted-foreground">开始与其他开发者交流吧！</p>
+        <div className="px-4 py-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              id="notifications-search"
+              name="notificationSearch"
+              placeholder="搜索通知..."
+              className="pl-10 h-9"
+              autoComplete="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
         </div>
-      )}
+
+        {/* 加载状态 */}
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <span className="ml-2">加载通知中...</span>
+          </div>
+        )}
+
+        {/* 通知列表 */}
+        {!loading && (
+          <div className="flex-1 overflow-y-auto pb-4">
+            <div className="space-y-2 px-4">
+              {filteredNotifications.map((notification) => (
+                <motion.div
+                  key={notification.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  onClick={() => handleNotificationClick(notification)}
+                >
+                  <Card className={`cursor-pointer transition-all duration-200 border-l-4 hover:shadow-md ${
+                    notification.is_read 
+                      ? 'border-l-muted hover:bg-muted/20' 
+                      : 'border-l-primary bg-primary/5 hover:bg-primary/10 shadow-sm'
+                  }`}>
+                    <CardContent className="p-3">
+                      <div className="flex items-start space-x-3">
+                        {/* 通知图标 */}
+                        <div className="flex-shrink-0 text-lg mt-0.5">
+                          {getNotificationIcon(notification.notif_type)}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between mb-1">
+                            <h3 className={`font-medium text-sm leading-tight ${
+                              notification.is_read ? 'text-muted-foreground' : 'text-foreground'
+                            }`}>
+                              {notification.title}
+                            </h3>
+                            <div className="flex items-center space-x-2 ml-2 flex-shrink-0">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                {formatTime(notification.created_at)}
+                              </span>
+                              {!notification.is_read && (
+                                <div className="w-2 h-2 bg-primary rounded-full"></div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <p className={`text-sm mb-2 leading-relaxed ${
+                            notification.is_read ? 'text-muted-foreground' : 'text-foreground/80'
+                          }`}>
+                            {notification.content}
+                          </p>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {notification.notif_type && (
+                                <Badge variant="outline" className="text-xs px-2 py-0.5">
+                                  {notification.notif_type}
+                                </Badge>
+                              )}
+                              {notification.link && (
+                                <ExternalLink size={12} className="text-muted-foreground" />
+                              )}
+                            </div>
+                            
+                            {!notification.is_read && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs hover:bg-primary/20"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleMarkAsRead(notification.id)
+                                }}
+                              >
+                                <Check size={12} className="mr-1" />
+                                已读
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 空状态 */}
+        {!loading && filteredNotifications.length === 0 && (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                {searchQuery ? '未找到相关通知' : notifications.length === 0 ? '暂无通知' : '没有匹配的通知'}
+              </h3>
+              <p className="text-muted-foreground">
+                {searchQuery 
+                  ? '尝试使用其他关键词搜索' 
+                  : notifications.length === 0 
+                    ? '当有新的通知时，会在这里显示' 
+                    : '尝试调整搜索条件'
+                }
+              </p>
+            </div>
+          </div>
+        )}
       </div> {/* 结束内容区域 */}
+
+      {/* 清理已读通知确认对话框 */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="mr-2 h-5 w-5 text-orange-500" />
+              确认清理已读通知
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              您即将清理 <span className="font-medium text-foreground">{readNotificationsCount}</span> 条已读通知。
+              此操作无法撤销，确定要继续吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearRead}
+              disabled={bulkActionLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkActionLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  清理中...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  确认清理
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -155,4 +155,19 @@ const formatDate = (d) => (d ? dayjs(d).format('YYYY-MM-DD') : '');
 
 .mr-1 { margin-right: 4px; }
 .ml-2 { margin-left: 8px; }
+
+/* 文本省略样式 */
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 </style> 

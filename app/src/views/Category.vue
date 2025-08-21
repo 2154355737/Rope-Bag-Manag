@@ -13,15 +13,19 @@
       <van-skeleton title :row="8" :loading="loading" v-if="loading && !categories.length" />
       
       <template v-else>
-        <div class="category-list">
-          <van-sidebar v-model="activeIndex" @change="onSidebarChange">
-            <van-sidebar-item 
-              v-for="category in categories" 
-              :key="category.id" 
-              :title="category.name" 
-            />
-          </van-sidebar>
+        <div class="category-layout">
+          <!-- 左侧分类栏 -->
+          <div class="category-sidebar">
+            <van-sidebar v-model="activeIndex" @change="onSidebarChange">
+              <van-sidebar-item 
+                v-for="category in categories" 
+                :key="category.id" 
+                :title="category.name" 
+              />
+            </van-sidebar>
+          </div>
           
+          <!-- 右侧资源内容 -->
           <div class="category-resources">
             <!-- 当前分类标题 -->
             <div class="current-category" v-if="currentCategory">
@@ -37,6 +41,7 @@
               :loading="resourceLoading"
               :finished="finished"
               :emptyText="'该分类暂无资源'"
+              :showCover="false"
               @resource-click="onResourceClick"
             />
             
@@ -202,14 +207,15 @@ onMounted(() => {
   height: calc(100vh - 46px - var(--safe-area-inset-top)); /* 扣除顶部导航高度和安全区域 */
 }
 
-.category-list {
+.category-layout {
   display: flex;
   flex: 1;
   height: 100%;
 }
 
-.van-sidebar {
-  width: 85px;
+.category-sidebar {
+  width: 90px; /* 左侧分类栏宽度 */
+  flex-shrink: 0; /* 确保侧边栏不收缩 */
   height: 100%;
   overflow-y: auto;
   background-color: #f7f8fa;
@@ -220,20 +226,26 @@ onMounted(() => {
   scrollbar-color: rgba(79, 192, 141, 0.3) transparent;
 }
 
-.van-sidebar::-webkit-scrollbar {
+.category-sidebar .van-sidebar {
+  width: 100%;
+  height: 100%;
+  background-color: transparent;
+}
+
+.category-sidebar::-webkit-scrollbar {
   width: 3px;
 }
 
-.van-sidebar::-webkit-scrollbar-track {
+.category-sidebar::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.van-sidebar::-webkit-scrollbar-thumb {
+.category-sidebar::-webkit-scrollbar-thumb {
   background: rgba(79, 192, 141, 0.3);
   border-radius: 2px;
 }
 
-.van-sidebar::-webkit-scrollbar-thumb:hover {
+.category-sidebar::-webkit-scrollbar-thumb:hover {
   background: rgba(79, 192, 141, 0.5);
 }
 

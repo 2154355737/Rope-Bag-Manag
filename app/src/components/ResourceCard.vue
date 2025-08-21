@@ -1,6 +1,5 @@
 <template>
   <div class="resource-card" @click="handleClick">
-    <!-- 封面已移除，保持紧凑卡片 -->
     <div class="resource-card__content">
       <div class="resource-card__header">
         <i-mdi-file-document-outline class="resource-card__icon" />
@@ -56,7 +55,6 @@
 <script setup>
 import { computed } from 'vue';
 import dayjs from 'dayjs';
-import defaultCover from '@/assets/resource-placeholder.svg';
 
 const emit = defineEmits(['click', 'more']);
 
@@ -131,26 +129,6 @@ const formatDate = (date) => {
   position: relative;
 }
 
-.resource-card__cover {
-  height: 140px;
-  position: relative;
-  overflow: hidden;
-  background-color: #f5f7fa;
-}
-
-.resource-card__cover img, 
-.resource-card__cover .van-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.resource-card__tag {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-}
-
 .resource-card__content {
   padding: 12px;
 }
@@ -192,8 +170,6 @@ const formatDate = (date) => {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-
-
 
 /* 右下角更多操作按钮 */
 .resource-card__more {
@@ -256,5 +232,20 @@ const formatDate = (date) => {
 
 .ml-2 {
   margin-left: 8px;
+}
+
+/* 文本省略样式 */
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style> 
