@@ -81,24 +81,24 @@ impl AuthHelper {
         let claims = jwt_utils.verify_token(&token).map_err(|_| AuthError::TokenInvalid)?;
         
         // 3. 构造用户对象
-        let user_role = match claims.role.as_str() {
-            "admin" => UserRole::Admin,
-            "moderator" => UserRole::Moderator,
-            "elder" => UserRole::Elder,
-            _ => UserRole::User,
-        };
-        
-        let is_admin = matches!(user_role, UserRole::Admin);
-        
         let user = User {
             id: claims.user_id,
-            username: claims.username,
-            email: "".to_string(), // TODO: 从数据库获取完整用户信息
-            password_hash: "".to_string(),
-            nickname: None,
-            role: user_role,
+            username: claims.username.clone(),
+            email: String::new(), // Claims中没有email字段，使用空字符串
+            password_hash: String::new(),
+            nickname: None, // Claims中没有nickname字段，使用None
+            bio: None,
+            location: None,
+            website: None,
+            skills: None,
+            role: match claims.role.as_str() {
+                "admin" => UserRole::Admin,
+                "moderator" => UserRole::Moderator,
+                "elder" => UserRole::Elder,
+                _ => UserRole::User,
+            },
             star: 0,
-            ban_status: BanStatus::Normal, // TODO: 从数据库获取真实状态
+            ban_status: BanStatus::Normal,
             ban_reason: None,
             qq_number: None,
             avatar_url: None,
@@ -107,7 +107,7 @@ impl AuthHelper {
             download_count: 0,
             created_at: chrono::Utc::now(),
             last_login: None,
-            is_admin,
+            is_admin: claims.role == "admin",
         };
         
         // 4. 检查封禁状态

@@ -1,4 +1,5 @@
-import { http, setToken, clearToken } from './client'
+import { http, setToken, clearToken, getToken } from './client'
+import { isTokenExpired } from '@/utils/jwt'
 
 export interface LoginRequest {
   username: string
@@ -15,8 +16,12 @@ export interface User {
   id: number
   username: string
   email: string
-  avatar?: string
+  avatar_url?: string
   nickname?: string
+  bio?: string
+  location?: string
+  website?: string
+  skills?: string
   role: string
   created_at: string
 }
@@ -58,7 +63,24 @@ export async function logout(): Promise<void> {
 
 // 获取当前用户信息
 export async function getCurrentUser(): Promise<User> {
-  return http.get<User>('/auth/me')
+  return http.get<User>('/auth/user-info')
+}
+
+// 获取当前用户详细资料
+export async function getCurrentUserProfile(): Promise<User> {
+  return http.get<User>('/users/profile')
+}
+
+// 更新当前用户资料
+export async function updateCurrentUserProfile(data: {
+  nickname?: string
+  bio?: string
+  location?: string
+  website?: string
+  skills?: string
+  avatar_url?: string
+}): Promise<void> {
+  return http.put<void>('/users/profile', data)
 }
 
 // 刷新token
@@ -85,7 +107,19 @@ export function getLocalUser(): User | null {
 
 // 检查是否已登录
 export function isLoggedIn(): boolean {
-  const token = localStorage.getItem('token')
+  const token = getToken() // 使用getToken()，它会自动检查过期
   const user = getLocalUser()
   return !!(token && user)
+}
+
+// 检查token是否有效（包含过期检查）
+export function isTokenValid(): boolean {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+  
+  try {
+    return !isTokenExpired(token)
+  } catch {
+    return false
+  }
 } 

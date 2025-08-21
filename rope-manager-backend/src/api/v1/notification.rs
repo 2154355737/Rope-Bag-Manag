@@ -11,9 +11,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route("/unread-count", web::get().to(unread_count))
             .route("/{id}/read", web::post().to(mark_read))
             .route("/mark-all-read", web::post().to(mark_all_read))
+            .route("/delete-read", web::delete().to(delete_read))
+            .route("/{id}", web::delete().to(delete_by_id))
             // 别名：对齐前端
             .route("/count", web::get().to(unread_count))
             .route("/read-all", web::post().to(mark_all_read))
+            .route("/clear-read", web::delete().to(delete_read))
     );
 }
 
@@ -52,6 +55,21 @@ async fn mark_read(path: web::Path<i32>, svc: web::Data<NotificationService>, us
 async fn mark_all_read(svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
     match svc.mark_all_read(user.id).await {
         Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"ok"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+async fn delete_read(svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    match svc.delete_read(user.id).await {
+        Ok(count) => HttpResponse::Ok().json(json!({"code":0, "data": {"deleted_count": count}, "message": format!("已清理 {} 条已读通知", count)})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+async fn delete_by_id(path: web::Path<i32>, svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    let id = path.into_inner();
+    match svc.delete_by_id(user.id, id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"删除成功"})),
         Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
     }
 } 

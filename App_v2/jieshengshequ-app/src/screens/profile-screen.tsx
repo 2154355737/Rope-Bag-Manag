@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download, FileText, MessageSquare, ChevronDown } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Settings, Edit, LogOut, BookOpen, Heart, Bookmark, ChevronRight, Moon, Sun, Camera, Save, X, Share2, QrCode, Award, Copy, Download, FileText, MessageSquare, ChevronDown, RefreshCw } from 'lucide-react'
 import QRCodeLib from 'qrcode'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,12 +19,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast'
 import { useTheme } from '@/components/theme-provider'
 import TopNavigation from '@/components/ui/top-navigation'
+import { getCurrentUserProfile, User } from '@/api/auth'
+import { 
+  getMyStats, 
+  getMyActivityStats, 
+  getMyWeeklyReport, 
+  getMyAchievements,
+  getMyResources,
+  getMyPosts,
+  getMyComments,
+  uploadAvatar,
+  type UserStats,
+  type UserActivityStats,
+  type WeeklyReportData,
+  type Achievement
+} from '@/api/user'
 
 const ProfileScreen: React.FC = () => {
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
+  const { logout } = useAuth()
   
-
+  // 数据加载状态
+  const [isLoading, setIsLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false) // 新增：头像上传状态
+  
+  // API数据状态
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+  const [myStats, setMyStats] = useState<UserStats | null>(null)
+  const [activityStats, setActivityStats] = useState<UserActivityStats | null>(null)
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReportData | null>(null)
+  const [achievements, setAchievements] = useState<Achievement[]>([])
+  
+  // 内容数据状态
+  const [myResources, setMyResources] = useState<any[]>([])
+  const [myPosts, setMyPosts] = useState<any[]>([])
+  const [myComments, setMyComments] = useState<any[]>([])
   
   // 分享和二维码状态管理
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -58,21 +90,27 @@ const ProfileScreen: React.FC = () => {
   }
 
   // 获取状态显示信息
-  const getStatusInfo = (status: 'published' | 'pending' | 'rejected') => {
-    switch (status) {
+  const getStatusInfo = (status: string) => {
+    // 统一转换为小写进行比较
+    const normalizedStatus = status?.toLowerCase()
+    
+    switch (normalizedStatus) {
       case 'published':
+      case 'active':
         return {
           text: '已发布',
           variant: 'default' as const,
           className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
         }
       case 'pending':
+      case 'draft':
         return {
           text: '待审核',
           variant: 'secondary' as const,
           className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
         }
       case 'rejected':
+      case 'inactive':
         return {
           text: '已拒绝',
           variant: 'destructive' as const,
@@ -92,7 +130,7 @@ const ProfileScreen: React.FC = () => {
   // 生成个人资料链接
   const generateProfileLink = () => {
     const baseUrl = window.location.origin
-    const profileId = userProfile.name.toLowerCase().replace(/\s+/g, '-')
+    const profileId = (currentUser?.username || currentUser?.nickname || userProfile.name).toLowerCase().replace(/\s+/g, '-')
     return `${baseUrl}/profile/${profileId}`
   }
 
@@ -265,150 +303,137 @@ END:VCARD`
   }
   
   // 处理头像上传
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // 这里应该上传到服务器，现在模拟
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          setUserProfile(prev => ({
-            ...prev,
-            avatar: e.target!.result as string
-          }))
-          toast({
-            title: "头像上传成功",
-            description: "您的头像已更新",
-            duration: 3000,
-          })
-        }
+      try {
+        setIsUpdating(true)
+        
+        // 调用头像上传API
+        const result = await uploadAvatar(file)
+        
+        // 更新当前用户数据
+        setCurrentUser(prev => prev ? {
+          ...prev,
+          avatar_url: result.avatar_url
+        } : null)
+        
+        toast({
+          title: "头像上传成功",
+          description: "您的头像已更新",
+          duration: 3000,
+        })
+        
+        // 重新加载用户数据以确保同步
+        await loadUserData()
+      } catch (error) {
+        console.error('头像上传失败:', error)
+        toast({
+          title: "头像上传失败",
+          description: "请稍后重试",
+          variant: "destructive",
+          duration: 3000,
+        })
+      } finally {
+        setIsUpdating(false)
       }
-      reader.readAsDataURL(file)
     }
   }
   
+  // 数据加载函数
+  const loadUserData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // 检查token
+      const token = localStorage.getItem('token')
+      console.log('当前token:', token ? '存在' : '不存在')
+      
+      // 并行加载所有用户数据
+      console.log('开始加载用户数据...')
+      const [user, stats, activity, weekly, achievementsData, resources, posts, comments] = await Promise.all([
+        getCurrentUserProfile().catch((err) => { console.error('获取用户信息失败:', err); return null }),
+        getMyStats().catch((err) => { console.error('获取用户统计失败:', err); return null }),
+        getMyActivityStats().catch((err) => { console.error('获取活动统计失败:', err); return null }),
+        getMyWeeklyReport().catch((err) => { console.error('获取周报失败:', err); return null }),
+        getMyAchievements().catch((err) => { console.error('获取成就失败:', err); return { list: [], total: 0 } }),
+        getMyResources().catch((err) => { console.error('获取资源失败:', err); return { list: [], total: 0 } }),
+        getMyPosts().catch((err) => { console.error('获取帖子失败:', err); return { list: [], total: 0 } }),
+        getMyComments().catch((err) => { console.error('获取评论失败:', err); return { list: [], total: 0 } })
+      ])
+      
+      console.log('API调用结果:', { user, stats, activity, weekly, achievementsData, resources, posts, comments })
+      
+      setCurrentUser(user)
+      setMyStats(stats)
+      setActivityStats(activity)
+      setWeeklyReport(weekly)
+      setAchievements(achievementsData?.list || [])
+      setMyResources(resources?.list || [])
+      setMyPosts(posts?.list || [])
+      setMyComments(comments?.list || [])
+    } catch (error) {
+      console.error('加载用户数据失败:', error)
+      toast({
+        title: "加载失败",
+        description: "无法加载用户数据，请稍后重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  
-  const userStats = {
-    posts: 12,
-    resources: 8,
-    views: 2560,
-    likes: 328,
+  // 刷新数据
+  const refreshUserData = async () => {
+    setIsRefreshing(true)
+    await loadUserData()
+    setIsRefreshing(false)
   }
-  
-  const weeklyReportData = {
-    totalPosts: 86,
-    completedProjects: 7,
-    currentStreak: 12,
-    achievements: [
-      { id: 1, name: '初学者', icon: '🌱', description: '完成第一个课程' },
-      { id: 2, name: '勤奋学习', icon: '📚', description: '连续学习7天' },
-      { id: 3, name: '代码大师', icon: '💻', description: '完成5个项目' },
-    ],
-    weeklyPosts: [2, 1, 3, 0, 2, 4, 1],
+
+  // 退出登录
+  const handleLogout = async () => {
+    try {
+      await logout()
+      toast({
+        title: "退出成功",
+        description: "您已成功退出登录",
+        variant: "default"
+      })
+      navigate('/login')
+    } catch (error) {
+      console.error('退出登录失败:', error)
+      toast({
+        title: "退出失败", 
+        description: "退出登录时发生错误，请重试",
+        variant: "destructive"
+      })
+    }
   }
-  
-  const userContent = {
-    resources: [
-      {
-        id: 1,
-        title: '结绳语言开发工具包',
-        image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Y29kaW5nfGVufDB8fDB8fHww',
-        likes: 42,
-        downloads: 128,
-        status: 'published' as const,
-      },
-      {
-        id: 2,
-        title: '移动端UI组件库',
-        image: 'https://images.unsplash.com/photo-1542831371-29b0f74f9713?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29kaW5nfGVufDB8fDB8fHww',
-        likes: 36,
-        downloads: 89,
-        status: 'pending' as const,
-      },
-      {
-        id: 5,
-        title: 'React Native组件集合',
-        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
-        likes: 0,
-        downloads: 0,
-        status: 'rejected' as const,
-      },
-      {
-        id: 6,
-        title: 'Vue.js工具集合',
-        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
-        likes: 0,
-        downloads: 0,
-        status: 'rejected' as const,
-      },
-      {
-        id: 7,
-        title: 'TypeScript开发套件',
-        image: 'https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=500&auto=format&fit=crop&q=60',
-        likes: 0,
-        downloads: 0,
-        status: 'rejected' as const,
-      },
-    ],
-    posts: [
-      {
-        id: 3,
-        title: '结绳高级特性详解',
-        image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8Y29kaW5nfGVufDB8fDB8fHww',
-        author: '程序员小王',
-        likes: 156,
-        comments: 23,
-        status: 'published' as const,
-      },
-      {
-        id: 4,
-        title: '结绳性能优化指南',
-        image: 'https://images.unsplash.com/photo-1551033406-611cf9a28f67?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTJ8fGNvZGluZ3xlbnwwfHwwfHx8MA%3D%3D',
-        author: '程序员小王',
-        likes: 89,
-        comments: 12,
-        status: 'pending' as const,
-      },
-      {
-        id: 8,
-        title: '结绳语言最佳实践分享',
-        image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=500&auto=format&fit=crop&q=60',
-        author: '程序员小王',
-        likes: 0,
-        comments: 0,
-        status: 'rejected' as const,
-      },
-    ],
-    comments: [
-      {
-        id: 9,
-        postTitle: '结绳语言新手入门指南',
-        content: '这个教程写得很详细，对新手很友好！',
-        author: '张三',
-        likes: 15,
-        time: '2小时前',
-      },
-      {
-        id: 10,
-        postTitle: 'Capacitor跨平台开发实践',
-        content: '感谢分享，解决了我的问题',
-        author: '李四',
-        likes: 8,
-        time: '5小时前',
-      },
-    ],
-  }
+
+  // 组件挂载时加载数据
+  useEffect(() => {
+    loadUserData()
+  }, [])
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
       <TopNavigation
         title="个人中心"
-        subtitle={userProfile.level}
+        subtitle={activityStats?.level || userProfile.level}
         showSettingsButton
         rightAction={
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={refreshUserData}
+              disabled={isRefreshing}
+            >
+              <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -437,16 +462,21 @@ END:VCARD`
           <div className="flex flex-col items-center">
             <div className="relative flex-shrink-0">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={userProfile.avatar} />
-                <AvatarFallback>{userProfile.name[0]}</AvatarFallback>
+                <AvatarImage src={currentUser?.avatar_url || userProfile.avatar} />
+                <AvatarFallback>{currentUser?.nickname || currentUser?.username || userProfile.name[0]}</AvatarFallback>
               </Avatar>
-              <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background">
-                <Camera size={14} />
+              <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background disabled:opacity-50 disabled:cursor-not-allowed">
+                {isUpdating ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <Camera size={14} />
+                )}
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarUpload}
                   className="hidden"
+                  disabled={isUpdating}
                 />
               </label>
             </div>
@@ -482,7 +512,7 @@ END:VCARD`
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold">{userProfile.name}</h2>
+              <h2 className="text-xl font-bold">{currentUser?.nickname || currentUser?.username || userProfile.name}</h2>
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -493,12 +523,12 @@ END:VCARD`
               </Button>
 
             </div>
-            <p className="text-muted-foreground text-sm mb-3">{userProfile.bio}</p>
+            <p className="text-muted-foreground text-sm mb-3">{currentUser?.bio || userProfile.bio}</p>
             
             {/* 等级标签 */}
             <div className="flex items-center mb-3">
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-medium">
-                {userProfile.level}
+                {activityStats?.level || userProfile.level}
               </Badge>
             </div>
             
@@ -506,23 +536,48 @@ END:VCARD`
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground font-medium">技能专长</div>
               <div className="flex flex-wrap gap-2">
-                {userProfile.skills.slice(0, 6).map((skill, index) => (
-                  <Badge 
-                    key={index} 
-                    variant="secondary" 
-                    className="text-xs bg-muted hover:bg-muted/80 transition-colors cursor-default px-3 py-1 rounded-full"
-                  >
-                    {skill}
-                  </Badge>
-                ))}
-                {userProfile.skills.length > 6 && (
-                  <Badge 
-                    variant="outline" 
-                    className="text-xs text-muted-foreground border-dashed cursor-default px-3 py-1 rounded-full"
-                  >
-                    +{userProfile.skills.length - 6}
-                  </Badge>
-                )}
+                {(() => {
+                  // 处理技能数据：可能是字符串（逗号分隔）或数组
+                  let skillsArray: string[] = []
+                  if (currentUser?.skills) {
+                    skillsArray = typeof currentUser.skills === 'string' 
+                      ? currentUser.skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
+                      : Array.isArray(currentUser.skills) ? currentUser.skills : []
+                  }
+                  if (skillsArray.length === 0) {
+                    skillsArray = userProfile.skills // 使用默认技能
+                  }
+                  
+                  return skillsArray.slice(0, 6).map((skill, index) => (
+                    <Badge 
+                      key={index} 
+                      variant="secondary" 
+                      className="text-xs bg-muted hover:bg-muted/80 transition-colors cursor-default px-3 py-1 rounded-full"
+                    >
+                      {skill}
+                    </Badge>
+                  ))
+                })()}
+                {(() => {
+                  let skillsArray: string[] = []
+                  if (currentUser?.skills) {
+                    skillsArray = typeof currentUser.skills === 'string' 
+                      ? currentUser.skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
+                      : Array.isArray(currentUser.skills) ? currentUser.skills : []
+                  }
+                  if (skillsArray.length === 0) {
+                    skillsArray = userProfile.skills
+                  }
+                  
+                  return skillsArray.length > 6 && (
+                    <Badge 
+                      variant="outline" 
+                      className="text-xs text-muted-foreground border-dashed cursor-default px-3 py-1 rounded-full"
+                    >
+                      +{skillsArray.length - 6}
+                    </Badge>
+                  )
+                })()}
               </div>
             </div>
           </div>
@@ -554,16 +609,21 @@ END:VCARD`
               <span className="text-sm font-medium">今日活跃度</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-primary">85%</span>
+              <span className="text-sm font-bold text-primary">
+                {weeklyReport?.today_activity || 0}%
+              </span>
               <span className="text-xs text-muted-foreground">+12%</span>
             </div>
           </div>
           <div className="mt-2 bg-background/50 rounded-full h-2">
-            <div className="bg-primary h-2 rounded-full transition-all duration-500" style={{ width: '85%' }}></div>
+            <div 
+              className="bg-primary h-2 rounded-full transition-all duration-500" 
+              style={{ width: `${weeklyReport?.today_activity || 0}%` }}
+            ></div>
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>已发布 3 篇内容</span>
-            <span>获得 12 个赞</span>
+            <span>已发布 {myStats?.posts || 0} 篇内容</span>
+            <span>获得 {myStats?.likes || 0} 个赞</span>
           </div>
         </div>
         
@@ -580,20 +640,20 @@ END:VCARD`
           <div className="grid grid-cols-3 gap-2 mb-4">
             <Card>
               <CardContent className="p-3 text-center">
-                <div className="text-2xl font-bold text-primary">{weeklyReportData.totalPosts}</div>
+                <div className="text-2xl font-bold text-primary">{weeklyReport?.total_posts || 0}</div>
                 <div className="text-xs text-muted-foreground">总发布</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-3 text-center">
-                <div className="text-2xl font-bold text-primary">{weeklyReportData.completedProjects}</div>
-                <div className="text-xs text-muted-foreground">内容浏览量</div>
+                <div className="text-2xl font-bold text-primary">{weeklyReport?.completed_projects || 0}</div>
+                <div className="text-xs text-muted-foreground">完成项目</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-3 text-center">
-                <div className="text-2xl font-bold text-primary">{weeklyReportData.currentStreak}</div>
-                <div className="text-xs text-muted-foreground">连续签到</div>
+                <div className="text-2xl font-bold text-primary">{weeklyReport?.current_streak || 0}</div>
+                <div className="text-xs text-muted-foreground">连续天数</div>
               </CardContent>
             </Card>
           </div>
@@ -603,7 +663,7 @@ END:VCARD`
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-medium">本周发布</h4>
                 <div className="text-xs text-muted-foreground">
-                  总计: {weeklyReportData.weeklyPosts.reduce((sum, posts) => sum + posts, 0)} 篇
+                  总计: {(weeklyReport?.weekly_posts || []).reduce((sum, posts) => sum + posts, 0)} 篇
                 </div>
               </div>
               
@@ -611,10 +671,11 @@ END:VCARD`
               <div className="relative">
                 {/* 纯柱状图区域 */}
                 <div className="flex items-end h-16 gap-1 mb-2">
-                  {weeklyReportData.weeklyPosts.map((posts, index) => {
+                  {(weeklyReport?.weekly_posts || [0,0,0,0,0,0,0]).map((posts, index) => {
                     // 限制最大高度，确保不会超出容器
-                    const maxDisplayValue = Math.max(...weeklyReportData.weeklyPosts)
-                    const height = maxDisplayValue > 0 ? (posts / maxDisplayValue) * 90 : 0 // 恢复到90%
+                    const weeklyPosts = weeklyReport?.weekly_posts || [0,0,0,0,0,0,0]
+                    const maxDisplayValue = Math.max(...weeklyPosts)
+                    const height = maxDisplayValue > 0 ? (posts / maxDisplayValue) * 90 : 0
                     
                     return (
                       <motion.div
@@ -667,7 +728,7 @@ END:VCARD`
                 
                 {/* 日期和数值标签区域 - 独立在柱状图下方 */}
                 <div className="flex gap-1 mb-3">
-                  {weeklyReportData.weeklyPosts.map((posts, index) => {
+                  {(weeklyReport?.weekly_posts || [0,0,0,0,0,0,0]).map((posts, index) => {
                     const dayNames = ['一', '二', '三', '四', '五', '六', '日']
                     
                     return (
@@ -714,7 +775,7 @@ END:VCARD`
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1.5, duration: 0.5 }}
                   >
-                    平均: {(weeklyReportData.weeklyPosts.reduce((sum, posts) => sum + posts, 0) / 7).toFixed(1)} 篇/天
+                    平均: {((weeklyReport?.weekly_posts || []).reduce((sum, posts) => sum + posts, 0) / 7).toFixed(1)} 篇/天
                   </motion.div>
                 </div>
               </div>
@@ -723,12 +784,13 @@ END:VCARD`
           
           <h4 className="text-sm font-medium mb-2">成就徽章</h4>
           <div className="flex gap-3 overflow-x-auto pb-2">
-            {weeklyReportData.achievements.map((achievement) => (
+            {(achievements.length > 0 ? achievements : weeklyReport?.achievements || []).map((achievement) => (
               <div key={achievement.id} className="flex flex-col items-center min-w-[60px]">
                 <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-1">
                   <span className="text-2xl">{achievement.icon}</span>
                 </div>
                 <div className="text-xs text-center">{achievement.name}</div>
+                <div className="text-xs text-muted-foreground text-center">{achievement.description}</div>
               </div>
             ))}
           </div>
@@ -749,7 +811,7 @@ END:VCARD`
             >
               <CardContent className="p-4 text-center">
                 <BookOpen size={24} className="mx-auto mb-2 text-primary" />
-                <div className="text-lg font-bold">{userContent.resources.length}</div>
+                <div className="text-lg font-bold">{myResources.length}</div>
                 <div className="text-xs text-muted-foreground">我的资源</div>
               </CardContent>
             </Card>
@@ -765,7 +827,7 @@ END:VCARD`
             >
               <CardContent className="p-4 text-center">
                 <FileText size={24} className="mx-auto mb-2 text-primary" />
-                <div className="text-lg font-bold">{userContent.posts.length}</div>
+                <div className="text-lg font-bold">{myPosts.length}</div>
                 <div className="text-xs text-muted-foreground">我的帖子</div>
               </CardContent>
             </Card>
@@ -781,7 +843,7 @@ END:VCARD`
             >
               <CardContent className="p-4 text-center">
                 <MessageSquare size={24} className="mx-auto mb-2 text-primary" />
-                <div className="text-lg font-bold">{userContent.comments.length}</div>
+                <div className="text-lg font-bold">{myComments.length}</div>
                 <div className="text-xs text-muted-foreground">我的评论</div>
               </CardContent>
             </Card>
@@ -797,34 +859,35 @@ END:VCARD`
           
           <TabsContent value="resources" className="mt-0">
             <div className="grid grid-cols-2 gap-3">
-              {userContent.resources.slice(0, 4).map((resource) => (
+              {myResources.slice(0, 4).map((resource) => (
                 <motion.div
                   key={resource.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/resource/${resource.id}`)}
                 >
-                  <Card className="overflow-hidden relative">
+                  <Card className="overflow-hidden relative hover:shadow-lg transition-shadow">
                     <div className="absolute top-2 right-2 z-10">
                       <Badge className={`text-xs px-2 py-0.5 ${getStatusInfo(resource.status).className}`}>
                         {getStatusInfo(resource.status).text}
                       </Badge>
                     </div>
-                    <img 
-                      src={resource.image} 
-                      alt={resource.title}
-                      className="w-full h-24 object-cover"
-                    />
+                    {/* 使用默认图片，因为后端资源数据没有图片字段 */}
+                    <div className="w-full h-24 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+                      <BookOpen size={32} className="text-primary/60" />
+                    </div>
                     <CardContent className="p-2">
-                      <h4 className="text-sm font-medium line-clamp-1">{resource.title}</h4>
+                      <h4 className="text-sm font-medium line-clamp-1">{resource.name}</h4>
                       <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
                         <div className="flex items-center">
                           <Heart size={12} className="mr-1" />
-                          <span>{resource.likes}</span>
+                          <span>{resource.like_count}</span>
                         </div>
                         <div className="flex items-center">
                           <BookOpen size={12} className="mr-1" />
-                          <span>{resource.downloads}</span>
+                          <span>{resource.download_count}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -833,7 +896,7 @@ END:VCARD`
               ))}
             </div>
             
-            {userContent.resources.length > 4 && (
+            {myResources.length > 4 && (
               <div className="text-center mt-4">
                 <Button 
                   variant="outline" 
@@ -841,7 +904,7 @@ END:VCARD`
                   onClick={() => navigate('/my-content?tab=resources')}
                   className="w-full"
                 >
-                  查看全部 {userContent.resources.length} 个资源
+                  查看全部 {myResources.length} 个资源
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               </div>
@@ -850,12 +913,14 @@ END:VCARD`
           
           <TabsContent value="posts" className="mt-0">
             <div className="grid grid-cols-2 gap-3">
-              {userContent.posts.slice(0, 4).map((post) => (
+              {myPosts.slice(0, 4).map((post) => (
                 <motion.div
                   key={post.id}
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.3 }}
+                  className="cursor-pointer"
+                  onClick={() => navigate(`/post/${post.id}`)}
                 >
                   <Card className="overflow-hidden relative">
                     <div className="absolute top-2 right-2 z-10">
@@ -863,18 +928,17 @@ END:VCARD`
                         {getStatusInfo(post.status).text}
                       </Badge>
                     </div>
-                    <img 
-                      src={post.image} 
-                      alt={post.title}
-                      className="w-full h-24 object-cover"
-                    />
+                    {/* 使用默认图片，因为后端帖子数据没有图片字段 */}
+                    <div className="w-full h-24 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center">
+                      <FileText size={32} className="text-blue-500/60" />
+                    </div>
                     <CardContent className="p-2">
                       <h4 className="text-sm font-medium line-clamp-1">{post.title}</h4>
                       <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                        <span>{post.author}</span>
+                        <span>{post.author_name || '匿名'}</span>
                         <div className="flex items-center">
                           <Heart size={12} className="mr-1" />
-                          <span>{post.likes}</span>
+                          <span>{post.like_count}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -883,7 +947,7 @@ END:VCARD`
               ))}
             </div>
             
-            {userContent.posts.length > 4 && (
+            {myPosts.length > 4 && (
               <div className="text-center mt-4">
                 <Button 
                   variant="outline" 
@@ -891,7 +955,7 @@ END:VCARD`
                   onClick={() => navigate('/my-content?tab=posts')}
                   className="w-full"
                 >
-                  查看全部 {userContent.posts.length} 个帖子
+                  查看全部 {myPosts.length} 个帖子
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               </div>
@@ -900,14 +964,23 @@ END:VCARD`
           
           <TabsContent value="comments" className="mt-0">
             <div className="space-y-3">
-              {userContent.comments.slice(0, 4).map((comment) => (
+              {myComments.slice(0, 4).map((comment) => (
                 <motion.div
                   key={comment.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    // 根据评论的目标类型跳转到对应页面
+                    if (comment.target_type === 'post') {
+                      navigate(`/post/${comment.target_id}`)
+                    } else if (comment.target_type === 'resource') {
+                      navigate(`/resource/${comment.target_id}`)
+                    }
+                  }}
                 >
-                  <Card>
+                  <Card className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between mb-2">
                         <h4 className="text-sm font-medium text-primary line-clamp-1">{comment.postTitle}</h4>
@@ -927,7 +1000,7 @@ END:VCARD`
               ))}
             </div>
             
-            {userContent.comments.length > 4 && (
+            {myComments.length > 4 && (
               <div className="text-center mt-4">
                 <Button 
                   variant="outline" 
@@ -935,7 +1008,7 @@ END:VCARD`
                   onClick={() => navigate('/my-content?tab=comments')}
                   className="w-full"
                 >
-                  查看全部 {userContent.comments.length} 条评论
+                  查看全部 {myComments.length} 条评论
                   <ChevronRight size={14} className="ml-1" />
                 </Button>
               </div>
@@ -957,7 +1030,11 @@ END:VCARD`
           />
         </div>
         
-        <Button variant="outline" className="w-full mt-4 text-destructive">
+        <Button 
+          variant="outline" 
+          className="w-full mt-4 text-destructive"
+          onClick={handleLogout}
+        >
           <LogOut size={16} className="mr-2" /> 退出登录
         </Button>
       </div>
@@ -1088,11 +1165,11 @@ END:VCARD`
                   </div>
                 ) : (
                   <>
-                    <div><span className="font-medium">姓名：</span>{userProfile.name}</div>
-                    <div><span className="font-medium">等级：</span>{userProfile.level}</div>
-                    <div><span className="font-medium">邮箱：</span>{userProfile.email}</div>
+                    <div><span className="font-medium">姓名：</span>{currentUser?.nickname || currentUser?.username || userProfile.name}</div>
+                    <div><span className="font-medium">等级：</span>{activityStats?.level || userProfile.level}</div>
+                    <div><span className="font-medium">邮箱：</span>{currentUser?.email || userProfile.email}</div>
                     <div><span className="font-medium">链接：</span>{generateProfileLink()}</div>
-                    <div><span className="font-medium">简介：</span>{userProfile.bio}</div>
+                    <div><span className="font-medium">简介：</span>{currentUser?.bio || userProfile.bio}</div>
                   </>
                 )}
               </div>

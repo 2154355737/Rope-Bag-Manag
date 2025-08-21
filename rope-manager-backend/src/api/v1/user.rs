@@ -7,6 +7,9 @@ use crate::utils::auth_helper::AuthHelper;
 use crate::services::user_action_service::UserActionService;
 use crate::services::package_service::PackageService;
 use crate::services::post_service::PostService;
+use actix_multipart::Multipart;
+use futures_util::TryStreamExt;
+use std::io::Write;
 
 #[derive(serde::Deserialize)]
 struct GetUsersQuery {
@@ -15,6 +18,48 @@ struct GetUsersQuery {
     search: Option<String>,
     role: Option<String>,
     ban_status: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct UpdateProfileRequest {
+    nickname: Option<String>,
+    bio: Option<String>,
+    location: Option<String>,
+    website: Option<String>,
+    skills: Option<String>,
+    avatar_url: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct WeeklyReportData {
+    total_posts: i32,
+    completed_projects: i32,
+    current_streak: i32,
+    today_activity: f32,
+    weekly_posts: Vec<i32>,
+    achievements: Vec<Achievement>,
+}
+
+#[derive(serde::Serialize)]
+struct Achievement {
+    id: i32,
+    name: String,
+    icon: String,
+    description: String,
+    earned_at: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct UserActivityStats {
+    posts_count: i32,
+    resources_count: i32,
+    comments_count: i32,
+    total_views: i32,
+    total_likes: i32,
+    total_downloads: i32,
+    level: String,
+    experience: i32,
+    next_level_exp: i32,
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
@@ -33,6 +78,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/profile")
                     .route(web::get().to(get_current_user_profile))
                     .route(web::put().to(update_current_user_profile))
+            )
+            .service(
+                web::resource("/upload-avatar")
+                    .route(web::post().to(upload_avatar))
             )
             .service(
                 web::resource("/my-resources")
@@ -79,8 +128,20 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(get_my_stats))
             )
             .service(
+                web::resource("/activity-stats")
+                    .route(web::get().to(get_my_activity_stats))
+            )
+            .service(
                 web::resource("/weekly-report")
                     .route(web::get().to(get_my_weekly_report))
+            )
+            .service(
+                web::resource("/achievements")
+                    .route(web::get().to(get_my_achievements))
+            )
+            .service(
+                web::resource("/check-in")
+                    .route(web::post().to(user_check_in))
             )
             .service(
                 web::resource("/resources")
@@ -561,9 +622,141 @@ async fn get_my_stats(
 
 // 新增：我的周报（占位）
 async fn get_my_weekly_report(
-    _http_req: HttpRequest,
+    http_req: HttpRequest,
+    user_service: web::Data<UserService>,
 ) -> Result<HttpResponse, actix_web::Error> {
-    Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": {"summary": "本周活跃良好", "highlights": []}})))
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    
+    // 获取本周的统计数据
+    let total_posts: i64 = conn.query_row("SELECT COUNT(*) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let total_resources: i64 = conn.query_row("SELECT COUNT(*) FROM packages WHERE author = (SELECT username FROM users WHERE id = ?)", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    
+    // 获取本周每天的发布数量（示例数据）
+    let weekly_posts = vec![2, 1, 3, 0, 2, 4, 1]; // 周一到周日的发布数量
+    
+    // 计算连续签到天数（示例）
+    let current_streak = 12;
+    
+    // 今日活跃度（示例）
+    let today_activity = 85.0;
+    
+    let report_data = WeeklyReportData {
+        total_posts: total_posts as i32,
+        completed_projects: total_resources as i32,
+        current_streak,
+        today_activity,
+        weekly_posts,
+        achievements: vec![
+            Achievement {
+                id: 1,
+                name: "初学者".to_string(),
+                icon: "🌱".to_string(),
+                description: "完成第一个课程".to_string(),
+                earned_at: Some("2024-01-15T10:30:00Z".to_string()),
+            },
+            Achievement {
+                id: 2,
+                name: "勤奋学习".to_string(),
+                icon: "📚".to_string(),
+                description: "连续学习7天".to_string(),
+                earned_at: Some("2024-01-20T15:45:00Z".to_string()),
+            },
+        ],
+    };
+    
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": report_data
+    })))
+}
+
+// 新增：我的活动统计
+async fn get_my_activity_stats(
+    http_req: HttpRequest,
+    user_service: web::Data<UserService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let posts: i64 = conn.query_row("SELECT COUNT(*) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let resources: i64 = conn.query_row("SELECT COUNT(*) FROM packages WHERE author = (SELECT username FROM users WHERE id = ?)", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let comments: i64 = conn.query_row("SELECT COUNT(*) FROM comments WHERE user_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let views: i64 = conn.query_row("SELECT COALESCE(SUM(view_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let likes: i64 = conn.query_row("SELECT COALESCE(SUM(like_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+    let downloads: i64 = conn.query_row("SELECT COALESCE(SUM(download_count),0) FROM packages WHERE author = (SELECT username FROM users WHERE id = ?)", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": {
+            "posts_count": posts as i32,
+            "resources_count": resources as i32,
+            "comments_count": comments as i32,
+            "total_views": views as i32,
+            "total_likes": likes as i32,
+            "total_downloads": downloads as i32,
+            "level": "初级开发者", // 示例级别
+            "experience": 1200, // 示例经验值
+            "next_level_exp": 2000 // 示例下一级所需经验
+        }
+    })))
+}
+
+// 新增：我的成就
+async fn get_my_achievements(
+    http_req: HttpRequest,
+    user_service: web::Data<UserService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) { Ok(u) => u, Err(e) => return Ok(e.to_response()) };
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let mut achievements: Vec<Achievement> = Vec::new();
+
+    // 示例：获取用户已完成的成就
+    // 实际应用中，这些成就应该从数据库或配置文件加载
+    let completed_achievements = vec![
+        Achievement { id: 1, name: "新手入门".to_string(), icon: "🎉".to_string(), description: "完成首次登录".to_string(), earned_at: None },
+        Achievement { id: 2, name: "点赞达人".to_string(), icon: "👍".to_string(), description: "点赞超过100次".to_string(), earned_at: None },
+        Achievement { id: 3, name: "资源分享".to_string(), icon: "📦".to_string(), description: "分享超过5个资源".to_string(), earned_at: None },
+    ];
+
+    // 实际应用中，这里需要从数据库或配置文件加载所有可能的成就
+    // 例如：let all_achievements = load_all_achievements();
+    // 然后过滤出用户已完成的成就
+
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": {
+            "list": completed_achievements,
+            "total": completed_achievements.len() as i32
+        }
+    })))
+}
+
+// 新增：用户签到
+async fn user_check_in(
+    http_req: HttpRequest,
+    user_service: web::Data<UserService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
+
+    match user_service.user_check_in(user.id).await {
+        Ok(_) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "签到成功"
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
 }
 
 // 新增：我的帖子
@@ -580,4 +773,103 @@ async fn get_my_posts(
         Ok(resp) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": resp}))),
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
     }
+} 
+
+// 新增：头像上传
+async fn upload_avatar(
+    mut payload: Multipart,
+    http_req: HttpRequest,
+    user_service: web::Data<UserService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user = match AuthHelper::verify_user(&http_req) {
+        Ok(user) => user,
+        Err(e) => return Ok(e.to_response()),
+    };
+
+    while let Some(mut field) = payload.try_next().await.map_err(actix_web::error::ErrorBadRequest)? {
+        let content_disposition = field.content_disposition();
+        
+        if let Some(filename) = content_disposition.and_then(|cd| cd.get_filename()) {
+            // 检查文件类型
+            if !filename.to_lowercase().ends_with(".jpg") 
+                && !filename.to_lowercase().ends_with(".jpeg") 
+                && !filename.to_lowercase().ends_with(".png") 
+                && !filename.to_lowercase().ends_with(".gif") {
+                return Ok(HttpResponse::BadRequest().json(json!({
+                    "code": 400,
+                    "message": "只支持 JPG, PNG, GIF 格式的图片"
+                })));
+            }
+
+            // 生成唯一文件名
+            let file_extension = filename.split('.').last().unwrap_or("jpg");
+            let new_filename = format!("avatar_{}_{}.{}", user.id, chrono::Utc::now().timestamp(), file_extension);
+            
+            // 创建上传目录
+            let upload_dir = std::path::Path::new("./uploads/avatars");
+            if !upload_dir.exists() {
+                std::fs::create_dir_all(upload_dir).map_err(actix_web::error::ErrorInternalServerError)?;
+            }
+            
+            let file_path = upload_dir.join(&new_filename);
+            let mut file = std::fs::File::create(&file_path).map_err(actix_web::error::ErrorInternalServerError)?;
+            
+            // 读取并写入文件数据，同时检查文件大小
+            let mut file_size = 0;
+            const MAX_FILE_SIZE: usize = 5 * 1024 * 1024; // 5MB
+            
+            while let Some(chunk) = field.try_next().await.map_err(actix_web::error::ErrorBadRequest)? {
+                file_size += chunk.len();
+                if file_size > MAX_FILE_SIZE {
+                    // 删除已创建的文件
+                    let _ = std::fs::remove_file(&file_path);
+                    return Ok(HttpResponse::BadRequest().json(json!({
+                        "code": 400,
+                        "message": "文件大小不能超过5MB"
+                    })));
+                }
+                file.write_all(&chunk).map_err(actix_web::error::ErrorInternalServerError)?;
+            }
+            
+            // 生成访问URL
+            let avatar_url = format!("/uploads/avatars/{}", new_filename);
+            
+            // 更新用户头像URL
+            let update_req = UpdateUserRequest {
+                email: None,
+                nickname: None,
+                star: None,
+                ban_status: None,
+                ban_reason: None,
+                role: None,
+                qq_number: None,
+                avatar_url: Some(avatar_url.clone()),
+            };
+            
+            match user_service.update_user(user.id, &update_req).await {
+                Ok(_) => {
+                    return Ok(HttpResponse::Ok().json(json!({
+                        "code": 0,
+                        "message": "头像上传成功",
+                        "data": {
+                            "avatar_url": avatar_url
+                        }
+                    })));
+                },
+                Err(e) => {
+                    // 删除上传的文件
+                    let _ = std::fs::remove_file(&file_path);
+                    return Ok(HttpResponse::InternalServerError().json(json!({
+                        "code": 500,
+                        "message": format!("更新头像失败: {}", e)
+                    })));
+                }
+            }
+        }
+    }
+    
+    Ok(HttpResponse::BadRequest().json(json!({
+        "code": 400,
+        "message": "未找到有效的图片文件"
+    })))
 } 

@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 修复按钮和标题的焦点高亮问题 */
+@layer utilities {
+  /* 移除不必要的焦点高亮，但保持可访问性 */
+  .focus-visible-only:focus:not(:focus-visible) {
+    outline: none;
+  }
+  
+  /* 针对 Radix UI 组件的焦点处理 */
+  [data-radix-collection-item]:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible),
+  h1:focus:not(:focus-visible),
+  h2:focus:not(:focus-visible),
+  h3:focus:not(:focus-visible),
+  h4:focus:not(:focus-visible),
+  h5:focus:not(:focus-visible),
+  h6:focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

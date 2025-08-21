@@ -12,6 +12,10 @@ impl FileUtils {
         Self { upload_path }
     }
 
+    pub fn get_upload_path(&self) -> &str {
+        &self.upload_path
+    }
+
     pub fn save_file(&self, file_data: &[u8], filename: &str) -> Result<String> {
         // 确保上传目录存在
         std::fs::create_dir_all(&self.upload_path)?;

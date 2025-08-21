@@ -1,3 +1,5 @@
+import { isTokenExpired } from '@/utils/jwt'
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 // 根据环境配置API基础URL
@@ -16,7 +18,17 @@ function buildQuery(params?: Record<string, any>): string {
 
 function getToken(): string | null {
 	try {
-		return localStorage.getItem('token')
+		const token = localStorage.getItem('token')
+		if (!token) return null
+		
+		// 检查token是否过期
+		if (isTokenExpired(token)) {
+			console.warn('Token已过期，自动清除')
+			clearToken()
+			return null
+		}
+		
+		return token
 	} catch {
 		return null
 	}
@@ -69,8 +81,9 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 
 		// 处理401未授权错误
 		if (resp.status === 401) {
+			console.warn('收到401响应，token可能已过期')
 			redirectToLogin()
-			throw new Error('未授权，请重新登录')
+			throw new Error('登录已过期，请重新登录')
 		}
 
 		const data = await resp.json().catch(() => ({}))
@@ -79,8 +92,9 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 			if (data.code === 0 || data.code === 200) return data.data as T
 			// 特殊处理401错误码
 			if (data.code === 401) {
+				console.warn('API返回401错误码，token可能已过期')
 				redirectToLogin()
-				throw new Error('未授权，请重新登录')
+				throw new Error('登录已过期，请重新登录')
 			}
 			throw new Error(data.message || '请求失败')
 		}

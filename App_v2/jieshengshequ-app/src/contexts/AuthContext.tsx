@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { User, getLocalUser, isLoggedIn, logout as logoutAPI } from '@/api/auth'
+import { User, getLocalUser, isLoggedIn, isTokenValid, logout as logoutAPI } from '@/api/auth'
 
 interface AuthState {
   isAuthenticated: boolean
@@ -39,9 +39,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const checkAuth = () => {
     const authenticated = isLoggedIn()
     const user = getLocalUser()
+    const tokenValid = isTokenValid()
+    
+    // 如果token无效但本地还有用户信息，清除所有认证数据
+    if (!tokenValid && user) {
+      console.warn('Token无效，清除认证状态')
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      setAuthState({
+        isAuthenticated: false,
+        user: null,
+        loading: false
+      })
+      return
+    }
     
     setAuthState({
-      isAuthenticated: authenticated,
+      isAuthenticated: authenticated && tokenValid,
       user: user,
       loading: false
     })

@@ -1,297 +1,600 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Filter, ChevronDown, Star, Clock, Zap, BookOpen, Menu } from 'lucide-react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
+import { 
+  Search, 
+  Filter, 
+  Grid3X3, 
+  List, 
+  Star, 
+  Download, 
+  Eye, 
+  Heart, 
+  Clock, 
+  ChevronDown,
+  Loader2,
+  RefreshCw,
+  TrendingUp,
+  Calendar
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Slider } from '@/components/ui/slider'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import TopNavigation from '@/components/ui/top-navigation'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { getCategories } from '../api/categories'
 import { getResources } from '../api/resources'
 
+// 资源数据接口
+interface Resource {
+  id: number
+  title: string
+  author?: string
+  description?: string
+  image?: string
+  tags: string[]
+  downloads: number
+  views: number
+  likes: number
+  rating: number
+  createdAt: string
+  isPinned: boolean
+  categoryId?: number
+}
+
+// 分类数据接口
+interface Category {
+  id: number | string
+  name: string
+  description?: string
+  count?: number
+}
+
+// 排序选项
+type SortOption = 'latest' | 'popular' | 'downloads' | 'rating'
+
+// 显示模式
+type ViewMode = 'grid' | 'list'
+
 const CategoryScreen: React.FC = () => {
   const { getActiveTab, setActiveTab } = useNavigation()
-  const [activeCategory, setActiveCategory] = useState<string|number>('all')
-  const [categories, setCategories] = useState<{id:string|number; name:string}[]>([{ id: 'all', name: '全部' }])
-  const [resources, setResources] = useState<any[]>([])
-  const [showCategorySidebar, setShowCategorySidebar] = useState(false)
   
-  // 获取当前活跃的显示模式 - 默认为列表
-  const activeDisplayMode = getActiveTab('category', 'list')
+  // 状态管理
+  const [categories, setCategories] = useState<Category[]>([])
+  const [resources, setResources] = useState<Resource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string | number>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<SortOption>('latest')
+  const [showFilters, setShowFilters] = useState(false)
   
-  useEffect(() => {
-    // 加载分类
-    getCategories().then((list) => setCategories([{ id: 'all', name: '全部' }, ...list])).catch(() => setCategories([{ id: 'all', name: '全部' }]))
-    // 初始加载资源
-    loadResources('all')
+  // 获取当前视图模式
+  const viewMode = getActiveTab('category', 'grid') as ViewMode
+
+  // 加载分类数据
+  const loadCategories = useCallback(async () => {
+    try {
+      const categoryList = await getCategories()
+      const categoriesWithAll = [
+        { id: 'all', name: '全部', count: 0 },
+        ...categoryList.map(cat => ({ ...cat, count: 0 }))
+      ]
+      setCategories(categoriesWithAll)
+    } catch (error) {
+      console.error('加载分类失败:', error)
+      setCategories([{ id: 'all', name: '全部', count: 0 }])
+    }
   }, [])
 
-  const loadResources = async (cat: string|number) => {
-    const params: any = { page: 1, pageSize: 20 }
-    if (cat !== 'all') params.category_id = cat
-    const data = await getResources(params)
-    const list = (data.list || []).map((r: any) => ({
-      id: r.id,
-      title: r.name || r.title,
-      difficulty: '',
-      duration: '',
-      tags: r.tags || [],
-      image: (r.screenshots && r.screenshots[0]) || '',
-      hot: r.download_count || r.like_count || 0,
-    }))
-    setResources(list)
+  // 加载资源数据
+  const loadResources = useCallback(async (categoryId: string | number = 'all', refresh = false) => {
+    if (refresh) {
+      setRefreshing(true)
+    } else {
+      setLoading(true)
+    }
+    
+    try {
+      const params: any = { page: 1, page_size: 50 }
+      if (categoryId !== 'all') {
+        params.category_id = categoryId
+      }
+      
+      const response = await getResources(params)
+      const resourceList = (response.list || []).map((item: any): Resource => ({
+        id: item.id,
+        title: item.name || item.title || '未命名资源',
+        author: item.author || '匿名用户',
+        description: item.description || '',
+        image: item.screenshots?.[0] || item.image || '',
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        downloads: item.download_count || 0,
+        views: item.view_count || 0,
+        likes: item.like_count || 0,
+        rating: item.rating || 0,
+        createdAt: item.created_at || new Date().toISOString(),
+        isPinned: item.is_pinned || false,
+        categoryId: item.category_id
+      }))
+      
+      setResources(resourceList)
+    } catch (error) {
+      console.error('加载资源失败:', error)
+      setResources([])
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+  }
+  }, [])
+
+  // 筛选和排序资源
+  const filteredAndSortedResources = useMemo(() => {
+    let filtered = [...resources]
+
+    // 搜索筛选
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter(resource =>
+        resource.title.toLowerCase().includes(query) ||
+        resource.author?.toLowerCase().includes(query) ||
+        resource.description?.toLowerCase().includes(query) ||
+        resource.tags.some(tag => tag.toLowerCase().includes(query))
+      )
+    }
+
+    // 排序
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+      case 'latest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      case 'popular':
+          return (b.views + b.likes) - (a.views + a.likes)
+      case 'downloads':
+          return b.downloads - a.downloads
+      case 'rating':
+          return b.rating - a.rating
+        default:
+          return 0
+      }
+    })
+
+    // 置顶资源排在前面
+    return filtered.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0))
+  }, [resources, searchQuery, sortBy])
+
+  // 初始化数据
+  useEffect(() => {
+    const initData = async () => {
+      await Promise.all([
+        loadCategories(),
+        loadResources('all')
+      ])
+    }
+    initData()
+  }, [loadCategories, loadResources])
+
+  // 处理分类切换
+  const handleCategoryChange = useCallback((categoryId: string | number) => {
+    setSelectedCategory(categoryId)
+    setSearchQuery('') // 清空搜索
+    loadResources(categoryId)
+  }, [loadResources])
+
+  // 处理刷新
+  const handleRefresh = useCallback(() => {
+    loadResources(selectedCategory, true)
+  }, [loadResources, selectedCategory])
+
+  // 获取排序选项的显示文本
+  const getSortText = (sort: SortOption) => {
+    const sortTexts = {
+      latest: '最新发布',
+      popular: '最受欢迎',
+      downloads: '下载最多',
+      rating: '评分最高'
+    }
+    return sortTexts[sort]
+  }
+
+  // 格式化数字显示
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`
+    return num.toString()
+  }
+
+  // 格式化时间显示
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffTime = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays === 0) return '今天'
+    if (diffDays === 1) return '昨天'
+    if (diffDays < 7) return `${diffDays}天前`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}周前`
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}个月前`
+    return `${Math.floor(diffDays / 365)}年前`
+  }
+
+  // 资源卡片组件 - 网格模式
+  const ResourceGridCard = ({ resource }: { resource: Resource }) => {
+    const navigate = useNavigate()
+    
+    const handleCardClick = () => {
+      navigate(`/resource/${resource.id}`)
+    }
+    
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.2 }}
+        className="group cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <Card className="overflow-hidden h-full hover:shadow-lg transition-all duration-200 border-0 bg-card/50 backdrop-blur-sm">
+          {/* 图片区域 */}
+          <div className="relative aspect-[4/3] overflow-hidden">
+            {resource.image ? (
+              <img 
+                src={resource.image} 
+                alt={resource.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                <div className="text-center text-muted-foreground">
+                  <Grid3X3 size={24} className="mx-auto mb-1" />
+                  <span className="text-xs">暂无封面</span>
+                </div>
+              </div>
+            )}
+            
+            {/* 置顶标记 */}
+            {resource.isPinned && (
+              <div className="absolute top-2 left-2">
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-primary/90 text-primary-foreground">
+                  置顶
+                </Badge>
+              </div>
+            )}
+            
+            {/* 评分 */}
+            {resource.rating > 0 && (
+              <div className="absolute top-2 right-2">
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-background/90 text-foreground flex items-center gap-1">
+                  <Star size={10} className="fill-yellow-400 text-yellow-400" />
+                  {resource.rating.toFixed(1)}
+                </Badge>
+              </div>
+            )}
+          </div>
+          
+          {/* 内容区域 */}
+          <CardContent className="p-3 space-y-2">
+            <div>
+              <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+                {resource.title}
+              </h3>
+              {resource.author && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  by {resource.author}
+                </p>
+              )}
+            </div>
+            
+            {/* 标签 */}
+            {resource.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {resource.tags.slice(0, 2).map((tag, index) => (
+                  <Badge key={index} variant="outline" className="text-xs px-1.5 py-0">
+                    {tag}
+                  </Badge>
+                ))}
+                {resource.tags.length > 2 && (
+                  <Badge variant="outline" className="text-xs px-1.5 py-0">
+                    +{resource.tags.length - 2}
+                  </Badge>
+                )}
+              </div>
+            )}
+            
+            {/* 统计信息 */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <Download size={10} />
+                  {formatNumber(resource.downloads)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Heart size={10} />
+                  {formatNumber(resource.likes)}
+                </span>
+              </div>
+              <span className="flex items-center gap-1">
+                <Clock size={10} />
+                {formatTime(resource.createdAt)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
+
+  // 资源卡片组件 - 列表模式
+  const ResourceListCard = ({ resource }: { resource: Resource }) => {
+    const navigate = useNavigate()
+    
+    const handleCardClick = () => {
+      navigate(`/resource/${resource.id}`)
+    }
+    
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -10 }}
+        transition={{ duration: 0.2 }}
+        className="group cursor-pointer"
+        onClick={handleCardClick}
+      >
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-0 bg-card/50 backdrop-blur-sm">
+          <div className="flex p-3 gap-3">
+            {/* 缩略图 */}
+            <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+              {resource.image ? (
+                <img 
+                  src={resource.image} 
+                  alt={resource.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                  <Grid3X3 size={14} className="text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            
+            {/* 内容 */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                    {resource.title}
+                  </h3>
+                  {resource.author && (
+                    <p className="text-xs text-muted-foreground">
+                      by {resource.author}
+                    </p>
+                  )}
+                </div>
+                
+                {/* 置顶和评分 */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {resource.isPinned && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-primary/90 text-primary-foreground">
+                      置顶
+                    </Badge>
+                  )}
+                  {resource.rating > 0 && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 flex items-center gap-1">
+                      <Star size={8} className="fill-yellow-400 text-yellow-400" />
+                      {resource.rating.toFixed(1)}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              {/* 标签 */}
+              {resource.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {resource.tags.slice(0, 3).map((tag, index) => (
+                    <Badge key={index} variant="outline" className="text-xs px-1.5 py-0">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {resource.tags.length > 3 && (
+                    <Badge variant="outline" className="text-xs px-1.5 py-0">
+                      +{resource.tags.length - 3}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              
+              {/* 统计信息 */}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1">
+                    <Download size={10} />
+                    {formatNumber(resource.downloads)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Eye size={10} />
+                    {formatNumber(resource.views)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Heart size={10} />
+                    {formatNumber(resource.likes)}
+                  </span>
+                </div>
+                <span className="flex items-center gap-1">
+                  <Clock size={10} />
+                  {formatTime(resource.createdAt)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+    )
   }
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
-      {/* 顶部导航栏 */}
+      {/* 顶部导航 */}
       <TopNavigation
         title="分类"
-        subtitle="发现更多精彩内容"
-        showSearchButton
-        leftAction={
-          <Sheet open={showCategorySidebar} onOpenChange={setShowCategorySidebar}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Menu size={20} />
+        subtitle={`发现 ${filteredAndSortedResources.length} 个精彩资源`}
+        rightAction={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="h-9 w-9"
+            >
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
               </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64">
-              <SheetHeader>
-                <SheetTitle>分类</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-1">
+          </div>
+        }
+      />
+
+      {/* 主内容区域 */}
+      <div className="pt-nav flex-1 flex flex-col">
+        {/* 分类选择和搜索 */}
+        <div className="sticky top-nav bg-background/80 backdrop-blur-sm border-b z-10">
+          <div className="p-4 space-y-3">
+            {/* 分类选择 */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 {categories.map((category) => (
                   <Button
                     key={category.id}
-                    variant="ghost"
-                    className={`w-full justify-start text-left h-10 ${
-                      activeCategory === category.id 
-                        ? "bg-primary/20 text-primary hover:bg-primary/30 border border-primary/30" 
-                        : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                    }`}
-                    onClick={() => {
-                      setActiveCategory(category.id)
-                      loadResources(category.id)
-                      setShowCategorySidebar(false)
-                    }}
+                  variant={selectedCategory === category.id ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleCategoryChange(category.id)}
+                  className="flex-shrink-0 h-8 px-3 text-xs"
                   >
                     {category.name}
                   </Button>
                 ))}
               </div>
-            </SheetContent>
-          </Sheet>
-        }
-        rightAction={
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Filter size={20} />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-80">
-              <SheetHeader>
-                <SheetTitle>筛选条件</SheetTitle>
-              </SheetHeader>
-              <div className="mt-6 space-y-6">
-                <div>
-                  <Label className="text-base font-medium">难度等级</Label>
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="beginner" />
-                      <Label htmlFor="beginner">入门</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="intermediate" />
-                      <Label htmlFor="intermediate">中级</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="advanced" />
-                      <Label htmlFor="advanced">高级</Label>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label className="text-base font-medium">时长范围</Label>
-                  <div className="mt-4">
-                    <Slider
-                      defaultValue={[0, 10]}
-                      max={10}
-                      step={0.5}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-sm text-muted-foreground mt-2">
-                      <span>0小时</span>
-                      <span>10小时+</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <Label className="text-base font-medium">热度筛选</Label>
-                  <div className="mt-2 space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Switch id="hot" />
-                      <Label htmlFor="hot">热门内容</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Switch id="new" />
-                      <Label htmlFor="new">最新发布</Label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-        }
-      />
-
-      {/* 内容区域 - 为固定导航栏留出空间 */}
-      <div className="pt-nav flex-1">
-        {/* 显示当前选中的分类 */}
-        <div className="px-4 py-3 border-b border-border/20">
-          <span className="text-sm text-muted-foreground">
-            当前分类：<span className="text-foreground font-medium">{categories.find(cat => cat.id === activeCategory)?.name || '全部'}</span>
-          </span>
-        </div>
-
-        {/* 内容标签页 */}
-        <div className="p-4 flex-1">
-          <Tabs value={activeDisplayMode} onValueChange={(value) => setActiveTab('category', value)} className="w-full">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-sm text-muted-foreground">共 {resources.length} 个资源</span>
-                          <TabsList>
-              <TabsTrigger value="list" className="text-xs px-2 py-1">
-                列表
-              </TabsTrigger>
-              <TabsTrigger value="grid" className="text-xs px-2 py-1">
-                网格
-              </TabsTrigger>
-            </TabsList>
-            </div>
             
-            <TabsContent value="grid" className="mt-0">
-              <div className="grid grid-cols-2 gap-4">
-                {resources.map((resource) => (
-                  <motion.div
-                    key={resource.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Card className="overflow-hidden h-full">
-                      {/* 图片区域 - 有图片时显示图片，无图片时显示占位符 */}
-                      <div className="relative">
-                        {resource.image ? (
-                          <img 
-                            src={resource.image} 
-                            alt={resource.title}
-                            className="w-full h-32 object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-32 bg-muted flex items-center justify-center">
-                            <span className="text-muted-foreground text-sm">暂无封面</span>
+            {/* 搜索和筛选 */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                  placeholder="搜索资源..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                      />
+                    </div>
+
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+                <SelectTrigger className="w-32 h-9 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="latest">
+                    <div className="flex items-center gap-2">
+                      <Calendar size={12} />
+                      最新
                           </div>
-                        )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute top-2 right-2 bg-background/50 backdrop-blur-sm rounded-full h-8 w-8 z-10"
-                        >
-                          <Star size={16} className="text-yellow-500" />
-                        </Button>
-                        {resource.difficulty && (
-                          <div className="absolute bottom-2 right-2 z-10">
-                            <Badge className="bg-background/50 backdrop-blur-sm text-foreground text-xs">
-                              {resource.difficulty}
-                            </Badge>
+                        </SelectItem>
+                        <SelectItem value="popular">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={12} />
+                      热门
                           </div>
-                        )}
+                        </SelectItem>
+                        <SelectItem value="downloads">
+                    <div className="flex items-center gap-2">
+                      <Download size={12} />
+                      下载
+                    </div>
+                        </SelectItem>
+                        <SelectItem value="rating">
+                    <div className="flex items-center gap-2">
+                      <Star size={12} />
+                      评分
+                    </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+              
+              <Tabs value={viewMode} onValueChange={(value) => setActiveTab('category', value)}>
+                <TabsList className="h-9">
+                  <TabsTrigger value="grid" className="px-2">
+                    <Grid3X3 size={14} />
+                  </TabsTrigger>
+                  <TabsTrigger value="list" className="px-2">
+                    <List size={14} />
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
                       </div>
-                      <CardContent className="p-3">
-                        <h3 className="font-medium text-sm line-clamp-2 mb-2">{resource.title}</h3>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center">
-                            <Clock size={12} className="mr-1" />
-                            <span>{resource.duration || '未知'}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Zap size={12} className="mr-1" />
-                            <span>{resource.hot}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))}
+                    </div>
+                  </div>
+
+        {/* 资源列表 */}
+        <div className="flex-1 p-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center space-y-2">
+                <Loader2 size={24} className="animate-spin mx-auto text-primary" />
+                <p className="text-sm text-muted-foreground">加载中...</p>
+                      </div>
+                    </div>
+          ) : filteredAndSortedResources.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center space-y-2">
+                <Search size={24} className="mx-auto text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? '没有找到匹配的资源' : '暂无资源'}
+                </p>
+                {searchQuery && (
+                  <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
+                    清空搜索
+                  </Button>
+                )}
               </div>
-            </TabsContent>
-            
-            <TabsContent value="list" className="mt-0 space-y-4">
-              {resources.map((resource) => (
+          </div>
+          ) : (
+            <Tabs value={viewMode} className="w-full">
+          <TabsContent value="grid" className="mt-0">
                 <motion.div
-                  key={resource.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
+                  className="grid grid-cols-2 gap-4"
+                  layout
                 >
-                  <Card>
-                    <div className="flex p-3">
-                      {/* 图片区域 - 有图片时显示图片，无图片时显示占位符 */}
-                      <div className="w-20 h-20 rounded-md mr-3 flex-shrink-0 overflow-hidden">
-                        {resource.image ? (
-                          <img 
-                            src={resource.image} 
-                            alt={resource.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <span className="text-muted-foreground text-xs">暂无封面</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-sm mb-1">{resource.title}</h3>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {resource.tags.map((tag, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs px-1">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <div className="flex items-center">
-                            <BookOpen size={12} className="mr-1" />
-                            <span>{resource.difficulty || '未知'}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Clock size={12} className="mr-1" />
-                            <span>{resource.duration || '未知'}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <Zap size={12} className="mr-1" />
-                            <span>{resource.hot}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon" className="self-start ml-2 flex-shrink-0">
-                        <Star size={16} />
-                      </Button>
-                    </div>
-                  </Card>
+                  <AnimatePresence>
+                    {filteredAndSortedResources.map((resource) => (
+                      <ResourceGridCard key={resource.id} resource={resource} />
+                    ))}
+                  </AnimatePresence>
                 </motion.div>
-              ))}
-            </TabsContent>
-          </Tabs>
-        </div>
+          </TabsContent>
+          
+              <TabsContent value="list" className="mt-0">
+              <motion.div
+                  className="space-y-3"
+                  layout
+                >
+                  <AnimatePresence>
+                    {filteredAndSortedResources.map((resource) => (
+                      <ResourceListCard key={resource.id} resource={resource} />
+                    ))}
+                  </AnimatePresence>
+              </motion.div>
+          </TabsContent>
+        </Tabs>
+          )}
+      </div>
       </div>
     </div>
   )

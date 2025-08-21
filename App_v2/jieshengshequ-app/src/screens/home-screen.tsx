@@ -102,7 +102,7 @@ const HomeScreen: React.FC = () => {
   useEffect(() => {
     // 加载热门搜索
     trendingKeywords().then(setHotKeywords).catch(() => setHotKeywords([]))
-    getUnreadCount().then(setUnread).catch(() => setUnread(0))
+    getUnreadCount().then(data => setUnread(data.count)).catch(() => setUnread(0))
   }, [])
 
   useEffect(() => {

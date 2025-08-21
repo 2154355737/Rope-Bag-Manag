@@ -28,13 +28,53 @@ import { initializeBackButton } from './utils/backButton'
 import BackButtonHandler from './components/BackButtonHandler'
 import { initializeSafeArea, setSafeAreaTheme, setSafeAreaDebug } from './utils/safeAreaManager'
 import StorageManager from './utils/storage'
+import { useTokenCheck } from './hooks/useTokenCheck'
 import { NavigationProvider } from './contexts/NavigationContext'
 import { AuthProvider } from './contexts/AuthContext'
 
+// 内部组件，用于在AuthProvider内部使用token检查
+const AppContent: React.FC = () => {
+  useTokenCheck() // 使用token检查hook
+
+  return (
+    <NavigationProvider>
+      <BackButtonHandler />
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<HomeScreen />} />
+          <Route path="home" element={<HomeScreen />} />
+          <Route path="category" element={<CategoryScreen />} />
+          <Route path="community" element={<CommunityScreen />} />
+          <Route path="messages" element={<ProtectedRoute><MessagesScreen /></ProtectedRoute>} />
+          <Route path="profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
+          <Route path="publish" element={<ProtectedRoute><PublishScreen /></ProtectedRoute>} />
+          <Route path="post/:id" element={<UniversalDetailScreen />} />
+          <Route path="resource/:id" element={<UniversalDetailScreen />} />
+          <Route path="announcement" element={<AnnouncementRedirect />} />
+          <Route path="announcement/:id" element={<UniversalDetailScreen />} />
+          <Route path="settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
+          <Route path="edit-profile" element={<ProtectedRoute><EditProfileScreen /></ProtectedRoute>} />
+          <Route path="my-content" element={<ProtectedRoute><MyContentScreen /></ProtectedRoute>} />
+          <Route path="help" element={<HelpScreen />} />
+          <Route path="about" element={<AboutScreen />} />
+          <Route path="privacy" element={<PrivacyScreen />} />
+          <Route path="search" element={<SearchScreen />} />
+        </Route>
+        
+        {/* 认证相关页面 */}
+        <Route path="/login" element={<LoginScreen />} />
+        <Route path="/register" element={<RegisterScreen />} />
+        <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+        <Route path="/terms" element={<TermsScreen />} />
+    </Routes>
+    </NavigationProvider>
+  )
+}
+
 import './styles/safe-area-v2.css'
 
-// 导入后端连接测试工具（仅在开发环境下运行）
-import './utils/backendTest'
+
+
 
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true)
@@ -125,37 +165,7 @@ const App: React.FC = () => {
   // 主应用界面
   return (
     <AuthProvider>
-      <NavigationProvider>
-        <BackButtonHandler />
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<HomeScreen />} />
-            <Route path="home" element={<HomeScreen />} />
-            <Route path="category" element={<CategoryScreen />} />
-            <Route path="community" element={<CommunityScreen />} />
-            <Route path="messages" element={<ProtectedRoute><MessagesScreen /></ProtectedRoute>} />
-            <Route path="profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
-            <Route path="publish" element={<ProtectedRoute><PublishScreen /></ProtectedRoute>} />
-            <Route path="post/:id" element={<UniversalDetailScreen />} />
-            <Route path="resource/:id" element={<UniversalDetailScreen />} />
-            <Route path="announcement" element={<AnnouncementRedirect />} />
-            <Route path="announcement/:id" element={<UniversalDetailScreen />} />
-            <Route path="settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
-            <Route path="edit-profile" element={<ProtectedRoute><EditProfileScreen /></ProtectedRoute>} />
-            <Route path="my-content" element={<ProtectedRoute><MyContentScreen /></ProtectedRoute>} />
-            <Route path="help" element={<HelpScreen />} />
-            <Route path="about" element={<AboutScreen />} />
-            <Route path="privacy" element={<PrivacyScreen />} />
-            <Route path="search" element={<SearchScreen />} />
-          </Route>
-          
-          {/* 认证相关页面 */}
-          <Route path="/login" element={<LoginScreen />} />
-          <Route path="/register" element={<RegisterScreen />} />
-          <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
-          <Route path="/terms" element={<TermsScreen />} />
-      </Routes>
-      </NavigationProvider>
+      <AppContent />
     </AuthProvider>
   )
 }

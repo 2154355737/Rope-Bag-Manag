@@ -154,6 +154,10 @@ where
                 email: "".to_string(), // 临时设置，实际应从数据库获取
                 password_hash: "".to_string(), // 不需要密码
                 nickname: None,
+                bio: None,
+                location: None,
+                website: None,
+                skills: None,
                 role: user_role,
                 star: 0,
                 ban_status: BanStatus::Normal, // 默认为正常状态，实际应从数据库获取

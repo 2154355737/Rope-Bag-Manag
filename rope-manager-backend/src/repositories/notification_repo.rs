@@ -138,4 +138,18 @@ impl NotificationRepository {
         let count: i32 = conn.query_row("SELECT COUNT(*) FROM notifications", [], |row| row.get(0))?;
         Ok(count)
     }
+
+    /// 删除用户的已读通知
+    pub async fn delete_read(&self, user_id: i32) -> Result<i32> {
+        let conn = self.conn.lock().await;
+        let affected = conn.execute("DELETE FROM notifications WHERE user_id=? AND is_read=1", params![user_id])?;
+        Ok(affected as i32)
+    }
+
+    /// 删除单个通知
+    pub async fn delete_by_id(&self, user_id: i32, id: i32) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute("DELETE FROM notifications WHERE id=? AND user_id=?", params![id, user_id])?;
+        Ok(())
+    }
 } 

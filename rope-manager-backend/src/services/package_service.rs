@@ -92,7 +92,7 @@ impl PackageService {
             author: req.author.clone(),
             version: req.version.clone(),
             description: req.description.clone(),
-            file_url: req.file_url.clone().unwrap_or_else(|| "".to_string()), // 使用请求中的file_url，如果没有则为空字符串
+            file_url: req.file_url.clone(), // 直接使用请求中的file_url，已经是Option<String>类型
             file_size: None,
             download_count: 0,
             like_count: 0,
@@ -172,7 +172,7 @@ impl PackageService {
             description: req.description.clone().or(package.description),
             category_id: req.category_id.or(package.category_id),
             status: req.status.clone().unwrap_or(package.status),
-            file_url: req.file_url.clone().unwrap_or(package.file_url), // 使用请求中的file_url，如果没有则保持原值
+            file_url: req.file_url.clone().or(package.file_url.clone()), // 使用请求中的file_url，如果没有则保持原值
             file_size: package.file_size,
             download_count: package.download_count,
             like_count: package.like_count,
@@ -268,39 +268,42 @@ impl PackageService {
            updated_package.status == crate::models::PackageStatus::Rejected {
             
             // 删除存储文件
-            if !updated_package.file_url.is_empty() {
-                log::info!("📂 审核拒绝，准备删除存储文件: {}", updated_package.file_url);
-                
-                // 判断是否为AList存储的文件
-                if updated_package.file_url.starts_with("alist:") {
-                    // AList存储文件
-                    let actual_path = &updated_package.file_url[6..]; // 移除 "alist:" 前缀
-                    use crate::services::package_storage_service::PackageStorageService;
-                    let mut storage_service = PackageStorageService::new("data.db")?;
+            if let Some(file_url) = &updated_package.file_url {
+                if !file_url.is_empty() {
+                    log::info!("📂 审核拒绝，准备删除存储文件: {}", file_url);
                     
-                    match storage_service.delete_package_file(actual_path).await {
-                        Ok(_) => {
-                            log::info!("✅ 成功删除AList存储文件: {}", actual_path);
-                        },
-                        Err(e) => {
-                            log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", actual_path, e);
+                    // 根据file_url的格式判断存储类型
+                    if file_url.starts_with("alist:") {
+                        // AList存储
+                        let actual_path = &file_url[6..]; // 移除 "alist:" 前缀
+                        use crate::services::package_storage_service::PackageStorageService;
+                        let mut alist_service = PackageStorageService::new("data.db")?;
+                        match alist_service.delete_package_file(actual_path).await {
+                            Ok(_) => {
+                                log::info!("✅ 成功删除AList存储文件: {}", file_url);
+                            },
+                            Err(e) => {
+                                log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", file_url, e);
+                            }
                         }
-                    }
-                } else if updated_package.file_url.starts_with("/image/") {
-                    // 兼容旧版本的AList文件路径
-                    use crate::services::package_storage_service::PackageStorageService;
-                    let mut storage_service = PackageStorageService::new("data.db")?;
-                    
-                    match storage_service.delete_package_file(&updated_package.file_url).await {
-                        Ok(_) => {
-                            log::info!("✅ 成功删除AList存储文件: {}", updated_package.file_url);
-                        },
-                        Err(e) => {
-                            log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", updated_package.file_url, e);
+                    } else if file_url.starts_with("/image/") {
+                        // 本地存储
+                        use crate::services::package_storage_service::PackageStorageService;
+                        let mut storage_service = PackageStorageService::new(
+                            self.file_utils.get_upload_path()
+                        ).map_err(|e| anyhow::anyhow!("初始化存储服务失败: {}", e))?;
+                        
+                        match storage_service.delete_package_file(file_url).await {
+                            Ok(_) => {
+                                log::info!("✅ 成功删除AList存储文件: {}", file_url);
+                            },
+                            Err(e) => {
+                                log::error!("❌ 删除AList存储文件失败: {}, 错误: {}", file_url, e);
+                            }
                         }
+                    } else {
+                        log::info!("🔗 文件为直链方式，无需删除存储文件: {}", file_url);
                     }
-                } else {
-                    log::info!("🔗 文件为直链方式，无需删除存储文件: {}", updated_package.file_url);
                 }
             }
 
@@ -536,7 +539,7 @@ impl PackageService {
         let mut package = self.package_repo.find_by_id(package_id).await?
                          .ok_or_else(|| anyhow::anyhow!("包不存在"))?;
         
-        package.file_url = upload_result.file_path.clone();
+        package.file_url = Some(upload_result.file_path.clone());
         package.file_size = Some(upload_result.file_size);
         
         // 保存到数据库

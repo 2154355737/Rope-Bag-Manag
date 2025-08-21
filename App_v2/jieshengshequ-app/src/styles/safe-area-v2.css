@@ -292,24 +292,29 @@ input:focus, textarea:focus {
 .h-safe { height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom)) !important; }
 .min-h-safe { min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom)) !important; }
 
-/* ===== 顶部导航栏适配 ===== */
+/* ===== 导航栏适配 ===== */
 :root {
   /* 顶部导航栏高度：安全区域 + 内容高度（56px + 24px padding） */
   --top-navigation-height: calc(var(--safe-area-inset-top) + 80px);
+  /* 底部导航栏高度：安全区域 + 内容高度（64px） */
+  --bottom-navigation-height: calc(var(--safe-area-inset-bottom) + 64px);
 }
 
-/* 为固定顶部导航栏预留空间的工具类 */
+/* 为固定导航栏预留空间的工具类 */
 .pt-nav { padding-top: var(--top-navigation-height) !important; }
 .mt-nav { margin-top: var(--top-navigation-height) !important; }
+.pb-nav { padding-bottom: var(--bottom-navigation-height) !important; }
+.mb-nav { margin-bottom: var(--bottom-navigation-height) !important; }
 
 /* ===== Z-Index 层级体系 ===== */
 /* 
   层级规划：
-  - z-[9999]: 底部导航栏 (确保始终在最上层，除了系统级弹窗)
-  - z-[200]: Toast/通知 (系统级消息，可以覆盖导航栏)
-  - z-[150]: Modal/Dialog (模态框，可以覆盖导航栏)
-  - z-[100]: 顶部导航栏
-  - z-[90]: Sheet/Drawer (侧边栏)
+  - z-[9999]: 底部导航栏 (确保始终在最上层)
+  - z-[9998]: 顶部导航栏 (确保在Sheet之上)
+  - z-[9997]: Sheet/Drawer (侧边栏内容)
+  - z-[9996]: Sheet Overlay (侧边栏背景)
+  - z-[200]: Toast/通知 (系统级消息)
+  - z-[150]: Modal/Dialog (模态框)
   - z-[80]: Popover/Dropdown (弹出菜单)
   - z-[70]: Tooltip (提示框)
   - z-[60]: 搜索下拉框等页面级弹出内容

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import React, { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Bell, Search, MoreVertical, Check, CheckCheck, Loader2, ExternalLink, Trash2, Settings, AlertTriangle } from 'lucide-react'
+import { Bell, Search, MoreVertical, Check, CheckCheck, Loader2, ExternalLink, Trash2, Settings, AlertTriangle, RefreshCw, Filter, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/hooks/use-toast'
@@ -24,35 +25,75 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { 
   getNotifications, 
   markAsRead,
   markAllAsRead,
   getUnreadCount,
+  deleteReadNotifications,
   Notification,
   NotificationQuery
 } from '@/api/notifications'
 
+// 通知类型配置 - 基于后端实际使用的类型
+const NOTIFICATION_TYPES = [
+  { value: 'all', label: '全部通知', icon: '📢' },
+  { value: 'ResourceApproved', label: '资源审核', icon: '✅' },
+  { value: 'CommentReceived', label: '评论回复', icon: '💬' },
+  { value: 'PostFlagChanged', label: '帖子状态', icon: '📝' },
+  { value: 'CategoryUpdate', label: '分类更新', icon: '🏷️' },
+  { value: 'unknown', label: '公告通知', icon: '📢' },
+]
+
 const MessagesScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [unreadCount, setUnreadCount] = useState(0)
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
   const [showClearDialog, setShowClearDialog] = useState(false)
+  const [selectedType, setSelectedType] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const [selectedNotifications, setSelectedNotifications] = useState<Set<number>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
 
   // 加载通知列表
   useEffect(() => {
-    loadNotifications()
+    loadNotifications(true)
     loadUnreadCount()
   }, [])
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (reset = false, showLoading = true) => {
     try {
-      setLoading(true)
-      const params: NotificationQuery = { page: 1, size: 50 }
+      if (showLoading) setLoading(true)
+      const page = reset ? 1 : currentPage
+      const params: NotificationQuery = { 
+        page, 
+        size: 20
+      }
+      
       const data = await getNotifications(params)
-      setNotifications(data.list || [])
+      const newNotifications = data.list || []
+      
+      if (reset) {
+        setNotifications(newNotifications)
+        setCurrentPage(1)
+      } else {
+        setNotifications(prev => [...prev, ...newNotifications])
+      }
+      
+      setHasMore(newNotifications.length === 20)
+      if (!reset) setCurrentPage(prev => prev + 1)
     } catch (error: any) {
       console.error('Failed to load notifications:', error)
       if (error.message !== '未授权，请重新登录') {
@@ -63,7 +104,7 @@ const MessagesScreen: React.FC = () => {
         })
       }
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
@@ -74,6 +115,28 @@ const MessagesScreen: React.FC = () => {
     } catch (error) {
       console.error('Failed to load unread count:', error)
     }
+  }
+
+  // 下拉刷新
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await Promise.all([
+      loadNotifications(true, false),
+      loadUnreadCount()
+    ])
+    setRefreshing(false)
+    toast({
+      title: "刷新完成",
+      description: "通知列表已更新",
+    })
+  }
+
+  // 加载更多
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    await loadNotifications(false, false)
+    setLoadingMore(false)
   }
 
   // 标记单个通知为已读
@@ -88,11 +151,6 @@ const MessagesScreen: React.FC = () => {
         )
       )
       setUnreadCount(prev => Math.max(0, prev - 1))
-      
-      toast({
-        title: "已标记为已读",
-        description: "通知已标记为已读",
-      })
     } catch (error: any) {
       console.error('Mark as read failed:', error)
       toast({
@@ -139,16 +197,16 @@ const MessagesScreen: React.FC = () => {
 
   // 清理已读通知
   const handleClearRead = async () => {
-    const readNotifications = notifications.filter(n => n.is_read)
-    
     try {
       setBulkActionLoading(true)
-      // 这里暂时只在前端移除，后端可能需要添加批量删除API
+      const result = await deleteReadNotifications()
+      
+      // 从前端状态中移除已读通知
       setNotifications(prev => prev.filter(n => !n.is_read))
       
       toast({
         title: "清理完成",
-        description: `已清理 ${readNotifications.length} 条已读通知`,
+        description: `已清理 ${result.deleted_count} 条已读通知`,
       })
     } catch (error: any) {
       console.error('Clear read failed:', error)
@@ -160,6 +218,75 @@ const MessagesScreen: React.FC = () => {
     } finally {
       setBulkActionLoading(false)
       setShowClearDialog(false)
+    }
+  }
+
+  // 批量选择相关
+  const toggleSelection = (id: number) => {
+    const newSelected = new Set(selectedNotifications)
+    if (newSelected.has(id)) {
+      newSelected.delete(id)
+    } else {
+      newSelected.add(id)
+    }
+    setSelectedNotifications(newSelected)
+  }
+
+  const selectAll = () => {
+    const visibleIds = filteredNotifications.map(n => n.id)
+    setSelectedNotifications(new Set(visibleIds))
+  }
+
+  const clearSelection = () => {
+    setSelectedNotifications(new Set())
+    setIsSelectionMode(false)
+  }
+
+  // 批量操作选中的通知
+  const handleBulkMarkAsRead = async () => {
+    const selectedIds = Array.from(selectedNotifications)
+    const unreadSelected = selectedIds.filter(id => {
+      const notification = notifications.find(n => n.id === id)
+      return notification && !notification.is_read
+    })
+
+    if (unreadSelected.length === 0) {
+      toast({
+        title: "提示",
+        description: "所选通知都已是已读状态",
+      })
+      return
+    }
+
+    try {
+      setBulkActionLoading(true)
+      // 这里需要批量标记API，暂时逐个调用
+      await Promise.all(unreadSelected.map(id => markAsRead(id)))
+      
+      setNotifications(prev => 
+        prev.map(notification => 
+          selectedIds.includes(notification.id) 
+            ? { ...notification, is_read: true }
+            : notification
+        )
+      )
+      
+      setUnreadCount(prev => Math.max(0, prev - unreadSelected.length))
+      clearSelection()
+      
+      toast({
+        title: "批量操作完成",
+        description: `已标记 ${unreadSelected.length} 条通知为已读`,
+      })
+    } catch (error: any) {
+      console.error('Bulk mark as read failed:', error)
+      toast({
+        title: "操作失败",
+        description: error.message || "批量标记失败",
+        variant: "destructive"
+      })
+    } finally {
+      setBulkActionLoading(false)
     }
   }
 
@@ -184,28 +311,59 @@ const MessagesScreen: React.FC = () => {
     return time.toLocaleDateString()
   }
 
-  // 过滤通知
-  const filteredNotifications = notifications.filter(notification =>
-    notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    notification.content.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // 过滤通知（前端筛选）
+  const filteredNotifications = notifications.filter(notification => {
+    // 类型筛选
+    let typeMatch = false
+    if (selectedType === 'all') {
+      typeMatch = true
+    } else if (selectedType === 'unknown') {
+      // "公告通知" 匹配所有未知类型或空类型（通常是系统公告）
+      typeMatch = !notification.notif_type || !NOTIFICATION_TYPES.some(t => t.value === notification.notif_type && t.value !== 'all' && t.value !== 'unknown')
+    } else {
+      typeMatch = notification.notif_type === selectedType
+    }
+    
+    // 搜索筛选
+    const searchMatch = !searchQuery || 
+      notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      notification.content.toLowerCase().includes(searchQuery.toLowerCase())
+    
+    return typeMatch && searchMatch
+  })
+
+  // 获取实际存在的通知类型
+  const actualTypes = React.useMemo(() => {
+    if (notifications.length === 0) return []
+    const uniqueTypes = [...new Set(notifications.map(n => n.notif_type).filter(Boolean))]
+    return uniqueTypes
+  }, [notifications])
+
+  // 调试信息：显示实际的通知类型
+  React.useEffect(() => {
+    if (notifications.length > 0) {
+      console.log('实际通知类型:', actualTypes)
+      console.log('当前筛选类型:', selectedType)
+      console.log('筛选后数量:', filteredNotifications.length)
+    }
+  }, [actualTypes, selectedType, filteredNotifications.length])
 
   // 获取通知类型图标
   const getNotificationIcon = (type?: string) => {
-    switch (type) {
-      case 'ResourceApproved':
-        return '✅'
-      case 'CommentReceived':
-        return '💬'
-      case 'SystemNotification':
-        return '🔔'
-      default:
-        return '📢'
-    }
+    if (!type) return '📢' // 未知类型使用公告图标（通常是系统公告）
+    const typeConfig = NOTIFICATION_TYPES.find(t => t.value === type)
+    return typeConfig?.icon || '📢' // 未匹配的类型也使用公告图标
   }
 
   // 处理通知点击
   const handleNotificationClick = (notification: Notification) => {
+    const navigate = useNavigate()
+    
+    if (isSelectionMode) {
+      toggleSelection(notification.id)
+      return
+    }
+
     // 如果未读，标记为已读
     if (!notification.is_read) {
       handleMarkAsRead(notification.id)
@@ -213,8 +371,25 @@ const MessagesScreen: React.FC = () => {
     
     // 如果有链接，跳转
     if (notification.link) {
-      // 这里可以根据需要处理内部路由或外部链接
-      console.log('Navigate to:', notification.link)
+      // 解析链接并跳转到相应页面
+      try {
+        const url = new URL(notification.link, window.location.origin)
+        const pathname = url.pathname
+        
+        // 内部路由跳转
+        if (pathname.startsWith('/')) {
+          navigate(pathname)
+        } else {
+          // 外部链接
+          window.open(notification.link, '_blank')
+        }
+      } catch (error) {
+        console.error('Invalid link:', notification.link)
+        // 如果链接格式不正确，尝试作为内部路由处理
+        if (notification.link.startsWith('/')) {
+          navigate(notification.link)
+        }
+      }
     }
   }
 
@@ -226,67 +401,181 @@ const MessagesScreen: React.FC = () => {
         subtitle={loading ? "加载中..." : `${notifications.length} 条通知${unreadCount > 0 ? `，${unreadCount} 条未读` : ''}`}
         showSearchButton
         rightAction={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <div className="flex items-center space-x-2">
+            {/* 刷新按钮 */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {/* 选择模式切换 */}
+            {notifications.length > 0 && (
               <Button 
                 variant="ghost" 
                 size="icon" 
                 className="h-9 w-9"
-                disabled={bulkActionLoading}
+                onClick={() => setIsSelectionMode(!isSelectionMode)}
               >
-                {bulkActionLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MoreVertical size={20} />
-                )}
+                <Check className={`h-4 w-4 ${isSelectionMode ? 'text-primary' : ''}`} />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={20} className="w-48 z-[80]">
-              <DropdownMenuItem 
-                onClick={handleMarkAllAsRead}
-                disabled={unreadCount === 0 || bulkActionLoading}
-                className="flex items-center"
-              >
-                <CheckCheck className="mr-2 h-4 w-4" />
-                一键已读 {unreadCount > 0 && `(${unreadCount})`}
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => setShowClearDialog(true)}
-                disabled={readNotificationsCount === 0 || bulkActionLoading}
-                className="flex items-center"
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                清理已读 {readNotificationsCount > 0 && `(${readNotificationsCount})`}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="flex items-center"
-                onClick={() => toast({ title: "通知设置", description: "功能开发中..." })}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                通知设置
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            )}
+
+            {/* 更多操作菜单 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-9 w-9"
+                  disabled={bulkActionLoading}
+                >
+                  {bulkActionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <MoreVertical size={20} />
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" sideOffset={20} className="w-48 z-[80]">
+                <DropdownMenuItem 
+                  onClick={handleMarkAllAsRead}
+                  disabled={unreadCount === 0 || bulkActionLoading}
+                  className="flex items-center"
+                >
+                  <CheckCheck className="mr-2 h-4 w-4" />
+                  一键已读 {unreadCount > 0 && `(${unreadCount})`}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setShowClearDialog(true)}
+                  disabled={readNotificationsCount === 0 || bulkActionLoading}
+                  className="flex items-center"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  清理已读 {readNotificationsCount > 0 && `(${readNotificationsCount})`}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="flex items-center"
+                  onClick={() => toast({ title: "通知设置", description: "功能开发中..." })}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  通知设置
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         }
       />
 
       {/* 内容区域 - 为固定导航栏留出空间 */}
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
-        {/* 搜索栏 */}
-        <div className="px-4 py-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
+        {/* 筛选和搜索栏 */}
+        <div className="px-4 py-3 space-y-3">
+          {/* 通知类型筛选 */}
+          <div className="flex items-center space-x-3">
+            <Select value={selectedType} onValueChange={setSelectedType}>
+              <SelectTrigger className="w-40 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {NOTIFICATION_TYPES.map((type) => {
+                  // 计算该类型的通知数量
+                  let count = 0
+                  if (type.value === 'all') {
+                    count = notifications.length
+                  } else if (type.value === 'unknown') {
+                    count = notifications.filter(n => !n.notif_type || !NOTIFICATION_TYPES.some(t => t.value === n.notif_type && t.value !== 'all' && t.value !== 'unknown')).length
+                  } else {
+                    count = notifications.filter(n => n.notif_type === type.value).length
+                  }
+
+                  // 如果不是"全部通知"且数量为0，则不显示该选项
+                  if (type.value !== 'all' && count === 0) {
+                    return null
+                  }
+
+                  return (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-2">
+                          <span>{type.icon}</span>
+                          <span>{type.label}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({count})
+                        </span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+            
+            {selectedType !== 'all' && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setSelectedType('all')}
+                className="h-9"
+              >
+                清除筛选
+              </Button>
+            )}
+            
+
+          </div>
+
+          {/* 搜索框 */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
               id="notifications-search"
               name="notificationSearch"
               placeholder="搜索通知..."
               className="pl-10 h-9"
-              autoComplete="search"
+            autoComplete="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {/* 批量选择工具栏 */}
+          <AnimatePresence>
+            {isSelectionMode && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm text-muted-foreground">
+                    已选择 {selectedNotifications.size} 项
+                  </span>
+                  <Button size="sm" variant="outline" onClick={selectAll}>
+                    全选
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={clearSelection}>
+                    取消
+                  </Button>
+                </div>
+                
+                {selectedNotifications.size > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Button size="sm" onClick={handleBulkMarkAsRead} disabled={bulkActionLoading}>
+                      <Check className="mr-1 h-3 w-3" />
+                      标记已读
+                    </Button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* 加载状态 */}
@@ -313,9 +602,26 @@ const MessagesScreen: React.FC = () => {
                     notification.is_read 
                       ? 'border-l-muted hover:bg-muted/20' 
                       : 'border-l-primary bg-primary/5 hover:bg-primary/10 shadow-sm'
+                  } ${
+                    selectedNotifications.has(notification.id) ? 'ring-2 ring-primary bg-primary/10' : ''
                   }`}>
                     <CardContent className="p-3">
                       <div className="flex items-start space-x-3">
+                        {/* 选择框（选择模式下） */}
+                        {isSelectionMode && (
+                          <div className="flex-shrink-0 mt-0.5">
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                              selectedNotifications.has(notification.id)
+                                ? 'bg-primary border-primary'
+                                : 'border-muted-foreground'
+                            }`}>
+                              {selectedNotifications.has(notification.id) && (
+                                <Check className="w-3 h-3 text-primary-foreground" />
+                              )}
+                            </div>
+                          </div>
+                        )}
+
                         {/* 通知图标 */}
                         <div className="flex-shrink-0 text-lg mt-0.5">
                           {getNotificationIcon(notification.notif_type)}
@@ -348,20 +654,20 @@ const MessagesScreen: React.FC = () => {
                             <div className="flex items-center space-x-2">
                               {notification.notif_type && (
                                 <Badge variant="outline" className="text-xs px-2 py-0.5">
-                                  {notification.notif_type}
+                                  {NOTIFICATION_TYPES.find(t => t.value === notification.notif_type)?.label || notification.notif_type}
                                 </Badge>
                               )}
                               {notification.link && (
                                 <ExternalLink size={12} className="text-muted-foreground" />
                               )}
-                            </div>
-                            
-                            {!notification.is_read && (
+      </div>
+
+                            {!isSelectionMode && !notification.is_read && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 px-2 text-xs hover:bg-primary/20"
-                                onClick={(e) => {
+        onClick={(e) => {
                                   e.stopPropagation()
                                   handleMarkAsRead(notification.id)
                                 }}
@@ -377,50 +683,75 @@ const MessagesScreen: React.FC = () => {
                   </Card>
                 </motion.div>
               ))}
+
+              {/* 加载更多按钮 */}
+              {!loading && hasMore && notifications.length > 0 && (
+                <div className="flex justify-center py-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="w-full max-w-xs"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        加载中...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="mr-2 h-4 w-4" />
+                        加载更多
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>
+      </div>
         )}
 
-        {/* 空状态 */}
+      {/* 空状态 */}
         {!loading && filteredNotifications.length === 0 && (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
               <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium mb-2">
-                {searchQuery ? '未找到相关通知' : notifications.length === 0 ? '暂无通知' : '没有匹配的通知'}
+                {searchQuery || selectedType !== 'all' ? '未找到相关通知' : notifications.length === 0 ? '暂无通知' : '没有匹配的通知'}
               </h3>
               <p className="text-muted-foreground">
-                {searchQuery 
-                  ? '尝试使用其他关键词搜索' 
+                {searchQuery || selectedType !== 'all'
+                  ? '尝试调整筛选条件或搜索关键词' 
                   : notifications.length === 0 
                     ? '当有新的通知时，会在这里显示' 
                     : '尝试调整搜索条件'
                 }
               </p>
             </div>
-          </div>
-        )}
+        </div>
+      )}
       </div> {/* 结束内容区域 */}
 
       {/* 清理已读通知确认对话框 */}
       <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center">
+        <AlertDialogContent className="mx-4 rounded-2xl max-w-md">
+          <AlertDialogHeader className="pb-4">
+            <AlertDialogTitle className="flex items-center text-lg">
               <AlertTriangle className="mr-2 h-5 w-5 text-orange-500" />
               确认清理已读通知
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              您即将清理 <span className="font-medium text-foreground">{readNotificationsCount}</span> 条已读通知。
-              此操作无法撤销，确定要继续吗？
+            <AlertDialogDescription className="text-sm leading-relaxed pt-2">
+              您即将永久清理 <span className="font-medium text-foreground">{readNotificationsCount}</span> 条已读通知。
+              <br /><br />
+              <span className="text-orange-600 font-medium">注意：此操作不可撤销，清理后的通知将无法恢复。</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
+          <AlertDialogFooter className="pt-4 gap-3">
+            <AlertDialogCancel className="rounded-xl">取消</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleClearRead}
               disabled={bulkActionLoading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
             >
               {bulkActionLoading ? (
                 <>

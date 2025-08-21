@@ -45,7 +45,7 @@ export async function deleteNotification(id: number): Promise<void> {
   return http.delete(`/notifications/${id}`)
 }
 
-// 批量删除已读通知（如果后端支持）
-export async function deleteReadNotifications(): Promise<void> {
-  return http.post('/notifications/delete-read')
+// 批量删除已读通知
+export async function deleteReadNotifications(): Promise<{ deleted_count: number }> {
+  return http.delete<{ deleted_count: number }>('/notifications/delete-read')
 } 

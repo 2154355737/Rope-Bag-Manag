@@ -88,21 +88,50 @@ impl UserService {
             email: email.to_string(),
             password_hash,
             nickname: None,
+            bio: None,
+            location: None,
+            website: None,
+            skills: None,
             role: match role.to_lowercase().as_str() { "admin" => crate::models::UserRole::Admin, "moderator" => crate::models::UserRole::Moderator, "elder" => crate::models::UserRole::Elder, _ => crate::models::UserRole::User },
             star,
             ban_status: crate::models::BanStatus::Normal,
             ban_reason: None,
             qq_number: qq_number.map(|s| s.to_string()),
             avatar_url: avatar_url.map(|s| s.to_string()),
-            login_count: 0, upload_count: 0, download_count: 0,
-            created_at: chrono::Utc::now(), last_login: None, is_admin: role.to_lowercase() == "admin",
+            login_count: 0,
+            upload_count: 0,
+            download_count: 0,
+            created_at: chrono::Utc::now(),
+            last_login: None,
+            is_admin: role.to_lowercase() == "admin",
         };
         self.user_repo.create_user(&user).await.map(|_| ())
     }
 
-    pub async fn batch_delete_users(&self, usernames: Vec<String>) -> Result<()> {
-        for username in usernames { if let Ok(Some(user)) = self.user_repo.find_by_username(&username).await { if !user.is_admin { self.user_repo.delete_user(user.id).await?; } } }
-        Ok(())
+    pub async fn batch_delete_users(&self, usernames: Vec<String>) -> Result<()> { 
+        self.user_repo.batch_delete_users(usernames).await 
+    }
+
+    // 新增：用户签到
+    pub async fn user_check_in(&self, user_id: i32) -> Result<()> {
+        self.user_repo.user_check_in(user_id).await
+    }
+
+    // 新增：获取用户连续签到天数
+    pub async fn get_user_check_in_streak(&self, user_id: i32) -> Result<i32> {
+        self.user_repo.get_check_in_streak(user_id).await
+    }
+
+    // 新增：获取用户今日活跃度
+    pub async fn get_user_today_activity(&self, user_id: i32) -> Result<f32> {
+        // 基于用户今日的各种活动计算活跃度
+        // 这里可以根据发帖、评论、点赞等行为计算
+        Ok(85.0) // 示例值
+    }
+
+    // 新增：获取用户本周发布统计
+    pub async fn get_user_weekly_posts(&self, user_id: i32) -> Result<Vec<i32>> {
+        self.user_repo.get_weekly_posts_count(user_id).await
     }
 
     // 新增：按ID批量删除

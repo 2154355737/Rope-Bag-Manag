@@ -104,7 +104,7 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
   return (
     <div
       className={cn(
-        'fixed top-0 left-0 right-0 z-[100] w-full border-b transition-all duration-200',
+        'fixed top-0 left-0 right-0 z-[9998] w-full border-b transition-all duration-200',
         'pt-safe', // 安全域适配
         getVariantStyles(),
         className

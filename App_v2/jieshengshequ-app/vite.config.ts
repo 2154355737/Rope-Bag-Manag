@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 8002, // 使用8002端口
+    port: 3000, // 前端使用3000端口，避免与后端8002冲突
     strictPort: false, // 如果端口被占用，会自动尝试下一个可用端口
     open: true, // 自动打开浏览器
     host: '0.0.0.0', // 允许外部访问

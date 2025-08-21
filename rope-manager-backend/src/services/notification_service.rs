@@ -38,4 +38,10 @@ impl NotificationService {
     // 管理员用：全站列表与总数
     pub async fn list_all(&self, page: i32, size: i32) -> Result<Vec<Notification>> { self.repo.list_all(page, size).await }
     pub async fn count_all(&self) -> Result<i32> { self.repo.count_all().await }
+
+    // 删除已读通知
+    pub async fn delete_read(&self, user_id: i32) -> Result<i32> { self.repo.delete_read(user_id).await }
+    
+    // 删除单个通知
+    pub async fn delete_by_id(&self, user_id: i32, id: i32) -> Result<()> { self.repo.delete_by_id(user_id, id).await }
 } 

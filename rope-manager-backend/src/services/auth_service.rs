@@ -131,21 +131,25 @@ impl AuthService {
 
         // 创建用户
         let mut user = User {
-            id: 0, // 数据库会自动生成
+            id: 0,
             username: req.username.clone(),
             email: req.email.clone(),
-            password_hash,
-            nickname: req.nickname.clone(),
+            password_hash: password_hash.clone(),
+            nickname: None,
+            bio: None,
+            location: None,
+            website: None,
+            skills: None,
             role: crate::models::UserRole::User,
-            star: 1,
+            star: 0,
             ban_status: crate::models::BanStatus::Normal,
             ban_reason: None,
-            qq_number: req.qq_number.clone(),
+            qq_number: None,
             avatar_url: None,
             login_count: 0,
             upload_count: 0,
             download_count: 0,
-            created_at: Utc::now(),
+            created_at: chrono::Utc::now(),
             last_login: None,
             is_admin: false,
         };

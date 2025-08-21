@@ -49,12 +49,34 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
+    
+    // 自动处理点击后失焦，避免高亮残留
+    const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+      if (onClick) {
+        onClick(e)
+      }
+      
+      // 延迟失焦，确保点击事件先完成
+      setTimeout(() => {
+        // 检查元素是否仍然存在且可以失焦
+        if (e.currentTarget && typeof e.currentTarget.blur === 'function') {
+          try {
+            e.currentTarget.blur()
+          } catch (error) {
+            // 忽略失焦错误，通常发生在元素已被卸载的情况下
+            console.debug('Button blur failed (element may have been unmounted):', error)
+          }
+        }
+      }, 0)
+    }, [onClick])
+    
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        onClick={asChild ? onClick : handleClick}
         {...props}
       />
     )

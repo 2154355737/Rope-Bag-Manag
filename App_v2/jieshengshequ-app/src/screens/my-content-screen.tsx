@@ -24,6 +24,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import { getMyResources, getMyPosts, getMyComments } from '@/api/user'
 
 const MyContentScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -34,6 +35,12 @@ const MyContentScreen: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: number; title: string } | null>(null)
 
+  // 数据状态
+  const [isLoading, setIsLoading] = useState(false)
+  const [myResources, setMyResources] = useState<any[]>([])
+  const [myPosts, setMyPosts] = useState<any[]>([])
+  const [myComments, setMyComments] = useState<any[]>([])
+
   // 根据URL参数设置初始tab
   useEffect(() => {
     const tab = searchParams.get('tab')
@@ -42,136 +49,45 @@ const MyContentScreen: React.FC = () => {
     }
   }, [searchParams])
 
-  // 模拟我的资源数据
-  const myResources = [
-    {
-      id: 1,
-      title: 'React Native 开发工具包',
-      description: '一个功能强大的React Native开发工具包...',
-      category: '开发工具',
-      image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=300',
-      status: 'published', // published, draft, reviewing, rejected
-      downloads: 1250,
-      likes: 89,
-      comments: 45,
-      createdAt: '2024-12-01',
-      updatedAt: '2025-01-10',
-      version: 'v2.1.0',
-      tags: ['React Native', 'TypeScript', '开发工具']
-    },
-    {
-      id: 2,
-      title: 'Vue3 组件库',
-      description: '基于Vue3和TypeScript的现代化组件库...',
-      category: '组件库',
-      image: 'https://images.unsplash.com/photo-1551650975-87deedd944c3?w=300',
-      status: 'draft',
-      downloads: 0,
-      likes: 12,
-      comments: 3,
-      createdAt: '2025-01-15',
-      updatedAt: '2025-01-15',
-      version: 'v1.0.0',
-      tags: ['Vue3', 'TypeScript', '组件库']
-    },
-    {
-      id: 3,
-      title: 'Python数据分析脚本',
-      description: '用于数据分析和可视化的Python脚本集合...',
-      category: '数据分析',
-      image: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=300',
-      status: 'reviewing',
-      downloads: 45,
-      likes: 23,
-      comments: 8,
-      createdAt: '2025-01-10',
-      updatedAt: '2025-01-12',
-      version: 'v1.2.0',
-      tags: ['Python', '数据分析', '可视化']
+  // 加载数据
+  const loadData = async () => {
+    try {
+      setIsLoading(true)
+      
+      const [resources, posts, comments] = await Promise.all([
+        getMyResources().catch((err) => { console.error('获取资源失败:', err); return { list: [] } }),
+        getMyPosts().catch((err) => { console.error('获取帖子失败:', err); return { list: [] } }),
+        getMyComments().catch((err) => { console.error('获取评论失败:', err); return { list: [] } })
+      ])
+      
+      setMyResources(resources?.list || [])
+      setMyPosts(posts?.list || [])
+      setMyComments(comments?.list || [])
+    } catch (error) {
+      console.error('加载数据失败:', error)
+      toast({
+        title: "加载失败",
+        description: "无法加载内容数据，请稍后重试",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
     }
-  ]
+  }
 
-  // 模拟我的帖子数据
-  const myPosts = [
-    {
-      id: 1,
-      title: '结绳语言移动应用开发经验分享',
-      content: '分享一些在结绳语言移动应用开发过程中的经验和踩过的坑...',
-      image: 'https://images.unsplash.com/photo-1551033406-611cf9a28f67?w=300',
-      status: 'published',
-      likes: 234,
-      comments: 45,
-      views: 1250,
-      createdAt: '2025-01-14',
-      updatedAt: '2025-01-14',
-      tags: ['移动开发', '项目分享', '经验总结']
-    },
-    {
-      id: 2,
-      title: 'TypeScript最佳实践总结',
-      content: 'TypeScript在大型项目中的应用最佳实践...',
-      image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=300',
-      status: 'draft',
-      likes: 0,
-      comments: 0,
-      views: 0,
-      createdAt: '2025-01-16',
-      updatedAt: '2025-01-16',
-      tags: ['TypeScript', '最佳实践', '开发经验']
-    },
-    {
-      id: 3,
-      title: 'React Hooks进阶使用技巧',
-      content: 'React Hooks的高级使用技巧和性能优化...',
-      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=300',
-      status: 'reviewing',
-      likes: 156,
-      comments: 32,
-      views: 890,
-      createdAt: '2025-01-12',
-      updatedAt: '2025-01-13',
-      tags: ['React', 'Hooks', '性能优化']
-    }
-  ]
-
-  // 模拟我的评论数据
-  const myComments = [
-    {
-      id: 1,
-      content: '这个工具包真的很实用！特别是TypeScript的支持，文档也很详细。',
-      postTitle: 'React Native 最新开发指南',
-      postAuthor: '技术大牛',
-      likes: 12,
-      replies: 3,
-      createdAt: '2025-01-15 14:30',
-      status: 'published'
-    },
-    {
-      id: 2,
-      content: '同意楼主的观点，我在实际项目中也遇到了类似的问题，这个解决方案确实有效。',
-      postTitle: '前端性能优化最佳实践',
-      postAuthor: '前端小王',
-      likes: 8,
-      replies: 1,
-      createdAt: '2025-01-14 09:15',
-      status: 'published'
-    },
-    {
-      id: 3,
-      content: '请问这个方法在Vue3中是否也适用？期待作者的回复。',
-      postTitle: '状态管理方案对比分析',
-      postAuthor: '架构师李四',
-      likes: 5,
-      replies: 0,
-      createdAt: '2025-01-13 16:45',
-      status: 'published'
-    }
-  ]
+  // 组件挂载时加载数据
+  useEffect(() => {
+    loadData()
+  }, [])
 
   // 获取状态信息
   const getStatusInfo = (status: string) => {
-    switch (status) {
+    // 统一转换为小写进行比较
+    const normalizedStatus = status?.toLowerCase()
+    
+    switch (normalizedStatus) {
       case 'published':
+      case 'active':
         return { 
           text: '已发布', 
           className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
@@ -184,12 +100,14 @@ const MyContentScreen: React.FC = () => {
           icon: FileText 
         }
       case 'reviewing':
+      case 'pending':
         return { 
           text: '审核中', 
           className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
           icon: Clock 
         }
       case 'rejected':
+      case 'inactive':
         return { 
           text: '已拒绝', 
           className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
@@ -261,11 +179,15 @@ const MyContentScreen: React.FC = () => {
   // 过滤内容
   const filterContent = (items: any[]) => {
     if (!searchQuery) return items
-    return items.filter(item => 
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.content && item.content.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.tags && item.tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
-    )
+    return items.filter(item => {
+      const title = item.title || item.name || ''
+      const content = item.content || item.description || ''
+      const tags = item.tags || []
+      
+      return title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (Array.isArray(tags) && tags.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase())))
+    })
   }
 
   // 渲染资源卡片
@@ -279,14 +201,15 @@ const MyContentScreen: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
+        className="cursor-pointer"
+        onClick={() => navigate(`/resource/${resource.id}`)}
       >
         <Card className="overflow-hidden hover:shadow-lg transition-shadow">
           <div className="relative">
-            <img 
-              src={resource.image} 
-              alt={resource.title}
-              className="w-full h-32 object-cover"
-            />
+            {/* 使用默认图标，因为后端资源数据没有图片字段 */}
+            <div className="w-full h-32 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center">
+              <BookOpen size={32} className="text-primary/60" />
+            </div>
             <div className="absolute top-2 right-2">
               <Badge className={`text-xs ${statusInfo.className}`}>
                 <StatusIcon size={10} className="mr-1" />
@@ -297,10 +220,10 @@ const MyContentScreen: React.FC = () => {
           
           <CardContent className="p-4">
             <div className="flex items-start justify-between mb-2">
-              <h3 className="font-medium text-sm line-clamp-1">{resource.title}</h3>
+              <h3 className="font-medium text-sm line-clamp-2 flex-1 min-w-0 pr-2">{resource.name}</h3>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
                     <MoreVertical size={12} />
                   </Button>
                 </DropdownMenuTrigger>
@@ -313,7 +236,7 @@ const MyContentScreen: React.FC = () => {
                     <Eye size={14} className="mr-2" />
                     查看
                   </DropdownMenuItem>
-                  {resource.status === 'published' && (
+                  {(resource.status === 'published' || resource.status === 'Active') && (
                     <DropdownMenuItem onClick={() => handleStatusChange('resource', resource.id, 'draft')}>
                       <EyeOff size={14} className="mr-2" />
                       下架
@@ -327,7 +250,7 @@ const MyContentScreen: React.FC = () => {
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    onClick={() => handleDelete('resource', resource.id, resource.title)}
+                    onClick={() => handleDelete('resource', resource.id, resource.name)}
                     className="text-destructive"
                   >
                     <Trash2 size={14} className="mr-2" />
@@ -337,31 +260,33 @@ const MyContentScreen: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+            <p className="text-xs text-muted-foreground mb-3 line-clamp-3 break-words">
               {resource.description}
             </p>
 
-            <div className="flex flex-wrap gap-1 mb-3">
-              {resource.tags.slice(0, 2).map((tag: string, index: number) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {resource.tags.length > 2 && (
-                <Badge variant="outline" className="text-xs">+{resource.tags.length - 2}</Badge>
-              )}
-            </div>
+            {resource.tags && (
+              <div className="flex flex-wrap gap-1 mb-3">
+                {resource.tags.slice(0, 2).map((tag: string, index: number) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+                {resource.tags.length > 2 && (
+                  <Badge variant="outline" className="text-xs">+{resource.tags.length - 2}</Badge>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{resource.version}</span>
-              <div className="flex items-center gap-3">
+              <span className="truncate">{resource.version}</span>
+              <div className="flex items-center gap-3 shrink-0">
                 <div className="flex items-center">
                   <Download size={10} className="mr-1" />
-                  {resource.downloads}
+                  {resource.download_count || 0}
                 </div>
                 <div className="flex items-center">
                   <Heart size={10} className="mr-1" />
-                  {resource.likes}
+                  {resource.like_count || 0}
                 </div>
               </div>
             </div>
@@ -382,19 +307,20 @@ const MyContentScreen: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
+        className="cursor-pointer"
+        onClick={() => navigate(`/post/${post.id}`)}
       >
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow overflow-hidden">
           <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <img 
-                src={post.image} 
-                alt={post.title}
-                className="w-16 h-16 rounded-lg object-cover shrink-0"
-              />
+            <div className="flex items-start gap-3 w-full">
+              {/* 使用默认图标，因为后端帖子数据没有图片字段 */}
+              <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center shrink-0">
+                <FileText size={24} className="text-blue-500/60" />
+              </div>
               
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-medium text-sm line-clamp-1">{post.title}</h3>
+              <div className="flex-1 min-w-0 overflow-hidden w-0">
+                <div className="flex items-start justify-between mb-2 gap-2">
+                  <h3 className="font-medium text-sm line-clamp-2 flex-1 min-w-0 break-words">{post.title}</h3>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
@@ -410,13 +336,13 @@ const MyContentScreen: React.FC = () => {
                         <Eye size={14} className="mr-2" />
                         查看
                       </DropdownMenuItem>
-                      {post.status === 'published' && (
+                      {(post.status === 'published' || post.status === 'Published') && (
                         <DropdownMenuItem onClick={() => handleStatusChange('post', post.id, 'draft')}>
                           <EyeOff size={14} className="mr-2" />
                           下架
                         </DropdownMenuItem>
                       )}
-                      {post.status === 'draft' && (
+                      {(post.status === 'draft' || post.status === 'Draft') && (
                         <DropdownMenuItem onClick={() => handleStatusChange('post', post.id, 'reviewing')}>
                           <CheckCircle size={14} className="mr-2" />
                           提交审核
@@ -441,24 +367,26 @@ const MyContentScreen: React.FC = () => {
                   </Badge>
                 </div>
 
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
-                  {post.content}
-                </p>
+                <div className="mb-3 w-full overflow-hidden">
+                  <p className="text-xs text-muted-foreground line-clamp-2 break-all leading-relaxed w-full max-w-full overflow-hidden text-ellipsis">
+                    {post.content && post.content.length > 100 ? post.content.substring(0, 100) + '...' : post.content}
+                  </p>
+                </div>
 
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{post.createdAt}</span>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center">
-                      <Eye size={10} className="mr-1" />
-                      {post.views}
+                <div className="flex items-center justify-between text-xs text-muted-foreground gap-2 flex-wrap">
+                  <span className="truncate text-xs">{new Date(post.created_at).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-2 shrink-0 text-xs">
+                    <div className="flex items-center gap-1">
+                      <Eye size={10} />
+                      <span>{post.view_count || 0}</span>
                     </div>
-                    <div className="flex items-center">
-                      <Heart size={10} className="mr-1" />
-                      {post.likes}
+                    <div className="flex items-center gap-1">
+                      <Heart size={10} />
+                      <span>{post.like_count || 0}</span>
                     </div>
-                    <div className="flex items-center">
-                      <MessageSquare size={10} className="mr-1" />
-                      {post.comments}
+                    <div className="flex items-center gap-1">
+                      <MessageSquare size={10} />
+                      <span>{post.comment_count || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -478,12 +406,21 @@ const MyContentScreen: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
+        className="cursor-pointer"
+        onClick={() => {
+          // 根据评论的目标类型跳转到对应页面
+          if (comment.target_type === 'post') {
+            navigate(`/post/${comment.target_id}`)
+          } else if (comment.target_type === 'resource') {
+            navigate(`/resource/${comment.target_id}`)
+          }
+        }}
       >
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-4">
-            <div className="flex items-start justify-between mb-2">
-              <h4 className="text-sm font-medium text-primary line-clamp-1">
-                {comment.postTitle}
+            <div className="flex items-start justify-between mb-2 gap-2">
+              <h4 className="text-sm font-medium text-primary line-clamp-2 flex-1 min-w-0">
+                {comment.target_title || '相关帖子'}
               </h4>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -507,24 +444,18 @@ const MyContentScreen: React.FC = () => {
               </DropdownMenu>
             </div>
 
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+            <p className="text-sm text-muted-foreground mb-3 line-clamp-4 break-words">
               {comment.content}
             </p>
 
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>回复给 {comment.postAuthor}</span>
-              <div className="flex items-center gap-3">
-                <span>{comment.createdAt}</span>
+            <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
+              <span className="truncate">我的评论</span>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className="whitespace-nowrap">{new Date(comment.created_at).toLocaleDateString()}</span>
                 <div className="flex items-center">
                   <Heart size={10} className="mr-1" />
-                  {comment.likes}
+                  {comment.likes || 0}
                 </div>
-                {comment.replies > 0 && (
-                  <div className="flex items-center">
-                    <MessageSquare size={10} className="mr-1" />
-                    {comment.replies}
-                  </div>
-                )}
               </div>
             </div>
           </CardContent>
@@ -549,10 +480,10 @@ const MyContentScreen: React.FC = () => {
 
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         <ScrollArea className="flex-1">
-          <div className="p-4">
+          <div className="p-4 max-w-full overflow-hidden">
             {/* 搜索栏 */}
             <div className="flex items-center gap-2 mb-4">
-              <div className="relative flex-1">
+              <div className="relative flex-1 min-w-0">
                 <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="搜索我的内容..."
@@ -561,7 +492,7 @@ const MyContentScreen: React.FC = () => {
                   className="pl-10"
                 />
               </div>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" className="shrink-0">
                 <Filter size={16} />
               </Button>
             </div>
@@ -624,7 +555,7 @@ const MyContentScreen: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 max-w-full overflow-hidden">
                   {filterContent(myPosts).map(renderPostCard)}
                 </div>
 

@@ -8,7 +8,7 @@ pub struct Package {
     pub author: String,
     pub version: Option<String>,
     pub description: Option<String>,
-    pub file_url: String,
+    pub file_url: Option<String>,
     pub file_size: Option<i64>,
     pub download_count: i32,
     pub like_count: i32,

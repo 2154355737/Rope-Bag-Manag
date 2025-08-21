@@ -358,7 +358,7 @@ impl PackageStorageService {
         let packages = self.package_repo.get_all_packages().await?;
         let db_file_paths: std::collections::HashSet<String> = packages
             .iter()
-            .map(|p| p.file_url.clone())
+            .filter_map(|p| p.file_url.clone())
             .collect();
         
         // 查找孤立文件（存储中有但数据库中没有的）

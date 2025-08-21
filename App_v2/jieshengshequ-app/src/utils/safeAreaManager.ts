@@ -247,10 +247,49 @@ class SafeAreaManager {
   }
 
   /**
+   * 检查元素是否在Sheet/Modal等覆盖层内部
+   */
+  private isInOverlay(element: Element): boolean {
+    if (!element) return false
+    
+    // 检查是否在Sheet内部 (Radix UI Sheet)
+    const sheetContent = element.closest('[data-radix-dialog-content]')
+    if (sheetContent) return true
+    
+    // 检查是否在固定定位的覆盖层内部（通过z-index判断）
+    let parent = element.parentElement
+    while (parent) {
+      const styles = window.getComputedStyle(parent)
+      const position = styles.position
+      const zIndex = parseInt(styles.zIndex) || 0
+      
+      // 如果是固定定位且z-index很高，认为是覆盖层
+      if (position === 'fixed' && zIndex > 9000) {
+        return true
+      }
+      
+      parent = parent.parentElement
+    }
+    
+    // 检查是否在其他模态覆盖层内部
+    const modalContent = element.closest('[role="dialog"], [role="alertdialog"]')
+    if (modalContent) return true
+    
+    return false
+  }
+
+  /**
    * 更新键盘状态
    */
   private updateKeyboardState(visible: boolean, keyboardHeight?: number): void {
     if (this.config.keyboardVisible === visible) return
+    
+    // 如果当前聚焦的输入框在覆盖层内部，不隐藏导航栏
+    const activeElement = document.activeElement
+    if (visible && activeElement && this.isInOverlay(activeElement)) {
+      console.log('⌨️ 输入框在覆盖层内部，不隐藏导航栏')
+      return
+    }
     
     this.config.keyboardVisible = visible
     this.applyCSSVariables()
