@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -33,6 +33,7 @@ const PostDetailScreen: React.FC = () => {
   const [recommendedItems, setRecommendedItems] = useState<any[]>([])
   const [isLiked, setIsLiked] = useState(false)
   const [isBookmarked, setIsBookmarked] = useState(false)
+  const [commentTotal, setCommentTotal] = useState(0)
 
   // 占位数据
   const initialPost = {
@@ -130,32 +131,19 @@ const PostDetailScreen: React.FC = () => {
         setRecommendedItems(recommendations)
         
         // 加载第一页评论
-        const cr = await apiGetComments('post', p.id, 1, 10)
-        const base = (cr.list || []).map((c: any) => ({
+        const cr = await apiGetComments('post', p.id, 1, 10, true)
+        const mapped = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
           content: c.content,
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: [] as any[]
-        }))
-        // 并行获取每条评论的回复
-        const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-        const mapped = base.map((c, idx) => ({
-          ...c,
-          replies: (repliesArr[idx] || []).map((r: any) => ({
-            id: r.id,
-            author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' },
-            content: r.content,
-            time: formatTimeOfDay(r.created_at || ''),
-            likes: r.likes || 0,
-            isLiked: false,
-            canEdit: true,
-          })),
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
           canEdit: true,
         }))
         setAllComments(mapped)
+        setCommentTotal(cr.total || mapped.length)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
       } catch (e) {
         console.warn(e)
@@ -169,32 +157,20 @@ const PostDetailScreen: React.FC = () => {
     setIsLoadingComments(true)
     
     try {
-      const cr = await apiGetComments('post', post.id, page, 10)
-      const base = (cr.list || []).map((c: any) => ({
+      const cr = await apiGetComments('post', post.id, page, 10, true)
+      const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: [] as any[]
-      }))
-      const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-      const mapped = base.map((c, idx) => ({
-        ...c,
-        replies: (repliesArr[idx] || []).map((r: any) => ({
-          id: r.id,
-          author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' },
-          content: r.content,
-          time: formatTimeOfDay(r.created_at || ''),
-          likes: r.likes || 0,
-          isLiked: false,
-          canEdit: true,
-        })),
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
         canEdit: true,
       }))
       
       setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
+      setCommentTotal(cr.total || 0)
       setIsLoadingComments(false)
       return mapped
     } catch (error) {
@@ -222,6 +198,7 @@ const PostDetailScreen: React.FC = () => {
       canEdit: true,
     }))
     setAllComments(mapped)
+    setCommentTotal(cr.total || mapped.length)
     toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
 
@@ -251,6 +228,8 @@ const PostDetailScreen: React.FC = () => {
   const handleReportComment = (commentId: number) => {
     console.log('举报评论:', commentId)
   }
+
+  const editableComments = useMemo(() => allComments.map(c => ({ ...c, canEdit: true })), [allComments])
 
   // 格式化数字
   const formatNumber = (num: number) => {
@@ -465,8 +444,8 @@ const PostDetailScreen: React.FC = () => {
 
           {/* 评论区 */}
           <CommentSection
-            comments={allComments.map(c => ({ ...c, canEdit: true }))}
-            totalCount={post.comments}
+            comments={editableComments}
+            totalCount={commentTotal}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
             onLikeComment={handleLikeComment}

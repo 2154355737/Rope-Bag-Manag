@@ -1,9 +1,14 @@
 import { http } from './client'
 
-export async function getComments(targetType: 'post'|'resource'|'package', targetId: number, page=1, pageSize=10) {
+export async function getComments(targetType: 'post'|'resource'|'package', targetId: number, page=1, pageSize=10, includeReplies: boolean = true) {
 	// 后端要求非管理员读取时 target_type 仅允许 post/package（resource 对应 package）
 	const t = (targetType === 'resource' || targetType === 'package') ? 'package' : 'post'
-	return http.get<{ list: any[]; total: number; page: number; size: number }>(`/comments`, { target_type: t, target_id: targetId, page, size: pageSize })
+	return http.get<{ list: any[]; total: number; page: number; size: number }>(`/comments`, { target_type: t, target_id: targetId, page, size: pageSize, include_replies: includeReplies })
+}
+
+// 平面列表（不包含replies）
+export async function getCommentsFlat(targetType: 'post'|'resource'|'package', targetId: number, page=1, pageSize=10) {
+  return getComments(targetType, targetId, page, pageSize, false)
 }
 
 export async function getCommentReplies(commentId: number) {

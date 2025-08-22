@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -80,6 +80,8 @@ const ResourceDetailScreen = (): JSX.Element => {
   const [comments, setComments] = useState<Comment[]>([])
   const [hasMoreComments, setHasMoreComments] = useState(true)
   const [recommendedItems, setRecommendedItems] = useState<any[]>([])
+  const [commentTotal, setCommentTotal] = useState(0)
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -217,23 +219,19 @@ const ResourceDetailScreen = (): JSX.Element => {
         setRecommendedItems(recommendations)
         
         // 加载评论
-        const cr = await apiGetComments('resource', r.id, 1, 10)
-        const base = (cr.list || []).map((c: any) => ({
+        const cr = await apiGetComments('resource', r.id, 1, 10, true)
+        const mapped = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
           content: c.content,
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: [] as any[]
-        }))
-        const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-        const mapped = base.map((c, idx) => ({
-          ...c,
-          replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
           canEdit: true,
         }))
         setComments(mapped)
+        setCommentTotal(cr.total || mapped.length)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
       } catch (e) {
         console.warn(e)
@@ -351,12 +349,37 @@ const ResourceDetailScreen = (): JSX.Element => {
     const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
     const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
     setComments(mapped)
+    setCommentTotal(cr.total || mapped.length)
     toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {
     await apiReplyComment(commentId, content)
     toast({ title: '回复发送成功', description: '您的回复已发布' })
+  }
+
+  // 加载更多评论
+  const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
+    setIsLoadingComments(true)
+    try {
+      const cr = await getResourceComments(resource.id, page, 10)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false }))
+      }))
+      setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
+      setCommentTotal(cr.total || 0)
+      setIsLoadingComments(false)
+      return mapped
+    } catch (e) {
+      setIsLoadingComments(false)
+      return []
+    }
   }
 
   const handleEditComment = async (commentId: number, content: string) => {
@@ -374,6 +397,8 @@ const ResourceDetailScreen = (): JSX.Element => {
   const handleReportComment = (commentId: number) => {
     console.log('举报评论:', commentId)
   }
+
+  const editableComments = useMemo(() => comments.map(c => ({ ...c, canEdit: true })), [comments])
 
   // 处理点赞
   const handleLike = async () => {
@@ -756,14 +781,15 @@ const ResourceDetailScreen = (): JSX.Element => {
 
           {/* 评论区 */}
           <CommentSection
-            comments={comments.map(c => ({ ...c, canEdit: true }))}
-            totalCount={comments.length}
+            comments={editableComments}
+            totalCount={commentTotal}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
             onLikeComment={handleLikeComment}
             onReportComment={handleReportComment}
+            onLoadMoreComments={handleLoadMoreComments}
             hasMoreComments={hasMoreComments}
-            isLoadingComments={false} // Set to false as comments are now loaded in useEffect
+            isLoadingComments={isLoadingComments}
             placeholder="写下你的看法..."
             maxLength={200}
             initialCommentsToShow={5}

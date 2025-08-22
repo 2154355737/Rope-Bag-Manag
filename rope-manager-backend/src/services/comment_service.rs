@@ -348,6 +348,54 @@ impl CommentService {
         self.comment_repo.get_top_level_comments_by_target(target_type, target_id, page, size).await
     }
 
+    // 新增：获取顶层评论并附带replies（一次性组装）
+    pub async fn get_top_level_comments_with_replies(
+        &self,
+        target_type: &str,
+        target_id: i32,
+        page: i32,
+        size: i32,
+    ) -> Result<(Vec<crate::models::CommentResponse>, i64)> {
+        let (parents, total) = self.get_top_level_comments(target_type, target_id, page, size).await?;
+        let mut result: Vec<crate::models::CommentResponse> = Vec::new();
+        for p in parents {
+            // 查询子回复
+            let replies = self.comment_repo.get_comment_replies(p.id).await.unwrap_or_default();
+            let reply_nodes: Vec<crate::models::CommentResponse> = replies.into_iter().map(|r| crate::models::CommentResponse {
+                id: r.id,
+                user_id: r.user_id,
+                author_name: r.author_name,
+                target_type: r.target_type,
+                target_id: r.target_id,
+                content: r.content,
+                status: r.status,
+                parent_id: r.parent_id,
+                likes: r.likes,
+                dislikes: r.dislikes,
+                created_at: r.created_at.to_rfc3339(),
+                updated_at: r.updated_at.to_rfc3339(),
+                replies: None,
+            }).collect();
+
+            result.push(crate::models::CommentResponse {
+                id: p.id,
+                user_id: p.user_id,
+                author_name: p.author_name,
+                target_type: p.target_type,
+                target_id: p.target_id,
+                content: p.content,
+                status: p.status,
+                parent_id: p.parent_id,
+                likes: p.likes,
+                dislikes: p.dislikes,
+                created_at: p.created_at.to_rfc3339(),
+                updated_at: p.updated_at.to_rfc3339(),
+                replies: if reply_nodes.is_empty() { None } else { Some(reply_nodes) },
+            });
+        }
+        Ok((result, total))
+    }
+
     // 置顶评论（仅资源作者、管理员和元老可用）
     pub async fn pin_comment(&self, comment_id: i32, user_id: i32, pinned: bool) -> Result<Comment> {
         // 获取评论信息

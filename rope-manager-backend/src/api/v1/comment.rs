@@ -51,6 +51,7 @@ pub struct CommentQueryParams {
     pub start_date: Option<String>,
     pub end_date: Option<String>,
     pub search: Option<String>,
+    pub include_replies: Option<bool>,
 }
 
 // 更新评论请求
@@ -145,6 +146,19 @@ async fn get_all_comments(
     // 若提供 target_id，则仅返回顶层评论（排除回复），避免重复
     if let Some(tid) = query.target_id {
         let db_target_type = if ttype_lower == "post" { "Post" } else { "Package" };
+        if query.include_replies.unwrap_or(false) {
+            // 返回带嵌套回复的结构
+            match comment_service.get_top_level_comments_with_replies(db_target_type, tid, page, size).await {
+                Ok((comments, total)) => {
+                    let response = crate::models::CommentListWithRepliesResponse { list: comments, total, page, size };
+                    return HttpResponse::Ok().json(ApiResponse::success(response));
+                },
+                Err(e) => {
+                    log::error!("公开获取顶层评论(含回复)失败: {}", e);
+                    return HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("获取评论列表失败: {}", e)));
+                }
+            }
+        }
         return match comment_service.get_top_level_comments(db_target_type, tid, page, size).await {
             Ok((comments, total)) => {
                 let response = CommentListResponse { list: comments, total, page, size };

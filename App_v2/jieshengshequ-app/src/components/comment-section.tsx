@@ -76,6 +76,16 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
 
+  // 当上层传入的评论列表变化时，重置分页游标为第一页
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [comments])
+
+  // 兜底的“是否还有更多”判断：父级 hasMoreComments 为主，若未提供，则用 totalCount 对比已显示条数
+  const computedHasMore = !!(hasMoreComments || (
+    typeof totalCount === 'number' ? (displayedComments.length < totalCount) : false
+  ))
+
   // 初始化显示的评论
   useEffect(() => {
     if (comments.length === 0) {
@@ -446,7 +456,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
           {/* 调试信息 (仅开发环境显示) */}
           {process.env.NODE_ENV === 'development' && (
             <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-              显示: {displayedComments.length}/{comments.length}
+              显示: {displayedComments.length}/{(typeof totalCount === 'number' ? totalCount : comments.length)}
             </span>
           )}
         </div>
@@ -524,7 +534,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             )}
 
             {/* 加载更多评论按钮 */}
-            {showAllComments && hasMoreComments && onLoadMoreComments && (
+            {showAllComments && onLoadMoreComments && computedHasMore && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -550,7 +560,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                   )}
                 </Button>
                 <div className="text-xs text-muted-foreground mt-2">
-                  {hasMoreComments ? '还有更多精彩评论' : ''}
+                  {computedHasMore ? '还有更多精彩评论' : ''}
                 </div>
               </motion.div>
             )}
@@ -589,7 +599,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             )}
 
             {/* 无更多评论提示 */}
-            {showAllComments && !hasMoreComments && comments.length > initialCommentsToShow && (
+            {showAllComments && !computedHasMore && comments.length > initialCommentsToShow && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

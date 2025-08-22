@@ -54,6 +54,22 @@ const AnnouncementDetailScreen: React.FC = () => {
         // 加载相关推荐
         const recommendations = await getAnnouncementRecommendations(a.id, a.tags || [])
         setRecommendedItems(recommendations)
+        // 加载第一页评论（公告使用 target_type=post or announcement? 按后端公开接口仅支持 post/package，这里统一按 post 读取）
+        try {
+          const cr = await apiGetComments('post' as any, a.id, 1, 10)
+          const mapped = (cr.list || []).map((c: any) => ({
+            id: c.id,
+            author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+            content: c.content,
+            time: (c.created_at || '').slice(11, 19),
+            likes: c.likes || 0,
+            isLiked: false,
+            replies: []
+          }))
+          setComments(mapped)
+          setCommentTotal(cr.total || mapped.length)
+          setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+        } catch {}
         
         setLoading(false)
       } catch (e) {
@@ -68,6 +84,9 @@ const AnnouncementDetailScreen: React.FC = () => {
   // const recommendedItems = getAnnouncementRecommendations(announcement?.id || 0, announcement?.tags || [])
 
   const [comments, setComments] = useState<Comment[]>([])
+  const [commentTotal, setCommentTotal] = useState(0)
+  const [hasMoreComments, setHasMoreComments] = useState(false)
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
 
   // 格式化数字
   const formatNumber = (num: number) => {
@@ -134,12 +153,45 @@ const AnnouncementDetailScreen: React.FC = () => {
   const handleSubmitComment = async (content: string) => {
     if (!announcement) return
     await apiCreateComment('Post', announcement.id, content)
+    // 重新加载第一页，刷新总数
+    try {
+      const cr = await apiGetComments('post' as any, announcement.id, 1, 10)
+      const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: (c.created_at || '').slice(11, 19), likes: c.likes || 0, isLiked: false, replies: [] }))
+      setComments(mapped)
+      setCommentTotal(cr.total || mapped.length)
+      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+    } catch {}
     toast({ title: '反馈已提交', description: '感谢您的反馈，我们会认真处理' })
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {
     await apiReplyComment(commentId, content)
     toast({ title: '回复发送成功', description: '您的回复已发布' })
+  }
+
+  // 加载更多评论
+  const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
+    if (!announcement) return []
+    setIsLoadingComments(true)
+    try {
+      const cr = await apiGetComments('post' as any, announcement.id, page, 10)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: (c.created_at || '').slice(11, 19),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: []
+      }))
+      setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
+      setCommentTotal(cr.total || 0)
+      setIsLoadingComments(false)
+      return mapped
+    } catch (e) {
+      setIsLoadingComments(false)
+      return []
+    }
   }
 
   const handleLikeComment = async (commentId: number) => {
@@ -484,11 +536,14 @@ const AnnouncementDetailScreen: React.FC = () => {
       <div className="p-4">
         <CommentSection
           comments={comments}
-          totalCount={announcement.comments || 0}
+          totalCount={commentTotal}
           onSubmitComment={handleSubmitComment}
           onSubmitReply={handleSubmitReply}
           onLikeComment={handleLikeComment}
           onReportComment={handleReportComment}
+          onLoadMoreComments={handleLoadMoreComments}
+          hasMoreComments={hasMoreComments}
+          isLoadingComments={isLoadingComments}
           placeholder="对此公告有疑问或建议..."
           maxLength={200}
           initialCommentsToShow={5}

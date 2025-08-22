@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
@@ -94,7 +94,7 @@ const UniversalDetailScreen: React.FC = () => {
   const [item, setItem] = useState<UniversalDetailItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [comments, setComments] = useState<Comment[]>([])
-  const [hasMoreComments, setHasMoreComments] = useState(true)
+  const [hasMoreComments, setHasMoreComments] = useState(false)
   const [recommendedItems, setRecommendedItems] = useState<any[]>([])
   
   // 交互状态
@@ -102,6 +102,8 @@ const UniversalDetailScreen: React.FC = () => {
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [commentTotal, setCommentTotal] = useState(0)
+  const [isLoadingComments, setIsLoadingComments] = useState(false)
 
   // 格式化数字
   const formatNumber = (num: number | undefined | null) => {
@@ -286,24 +288,20 @@ const UniversalDetailScreen: React.FC = () => {
         
         // 加载评论
         const targetType = type === 'resource' ? 'package' : type
-        const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10)
-        const base = (cr.list || []).map((c: any) => ({
+        const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
+        const mapped = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
           content: c.content,
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: []
-        }))
-        const repliesArr = await Promise.all(base.map(c => import('../api/comments').then(m => m.getCommentReplies(c.id)).catch(() => [])))
-        const mapped = base.map((c, idx) => ({
-          ...c,
-          replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
           canEdit: true
         }))
         setComments(mapped)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+        setCommentTotal(cr.total || mapped.length)
         
       } catch (error) {
         console.error('加载详情失败:', error)
@@ -430,7 +428,7 @@ const UniversalDetailScreen: React.FC = () => {
       await apiCreateComment(targetType as any, item.id, content)
       
       // 重新加载评论
-      const cr = await apiGetComments(item.type === 'resource' ? 'package' : item.type as any, item.id, 1, 10)
+      const cr = await apiGetComments(item.type === 'resource' ? 'package' : item.type as any, item.id, 1, 10, true)
       const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
@@ -438,9 +436,11 @@ const UniversalDetailScreen: React.FC = () => {
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: []
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false }))
       }))
       setComments(mapped)
+      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      setCommentTotal(cr.total || mapped.length)
       
       toast({ title: '评论发送成功', description: '您的评论已发布' })
     } catch (error) {
@@ -453,14 +453,39 @@ const UniversalDetailScreen: React.FC = () => {
       await apiReplyComment(commentId, content)
       // 重新加载评论
       const targetType = type === 'resource' ? 'package' : type
-      const cr = await apiGetComments(targetType as any, parseInt(id!), 1, 10)
-      const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
-      const repliesArr = await Promise.all(base.map(c => import('../api/comments').then(m => m.getCommentReplies(c.id)).catch(() => [])))
-      const updated = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
+      const cr = await apiGetComments(targetType as any, parseInt(id!), 1, 10, true)
+      const updated = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
       setComments(updated)
+      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      setCommentTotal(cr.total || updated.length)
       toast({ title: '回复发送成功', description: '您的回复已发布' })
     } catch (error) {
       toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
+  }
+
+  // 加载更多评论
+  const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
+    setIsLoadingComments(true)
+    try {
+      const targetType = type === 'resource' ? 'package' : type
+      const cr = await apiGetComments(targetType as any, parseInt(id!), page, 10, true)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false }))
+      }))
+      setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
+      setCommentTotal(cr.total || 0)
+      setIsLoadingComments(false)
+      return mapped
+    } catch (e) {
+      setIsLoadingComments(false)
+      return []
     }
   }
 
@@ -472,6 +497,8 @@ const UniversalDetailScreen: React.FC = () => {
       toast({ title: '点赞失败', description: '请稍后重试', variant: 'destructive' })
     }
   }
+
+  const editableComments = useMemo(() => comments.map(c => ({ ...c, canEdit: true })), [comments])
 
   if (loading) {
     return (
@@ -688,14 +715,15 @@ const UniversalDetailScreen: React.FC = () => {
 
             {/* 评论区 */}
             <CommentSection
-              comments={comments.map(c => ({ ...c, canEdit: true }))}
-              totalCount={item.stats.comments}
+              comments={editableComments}
+              totalCount={commentTotal || item.stats.comments}
               onSubmitComment={handleSubmitComment}
               onSubmitReply={handleSubmitReply}
               onLikeComment={handleLikeComment}
               onReportComment={(commentId) => console.log('举报评论:', commentId)}
+              onLoadMoreComments={handleLoadMoreComments}
               hasMoreComments={hasMoreComments}
-              isLoadingComments={false}
+              isLoadingComments={isLoadingComments}
               placeholder="发表评论..."
               maxLength={200}
               initialCommentsToShow={5}

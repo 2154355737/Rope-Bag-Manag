@@ -60,4 +60,13 @@ pub struct CommentResponse {
     pub created_at: String,
     pub updated_at: String,
     pub replies: Option<Vec<CommentResponse>>,
+}
+
+// 新增：包含嵌套回复的列表响应
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommentListWithRepliesResponse {
+    pub list: Vec<CommentResponse>,
+    pub total: i64,
+    pub page: i32,
+    pub size: i32,
 } 
