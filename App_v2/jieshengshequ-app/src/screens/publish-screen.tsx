@@ -198,10 +198,7 @@ const PublishScreen: React.FC = () => {
         toast.error('请填写版本信息和选择分类')
         return
       }
-      if (files.length === 0) {
-        toast.error('请上传资源文件')
-        return
-      }
+      // 资源文件现在是可选的，不再强制要求上传
     }
 
     setIsPublishing(true)
@@ -363,7 +360,7 @@ const PublishScreen: React.FC = () => {
               <ul className="text-xs space-y-1 text-muted-foreground">
                 <li>• {publishType === 'resource' ? '资源' : '帖子'}发布后需要管理员审核，通常在1-24小时内完成</li>
                 <li>• 请确保内容原创或已获得授权，避免版权纠纷</li>
-                <li>• {publishType === 'resource' ? '上传的文件请确保无病毒，建议压缩打包' : '图片建议压缩后上传，单张不超过5MB'}</li>
+                <li>• {publishType === 'resource' ? '如需上传文件请确保无病毒，建议压缩打包' : '如需上传图片建议压缩后上传，单张不超过5MB'}</li>
                 <li>• 标题和内容请使用规范语言，避免敏感词汇</li>
               </ul>
             </div>
@@ -474,7 +471,7 @@ const PublishScreen: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
                   <Upload className="h-4 w-4 mr-2" />
-                  资源文件
+                  资源文件（可选）
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -534,7 +531,7 @@ const PublishScreen: React.FC = () => {
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
                   <Monitor className="h-4 w-4 mr-2" />
-                  预览截图
+                  预览截图（可选）
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -826,13 +823,13 @@ const PublishScreen: React.FC = () => {
 
         {/* 帖子专用：图片上传 */}
         {publishType === 'post' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <Image className="h-4 w-4 mr-2" />
-                图片
-              </CardTitle>
-            </CardHeader>
+                      <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Image className="h-4 w-4 mr-2" />
+                  图片（可选）
+                </CardTitle>
+              </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {images.map((image, index) => (

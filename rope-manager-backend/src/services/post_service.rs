@@ -35,14 +35,29 @@ impl PostService {
             return Ok(existing_id);
         }
         
-        // 获取作者信息
+        // 获取作者信息并验证用户是否存在
         let user_repo = UserRepository::new(&self.db_path).map_err(|e| rusqlite::Error::InvalidPath(std::path::PathBuf::from(e.to_string())))?;
         let author = user_repo.find_by_id(author_id).await.map_err(|e| rusqlite::Error::InvalidPath(std::path::PathBuf::from(e.to_string())))?;
         
         let author_name = match author {
             Some(user) => user.nickname.unwrap_or(user.username),
-            None => return Err(rusqlite::Error::InvalidPath(std::path::PathBuf::from("User not found"))),
+            None => {
+                log::error!("用户不存在: author_id={}", author_id);
+                return Err(rusqlite::Error::InvalidPath(std::path::PathBuf::from("User not found in database")));
+            },
         };
+        
+        // 额外验证：直接查询数据库确认用户存在
+        let user_exists = conn.query_row(
+            "SELECT COUNT(*) FROM users WHERE id = ?",
+            params![author_id],
+            |row| row.get::<_, i32>(0)
+        ).unwrap_or(0) > 0;
+        
+        if !user_exists {
+            log::error!("数据库中不存在用户: author_id={}", author_id);
+            return Err(rusqlite::Error::InvalidPath(std::path::PathBuf::from("User does not exist in database")));
+        }
         
         let now = Utc::now();
         let status = req.status.unwrap_or_default();

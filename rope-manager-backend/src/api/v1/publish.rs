@@ -118,7 +118,8 @@ async fn publish_post(
     // 验证用户认证
     let user = require_auth!(&http_req);
     
-    log::info!("📝 用户 {} 发布帖子: {}", user.username, req.title);
+    log::info!("📝 用户 {} (ID: {}) 发布帖子: {}", user.username, user.id, req.title);
+    log::debug!("发布帖子请求数据: {:?}", req);
     
     // 验证标题和内容
     if req.title.trim().is_empty() || req.content.trim().is_empty() {

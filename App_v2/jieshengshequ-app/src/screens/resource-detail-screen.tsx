@@ -420,6 +420,11 @@ const ResourceDetailScreen = (): JSX.Element => {
         showBackButton
         rightAction={
           <div className="flex items-center gap-1">
+            {resource.category && (
+              <Badge variant="secondary" className="text-xs mr-2">
+                {resource.category}
+              </Badge>
+            )}
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
               <Share2 size={20} />
             </Button>

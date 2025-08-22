@@ -123,14 +123,23 @@ const HomeScreen: React.FC = () => {
         title: i.title,
         description: i.description,
         tags: i.tags || [],
-        author: i.author_detail || { name: i.author_name || (typeof i.author === 'string' ? i.author : i.author?.name) || '用户', avatar: i.author_avatar || i.author?.avatar || '' },
-        likes: i.stats?.likes || 0,
-        comments: i.stats?.comments || 0,
-        views: i.stats?.views || 0,
-        downloads: i.stats?.downloads || 0,
+        // 使用新的author_detail字段，如果没有则回退到原有逻辑
+        author: i.author_detail ? {
+          id: i.author_detail.id,
+          name: i.author_detail.nickname || i.author_detail.name,
+          avatar: i.author_detail.avatar || ''
+        } : { 
+          name: i.author_name || (typeof i.author === 'string' ? i.author : i.author?.name) || '用户', 
+          avatar: i.author_avatar || i.author?.avatar || '' 
+        },
+        likes: i.stats?.likes || i.like_count || 0,
+        comments: i.stats?.comments || i.comment_count || 0,
+        views: i.stats?.views || i.view_count || 0,
+        downloads: i.stats?.downloads || i.download_count || 0,
         date: i.created_at || i.publishedAt,
         isTop: i.is_pinned || false,
         isHot: i.is_featured || false,
+        category: i.category, // 添加分类信息
       }))
       setAllContent(mapped)
     }
@@ -311,9 +320,11 @@ const HomeScreen: React.FC = () => {
                       </Avatar>
                       <span className="text-sm">{card.author.name}</span>
                       <div className="ml-auto flex items-center gap-2">
-                                              <Badge variant="outline" className="text-xs">
-                        帖子
-                      </Badge>
+                        {card.category && (
+                          <Badge variant="outline" className="text-xs">
+                            {card.category.name}
+                          </Badge>
+                        )}
                       {card.isTop && (
                         <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
                           <Pin size={10} className="mr-1" />
@@ -487,9 +498,11 @@ const HomeScreen: React.FC = () => {
                       </Avatar>
                       <span className="text-sm">{card.author.name}</span>
                       <div className="ml-auto flex items-center gap-2">
-                                              <Badge variant="secondary" className="text-xs">
-                        资源
-                      </Badge>
+                        {card.category && (
+                          <Badge variant="secondary" className="text-xs">
+                            {card.category.name}
+                          </Badge>
+                        )}
                       {card.isTop && (
                         <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
                           <Pin size={10} className="mr-1" />

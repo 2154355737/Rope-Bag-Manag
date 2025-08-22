@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use crate::services::{package_service::PackageService, post_service::PostService};
 use crate::services::admin_service::AdminService;
+use crate::repositories::{UserRepository, SystemRepository};
 // use crate::models::*;  // 移除未使用的导入
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
@@ -36,6 +37,9 @@ pub struct FeedItem {
     pub item_type: String, // "post" | "package"
     pub title: String,
     pub author: String,
+    // 新增：作者详细信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_detail: Option<AuthorDetail>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download_count: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,6 +50,23 @@ pub struct FeedItem {
     pub is_pinned: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub is_featured: Option<bool>,
+    // 新增：分类信息
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<CategoryInfo>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct AuthorDetail {
+    pub id: i32,
+    pub name: String,
+    pub nickname: Option<String>,
+    pub avatar: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct CategoryInfo {
+    pub id: i32,
+    pub name: String,
 }
 
 async fn get_feed(
@@ -54,6 +75,29 @@ async fn get_feed(
     admin_service: web::Data<AdminService>,
     query: web::Query<FeedQueryParams>,
 ) -> Result<HttpResponse, actix_web::Error> {
+    // 初始化仓库 - 使用与其他服务相同的数据库路径
+    let db_path = "data.db";
+    let user_repo = match UserRepository::new(db_path) {
+        Ok(repo) => repo,
+        Err(e) => {
+            log::error!("初始化用户仓库失败: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("初始化用户仓库失败: {}", e)
+            })));
+        }
+    };
+    
+    let system_repo = match SystemRepository::new(db_path) {
+        Ok(repo) => repo,
+        Err(e) => {
+            log::error!("初始化系统仓库失败: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(json!({
+                "code": 500,
+                "message": format!("初始化系统仓库失败: {}", e)
+            })));
+        }
+    };
     let page = query.page.unwrap_or(1);
     let page_size = query.page_size.unwrap_or(20);
 
@@ -108,20 +152,45 @@ async fn get_feed(
         }
     };
 
+    // 获取所有分类信息
+    let categories = system_repo.get_categories().await.unwrap_or_default();
+    
     // 合并
     let mut items: Vec<FeedItem> = Vec::new();
     for p in packages {
+        // 获取作者详细信息 - 暂时使用简化版本，避免数据库查询错误
+        let author_detail = Some(AuthorDetail {
+            id: 0, // 暂时使用默认值
+            name: p.author.clone(),
+            nickname: None,
+            avatar: None,
+        });
+        
+        // 获取分类信息
+        let category = if let Some(category_id) = p.category_id {
+            categories.iter()
+                .find(|cat| cat.id == category_id)
+                .map(|cat| CategoryInfo {
+                    id: category_id,
+                    name: cat.name.clone(),
+                })
+        } else {
+            None
+        };
+        
         items.push(FeedItem {
             id: p.id,
             item_type: "resource".to_string(),
             title: p.name,
             author: p.author,
+            author_detail,
             download_count: Some(p.download_count),
             view_count: None,
             created_at: p.created_at.to_rfc3339(),
             tags: p.tags.unwrap_or_default(),
             is_pinned: Some(p.is_pinned),
             is_featured: Some(p.is_featured),
+            category,
         });
     }
     for post in posts {
@@ -131,17 +200,46 @@ async fn get_feed(
             Err(_) => vec![], // 如果获取失败，返回空标签
         };
         
+        // 获取作者详细信息 - 暂时使用简化版本，避免数据库查询错误
+        let author_detail = Some(AuthorDetail {
+            id: post.author_id,
+            name: post.author_name.clone().unwrap_or_else(|| "匿名".to_string()),
+            nickname: None,
+            avatar: None,
+        });
+        
+        // 获取分类信息 - 帖子如果没有分类，显示为"讨论"
+        let category = if let Some(category_id) = post.category_id {
+            categories.iter()
+                .find(|cat| cat.id == category_id)
+                .map(|cat| CategoryInfo {
+                    id: category_id,
+                    name: cat.name.clone(),
+                })
+                .or_else(|| Some(CategoryInfo {
+                    id: 0,
+                    name: "讨论".to_string(),
+                }))
+        } else {
+            Some(CategoryInfo {
+                id: 0,
+                name: "讨论".to_string(),
+            })
+        };
+        
         items.push(FeedItem {
             id: post.id,
             item_type: "post".to_string(),
             title: post.title,
             author: post.author_name.unwrap_or_else(|| "匿名".to_string()),
+            author_detail,
             download_count: None,
             view_count: Some(post.view_count),
             created_at: post.created_at.to_rfc3339(),
             tags: post_tags,
             is_pinned: Some(post.is_pinned),
             is_featured: Some(post.is_featured),
+            category,
         });
     }
     for a in announcements {
@@ -150,12 +248,22 @@ async fn get_feed(
             item_type: "announcement".to_string(),
             title: a.title,
             author: "系统公告".to_string(),
+            author_detail: Some(AuthorDetail {
+                id: 0, // 系统公告使用特殊ID
+                name: "系统公告".to_string(),
+                nickname: Some("官方".to_string()),
+                avatar: None,
+            }),
             download_count: None,
             view_count: None,
             created_at: a.start_time,
             tags: vec![],
             is_pinned: Some(a.priority >= 3), // 优先级3及以上的公告视为置顶
             is_featured: None, // 公告没有精华概念
+            category: Some(CategoryInfo {
+                id: 0,
+                name: "系统公告".to_string(),
+            }),
         });
     }
 

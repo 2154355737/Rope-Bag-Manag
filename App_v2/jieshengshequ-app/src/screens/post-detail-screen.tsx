@@ -51,7 +51,8 @@ const PostDetailScreen: React.FC = () => {
     comments: 156,
     views: 2340,
     time: '',
-    publishDate: ''
+    publishDate: '',
+    category: ''
   }
 
   const [post, setPost] = useState(initialPost)
@@ -119,7 +120,8 @@ const PostDetailScreen: React.FC = () => {
           comments: p.comment_count || 0,
           views: p.view_count || 0,
           time: new Date(p.created_at || p.publishDate || Date.now()).toLocaleString('zh-CN'),
-          publishDate: new Date(p.created_at || p.publishDate || Date.now()).toLocaleDateString('zh-CN')
+          publishDate: new Date(p.created_at || p.publishDate || Date.now()).toLocaleDateString('zh-CN'),
+          category: p.category?.name || p.category_name || ''
         }
         setPost(updatedPost)
         
@@ -294,6 +296,11 @@ const PostDetailScreen: React.FC = () => {
         showBackButton
         rightAction={
           <div className="flex items-center gap-1">
+            {post.category && (
+              <Badge variant="secondary" className="text-xs mr-2">
+                {post.category}
+              </Badge>
+            )}
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
               <Share2 size={20} />
             </Button>
