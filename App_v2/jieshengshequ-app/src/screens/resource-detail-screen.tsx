@@ -5,7 +5,7 @@ import {
   ArrowLeft, Download, Heart, MessageSquare, Share2, Bookmark, 
   MoreHorizontal, Flag, Hash, ThumbsUp, ThumbsDown, 
   Star, FileText, Package, Shield, Calendar, Eye, AlertTriangle,
-  ExternalLink, Copy, CheckCircle
+  ExternalLink, Copy, CheckCircle, Smartphone
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -85,13 +85,103 @@ const ResourceDetailScreen: React.FC = () => {
     const load = async () => {
       try {
         const r = await getResource(parseInt(id || '1'))
+        
+        // 统一处理：获取可展示的文件名
+        const extractNameFromUrl = (url?: string) => {
+          if (!url) return ''
+          const clean = url.split('?')[0].split('#')[0]
+          const last = clean.split('/').pop() || ''
+          try { return decodeURIComponent(last) } catch { return last }
+        }
+        const stripHashedPrefix = (name: string) => {
+          // 先处理常见前缀：<hash>_<hash>_原名 或 13位时间戳_原名
+          let s = name
+            .replace(/^([0-9a-fA-F]{8,})_([0-9a-fA-F]{8,})_/, '')
+            .replace(/^\d{10,}_/, '')
+            .replace(/^[0-9A-Za-z]{8,}_/, '') // 单段哈希前缀
+          // 若仍存在类似 <hash>_原名 的结构，按“_”右侧显示
+          if (s.includes('_')) {
+            const idx = s.indexOf('_')
+            const left = s.slice(0, idx)
+            if (/^[0-9A-Za-z]{6,}$/.test(left)) s = s.slice(idx + 1)
+          }
+          return s
+        }
+        const getDisplayName = (given?: string, fallbackUrl?: string) => {
+          const base = (given && given.trim()) ? given : extractNameFromUrl(fallbackUrl)
+          return stripHashedPrefix(base)
+        }
+
+        // 优先使用服务端提供的包含文件（files 或 included_files），并做字段兼容
+        const serverFilesRaw = (r.files && r.files.length ? r.files : (r.included_files || [])) as any[]
+        const serverFiles = Array.isArray(serverFilesRaw)
+          ? serverFilesRaw.map((f: any) => ({
+              name: getDisplayName(f?.name ?? String(f ?? ''), r.file_url),
+              type: f?.type ?? f?.file_type ?? '未知',
+              size: typeof f?.size === 'number' ? formatFileSize(f.size) : (f?.size || '')
+            }))
+          : []
+
+        // 基于file_url和描述补充files数组（去重按名称）
+        const files: any[] = [...serverFiles]
+        if (r.file_url) {
+          const fileName = getDisplayName(undefined, r.file_url)
+          const fileExtension = (fileName.split('.').pop() || '').toLowerCase()
+          let fileType = 'unknown'
+          
+          // 根据文件扩展名确定类型
+          if (['zip', 'rar', '7z', 'tar', 'gz'].includes(fileExtension)) {
+            fileType = '压缩包'
+          } else if (['exe', 'msi', 'dmg', 'pkg'].includes(fileExtension)) {
+            fileType = '安装程序'
+          } else if (['apk', 'ipa'].includes(fileExtension)) {
+            fileType = '移动应用'
+          } else if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(fileExtension)) {
+            fileType = '文档'
+          }
+          
+          if (!files.some(f => f.name === fileName)) {
+            files.push({
+              name: fileName,
+              type: fileType,
+              size: formatFileSize(r.file_size || 0)
+            })
+          }
+        }
+
+        // 从描述中提取可能的文件信息
+        if (r.description) {
+          const description = r.description.toLowerCase()
+          const commonFiles = [
+            { pattern: /readme\.md|说明文档/, name: 'README.md', type: '说明文档', size: '2-5 KB' },
+            { pattern: /changelog\.md|更新日志/, name: 'CHANGELOG.md', type: '更新日志', size: '1-3 KB' },
+            { pattern: /license|许可证/, name: 'LICENSE', type: '许可证', size: '1 KB' },
+            { pattern: /\.java|java文件/, name: 'Java源码', type: 'Java代码', size: '若干文件' },
+            { pattern: /\.js|javascript/, name: 'JavaScript文件', type: 'JS代码', size: '若干文件' },
+            { pattern: /\.py|python/, name: 'Python文件', type: 'Python代码', size: '若干文件' },
+            { pattern: /\.cpp|\.c\+\+|c\+\+/, name: 'C++源码', type: 'C++代码', size: '若干文件' },
+            { pattern: /\.xml|配置文件/, name: '配置文件', type: 'XML配置', size: '若干文件' },
+            { pattern: /\.json|json文件/, name: 'JSON文件', type: '配置文件', size: '若干文件' },
+            { pattern: /\.png|\.jpg|\.jpeg|图片|截图/, name: '图片文件', type: '图片资源', size: '若干文件' },
+            { pattern: /\.apk|安卓|android/, name: 'Android APK', type: '安卓应用', size: '若干MB' },
+            { pattern: /\.exe|可执行文件/, name: '可执行文件', type: '程序文件', size: '若干MB' }
+          ]
+          
+          commonFiles.forEach(fileInfo => {
+            if (fileInfo.pattern.test(description)
+                && !files.some(f => f.type === fileInfo.type || f.name === fileInfo.name)) {
+              files.push({ name: fileInfo.name, type: fileInfo.type, size: fileInfo.size })
+            }
+          })
+        }
+
         setResource({
           id: r.id,
           title: r.name || r.title,
           author: { name: r.author || '开发者', avatar: '', verified: false },
           description: r.description || '',
           downloadUrl: r.file_url,
-          fileSize: r.file_size?.toString() || '0',
+          fileSize: (typeof r.file_size === 'number' && r.file_size > 0) ? formatFileSize(r.file_size) : '',
           downloadCount: r.download_count || 0,
           likes: r.like_count || 0,
           views: r.view_count || 0,
@@ -103,7 +193,7 @@ const ResourceDetailScreen: React.FC = () => {
           version: r.version || '1.0.0',
           category: r.category?.name || '其他',
           screenshots: r.screenshots || [],
-          files: r.files || [],
+          files: files,
           requirements: r.requirements || [],
           safetyStatus: r.safety_status || 'unknown',
           authorStats: {
@@ -140,8 +230,20 @@ const ResourceDetailScreen: React.FC = () => {
   // const recommendedItems = getResourceRecommendations(resource.id, resource.tags)
   
   // 格式化文件大小
-  const formatFileSize = (bytes: string) => {
-    return bytes
+  const formatFileSize = (bytes: string | number) => {
+    const size = typeof bytes === 'string' ? parseInt(bytes) : bytes
+    if (isNaN(size) || size === 0) return '未知大小'
+    
+    const units = ['B', 'KB', 'MB', 'GB']
+    let unitIndex = 0
+    let fileSize = size
+    
+    while (fileSize >= 1024 && unitIndex < units.length - 1) {
+      fileSize /= 1024
+      unitIndex++
+    }
+    
+    return `${fileSize.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
   }
 
   // 格式化数字
@@ -154,17 +256,66 @@ const ResourceDetailScreen: React.FC = () => {
 
   // 处理下载
   const handleDownload = async () => {
+    if (!resource.downloadUrl) {
+      toast({ title: '下载失败', description: '下载链接不可用', variant: 'destructive' })
+      return
+    }
+
     setIsDownloading(true)
     setDownloadProgress(20)
+    
     try {
+      // 先尝试获取下载URL
       const url = await downloadResource(resource.id)
-      setDownloadProgress(80)
-      window.location.href = url
-      setDownloadProgress(100)
+      setDownloadProgress(60)
+      
+      if (url) {
+        // 创建一个临时链接来触发下载
+        const link = document.createElement('a')
+        link.href = url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        
+        // 尝试从URL中提取文件名
+        const fileName = url.split('/').pop() || resource.title || 'download'
+        link.download = fileName
+        
+        document.body.appendChild(link)
+        setDownloadProgress(80)
+        
+        link.click()
+        document.body.removeChild(link)
+        
+        setDownloadProgress(100)
+        toast({ title: '下载开始', description: '文件开始下载，请查看浏览器下载管理器' })
+      } else {
+        throw new Error('无法获取下载链接')
+      }
     } catch (e) {
-      toast({ title: '下载失败', description: (e as any)?.message || '请稍后再试', variant: 'destructive' })
+      console.error('Download error:', e)
+      const errorMessage = (e as any)?.message || '下载失败，请稍后再试'
+      toast({ title: '下载失败', description: errorMessage, variant: 'destructive' })
+      
+      // 如果API失败，尝试直接使用原始URL
+      if (resource.downloadUrl) {
+        try {
+          const link = document.createElement('a')
+          link.href = resource.downloadUrl
+          link.target = '_blank'
+          link.rel = 'noopener noreferrer'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          toast({ title: '使用备用下载', description: '正在使用直链下载' })
+        } catch (fallbackError) {
+          console.error('Fallback download error:', fallbackError)
+        }
+      }
     } finally {
-      setTimeout(() => setIsDownloading(false), 800)
+      setTimeout(() => {
+        setIsDownloading(false)
+        setDownloadProgress(0)
+      }, 1000)
     }
   }
 
@@ -460,26 +611,64 @@ const ResourceDetailScreen: React.FC = () => {
           </Card>
 
           {/* 文件列表 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">包含文件</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-0 content-container">
-              <div className="space-y-3">
-                {resource.files.map((file, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded border">
-                    <div className="flex items-center flex-1 min-w-0">
-                      <FileText size={16} className="text-blue-500 mr-2 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm text-overflow-protection truncate">{file.name}</div>
-                        <div className="text-xs text-muted-foreground">{file.type} • {file.size}</div>
+          {resource.files.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <Package size={20} className="mr-2" />
+                  包含文件 ({resource.files.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0 content-container">
+                <div className="space-y-3">
+                  {resource.files.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-border/50 hover:bg-muted/70 transition-colors">
+                      <div className="flex items-center flex-1 min-w-0">
+                        {/* 文件类型图标 */}
+                        {file.type === '压缩包' && <Package size={18} className="text-orange-500 mr-3 flex-shrink-0" />}
+                        {file.type === '安装程序' && <Download size={18} className="text-green-500 mr-3 flex-shrink-0" />}
+                        {file.type === '移动应用' && <Smartphone size={18} className="text-blue-500 mr-3 flex-shrink-0" />}
+                        {file.type === '文档' && <FileText size={18} className="text-gray-500 mr-3 flex-shrink-0" />}
+                        {['Java代码', 'JS代码', 'Python代码', 'C++代码'].includes(file.type) && <FileText size={18} className="text-purple-500 mr-3 flex-shrink-0" />}
+                        {['说明文档', '更新日志', '许可证'].includes(file.type) && <FileText size={18} className="text-blue-500 mr-3 flex-shrink-0" />}
+                        {['配置文件', 'XML配置'].includes(file.type) && <FileText size={18} className="text-yellow-500 mr-3 flex-shrink-0" />}
+                        {file.type === '图片资源' && <FileText size={18} className="text-pink-500 mr-3 flex-shrink-0" />}
+                        {!['压缩包', '安装程序', '移动应用', '文档', 'Java代码', 'JS代码', 'Python代码', 'C++代码', '说明文档', '更新日志', '许可证', '配置文件', 'XML配置', '图片资源'].includes(file.type) && 
+                          <FileText size={18} className="text-gray-400 mr-3 flex-shrink-0" />}
+                        
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-sm text-overflow-protection truncate">{file.name}</div>
+                          <div className="text-xs text-muted-foreground flex items-center">
+                            <span className="mr-2">{file.type}</span>
+                            {file.size && (
+                              <>
+                                <span className="w-1 h-1 bg-muted-foreground rounded-full mr-2"></span>
+                                <span>{file.size}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       </div>
+                      {idx === 0 && resource.downloadUrl && (
+                        <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
+                          主文件
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                
+                {resource.files.length > 1 && (
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-center text-sm text-blue-700 dark:text-blue-300">
+                      <AlertTriangle size={16} className="mr-2 flex-shrink-0" />
+                      <span>此资源包含多个文件，下载后请解压查看完整内容</span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* 下载按钮 */}
           <Card>
@@ -499,7 +688,7 @@ const ResourceDetailScreen: React.FC = () => {
                   onClick={handleDownload}
                 >
                   <Download size={18} className="mr-2" />
-                  免费下载 ({resource.fileSize})
+                  免费下载{resource.fileSize ? ` (${resource.fileSize})` : ''}
                 </Button>
               )}
             </CardContent>

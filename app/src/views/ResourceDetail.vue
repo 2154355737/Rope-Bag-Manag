@@ -89,6 +89,22 @@
           </div>
         </div>
         
+        <!-- 包含文件 -->
+        <div class="detail-card" v-if="(resource.files && resource.files.length) || (resource.included_files && resource.included_files.length)">
+          <div class="card-title">包含文件</div>
+          <div>
+            <div v-for="(file, idx) in (resource.files && resource.files.length ? resource.files : resource.included_files)" :key="idx" class="file-item">
+              <div class="file-row">
+                <div class="file-name">{{ file.name || file }}</div>
+                <div class="file-meta">
+                  <span v-if="file.size">{{ typeof file.size === 'number' ? (file.size + 'B') : file.size }}</span>
+                  <span v-if="file.file_type || file.type" class="file-type">{{ file.file_type || file.type }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
         <!-- 资源评论 -->
         <div class="detail-card">
           <div class="card-title">
@@ -1456,4 +1472,11 @@ const submitComment = async () => {
   color: #999;
   margin-left: 2px;
 }
+
+.file-item { padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
+.file-item:last-child { border-bottom: none; }
+.file-row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.file-name { font-size: 14px; color: var(--text-color); word-break: break-all; }
+.file-meta { font-size: 12px; color: var(--text-color-lighter); display: flex; gap: 8px; }
+.file-type { background: #f5f7fa; padding: 2px 6px; border-radius: 10px; }
 </style> 

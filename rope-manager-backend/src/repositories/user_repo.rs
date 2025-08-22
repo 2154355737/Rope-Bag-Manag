@@ -417,7 +417,7 @@ impl UserRepository {
             "SELECT id, name, author, version, description, file_url, file_size, 
                     download_count, like_count, favorite_count, category_id, status, 
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment,
-                    is_pinned, is_featured 
+                    is_pinned, is_featured, screenshots, cover_image, requirements
              FROM packages WHERE author = ? ORDER BY is_pinned DESC, is_featured DESC, created_at DESC"
         )?;
 
@@ -480,7 +480,24 @@ impl UserRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                // 新增字段
+                screenshots: {
+                    if let Ok(json_str) = row.get::<_, String>(19) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
+                cover_image: row.get(20).ok(),
+                requirements: {
+                    if let Ok(json_str) = row.get::<_, String>(21) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
                 tags: None, // 用户仓库中暂时不处理标签
+                included_files: None, // 默认为空
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;

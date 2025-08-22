@@ -71,6 +71,11 @@ impl PackageService {
         "data.db"
     }
 
+    // 获取资源的浏览量与评论数
+    pub async fn get_view_and_comment_counts(&self, package_id: i32) -> Result<(i32, i32)> {
+        self.package_repo.get_view_and_comment_counts(package_id).await
+    }
+
     pub async fn get_packages(&self) -> Result<Vec<Package>> {
         self.package_repo.get_all_packages().await
     }
@@ -107,6 +112,11 @@ impl PackageService {
             is_pinned: req.is_pinned.unwrap_or(false),
             is_featured: req.is_featured.unwrap_or(false),
             tags: req.tags.clone(),
+            // 新增字段
+            screenshots: req.screenshots.clone(),
+            cover_image: req.cover_image.clone(),
+            requirements: req.requirements.clone(),
+            included_files: None, // 默认为空
         };
 
         // 创建包
@@ -173,7 +183,7 @@ impl PackageService {
             category_id: req.category_id.or(package.category_id),
             status: req.status.clone().unwrap_or(package.status),
             file_url: req.file_url.clone().or(package.file_url.clone()), // 使用请求中的file_url，如果没有则保持原值
-            file_size: package.file_size,
+            file_size: req.file_size.or(package.file_size), // 使用请求中的file_size，如果没有则保持原值
             download_count: package.download_count,
             like_count: package.like_count,
             favorite_count: package.favorite_count,
@@ -185,6 +195,11 @@ impl PackageService {
             is_pinned: req.is_pinned.unwrap_or(package.is_pinned),
             is_featured: req.is_featured.unwrap_or(package.is_featured),
             tags: req.tags.clone().or(package.tags),
+            // 新增字段
+            screenshots: req.screenshots.clone().or(package.screenshots),
+            cover_image: req.cover_image.clone().or(package.cover_image),
+            requirements: req.requirements.clone().or(package.requirements),
+            included_files: req.included_files.clone().or(package.included_files),
         };
 
         self.package_repo.update_package(&updated_package).await?;
@@ -539,15 +554,15 @@ impl PackageService {
         let mut package = self.package_repo.find_by_id(package_id).await?
                          .ok_or_else(|| anyhow::anyhow!("包不存在"))?;
         
-        package.file_url = Some(upload_result.file_path.clone());
+        package.file_url = Some(upload_result.download_url.clone());
         package.file_size = Some(upload_result.file_size);
         
         // 保存到数据库
         self.package_repo.update_package(&package).await?;
         
-        log::info!("📦 包 {} 文件上传并更新成功: {}", package_id, upload_result.file_path);
+        log::info!("📦 包 {} 文件上传并更新成功: {}", package_id, upload_result.download_url);
         
-        Ok(upload_result.file_path)
+        Ok(upload_result.download_url)
     }
 
     // 新增方法：获取分类

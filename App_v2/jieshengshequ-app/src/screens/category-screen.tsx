@@ -241,19 +241,22 @@ const CategoryScreen: React.FC = () => {
         transition={{ duration: 0.2 }}
         className="group cursor-pointer"
         onClick={handleCardClick}
+        onMouseLeave={() => {
+          // 确保鼠标离开时重置所有hover状态
+        }}
       >
-        <Card className="overflow-hidden h-full hover:shadow-lg transition-all duration-200 border-0 bg-card/50 backdrop-blur-sm">
+        <Card className="overflow-hidden h-full hover:shadow-lg transition-all duration-200 border border-border/60 bg-card shadow-sm">
           {/* 图片区域 */}
           <div className="relative aspect-[4/3] overflow-hidden">
             {resource.image ? (
               <img 
                 src={resource.image} 
                 alt={resource.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                className="w-full h-full object-cover transition-transform duration-200"
                 loading="lazy"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+              <div className="w-full h-full bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center">
                 <div className="text-center text-muted-foreground">
                   <Grid3X3 size={24} className="mx-auto mb-1" />
                   <span className="text-xs">暂无封面</span>
@@ -284,7 +287,7 @@ const CategoryScreen: React.FC = () => {
           {/* 内容区域 */}
           <CardContent className="p-3 space-y-2">
             <div>
-              <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">
+              <h3 className="font-medium text-sm line-clamp-2 text-foreground">
                 {resource.title}
               </h3>
               {resource.author && (
@@ -311,7 +314,7 @@ const CategoryScreen: React.FC = () => {
             )}
             
             {/* 统计信息 */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <div className="flex items-center justify-between text-xs text-foreground/70 pt-1">
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1">
                   <Download size={10} />
@@ -350,8 +353,11 @@ const CategoryScreen: React.FC = () => {
         transition={{ duration: 0.2 }}
         className="group cursor-pointer"
         onClick={handleCardClick}
+        onMouseLeave={() => {
+          // 确保鼠标离开时重置所有hover状态
+        }}
       >
-        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border-0 bg-card/50 backdrop-blur-sm">
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 border border-border/60 bg-card shadow-sm">
           <div className="flex p-3 gap-3">
             {/* 缩略图 */}
             <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
@@ -359,11 +365,11 @@ const CategoryScreen: React.FC = () => {
                 <img 
                   src={resource.image} 
                   alt={resource.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  className="w-full h-full object-cover transition-transform duration-200"
                   loading="lazy"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                <div className="w-full h-full bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center">
                   <Grid3X3 size={14} className="text-muted-foreground" />
                 </div>
               )}
@@ -373,7 +379,7 @@ const CategoryScreen: React.FC = () => {
             <div className="flex-1 min-w-0 space-y-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                  <h3 className="font-medium text-sm line-clamp-1 text-foreground">
                     {resource.title}
                   </h3>
                   {resource.author && (
@@ -416,7 +422,7 @@ const CategoryScreen: React.FC = () => {
               )}
               
               {/* 统计信息 */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center justify-between text-xs text-foreground/70">
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <Download size={10} />

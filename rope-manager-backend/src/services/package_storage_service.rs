@@ -144,6 +144,91 @@ impl PackageStorageService {
         Ok(categories)
     }
     
+    /// 上传包截图文件
+    pub async fn upload_package_screenshot(
+        &mut self,
+        file_name: &str,
+        file_data: Bytes,
+        package_id: i32
+    ) -> Result<UploadResult> {
+        log::info!("📷 开始上传截图: {} (资源ID: {})", file_name, package_id);
+        
+        // 确保存储已初始化
+        self.initialize_storage().await?;
+        
+        // 获取包的分类名称和资源名称
+        let (category_name, package_name) = match self.get_package_info(package_id).await {
+            Ok((cat, name)) => {
+                log::info!("📂 资源分类: {}, 资源名称: {}", cat, name);
+                (cat, name)
+            },
+            Err(e) => {
+                log::warn!("⚠️  获取资源信息失败: {}，使用默认值", e);
+                ("默认分类".to_string(), format!("resource_{}", package_id))
+            }
+        };
+        
+        // 生成文件名: 资源id-资源文件名.扩展名
+        let file_extension = std::path::Path::new(file_name)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .unwrap_or("png");
+        
+        // 清理文件名中的特殊字符
+        let clean_package_name = package_name
+            .replace("/", "_")
+            .replace("\\", "_")
+            .replace(":", "_")
+            .replace("*", "_")
+            .replace("?", "_")
+            .replace("\"", "_")
+            .replace("<", "_")
+            .replace(">", "_")
+            .replace("|", "_");
+        
+        let unique_name = format!("{}-{}.{}", package_id, clean_package_name, file_extension);
+        log::info!("🔄 生成截图文件名: {}", unique_name);
+        
+        // 按分类和年月存储: 结绳社区/分类名称/年月/资源id-资源名称.扩展名
+        let now = chrono::Utc::now();
+        let year_month = now.format("%Y-%m").to_string();
+        let storage_path = format!("{}/{}/{}", self.storage_base_path, category_name, year_month);
+        log::info!("📁 目标存储路径: {}", storage_path);
+        
+        // 确保目录存在
+        let category_path = format!("{}/{}", self.storage_base_path, category_name);
+        self.alist_service.create_folder(&category_path).await.ok();
+        self.alist_service.create_folder(&storage_path).await.ok();
+        
+        // 上传文件
+        log::info!("⬆️  正在上传截图到AList...");
+        let file_path = self.alist_service.upload_file(
+            &storage_path, 
+            &unique_name, 
+            file_data.clone()
+        ).await?;
+        
+        log::info!("✅ 截图上传成功: {}", file_path);
+        
+        // 获取文件信息和大小
+        log::info!("🔍 获取截图文件信息...");
+        let file_info = self.alist_service.get_file_info(&file_path).await?;
+        
+        // 构建AList的标准下载URL: {base_url}/d{file_path}
+        let download_url = format!("{}/d{}", 
+            self.alist_service.base_url(),
+            file_path
+        );
+        
+        log::info!("🔗 截图AList下载地址: {}", download_url);
+        
+        Ok(UploadResult {
+            file_path,
+            download_url,
+            file_size: file_info.size,
+        })
+    }
+
     /// 上传包文件
     pub async fn upload_package_file(
         &mut self,
@@ -216,20 +301,48 @@ impl PackageStorageService {
         
         log::info!("✅ 文件上传成功: {}", file_path);
         
-        // 不在上传时获取下载链接，而是在实际下载时获取
-        // 避免权限问题："You are not an admin"
+        // 获取文件信息和大小
+        log::info!("🔍 获取文件信息...");
+        let file_info = self.alist_service.get_file_info(&file_path).await?;
+        
+        // 构建AList的标准下载URL: {base_url}/d{file_path}
+        let download_url = format!("{}/d{}", 
+            self.alist_service.base_url(),
+            file_path
+        );
+        
         let result = UploadResult {
             file_path: file_path.clone(),
-            download_url: format!("alist:{}", file_path), // 标记为AList文件路径
-            file_size: file_data.len() as i64,
+            download_url,
+            file_size: file_info.size,
         };
         
-        log::info!("🎉 包文件上传完成: {} -> {} ({}字节)", file_name, file_path, file_data.len());
+        log::info!("🎉 包文件上传完成: {} -> {} ({}字节)", file_name, file_path, result.file_size);
         
         Ok(result)
     }
     
     /// 根据包ID获取分类名称
+    async fn get_package_info(&self, package_id: i32) -> Result<(String, String)> {
+        use rusqlite::Connection;
+        let conn = Connection::open(&self.db_path)?;
+        let sql = "SELECT c.name as category_name, p.name as package_name 
+                   FROM packages p 
+                   LEFT JOIN categories c ON p.category_id = c.id 
+                   WHERE p.id = ?";
+        
+        let result = conn.query_row(sql, [package_id], |row| {
+            let category_name: String = row.get("category_name").unwrap_or_else(|_| "默认分类".to_string());
+            let package_name: String = row.get("package_name")?;
+            Ok((category_name, package_name))
+        });
+        
+        match result {
+            Ok((cat, name)) => Ok((cat, name)),
+            Err(_) => Err(anyhow!("无法获取资源信息"))
+        }
+    }
+
     async fn get_package_category_name(&self, package_id: i32) -> Result<String> {
         use rusqlite::Connection;
         

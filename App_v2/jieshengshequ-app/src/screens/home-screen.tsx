@@ -13,6 +13,7 @@ import { getUnreadCount } from '../api/notifications'
 import { trendingKeywords, suggestKeywords } from '../api/search'
 import { fetchFeed } from '../api/feed'
 import { useNavigation } from '@/contexts/NavigationContext'
+import { getCategories, Category } from '@/api/categories'
 
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -65,14 +66,51 @@ const HomeScreen: React.FC = () => {
     }
   }
   
-  const categories = [
-    { icon: Code, label: '基础语法', color: 'bg-blue-100 dark:bg-blue-900' },
-    { icon: BookOpen, label: '学习资源', color: 'bg-green-100 dark:bg-green-900' },
-    { icon: Zap, label: '实战项目', color: 'bg-yellow-100 dark:bg-yellow-900' },
-    { icon: Star, label: '精选内容', color: 'bg-purple-100 dark:bg-purple-900' },
-    { icon: Clock, label: '最近更新', color: 'bg-red-100 dark:bg-red-900' },
-    { icon: Bookmark, label: '我的收藏', color: 'bg-indigo-100 dark:bg-indigo-900' },
+  // 分类数据
+  const [categories, setCategories] = useState<(Category & { icon: any; color: string })[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
+
+  // 分类图标映射
+  const categoryIcons = [Code, BookOpen, Zap, Star, Clock, Bookmark]
+  const categoryColors = [
+    'bg-blue-100 dark:bg-blue-900',
+    'bg-green-100 dark:bg-green-900',
+    'bg-yellow-100 dark:bg-yellow-900',
+    'bg-purple-100 dark:bg-purple-900',
+    'bg-red-100 dark:bg-red-900',
+    'bg-indigo-100 dark:bg-indigo-900'
   ]
+
+  // 加载分类数据
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true)
+        const categoryList = await getCategories()
+        const categoriesWithStyle = categoryList.map((cat, index) => ({
+          ...cat,
+          icon: categoryIcons[index % categoryIcons.length] || Code,
+          color: categoryColors[index % categoryColors.length]
+        }))
+        setCategories(categoriesWithStyle)
+      } catch (error) {
+        console.error('加载分类失败:', error)
+        // 使用备用分类数据
+        setCategories([
+          { id: 1, name: '基础语法', icon: Code, color: 'bg-blue-100 dark:bg-blue-900' },
+          { id: 2, name: '学习资源', icon: BookOpen, color: 'bg-green-100 dark:bg-green-900' },
+          { id: 3, name: '实战项目', icon: Zap, color: 'bg-yellow-100 dark:bg-yellow-900' },
+          { id: 4, name: '精选内容', icon: Star, color: 'bg-purple-100 dark:bg-purple-900' },
+          { id: 5, name: '最近更新', icon: Clock, color: 'bg-red-100 dark:bg-red-900' },
+          { id: 6, name: '我的收藏', icon: Bookmark, color: 'bg-indigo-100 dark:bg-indigo-900' },
+        ])
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    
+    loadCategories()
+  }, [])
 
   const [allContent, setAllContent] = useState<any[]>([])
 
@@ -231,7 +269,7 @@ const HomeScreen: React.FC = () => {
               <div className={`flex items-center justify-center w-14 h-14 rounded-full ${category.color} mb-2`}>
                 <category.icon size={24} className="text-foreground" />
               </div>
-              <span className="text-xs text-center">{category.label}</span>
+                                <span className="text-xs text-center">{category.name}</span>
             </motion.div>
           ))}
         </div>

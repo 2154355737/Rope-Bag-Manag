@@ -28,7 +28,7 @@ import InteractionButtons, {
 
 // API imports
 import { getPost } from '../api/posts'
-import { getResource } from '../api/resources'
+import { getResource, downloadResource } from '../api/resources'
 import { getAnnouncement } from '../api/announcements'
 import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
 import { getPostRecommendations, getResourceRecommendations, getAnnouncementRecommendations } from '@/utils/recommendations'
@@ -111,6 +111,15 @@ const UniversalDetailScreen: React.FC = () => {
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
   }
+  const humanFileSize = (size?: string) => {
+    if (!size) return ''
+    // 如果是纯数字字符串，转成 KB/MB
+    const n = parseInt(size)
+    if (!isNaN(n) && n > 0) {
+      return n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
+    }
+    return size
+  }
 
   // 获取页面标题
   const getPageTitle = () => {
@@ -132,6 +141,25 @@ const UniversalDetailScreen: React.FC = () => {
         let data: any
         let recommendations: any[] = []
         
+        // 统一处理：可展示文件名生成
+        const extractNameFromUrl = (url?: string) => {
+          if (!url) return ''
+          const clean = url.split('?')[0].split('#')[0]
+          const last = clean.split('/').pop() || ''
+          try { return decodeURIComponent(last) } catch { return last }
+        }
+        const stripHashedPrefix = (name: string) => name
+          .replace(/^([0-9a-fA-F]{8,})_([0-9a-fA-F]{8,})_/, '')
+          .replace(/^\d{10,}_/, '')
+          .replace(/^[0-9A-Za-z]{8,}_/, '')
+          .replace(/^[0-9A-Za-z]{6,}_(.+)$/,(m, p1)=>m) // 占位，不改变值
+          // 若还有 <hash>_原名 的形式，保留“_”右边
+          .replace(/^([0-9A-Za-z]{6,})_(.+)$/,'$2')
+        const getDisplayName = (given?: string, fallbackUrl?: string) => {
+          const base = (given && given.trim()) ? given : extractNameFromUrl(fallbackUrl)
+          return stripHashedPrefix(base)
+        }
+
         switch (type) {
           case 'post':
             data = await getPost(parseInt(id))
@@ -161,6 +189,35 @@ const UniversalDetailScreen: React.FC = () => {
           case 'resource':
             data = await getResource(parseInt(id))
             recommendations = await getResourceRecommendations(data.id, data.tags || [])
+            // 兼容后端：将 included_files 正常化为 files
+            const normalizedFiles = Array.isArray(data.files) && data.files.length
+              ? data.files
+              : (Array.isArray(data.included_files) ? data.included_files : [])
+            const mapped = normalizedFiles.map((f: any) => ({
+              name: getDisplayName(f?.name ?? String(f ?? ''), data.file_url),
+              type: f?.type ?? f?.file_type ?? '未知',
+              size: typeof f?.size === 'number' ? `${f.size}` : (f?.size || '')
+            }))
+            // 回退：当服务端无文件数组时，基于 file_url / file_size 补充一个主文件
+            const fallback: Array<{ name: string; type: string; size: string }> = []
+            if ((!mapped || mapped.length === 0) && data.file_url) {
+              const fileName = getDisplayName(undefined, data.file_url)
+              const ext = fileName.split('.').pop()?.toLowerCase() || ''
+              let fileType = '未知'
+              if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) fileType = '压缩包'
+              else if (['exe', 'msi', 'dmg', 'pkg'].includes(ext)) fileType = '安装程序'
+              else if (['apk', 'ipa'].includes(ext)) fileType = '移动应用'
+              else if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) fileType = '文档'
+              const humanSize = typeof data.file_size === 'number' && data.file_size > 0
+                ? (data.file_size >= 1024 * 1024
+                    ? `${(data.file_size / (1024 * 1024)).toFixed(1)} MB`
+                    : `${Math.max(1, Math.round(data.file_size / 1024))} KB`)
+                : ''
+              fallback.push({ name: fileName, type: fileType, size: humanSize })
+            }
+            // 合并并去重（按名称）
+            const nameSet = new Set(mapped.map(f => f.name))
+            const files = mapped.concat(fallback.filter(f => !nameSet.has(f.name)))
             setItem({
               id: data.id,
               type: 'resource',
@@ -184,7 +241,7 @@ const UniversalDetailScreen: React.FC = () => {
               version: data.version || '1.0.0',
               fileSize: data.file_size?.toString() || '0',
               downloadUrl: data.file_url,
-              files: data.files || [],
+              files,
               requirements: data.requirements || [],
               screenshots: data.screenshots || [],
               safetyStatus: data.safety_status || 'unknown'
@@ -286,31 +343,48 @@ const UniversalDetailScreen: React.FC = () => {
 
   const handleDownload = async () => {
     if (item?.type !== 'resource') return
-    
     setIsDownloading(true)
-    setDownloadProgress(20)
-    
+    setDownloadProgress(15)
     try {
-      // 模拟下载过程
-      for (let i = 20; i <= 100; i += 20) {
-        await new Promise(resolve => setTimeout(resolve, 500))
-        setDownloadProgress(i)
+      // 调用后端获取真实下载地址
+      const url = await downloadResource(item.id)
+      setDownloadProgress(60)
+      const finalUrl = typeof url === 'string' ? url : (url as any)?.url || item.downloadUrl
+      if (!finalUrl) throw new Error('下载链接不可用')
+
+      // 触发浏览器下载
+      const a = document.createElement('a')
+      a.href = finalUrl
+      a.target = '_blank'
+      a.rel = 'noopener noreferrer'
+      const fileName = (finalUrl.split('/').pop() || item.title || 'download')
+      a.download = fileName
+      document.body.appendChild(a)
+      setDownloadProgress(85)
+      a.click()
+      document.body.removeChild(a)
+      setDownloadProgress(100)
+      toast({ title: '下载开始', description: '文件已开始下载', duration: 2500 })
+    } catch (e) {
+      // 回退：若API失败，尝试直接用原始URL
+      try {
+        if (item.downloadUrl) {
+          const a = document.createElement('a')
+          a.href = item.downloadUrl
+          a.target = '_blank'
+          a.rel = 'noopener noreferrer'
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          toast({ title: '使用备用下载', description: '正在使用直链下载', duration: 2500 })
+        } else {
+          throw new Error('无可用下载链接')
+        }
+      } catch (fallbackError) {
+        toast({ title: '下载失败', description: '请检查网络或稍后重试', variant: 'destructive' })
       }
-      
-      toast({
-        title: "下载完成",
-        description: `${item.title} 已下载到您的设备`,
-        duration: 3000,
-      })
-    } catch (error) {
-      toast({
-        title: "下载失败",
-        description: "请检查网络连接后重试",
-        variant: "destructive"
-      })
     } finally {
-      setIsDownloading(false)
-      setDownloadProgress(0)
+      setTimeout(() => { setIsDownloading(false); setDownloadProgress(0) }, 800)
     }
   }
 
@@ -558,7 +632,7 @@ const UniversalDetailScreen: React.FC = () => {
                       onClick={handleDownload}
                     >
                       <Download size={18} className="mr-2" />
-                      免费下载 ({item.fileSize})
+                      免费下载{humanFileSize(item.fileSize) ? ` (${humanFileSize(item.fileSize)})` : ''}
                     </Button>
                   )}
                 </CardContent>

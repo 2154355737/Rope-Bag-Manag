@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import TopNavigation from '@/components/ui/top-navigation'
+import { getCategories, Category } from '@/api/categories'
 
 type PublishType = 'resource' | 'post'
 
@@ -43,16 +44,37 @@ const PublishScreen: React.FC = () => {
   // 富文本编辑器状态
   const [showPreview, setShowPreview] = useState(false)
 
-  // 分类选项
-  const categories = [
-    { value: 'tools', label: '开发工具' },
-    { value: 'libraries', label: '库/框架' },
-    { value: 'templates', label: '模板' },
-    { value: 'plugins', label: '插件' },
-    { value: 'assets', label: '素材资源' },
-    { value: 'docs', label: '文档教程' },
-    { value: 'other', label: '其他' }
-  ]
+  // 分类数据
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
+
+  // 加载分类数据
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true)
+        const categoryList = await getCategories()
+        setCategories(categoryList)
+      } catch (error) {
+        console.error('加载分类失败:', error)
+        toast.error('加载分类失败')
+        // 使用备用分类数据
+        setCategories([
+          { id: 1, name: '开发工具' },
+          { id: 2, name: '库/框架' },
+          { id: 3, name: '模板' },
+          { id: 4, name: '插件' },
+          { id: 5, name: '素材资源' },
+          { id: 6, name: '文档教程' },
+          { id: 7, name: '其他' }
+        ])
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+    
+    loadCategories()
+  }, [])
 
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -184,31 +206,73 @@ const PublishScreen: React.FC = () => {
     setIsPublishing(true)
     
     try {
-      // 模拟发布API调用
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      let response: any
       
-      const publishData = {
-        type: publishType,
-        title,
-        content,
-        tags,
-        ...(publishType === 'resource' ? {
+      if (publishType === 'resource') {
+        // 发布资源
+        const { publishResource } = await import('@/api/publish')
+        response = await publishResource({
+          title,
+          content,
           version,
           category,
+          tags,
+          requirements,
           files: files.map(f => ({ name: f.name, size: f.size, type: f.type })),
-          screenshots: screenshots.map(s => ({ name: s.name, size: s.size })),
-          requirements
-        } : {
-          images: images.map(img => ({ name: img.name, size: img.size })),
-          codeSnippet
+          screenshots: screenshots.map(s => ({ name: s.name, size: s.size }))
         })
+        
+        // 如果有文件，逐个上传
+        if (files.length > 0) {
+          const { uploadResourceFile } = await import('@/api/publish')
+          for (const file of files) {
+            try {
+              await uploadResourceFile(response.id, file)
+            } catch (error) {
+              console.warn(`文件 ${file.name} 上传失败:`, error)
+            }
+          }
+        }
+        
+        // 如果有截图，上传截图
+        if (screenshots.length > 0) {
+          const { uploadImage } = await import('@/api/publish')
+          for (const screenshot of screenshots) {
+            try {
+              await uploadImage(screenshot, response.id)
+            } catch (error) {
+              console.warn(`截图 ${screenshot.name} 上传失败:`, error)
+            }
+          }
+        }
+      } else {
+        // 发布帖子
+        const { publishPost } = await import('@/api/publish')
+        response = await publishPost({
+          title,
+          content,
+          tags,
+          images: images.map(img => ({ name: img.name, size: img.size })),
+          code_snippet: codeSnippet
+        })
+        
+        // 如果有图片，上传图片
+        if (images.length > 0) {
+          const { uploadImage } = await import('@/api/publish')
+          for (const image of images) {
+            try {
+              await uploadImage(image)
+            } catch (error) {
+              console.warn(`图片 ${image.name} 上传失败:`, error)
+            }
+          }
+        }
       }
       
-      console.log('发布数据:', publishData)
-      
-      // 显示成功提示和审核说明
-      toast.success(`${publishType === 'resource' ? '资源' : '帖子'}发布成功！`, {
-        description: '内容已提交审核，审核通过后将自动发布',
+      // 显示成功提示
+      const isResource = publishType === 'resource'
+      toast.success(`${isResource ? '资源' : '帖子'}发布成功！`, {
+        description: isResource ? '内容已提交审核，审核通过后将自动发布' : '帖子已发布',
         duration: 5000,
       })
       
@@ -229,8 +293,9 @@ const PublishScreen: React.FC = () => {
         navigate('/')
       }, 2000)
       
-    } catch (error) {
-      toast.error('发布失败，请重试')
+    } catch (error: any) {
+      console.error('发布失败:', error)
+      toast.error(error.message || '发布失败，请重试')
     } finally {
       setIsPublishing(false)
     }
@@ -395,8 +460,8 @@ const PublishScreen: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
+                      <SelectItem key={cat.id} value={cat.id.toString()}>
+                        {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

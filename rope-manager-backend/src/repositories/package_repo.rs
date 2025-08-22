@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rusqlite::{Connection, params, OptionalExtension};
-use crate::models::{Package, Category};
+use crate::models::{Package, Category, PackageFile};
 use crate::models::Tag; // 需要Tag模型
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -17,6 +17,22 @@ impl PackageRepository {
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
+    }
+
+    /// 获取指定包的浏览量和评论数
+    pub async fn get_view_and_comment_counts(&self, package_id: i32) -> Result<(i32, i32)> {
+        let conn = self.conn.lock().await;
+        let view_count: i32 = conn
+            .query_row("SELECT COALESCE(view_count, 0) FROM packages WHERE id = ?", params![package_id], |r| r.get(0))
+            .unwrap_or(0);
+        let comment_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(1) FROM comments WHERE target_type = 'Package' AND target_id = ?",
+                params![package_id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        Ok((view_count, comment_count))
     }
 
     // 修复历史错误的触发器：将 DELETE 触发器中误用的 NEW.* 替换为 OLD.*
@@ -42,7 +58,7 @@ impl PackageRepository {
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
-                    is_pinned, is_featured \
+                    is_pinned, is_featured, screenshots, cover_image, requirements \
              FROM packages ORDER BY is_pinned DESC, is_featured DESC, created_at DESC";
         log::debug!("🗄️ SQL: get_all_packages: {}", sql);
         let mut stmt = match conn.prepare(sql) {
@@ -53,6 +69,11 @@ impl PackageRepository {
             }
         };
         let mut packages = match stmt.query_map([], |row| {
+            // 解析JSON字段的辅助函数
+            let parse_json_array = |json_str: Option<String>| -> Option<Vec<String>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            
             Ok(Package {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -80,7 +101,11 @@ impl PackageRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                screenshots: parse_json_array(row.get(19).ok()),
+                cover_image: row.get(20).ok(),
+                requirements: parse_json_array(row.get(21).ok()),
                 tags: None, // 这里会在后面填充
+                included_files: None,
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -108,7 +133,7 @@ impl PackageRepository {
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
-                    is_pinned, is_featured \
+                    is_pinned, is_featured, screenshots, cover_image, requirements, included_files \
              FROM packages WHERE id = ?";
         log::debug!("🗄️ SQL: find_by_id: {} | id={}", sql, id);
         let mut stmt = match conn.prepare(sql) {
@@ -119,6 +144,14 @@ impl PackageRepository {
             }
         };
         let package = match stmt.query_row(params![id], |row| {
+            // 解析JSON字段的辅助函数
+            let parse_json_array = |json_str: Option<String>| -> Option<Vec<String>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            let parse_included_files = |json_str: Option<String>| -> Option<Vec<PackageFile>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            
             Ok(Package {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -146,7 +179,11 @@ impl PackageRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                screenshots: parse_json_array(row.get(19).ok()),
+                cover_image: row.get(20).ok(),
+                requirements: parse_json_array(row.get(21).ok()),
                 tags: None, // 这里会在后面填充
+                included_files: parse_included_files(row.get(22).ok()),
             })
         }) {
             Ok(val) => Some(val),
@@ -169,9 +206,21 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         let sql = "INSERT INTO packages (name, author, version, description, file_url, file_size, \
                                   download_count, like_count, favorite_count, category_id, status, \
-                                  created_at, updated_at, is_pinned, is_featured) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                  created_at, updated_at, is_pinned, is_featured, screenshots, cover_image, requirements, included_files) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         log::debug!("🗄️ SQL: create_package: {}", sql);
+        
+        // 序列化数组字段为JSON
+        let screenshots_json = package.screenshots.as_ref()
+            .map(|arr| serde_json::to_string(arr).unwrap_or("[]".to_string()))
+            .unwrap_or("[]".to_string());
+        let requirements_json = package.requirements.as_ref()
+            .map(|arr| serde_json::to_string(arr).unwrap_or("[]".to_string()))
+            .unwrap_or("[]".to_string());
+        let included_files_json = package.included_files.as_ref()
+            .map(|arr| serde_json::to_string(arr).unwrap_or("[]".to_string()))
+            .unwrap_or("[]".to_string());
+        
         let params = params![
             package.name,
             package.author,
@@ -194,6 +243,10 @@ impl PackageRepository {
             package.updated_at.to_rfc3339(),
             package.is_pinned,
             package.is_featured,
+            screenshots_json,
+            package.cover_image,
+            requirements_json,
+            included_files_json,
         ];
         match conn.execute(sql, params) {
             Ok(rows) => println!("[SQL] create_package affected rows: {}", rows),
@@ -221,8 +274,21 @@ impl PackageRepository {
         let sql = "UPDATE packages SET name = ?, author = ?, version = ?, description = ?, \
                     file_url = ?, file_size = ?, download_count = ?, like_count = ?, \
                     favorite_count = ?, category_id = ?, status = ?, created_at = ?, \
-                    updated_at = ?, is_pinned = ?, is_featured = ? WHERE id = ?";
+                    updated_at = ?, is_pinned = ?, is_featured = ?, screenshots = ?, \
+                    cover_image = ?, requirements = ?, included_files = ? WHERE id = ?";
         log::debug!("🗄️ SQL: update_package: {} | id={}", sql, package.id);
+        
+        // 序列化JSON字段
+        let screenshots_json = package.screenshots.as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|| "[]".to_string());
+        let requirements_json = package.requirements.as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|| "[]".to_string());
+        let included_files_json = package.included_files.as_ref()
+            .map(|v| serde_json::to_string(v).unwrap_or_else(|_| "[]".to_string()))
+            .unwrap_or_else(|| "[]".to_string());
+        
         let params = params![
             package.name,
             package.author,
@@ -245,6 +311,10 @@ impl PackageRepository {
             package.updated_at.to_rfc3339(),
             package.is_pinned,
             package.is_featured,
+            screenshots_json,
+            package.cover_image,
+            requirements_json,
+            included_files_json,
             package.id,
         ];
         match conn.execute(sql, params) {
@@ -349,7 +419,7 @@ impl PackageRepository {
         let conn = self.conn.lock().await;
         log::debug!("🔍 get_packages_advanced called");
         log::debug!("🔍 page: {}, page_size: {}, category: {:?}, search: {:?}, status: {:?}", page, page_size, category, search, status);
-        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment, is_pinned, is_featured FROM packages WHERE 1=1");
+        let mut sql = String::from("SELECT id, name, author, version, description, file_url, file_size, download_count, like_count, favorite_count, category_id, status, created_at, updated_at, reviewer_id, reviewed_at, review_comment, is_pinned, is_featured, screenshots, cover_image, requirements FROM packages WHERE 1=1");
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         if let Some(category_id) = category {
             sql.push_str(" AND category_id = ?");
@@ -398,6 +468,11 @@ impl PackageRepository {
             }
         };
         let packages = match stmt.query_map(&*params_refs, |row| {
+            // 解析JSON字段的辅助函数
+            let parse_json_array = |json_str: Option<String>| -> Option<Vec<String>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            
             Ok(Package {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -425,7 +500,11 @@ impl PackageRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                screenshots: parse_json_array(row.get::<_, Option<String>>(19).ok().flatten()),
+                cover_image: row.get(20).ok(),
+                requirements: parse_json_array(row.get::<_, Option<String>>(21).ok().flatten()),
                 tags: None, // 这里会在后面填充
+                included_files: None,
             })
         }) {
             Ok(res) => match res.collect::<Result<Vec<_>, _>>() {
@@ -507,7 +586,7 @@ impl PackageRepository {
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
-                    is_pinned, is_featured \
+                    is_pinned, is_featured, screenshots, cover_image, requirements, included_files \
              FROM packages WHERE status = 'active' ORDER BY download_count DESC LIMIT ?";
         let mut stmt = conn.prepare(sql)?;
         let list = stmt.query_map(params![limit], |row| {
@@ -538,7 +617,24 @@ impl PackageRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                // 新增字段
+                screenshots: {
+                    if let Ok(json_str) = row.get::<_, String>(19) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
+                cover_image: row.get(20).ok(),
+                requirements: {
+                    if let Ok(json_str) = row.get::<_, String>(21) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
                 tags: None,
+                included_files: None,
             })
         })?.collect::<Result<Vec<_>, _>>()?;
         Ok(list)
@@ -550,7 +646,7 @@ impl PackageRepository {
         let sql = "SELECT id, name, author, version, description, file_url, file_size, \
                     download_count, like_count, favorite_count, category_id, status, \
                     created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
-                    is_pinned, is_featured \
+                    is_pinned, is_featured, screenshots, cover_image, requirements, included_files \
              FROM packages WHERE status = 'active' ORDER BY like_count DESC, download_count DESC LIMIT ?";
         let mut stmt = conn.prepare(sql)?;
         let list = stmt.query_map(params![limit], |row| {
@@ -581,7 +677,24 @@ impl PackageRepository {
                 review_comment: row.get(16)?,
                 is_pinned: row.get(17).unwrap_or(false),
                 is_featured: row.get(18).unwrap_or(false),
+                // 新增字段
+                screenshots: {
+                    if let Ok(json_str) = row.get::<_, String>(19) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
+                cover_image: row.get(20).ok(),
+                requirements: {
+                    if let Ok(json_str) = row.get::<_, String>(21) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
                 tags: None,
+                included_files: None,
             })
         })?.collect::<Result<Vec<_>, _>>()?;
         Ok(list)

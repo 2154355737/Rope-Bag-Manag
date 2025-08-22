@@ -265,16 +265,16 @@ const MyContentScreen: React.FC = () => {
             </p>
 
             {resource.tags && (
-              <div className="flex flex-wrap gap-1 mb-3">
-                {resource.tags.slice(0, 2).map((tag: string, index: number) => (
-                  <Badge key={index} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-                {resource.tags.length > 2 && (
-                  <Badge variant="outline" className="text-xs">+{resource.tags.length - 2}</Badge>
-                )}
-              </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              {resource.tags.slice(0, 2).map((tag: string, index: number) => (
+                <Badge key={index} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+              {resource.tags.length > 2 && (
+                <Badge variant="outline" className="text-xs">+{resource.tags.length - 2}</Badge>
+              )}
+            </div>
             )}
 
             <div className="flex items-center justify-between text-xs text-muted-foreground">

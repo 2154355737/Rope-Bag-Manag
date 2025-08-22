@@ -3,9 +3,11 @@ use actix_multipart::Multipart;
 use futures_util::stream::StreamExt as _;
 use crate::models::ApiResponse;
 use crate::services::package_storage_service::{PackageStorageService, StorageStats, CleanupResult};
+use crate::services::package_service::PackageService;
 use crate::middleware::auth::AuthenticatedUser;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use crate::models::PackageFile;
 
 #[derive(Deserialize)]
 pub struct PresignRequest {
@@ -130,13 +132,127 @@ async fn upload_file(
         )));
     }
 
-    // 上传文件到AList
-    match storage_service.upload_package_file(
-        &file_name,
-        actix_web::web::Bytes::from(file_data),
-        package_id
-    ).await {
+    // 判断是否为截图上传
+    let is_image = file_name.to_lowercase().ends_with(".jpg") ||
+                  file_name.to_lowercase().ends_with(".jpeg") ||
+                  file_name.to_lowercase().ends_with(".png") ||
+                  file_name.to_lowercase().ends_with(".gif") ||
+                  file_name.to_lowercase().ends_with(".webp");
+
+    // 根据文件类型和package_id选择上传方法
+    let upload_result = if is_image && package_id.is_some() {
+        // 截图上传，使用专门的截图上传方法
+        storage_service.upload_package_screenshot(
+            &file_name,
+            actix_web::web::Bytes::from(file_data),
+            package_id.unwrap()
+        ).await
+    } else {
+        // 普通文件上传
+        storage_service.upload_package_file(
+            &file_name,
+            actix_web::web::Bytes::from(file_data),
+            package_id
+        ).await
+    };
+
+    match upload_result {
         Ok(result) => {
+            // 根据上传类型更新Package信息
+            if let Some(pkg_id) = package_id {
+                let package_repo = crate::repositories::PackageRepository::new(db_path).unwrap();
+                let package_service = PackageService::new(package_repo, "uploads".to_string());
+                
+                if let Ok(Some(package)) = package_service.get_package_by_id(pkg_id).await {
+                    if is_image {
+                        // 截图上传：更新screenshots字段
+                        let mut screenshots = package.screenshots.unwrap_or_else(Vec::new);
+                        screenshots.push(result.download_url.clone());
+                        
+                        let update_req = crate::models::UpdatePackageRequest {
+                            name: None,
+                            version: None,
+                            description: None,
+                            category_id: None,
+                            status: None,
+                            file_url: None,
+                            file_size: None,
+                            is_pinned: None,
+                            is_featured: None,
+                            reviewer_id: None,
+                            reviewed_at: None,
+                            review_comment: None,
+                            tags: None,
+                            screenshots: Some(screenshots),
+                            cover_image: None,
+                            requirements: None,
+                            included_files: None,
+                        };
+                        
+                        match package_service.update_package(pkg_id, &update_req).await {
+                            Ok(_) => {
+                                log::info!("📷 已将截图添加到资源 {} 的screenshots字段: {}", pkg_id, result.download_url);
+                            },
+                            Err(e) => {
+                                log::error!("❌ 更新资源 {} 的screenshots字段失败: {}", pkg_id, e);
+                            }
+                        }
+                    } else {
+                        // 文件上传：更新file_url和file_size字段，并记录原始文件名到 included_files
+                        // 推断文件类型
+                        let ext = std::path::Path::new(&file_name)
+                            .extension()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("")
+                            .to_lowercase();
+                        let file_type = if ["zip","rar","7z","tar","gz"].contains(&ext.as_str()) {
+                            "压缩包".to_string()
+                        } else if ["exe","msi","dmg","pkg"].contains(&ext.as_str()) {
+                            "安装程序".to_string()
+                        } else if ["apk","ipa"].contains(&ext.as_str()) {
+                            "移动应用".to_string()
+                        } else if ["pdf","doc","docx","txt","md"].contains(&ext.as_str()) {
+                            "文档".to_string()
+                        } else {
+                            "文件".to_string()
+                        };
+
+                        // 合并/追加到 included_files（按名称去重）
+                        let mut included_files = package.included_files.unwrap_or_else(Vec::new);
+                        if let Some(f) = included_files.iter_mut().find(|f| f.name == file_name) {
+                            f.size = result.file_size;
+                            f.file_type = file_type.clone();
+                        } else {
+                            included_files.push(PackageFile { name: file_name.clone(), size: result.file_size, file_type: file_type.clone() });
+                        }
+
+                        let update_req = crate::models::UpdatePackageRequest {
+                            name: None,
+                            version: None,
+                            description: None,
+                            category_id: None,
+                            status: None,
+                            file_url: Some(result.download_url.clone()),
+                            file_size: Some(result.file_size),
+                            is_pinned: None,
+                            is_featured: None,
+                            reviewer_id: None,
+                            reviewed_at: None,
+                            review_comment: None,
+                            tags: None,
+                            screenshots: None,
+                            cover_image: None,
+                            requirements: None,
+                            included_files: Some(included_files),
+                        };
+                        
+                        let _ = package_service.update_package(pkg_id, &update_req).await;
+                        log::info!("📁 已将文件信息更新到资源 {} - 文件: {}, 下载地址: {}, 大小: {} bytes", 
+                                 pkg_id, file_name, result.download_url, result.file_size);
+                    }
+                }
+            }
+            
             let response = UploadResponse {
                 file_path: result.file_path,
                 download_url: result.download_url,

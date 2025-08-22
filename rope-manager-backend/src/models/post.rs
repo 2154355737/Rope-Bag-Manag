@@ -22,6 +22,10 @@ pub struct Post {
     pub review_comment: Option<String>,
     pub reviewer_id: Option<i32>,
     pub reviewed_at: Option<DateTime<Utc>>,
+    // 新增字段 - 支持前端发布页面
+    pub images: Option<Vec<String>>,    // 图片URLs
+    pub code_snippet: Option<String>,   // 代码片段
+    pub tags: Option<Vec<String>>,      // 标签列表
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -45,6 +49,9 @@ pub struct CreatePostRequest {
     pub category_id: Option<i32>,
     pub tags: Option<Vec<String>>,
     pub status: Option<PostStatus>,
+    // 新增字段 - 支持前端发布页面
+    pub images: Option<Vec<String>>,    // 图片URLs
+    pub code_snippet: Option<String>,   // 代码片段
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,6 +63,9 @@ pub struct UpdatePostRequest {
     pub status: Option<PostStatus>,
     pub is_pinned: Option<bool>,
     pub is_featured: Option<bool>,
+    // 新增字段 - 支持前端发布页面
+    pub images: Option<Vec<String>>,    // 图片URLs
+    pub code_snippet: Option<String>,   // 代码片段
 }
 
 #[derive(Debug, Serialize, Deserialize)]

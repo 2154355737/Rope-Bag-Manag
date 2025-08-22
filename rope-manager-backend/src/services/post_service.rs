@@ -244,7 +244,7 @@ impl PostService {
 
         // 获取帖子列表（包含审核字段）
         let sql = format!(
-            "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at FROM posts {} ORDER BY is_pinned DESC, is_featured DESC, created_at DESC LIMIT ? OFFSET ?",
+            "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at, images, code_snippet, tags FROM posts {} ORDER BY is_pinned DESC, is_featured DESC, created_at DESC LIMIT ? OFFSET ?",
             where_clause
         );
 
@@ -275,6 +275,22 @@ impl PostService {
                     review_comment: row.get(15).ok(),
                     reviewer_id: row.get(16).ok(),
                     reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
+                    // 新增字段
+                    images: {
+                        if let Ok(json_str) = row.get::<_, String>(18) {
+                            serde_json::from_str(&json_str).ok()
+                        } else {
+                            None
+                        }
+                    },
+                    code_snippet: row.get(19).ok(),
+                    tags: {
+                        if let Ok(json_str) = row.get::<_, String>(20) {
+                            serde_json::from_str(&json_str).ok()
+                        } else {
+                            None
+                        }
+                    },
                 })
             }
         )?.collect::<Result<Vec<_>, _>>()?;
@@ -291,7 +307,7 @@ impl PostService {
     pub async fn get_post(&self, post_id: i32) -> SqliteResult<Option<Post>> {
         let conn = Connection::open(&self.db_path)?;
         
-        let sql = "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at FROM posts WHERE id = ?";
+        let sql = "SELECT id, title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, review_comment, reviewer_id, reviewed_at, images, code_snippet, tags FROM posts WHERE id = ?";
         
         let result = conn.query_row(sql, params![post_id], |row| {
             Ok(Post {
@@ -313,6 +329,22 @@ impl PostService {
                 review_comment: row.get(15).ok(),
                 reviewer_id: row.get(16).ok(),
                 reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
+                // 新增字段
+                images: {
+                    if let Ok(json_str) = row.get::<_, String>(18) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
+                code_snippet: row.get(19).ok(),
+                tags: {
+                    if let Ok(json_str) = row.get::<_, String>(20) {
+                        serde_json::from_str(&json_str).ok()
+                    } else {
+                        None
+                    }
+                },
             })
         });
 
@@ -469,7 +501,7 @@ impl PostService {
             |r| r.get(0),
         )?;
         let offset = (page - 1).max(0) * page_size.max(1);
-        let sql = "SELECT p.id, p.title, p.content, p.author_id, p.author_name, p.category_id, p.status, p.view_count, p.like_count, p.comment_count, p.is_pinned, p.is_featured, p.created_at, p.updated_at, p.review_status, p.review_comment, p.reviewer_id, p.reviewed_at FROM posts p JOIN post_likes pl ON pl.post_id = p.id WHERE pl.user_id = ? ORDER BY pl.created_at DESC LIMIT ? OFFSET ?";
+        let sql = "SELECT p.id, p.title, p.content, p.author_id, p.author_name, p.category_id, p.status, p.view_count, p.like_count, p.comment_count, p.is_pinned, p.is_featured, p.created_at, p.updated_at, p.review_status, p.review_comment, p.reviewer_id, p.reviewed_at, p.images, p.code_snippet, p.tags FROM posts p JOIN post_likes pl ON pl.post_id = p.id WHERE pl.user_id = ? ORDER BY pl.created_at DESC LIMIT ? OFFSET ?";
         let mut stmt = conn.prepare(sql)?;
         let posts = stmt
             .query_map(params![user_id, page_size, offset], |row| {
@@ -492,6 +524,22 @@ impl PostService {
                     review_comment: row.get(15).ok(),
                     reviewer_id: row.get(16).ok(),
                     reviewed_at: row.get::<_, Option<String>>(17).ok().flatten().map(parse_timestamp),
+                    // 新增字段
+                    images: {
+                        if let Ok(json_str) = row.get::<_, String>(18) {
+                            serde_json::from_str(&json_str).ok()
+                        } else {
+                            None
+                        }
+                    },
+                    code_snippet: row.get(19).ok(),
+                    tags: {
+                        if let Ok(json_str) = row.get::<_, String>(20) {
+                            serde_json::from_str(&json_str).ok()
+                        } else {
+                            None
+                        }
+                    },
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;

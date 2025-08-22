@@ -40,7 +40,10 @@ pub struct FileInfo {
     pub modified: String,
     pub sign: Option<String>,
     pub thumb: Option<String>,
+    #[serde(rename = "type")]
     pub type_: Option<i32>,
+    pub raw_url: Option<String>, // 文件的真实下载地址
+    pub provider: Option<String>, // 存储提供商
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -469,5 +472,44 @@ impl AListService {
         }
         
         Err(anyhow!("文件重命名失败: {}", response_json.message))
+    }
+
+    /// 获取文件信息，包括下载直链
+    pub async fn get_file_info(&mut self, file_path: &str) -> Result<FileInfo> {
+        self.login().await?;
+
+        let url = format!("{}/api/fs/get", self.base_url);
+        
+        let request_body = json!({
+            "path": file_path,
+            "password": ""
+        });
+        
+        log::info!("🔍 获取文件信息: {}", file_path);
+        
+        let response = self.client
+            .post(&url)
+            .header("Authorization", self.token.as_ref().unwrap())
+            .header("Content-Type", "application/json")
+            .json(&request_body)
+            .send()
+            .await?;
+            
+        let response_text = response.text().await?;
+        let result: AListResponse<FileInfo> = serde_json::from_str(&response_text)
+            .map_err(|e| anyhow!("解析文件信息响应失败: {} - 响应: {}", e, response_text))?;
+        
+        if result.code == 200 {
+            match result.data {
+                Some(file_info) => {
+                    log::info!("✅ 获取文件信息成功: {} - 大小: {} bytes, 下载地址: {:?}", 
+                             file_info.name, file_info.size, file_info.raw_url);
+                    Ok(file_info)
+                },
+                None => Err(anyhow!("文件信息为空")),
+            }
+        } else {
+            Err(anyhow!("获取文件信息失败: {}", result.message))
+        }
     }
 } 

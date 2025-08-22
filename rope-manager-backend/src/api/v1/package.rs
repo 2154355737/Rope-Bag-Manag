@@ -350,12 +350,18 @@ async fn review_resource(
         category_id: None,
         status: Some(new_status),
         file_url: None,
+        file_size: None,
         is_pinned: None,
         is_featured: None,
         reviewer_id: Some(user.id),
         reviewed_at: Some(chrono::Utc::now()),
         review_comment: req.comment.clone(),
         tags: None,
+        // 新增字段
+        screenshots: None,
+        cover_image: None,
+        requirements: None,
+        included_files: None,
     };
     
     match package_service.update_package(resource_id, &update_req).await {
@@ -528,10 +534,28 @@ async fn get_package(
         let _ = package_service.record_view(package_id, user_id, ip_address, user_agent).await;
     }
 
+    // 将package序列化为JSON，并添加 files 字段作为 included_files 的别名，便于前端兼容
+    let mut pkg_value = serde_json::to_value(&package).unwrap_or_else(|_| json!({}));
+    if let serde_json::Value::Object(ref mut map) = pkg_value {
+        if !map.contains_key("files") {
+            if let Some(ref included) = package.included_files {
+                map.insert("files".to_string(), serde_json::to_value(included).unwrap_or_else(|_| json!([])));
+            } else {
+                map.insert("files".to_string(), json!([]));
+            }
+        }
+
+        // 补充统计字段：view_count 和 comment_count
+        if let Ok((views, comments)) = package_service.get_view_and_comment_counts(package_id).await {
+            map.entry("view_count").or_insert(json!(views));
+            map.entry("comment_count").or_insert(json!(comments));
+        }
+    }
+
     Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "success",
-            "data": package
+            "data": pkg_value
     })))
 }
 
@@ -581,6 +605,11 @@ async fn user_submit_resource(
         tags: req.tags.clone(),
         is_pinned: None,
         is_featured: None,
+        // 新增字段
+        screenshots: None,
+        cover_image: None,
+        requirements: None,
+        included_files: None,
     };
     
     match package_service.create_package(&create_req).await {
