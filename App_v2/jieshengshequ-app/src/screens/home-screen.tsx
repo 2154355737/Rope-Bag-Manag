@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, X, Eye, Download, Calendar } from 'lucide-react'
+import { Search, Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, X, Eye, Download, Calendar, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
@@ -12,8 +12,43 @@ import TopNavigation from '@/components/ui/top-navigation'
 import { getUnreadCount } from '../api/notifications'
 import { trendingKeywords, suggestKeywords } from '../api/search'
 import { fetchFeed } from '../api/feed'
+import { getPosts } from '../api/posts'
+import { getAnnouncements } from '../api/announcements'
+import { getResources } from '../api/resources'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { getCategories, Category } from '@/api/categories'
+
+// 内容数据接口
+interface ContentItem {
+  id: number
+  type: 'post' | 'resource' | 'announcement'
+  title: string
+  description?: string
+  tags?: string[]
+  author: {
+    id?: number
+    name: string
+    avatar?: string
+  }
+  likes: number
+  comments: number
+  views: number
+  downloads?: number
+  date: string
+  isTop: boolean
+  isHot: boolean
+  category?: any
+}
+
+// 标签页数据状态接口
+interface TabDataState {
+  data: ContentItem[]
+  loading: boolean
+  error: string | null
+  page: number
+  hasMore: boolean
+  lastUpdate: number
+}
 
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -27,6 +62,34 @@ const HomeScreen: React.FC = () => {
   
   // 获取当前活跃的标签页
   const activeTab = getActiveTab('home', 'posts')
+
+  // 为每个标签页维护独立的数据状态
+  const [tabsData, setTabsData] = useState<Record<string, TabDataState>>({
+    posts: {
+      data: [],
+      loading: false,
+      error: null,
+      page: 1,
+      hasMore: true,
+      lastUpdate: 0
+    },
+    announcements: {
+      data: [],
+      loading: false,
+      error: null,
+      page: 1,
+      hasMore: true,
+      lastUpdate: 0
+    },
+    resources: {
+      data: [],
+      loading: false,
+      error: null,
+      page: 1,
+      hasMore: true,
+      lastUpdate: 0
+    }
+  })
 
   // 格式化日期显示
   const formatDate = (dateString: string) => {
@@ -50,7 +113,7 @@ const HomeScreen: React.FC = () => {
   }
 
   // 处理卡片点击
-  const handleCardClick = (card: any) => {
+  const handleCardClick = (card: ContentItem) => {
     switch (card.type) {
       case 'post':
         navigate(`/post/${card.id}`)
@@ -65,7 +128,118 @@ const HomeScreen: React.FC = () => {
         navigate(`/post/${card.id}`)
     }
   }
-  
+
+  // 数据映射函数
+  const mapApiDataToContentItem = (item: any, type: 'post' | 'resource' | 'announcement'): ContentItem => {
+    return {
+      id: item.id,
+      type,
+      title: item.title,
+      description: item.description || item.summary || '',
+      tags: item.tags || [],
+      author: item.author_detail ? {
+        id: item.author_detail.id,
+        name: item.author_detail.nickname || item.author_detail.name,
+        avatar: item.author_detail.avatar || ''
+      } : { 
+        name: item.author_name || (typeof item.author === 'string' ? item.author : item.author?.name) || '用户', 
+        avatar: item.author_avatar || item.author?.avatar || '' 
+      },
+      likes: item.stats?.likes || item.like_count || 0,
+      comments: item.stats?.comments || item.comment_count || 0,
+      views: item.stats?.views || item.view_count || 0,
+      downloads: item.stats?.downloads || item.download_count || 0,
+      date: item.created_at || item.publishedAt || item.publishDate,
+      isTop: item.is_pinned || item.isPinned || false,
+      isHot: item.is_featured || false,
+      category: item.category,
+    }
+  }
+
+  // 加载指定标签页数据
+  const loadTabData = async (tabType: string, refresh = false) => {
+    const currentState = tabsData[tabType]
+    const now = Date.now()
+    
+    // 如果数据较新且不是刷新操作，则跳过加载
+    if (!refresh && currentState.data.length > 0 && (now - currentState.lastUpdate) < 30000) {
+      return
+    }
+
+    // 设置加载状态
+    setTabsData(prev => ({
+      ...prev,
+      [tabType]: {
+        ...prev[tabType],
+        loading: true,
+        error: null
+      }
+    }))
+
+    try {
+      let response: any
+      let mappedData: ContentItem[] = []
+
+      switch (tabType) {
+        case 'posts':
+          response = await getPosts({ page: 1, pageSize: 20 })
+          mappedData = (response.list || []).map((item: any) => 
+            mapApiDataToContentItem(item, 'post')
+          )
+          break
+
+        case 'announcements':
+          const announcements = await getAnnouncements({ page: 1, pageSize: 20 })
+          mappedData = announcements.map((item: any) => 
+            mapApiDataToContentItem(item, 'announcement')
+          )
+          break
+
+        case 'resources':
+          response = await getResources({ page: 1, pageSize: 20 })
+          mappedData = (response.list || []).map((item: any) => 
+            mapApiDataToContentItem(item, 'resource')
+          )
+          break
+
+        default:
+          console.warn(`未知的标签页类型: ${tabType}`)
+          return
+      }
+
+      // 更新数据状态
+      setTabsData(prev => ({
+        ...prev,
+        [tabType]: {
+          ...prev[tabType],
+          data: mappedData,
+          loading: false,
+          error: null,
+          lastUpdate: now,
+          hasMore: response?.total ? mappedData.length < response.total : false
+        }
+      }))
+
+    } catch (error) {
+      console.error(`加载${tabType}数据失败:`, error)
+      setTabsData(prev => ({
+        ...prev,
+        [tabType]: {
+          ...prev[tabType],
+          loading: false,
+          error: `加载失败，请稍后重试`
+        }
+      }))
+    }
+  }
+
+  // 标签页切换处理
+  const handleTabChange = (newTab: string) => {
+    setActiveTab('home', newTab)
+    // 立即加载新标签页的数据
+    loadTabData(newTab)
+  }
+
   // 分类数据
   const [categories, setCategories] = useState<(Category & { icon: any; color: string })[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
@@ -112,46 +286,17 @@ const HomeScreen: React.FC = () => {
     loadCategories()
   }, [])
 
-  const [allContent, setAllContent] = useState<any[]>([])
-
+  // 初始化数据加载
   useEffect(() => {
-    const loadFeed = async () => {
-      const data = await fetchFeed({ page: 1, pageSize: 20 })
-      const mapped = (data.items || []).map((i: any) => ({
-        id: i.id,
-        type: i.type || i.item_type,
-        title: i.title,
-        description: i.description,
-        tags: i.tags || [],
-        // 使用新的author_detail字段，如果没有则回退到原有逻辑
-        author: i.author_detail ? {
-          id: i.author_detail.id,
-          name: i.author_detail.nickname || i.author_detail.name,
-          avatar: i.author_detail.avatar || ''
-        } : { 
-          name: i.author_name || (typeof i.author === 'string' ? i.author : i.author?.name) || '用户', 
-          avatar: i.author_avatar || i.author?.avatar || '' 
-        },
-        likes: i.stats?.likes || i.like_count || 0,
-        comments: i.stats?.comments || i.comment_count || 0,
-        views: i.stats?.views || i.view_count || 0,
-        downloads: i.stats?.downloads || i.download_count || 0,
-        date: i.created_at || i.publishedAt,
-        isTop: i.is_pinned || false,
-        isHot: i.is_featured || false,
-        category: i.category, // 添加分类信息
-      }))
-      setAllContent(mapped)
-    }
-    loadFeed()
-  }, [])
-
-  useEffect(() => {
-    // 加载热门搜索
+    // 加载当前活跃标签页的数据
+    loadTabData(activeTab)
+    
+    // 加载热门搜索和未读消息
     trendingKeywords().then(setHotKeywords).catch(() => setHotKeywords([]))
     getUnreadCount().then(data => setUnread(data.count)).catch(() => setUnread(0))
   }, [])
 
+  // 搜索建议
   useEffect(() => {
     const t = setTimeout(() => {
       if (searchValue.trim()) {
@@ -162,6 +307,170 @@ const HomeScreen: React.FC = () => {
     }, 250)
     return () => clearTimeout(t)
   }, [searchValue])
+
+  // 渲染内容卡片
+  const renderContentCard = (card: ContentItem) => (
+    <motion.div
+      key={card.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <Card 
+        className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
+        onClick={() => handleCardClick(card)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center mb-3">
+            <Avatar className="h-6 w-6 mr-2">
+              <AvatarImage src={card.author.avatar} />
+              <AvatarFallback>{card.author.name[0]}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm">{card.author.name}</span>
+            <div className="ml-auto flex items-center gap-2">
+              {card.category && (
+                <Badge variant="outline" className="text-xs">
+                  {card.category.name}
+                </Badge>
+              )}
+              {card.type === 'announcement' && (
+                <Badge variant="outline" className="text-xs">
+                  公告
+                </Badge>
+              )}
+              {card.isTop && (
+                <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
+                  <Pin size={10} className="mr-1" />
+                  置顶
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <h3 className="font-medium text-lg mb-2">{card.title}</h3>
+          <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
+          
+          {/* 标签区域 - 只在有标签时显示 */}
+          {(card.tags && card.tags.length > 0) || card.isHot ? (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
+                <Badge key={idx} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+              {card.tags && card.tags.length > 3 && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  +{card.tags.length - 3}
+                </Badge>
+              )}
+              {card.isHot && (
+                <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
+                  <Star size={12} className="mr-1" /> 精华
+                </Badge>
+              )}
+            </div>
+          ) : null}
+        </CardContent>
+        
+        <CardFooter className="p-4 pt-3 border-t">
+          <div className="flex items-center text-muted-foreground text-xs space-x-4">
+            <div className="flex items-center">
+              <Calendar size={14} className="mr-1" />
+              {formatDate(card.date)}
+            </div>
+            <div className="flex items-center">
+              <Eye size={14} className="mr-1" />
+              {formatNumber(card.views)}
+            </div>
+            <div className="flex items-center">
+              <Star size={14} className="mr-1" />
+              {formatNumber(card.likes)}
+            </div>
+            {card.type === 'resource' && (
+              <div className="flex items-center">
+                <Download size={14} className="mr-1" />
+                {formatNumber(card.downloads || 0)}
+              </div>
+            )}
+          </div>
+        </CardFooter>
+      </Card>
+    </motion.div>
+  )
+
+  // 渲染加载状态
+  const renderLoadingState = () => (
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">加载中...</p>
+    </div>
+  )
+
+  // 渲染错误状态
+  const renderErrorState = (error: string, tabType: string) => (
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <div className="text-center">
+        <p className="text-sm text-muted-foreground mb-4">{error}</p>
+        <Button 
+          variant="outline" 
+          onClick={() => loadTabData(tabType, true)}
+        >
+          重试
+        </Button>
+      </div>
+    </div>
+  )
+
+  // 渲染空状态
+  const renderEmptyState = (tabType: string) => {
+    const messages = {
+      posts: '暂无帖子',
+      announcements: '暂无公告',
+      resources: '暂无资源'
+    }
+    
+    return (
+      <div className="flex flex-col items-center justify-center py-12 space-y-4">
+        <p className="text-sm text-muted-foreground">{messages[tabType as keyof typeof messages]}</p>
+        <Button 
+          variant="outline" 
+          onClick={() => loadTabData(tabType, true)}
+        >
+          刷新
+        </Button>
+      </div>
+    )
+  }
+
+  // 渲染标签页内容
+  const renderTabContent = (tabType: string) => {
+    const tabState = tabsData[tabType]
+    
+    if (tabState.loading) {
+      return renderLoadingState()
+    }
+    
+    if (tabState.error) {
+      return renderErrorState(tabState.error, tabType)
+    }
+    
+    if (tabState.data.length === 0) {
+      return renderEmptyState(tabType)
+    }
+
+    // 排序数据（置顶优先）
+    const sortedData = [...tabState.data].sort((a, b) => {
+      if (a.isTop && !b.isTop) return -1
+      if (!a.isTop && b.isTop) return 1
+      return 0
+    })
+
+    return (
+      <div className="space-y-4">
+        {sortedData.map(renderContentCard)}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
@@ -278,7 +587,7 @@ const HomeScreen: React.FC = () => {
               <div className={`flex items-center justify-center w-14 h-14 rounded-full ${category.color} mb-2`}>
                 <category.icon size={24} className="text-foreground" />
               </div>
-                                <span className="text-xs text-center">{category.name}</span>
+              <span className="text-xs text-center">{category.name}</span>
             </motion.div>
           ))}
         </div>
@@ -286,282 +595,25 @@ const HomeScreen: React.FC = () => {
 
       {/* 内容标签页 */}
       <div className="px-4 flex-1">
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab('home', value)} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-4">
+          <TabsList className="grid grid-cols-3">
             <TabsTrigger value="posts">帖子</TabsTrigger>
             <TabsTrigger value="announcements">公告</TabsTrigger>
             <TabsTrigger value="resources">资源</TabsTrigger>
           </TabsList>
-          
-          <TabsContent value="posts" className="space-y-4">
-            {allContent.filter(item => item.type === 'post')
-              .sort((a, b) => {
-                // 置顶的卡片排在前面
-                if (a.isTop && !b.isTop) return -1
-                if (!a.isTop && b.isTop) return 1
-                return 0
-              })
-              .map((card) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card 
-                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
-                  onClick={() => handleCardClick(card)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center mb-3">
-                      <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={card.author.avatar} />
-                        <AvatarFallback>{card.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{card.author.name}</span>
-                      <div className="ml-auto flex items-center gap-2">
-                        {card.category && (
-                          <Badge variant="outline" className="text-xs">
-                            {card.category.name}
-                          </Badge>
-                        )}
-                      {card.isTop && (
-                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                          <Pin size={10} className="mr-1" />
-                          置顶
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                  
-                  {/* 标签区域 - 只在有标签时显示 */}
-                  {(card.tags && card.tags.length > 0) || card.isHot ? (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {card.tags && card.tags.length > 3 && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          +{card.tags.length - 3}
-                        </Badge>
-                      )}
-                      {card.isHot && (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
-                          <Star size={12} className="mr-1" /> 精华
-                        </Badge>
-                      )}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                  
-                  <CardFooter className="p-4 pt-3 border-t">
-                    <div className="flex items-center text-muted-foreground text-xs space-x-4">
-                      <div className="flex items-center">
-                        <Calendar size={14} className="mr-1" />
-                        {formatDate(card.date)}
-                      </div>
-                      <div className="flex items-center">
-                        <Eye size={14} className="mr-1" />
-                        {formatNumber(card.views)}
-                      </div>
-                      <div className="flex items-center">
-                        <Star size={14} className="mr-1" />
-                        {formatNumber(card.likes)}
-                      </div>
-                    </div>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="announcements" className="space-y-4">
-            {allContent.filter(item => item.type === 'announcement')
-              .sort((a, b) => {
-                // 置顶的卡片排在前面
-                if (a.isTop && !b.isTop) return -1
-                if (!a.isTop && b.isTop) return 1
-                return 0
-              })
-              .map((card) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card 
-                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
-                  onClick={() => handleCardClick(card)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center mb-3">
-                      <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={card.author.avatar} />
-                        <AvatarFallback>{card.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{card.author.name}</span>
-                      <div className="ml-auto flex items-center gap-2">
-                                              <Badge variant="outline" className="text-xs">
-                        公告
-                      </Badge>
-                      {card.isTop && (
-                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                          <Pin size={10} className="mr-1" />
-                          置顶
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                  
-                  {/* 标签区域 - 只在有标签时显示 */}
-                  {(card.tags && card.tags.length > 0) || card.isHot ? (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {card.tags && card.tags.length > 3 && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          +{card.tags.length - 3}
-                        </Badge>
-                      )}
-                      {card.isHot && (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
-                          <Star size={12} className="mr-1" /> 精华
-                        </Badge>
-                      )}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                  
-                  <CardFooter className="p-4 pt-3 border-t">
-                    <div className="flex items-center text-muted-foreground text-xs space-x-4">
-                      <div className="flex items-center">
-                        <Calendar size={14} className="mr-1" />
-                        {formatDate(card.date)}
-                      </div>
-                      <div className="flex items-center">
-                        <Eye size={14} className="mr-1" />
-                        {formatNumber(card.views)}
-                      </div>
-                      <div className="flex items-center">
-                        <Star size={14} className="mr-1" />
-                        {formatNumber(card.likes)}
-                      </div>
-                      {card.type === 'resource' && card.downloads && (
-                        <div className="flex items-center">
-                          <Download size={14} className="mr-1" />
-                          {formatNumber(card.downloads)}
-                        </div>
-                      )}
-                    </div>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="resources" className="space-y-4">
-            {allContent.filter(item => item.type === 'resource')
-              .sort((a, b) => {
-                // 置顶的卡片排在前面
-                if (a.isTop && !b.isTop) return -1
-                if (!a.isTop && b.isTop) return 1
-                return 0
-              })
-              .map((card) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card 
-                  className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
-                  onClick={() => handleCardClick(card)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center mb-3">
-                      <Avatar className="h-6 w-6 mr-2">
-                        <AvatarImage src={card.author.avatar} />
-                        <AvatarFallback>{card.author.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm">{card.author.name}</span>
-                      <div className="ml-auto flex items-center gap-2">
-                        {card.category && (
-                          <Badge variant="secondary" className="text-xs">
-                            {card.category.name}
-                          </Badge>
-                        )}
-                      {card.isTop && (
-                        <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                          <Pin size={10} className="mr-1" />
-                          置顶
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-                  <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-                  
-                  {/* 标签区域 - 只在有标签时显示 */}
-                  {(card.tags && card.tags.length > 0) || card.isHot ? (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
-                        <Badge key={idx} variant="outline" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {card.tags && card.tags.length > 3 && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground">
-                          +{card.tags.length - 3}
-                        </Badge>
-                      )}
-                      {card.isHot && (
-                        <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
-                          <Star size={12} className="mr-1" /> 精华
-                        </Badge>
-                      )}
-                      </div>
-                    ) : null}
-                  </CardContent>
-                  
-                  <CardFooter className="p-4 pt-3 border-t">
-                    <div className="flex items-center text-muted-foreground text-xs space-x-4">
-                      <div className="flex items-center">
-                        <Calendar size={14} className="mr-1" />
-                        {formatDate(card.date)}
-                      </div>
-                      <div className="flex items-center">
-                        <Eye size={14} className="mr-1" />
-                        {formatNumber(card.views)}
-                      </div>
-                      <div className="flex items-center">
-                        <Star size={14} className="mr-1" />
-                        {formatNumber(card.likes)}
-                      </div>
-                      <div className="flex items-center">
-                        <Download size={14} className="mr-1" />
-                        {formatNumber(card.downloads || 0)}
-                      </div>
-                    </div>
-                  </CardFooter>
-                </Card>
-              </motion.div>
-            ))}
-          </TabsContent>
         </Tabs>
+        
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+          >
+            {renderTabContent(activeTab)}
+          </motion.div>
+        </AnimatePresence>
       </div>
       </div> {/* 结束内容区域 */}
     </div>
