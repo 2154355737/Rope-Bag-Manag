@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { 
   ArrowLeft, Share2, MoreHorizontal, Download, 
   Heart, MessageSquare, Eye, Star, CheckCircle, Shield, Hash,
-  FileText, ChevronDown, Loader2, Calendar, User, Tag
+  FileText, ChevronDown, Loader2, Calendar, User, Tag, X, ZoomIn
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -94,9 +94,15 @@ const UniversalDetailScreen: React.FC = () => {
   
   const [item, setItem] = useState<UniversalDetailItem | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<{ type: 'forbidden' | 'not-found' | 'general', message: string } | null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [hasMoreComments, setHasMoreComments] = useState(false)
   const [recommendedItems, setRecommendedItems] = useState<any[]>([])
+  
+  // 图片查看器状态
+  const [imageViewerOpen, setImageViewerOpen] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [imageList, setImageList] = useState<string[]>([])
   
   // 交互状态
   const [isLiked, setIsLiked] = useState(false)
@@ -305,13 +311,41 @@ const UniversalDetailScreen: React.FC = () => {
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
         setCommentTotal(cr.total || mapped.length)
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('加载详情失败:', error)
-        toast({
-          title: "加载失败",
-          description: "无法加载详情信息，请稍后重试",
-          variant: "destructive"
-        })
+        
+        // 根据错误类型设置不同的错误状态
+        if (error?.message?.includes('未审核通过') || error?.message?.includes('Forbidden')) {
+          setError({
+            type: 'forbidden',
+            message: '该内容正在审核中或未通过审核，暂时无法查看'
+          })
+          toast({
+            title: "访问受限",
+            description: "该内容正在审核中或未通过审核，暂时无法查看",
+            variant: "destructive"
+          })
+        } else if (error?.message?.includes('Not Found') || error?.status === 404) {
+          setError({
+            type: 'not-found',
+            message: '该内容可能已被删除或不存在'
+          })
+          toast({
+            title: "内容不存在",
+            description: "该内容可能已被删除或不存在",
+            variant: "destructive"
+          })
+        } else {
+          setError({
+            type: 'general',
+            message: '无法加载详情信息，请稍后重试'
+          })
+          toast({
+            title: "加载失败",
+            description: "无法加载详情信息，请稍后重试",
+            variant: "destructive"
+          })
+        }
       } finally {
         setLoading(false)
       }
@@ -418,6 +452,22 @@ const UniversalDetailScreen: React.FC = () => {
       }
     } finally {
       setTimeout(() => { setIsDownloading(false); setDownloadProgress(0) }, 800)
+    }
+  }
+
+  // 图片点击处理
+  const handleImageClick = (images: string[], index: number) => {
+    setImageList(images)
+    setCurrentImageIndex(index)
+    setImageViewerOpen(true)
+  }
+
+  // 图片查看器导航
+  const navigateImage = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') {
+      setCurrentImageIndex(prev => prev > 0 ? prev - 1 : imageList.length - 1)
+    } else {
+      setCurrentImageIndex(prev => prev < imageList.length - 1 ? prev + 1 : 0)
     }
   }
 
@@ -545,6 +595,52 @@ const UniversalDetailScreen: React.FC = () => {
             <p className="text-muted-foreground mb-4">作者信息格式不正确</p>
             <Button onClick={() => navigate(-1)}>返回上一页</Button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 错误状态显示
+  if (error) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background pb-16">
+        <TopNavigation
+          title="加载失败"
+          showBackButton
+        />
+        
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 text-center">
+              <div className="mb-4">
+                {error.type === 'forbidden' ? (
+                  <Shield className="h-16 w-16 text-amber-500 mx-auto" />
+                ) : error.type === 'not-found' ? (
+                  <FileText className="h-16 w-16 text-gray-400 mx-auto" />
+                ) : (
+                  <X className="h-16 w-16 text-red-500 mx-auto" />
+                )}
+              </div>
+              
+              <h3 className="text-lg font-semibold mb-2">
+                {error.type === 'forbidden' ? '访问受限' : 
+                 error.type === 'not-found' ? '内容不存在' : '加载失败'}
+              </h3>
+              
+              <p className="text-muted-foreground mb-4">{error.message}</p>
+              
+              <div className="flex gap-2 justify-center">
+                <Button variant="outline" onClick={() => navigate('/')}>
+                  返回首页
+                </Button>
+                {error.type === 'general' && (
+                  <Button onClick={() => window.location.reload()}>
+                    重新加载
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -682,7 +778,7 @@ const UniversalDetailScreen: React.FC = () => {
             </Card>
 
             {/* 内容详情渲染 */}
-            <ContentRenderer item={item} />
+            <ContentRenderer item={item} onImageClick={handleImageClick} />
 
             {/* 下载按钮（仅资源） */}
             {item.type === 'resource' && (
@@ -755,27 +851,199 @@ const UniversalDetailScreen: React.FC = () => {
           </div>
         </ScrollArea>
       </div>
+
+      {/* 图片查看器模态框 */}
+      {imageViewerOpen && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+          <div className="relative max-w-full max-h-full p-4">
+            {/* 关闭按钮 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white"
+              onClick={() => setImageViewerOpen(false)}
+            >
+              <X size={24} />
+            </Button>
+
+            {/* 图片计数 */}
+            {imageList.length > 1 && (
+              <div className="absolute top-4 left-4 z-10 bg-black/50 text-white px-3 py-1 rounded-md text-sm">
+                {currentImageIndex + 1} / {imageList.length}
+              </div>
+            )}
+
+            {/* 主图片 */}
+            <img
+              src={imageList[currentImageIndex]}
+              alt={`图片 ${currentImageIndex + 1}`}
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+
+            {/* 导航按钮 */}
+            {imageList.length > 1 && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                  onClick={() => navigateImage('prev')}
+                >
+                  <ArrowLeft size={24} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                  onClick={() => navigateImage('next')}
+                >
+                  <ArrowLeft size={24} className="rotate-180" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* 点击背景关闭 */}
+          <div 
+            className="absolute inset-0 -z-10" 
+            onClick={() => setImageViewerOpen(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
 // 内容渲染组件
-const ContentRenderer: React.FC<{ item: UniversalDetailItem }> = ({ item }) => {
+const ContentRenderer: React.FC<{ 
+  item: UniversalDetailItem
+  onImageClick?: (images: string[], index: number) => void 
+}> = ({ item, onImageClick }) => {
   const renderContent = (content: string) => {
+    // 检查是否是HTML内容
+    const isHtmlContent = content.includes('<') && content.includes('>')
+    
+    if (isHtmlContent) {
+      // 对于HTML内容，使用dangerouslySetInnerHTML但需要清理
+      const sanitizedHtml = content
+        .replace(/<script[^>]*>.*?<\/script>/gi, '') // 移除script标签
+        .replace(/javascript:/gi, '') // 移除javascript: 协议
+        .replace(/on\w+\s*=/gi, '') // 移除事件处理器
+      
+      return (
+        <div 
+          className="prose prose-sm max-w-none dark:prose-invert 
+                     prose-headings:text-foreground prose-p:text-foreground 
+                     prose-strong:text-foreground prose-em:text-foreground
+                     prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:rounded
+                     prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg
+                     prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground
+                     prose-a:text-primary hover:prose-a:text-primary/80
+                     prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      )
+    }
+
+    // 对于纯文本内容，解析简单的Markdown语法
     return content.split('\n').map((line, idx) => {
       const trimmedLine = line.trim()
-      if (!trimmedLine) return <div key={idx} className="h-2" />
+      if (!trimmedLine) return <div key={idx} className="h-3" />
       
-      // 检查是否是URL
+      // Markdown标题 (### ## #)
+      if (trimmedLine.startsWith('###')) {
+        return (
+          <h3 key={idx} className="text-lg font-semibold text-foreground mt-6 mb-3">
+            {trimmedLine.substring(3).trim()}
+          </h3>
+        )
+      }
+      if (trimmedLine.startsWith('##')) {
+        return (
+          <h2 key={idx} className="text-xl font-semibold text-foreground mt-6 mb-4">
+            {trimmedLine.substring(2).trim()}
+          </h2>
+        )
+      }
+      if (trimmedLine.startsWith('#')) {
+        return (
+          <h1 key={idx} className="text-2xl font-bold text-foreground mt-6 mb-4">
+            {trimmedLine.substring(1).trim()}
+          </h1>
+        )
+      }
+      
+      // Markdown代码块 (```)
+      if (trimmedLine.startsWith('```')) {
+        const language = trimmedLine.substring(3).trim()
+        return (
+          <div key={idx} className="my-4 p-4 bg-muted rounded-lg border">
+            {language && (
+              <div className="text-xs text-muted-foreground mb-2 font-mono">{language}</div>
+            )}
+            <code className="text-sm font-mono text-foreground block">
+              {/* 这里应该收集后续行直到遇到结束的``` */}
+              代码块开始...
+            </code>
+          </div>
+        )
+      }
+      
+      // Markdown引用 (>)
+      if (trimmedLine.startsWith('>')) {
+        return (
+          <blockquote key={idx} className="border-l-4 border-primary pl-4 my-3 text-muted-foreground italic">
+            {trimmedLine.substring(1).trim()}
+          </blockquote>
+        )
+      }
+      
+      // Markdown列表 (- 或 *)
+      if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+        return (
+          <div key={idx} className="flex items-start my-1">
+            <span className="text-primary mr-2">•</span>
+            <span className="text-sm text-foreground">
+              {renderInlineMarkdown(trimmedLine.substring(2).trim())}
+            </span>
+          </div>
+        )
+      }
+      
+      // Markdown数字列表 (1. 2. 等)
+      if (/^\d+\.\s/.test(trimmedLine)) {
+        const match = trimmedLine.match(/^(\d+)\.\s(.*)/)
+        if (match) {
+          return (
+            <div key={idx} className="flex items-start my-1">
+              <span className="text-primary mr-2 font-mono text-sm">{match[1]}.</span>
+              <span className="text-sm text-foreground">
+                {renderInlineMarkdown(match[2])}
+              </span>
+            </div>
+          )
+        }
+      }
+      
+      // 内联代码 (`code`)
+      if (trimmedLine.includes('`')) {
+        return (
+          <p key={idx} className="text-sm text-foreground leading-relaxed my-2">
+            {renderInlineMarkdown(trimmedLine)}
+          </p>
+        )
+      }
+      
+      // URL检测
       if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
         return (
           <div key={idx} className="my-3">
-            <span className="text-sm text-muted-foreground block mb-1">链接：</span>
             <a 
               href={trimmedLine} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-sm text-blue-500 hover:text-blue-600 underline url-break block"
+              className="text-sm text-primary hover:text-primary/80 underline break-all"
             >
               {trimmedLine}
             </a>
@@ -783,68 +1051,27 @@ const ContentRenderer: React.FC<{ item: UniversalDetailItem }> = ({ item }) => {
         )
       }
       
-      // 检查是否是代码路径
-      if (trimmedLine.includes('java') && (trimmedLine.includes('.') || trimmedLine.includes('/'))) {
-        return (
-          <div key={idx} className="my-3 p-3 bg-muted rounded-md">
-            <span className="text-sm font-mono text-overflow-protection break-all">
-              {trimmedLine}
-            </span>
-          </div>
-        )
-      }
-      
-      // 检查是否是特殊标记
-      if (trimmedLine.startsWith('★') || trimmedLine.startsWith('@')) {
-        return (
-          <div key={idx} className="my-2 p-2 bg-orange-50 border-l-4 border-orange-200 rounded-r">
-            <span className="text-sm font-medium text-orange-800 text-overflow-protection">
-              {trimmedLine}
-            </span>
-          </div>
-        )
-      }
-      
-      // 检查是否是方法标题
-      if (trimmedLine.startsWith('方法') || trimmedLine.includes('方法')) {
-        return (
-          <div key={idx} className="my-3">
-            <h4 className="text-base font-semibold text-primary text-overflow-protection">
-              {trimmedLine}
-            </h4>
-          </div>
-        )
-      }
-      
-      // 检查是否是代码示例
-      if (trimmedLine.toLowerCase().includes('code') || trimmedLine.includes('class') || trimmedLine.includes('()')) {
-        return (
-          <div key={idx} className="my-2 p-3 bg-slate-100 rounded border">
-            <code className="text-sm font-mono text-overflow-protection break-all">
-              {trimmedLine}
-            </code>
-          </div>
-        )
-      }
-      
-      // 检查是否是列表项
-      if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-')) {
-        return (
-          <div key={idx} className="ml-4 my-1">
-            <span className="text-sm text-overflow-protection">
-              {trimmedLine.substring(1).trim()}
-            </span>
-          </div>
-        )
-      }
-      
-      // 普通文本段落
+      // 普通段落
       return (
-        <p key={idx} className="text-sm long-text text-overflow-protection leading-relaxed">
-          {trimmedLine}
+        <p key={idx} className="text-sm text-foreground leading-relaxed my-2">
+          {renderInlineMarkdown(trimmedLine)}
         </p>
       )
     })
+  }
+
+  // 渲染内联Markdown语法
+  const renderInlineMarkdown = (text: string): React.ReactNode => {
+    // **粗体**
+    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // *斜体*
+    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>')
+    // `代码`
+    text = text.replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-sm font-mono">$1</code>')
+    // [链接](url)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary/80 underline">$1</a>')
+    
+    return <span dangerouslySetInnerHTML={{ __html: text }} />
   }
 
   switch (item.type) {
@@ -888,12 +1115,20 @@ const ContentRenderer: React.FC<{ item: UniversalDetailItem }> = ({ item }) => {
               <CardContent className="p-4 pt-0">
                 <div className="grid grid-cols-1 gap-3">
                   {item.images.map((image, idx) => (
-                    <img
-                      key={idx}
-                      src={image}
-                      alt={`图片 ${idx + 1}`}
-                      className="rounded-md w-full h-48 object-cover"
-                    />
+                    <div 
+                      key={idx} 
+                      className="relative group cursor-pointer"
+                      onClick={() => onImageClick?.(item.images!, idx)}
+                    >
+                      <img
+                        src={image}
+                        alt={`图片 ${idx + 1}`}
+                        className="rounded-md w-full h-48 object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
+                        <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </CardContent>
@@ -914,12 +1149,20 @@ const ContentRenderer: React.FC<{ item: UniversalDetailItem }> = ({ item }) => {
               {item.screenshots && item.screenshots.length > 0 ? (
                 <div className="grid grid-cols-1 gap-3">
                   {item.screenshots.map((screenshot, idx) => (
-                    <img
-                      key={idx}
-                      src={screenshot}
-                      alt={`Screenshot ${idx + 1}`}
-                      className="rounded-md w-full h-48 object-cover"
-                    />
+                    <div 
+                      key={idx} 
+                      className="relative group cursor-pointer"
+                      onClick={() => onImageClick?.(item.screenshots!, idx)}
+                    >
+                      <img
+                        src={screenshot}
+                        alt={`Screenshot ${idx + 1}`}
+                        className="rounded-md w-full h-48 object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
+                        <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                      </div>
+                    </div>
                   ))}
                 </div>
               ) : (

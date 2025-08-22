@@ -61,7 +61,11 @@ const HomeScreen: React.FC = () => {
   const [unread, setUnread] = useState(0)
   
   // 获取当前活跃的标签页
-  const activeTab = getActiveTab('home', 'posts')
+  const rawActiveTab = getActiveTab('home', 'posts')
+  // 确保activeTab总是有效的值
+  const activeTab = ['posts', 'announcements', 'resources'].includes(rawActiveTab) 
+    ? rawActiveTab 
+    : 'posts'
 
   // 为每个标签页维护独立的数据状态
   const [tabsData, setTabsData] = useState<Record<string, TabDataState>>({
@@ -90,6 +94,11 @@ const HomeScreen: React.FC = () => {
       lastUpdate: 0
     }
   })
+
+  // 调试日志 - 检查activeTab值
+  React.useEffect(() => {
+    console.log('HomeScreen activeTab:', { rawActiveTab, activeTab, availableTabs: Object.keys(tabsData) })
+  }, [rawActiveTab, activeTab])
 
   // 格式化日期显示
   const formatDate = (dateString: string) => {
@@ -145,10 +154,10 @@ const HomeScreen: React.FC = () => {
         name: item.author_name || (typeof item.author === 'string' ? item.author : item.author?.name) || '用户', 
         avatar: item.author_avatar || item.author?.avatar || '' 
       },
-      likes: item.stats?.likes || item.like_count || 0,
-      comments: item.stats?.comments || item.comment_count || 0,
-      views: item.stats?.views || item.view_count || 0,
-      downloads: item.stats?.downloads || item.download_count || 0,
+      likes: item.stats?.likes || item.like_count || item.likes || 0,
+      comments: item.stats?.comments || item.comment_count || item.comments || 0,
+      views: item.stats?.views || item.view_count || item.views || item.views_count || 0,
+      downloads: item.stats?.downloads || item.download_count || item.downloads || 0,
       date: item.created_at || item.publishedAt || item.publishDate,
       isTop: item.is_pinned || item.isPinned || false,
       isHot: item.is_featured || false,
@@ -159,6 +168,13 @@ const HomeScreen: React.FC = () => {
   // 加载指定标签页数据
   const loadTabData = async (tabType: string, refresh = false) => {
     const currentState = tabsData[tabType]
+    
+    // 验证tabType是否有效
+    if (!currentState) {
+      console.warn(`Cannot load data for invalid tab type: ${tabType}`)
+      return
+    }
+    
     const now = Date.now()
     
     // 如果数据较新且不是刷新操作，则跳过加载
@@ -235,11 +251,17 @@ const HomeScreen: React.FC = () => {
 
   // 标签页切换处理
   const handleTabChange = (newTab: string) => {
+    // 验证newTab是否为有效值
+    if (!['posts', 'announcements', 'resources'].includes(newTab)) {
+      console.warn(`Invalid tab type: ${newTab}, defaulting to 'posts'`)
+      newTab = 'posts'
+    }
+    
     setActiveTab('home', newTab)
     // 立即加载新标签页的数据
     loadTabData(newTab)
   }
-
+  
   // 分类数据
   const [categories, setCategories] = useState<(Category & { icon: any; color: string })[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
@@ -446,6 +468,12 @@ const HomeScreen: React.FC = () => {
   const renderTabContent = (tabType: string) => {
     const tabState = tabsData[tabType]
     
+    // 安全检查：如果tabState不存在，返回空状态
+    if (!tabState) {
+      console.warn(`Tab state for '${tabType}' is undefined. Available tabs:`, Object.keys(tabsData))
+      return renderEmptyState(tabType)
+    }
+    
     if (tabState.loading) {
       return renderLoadingState()
     }
@@ -587,7 +615,7 @@ const HomeScreen: React.FC = () => {
               <div className={`flex items-center justify-center w-14 h-14 rounded-full ${category.color} mb-2`}>
                 <category.icon size={24} className="text-foreground" />
               </div>
-              <span className="text-xs text-center">{category.name}</span>
+                                <span className="text-xs text-center">{category.name}</span>
             </motion.div>
           ))}
         </div>
@@ -604,7 +632,7 @@ const HomeScreen: React.FC = () => {
         </Tabs>
         
         <AnimatePresence mode="wait">
-          <motion.div
+              <motion.div
             key={activeTab}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -612,7 +640,7 @@ const HomeScreen: React.FC = () => {
             transition={{ duration: 0.2 }}
           >
             {renderTabContent(activeTab)}
-          </motion.div>
+              </motion.div>
         </AnimatePresence>
       </div>
       </div> {/* 结束内容区域 */}

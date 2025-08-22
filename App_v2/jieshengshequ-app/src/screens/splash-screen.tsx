@@ -29,7 +29,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onSkip }) => {
   }, [])
 
   return (
-    <div className="fullscreen-content bg-background">
+    <div className="fullscreen-content bg-background" onClick={onSkip}>
       <div className="content-area flex flex-col items-center justify-center text-foreground relative overflow-hidden">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}

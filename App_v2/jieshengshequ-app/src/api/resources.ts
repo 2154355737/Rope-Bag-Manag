@@ -49,4 +49,27 @@ export async function likeResource(id: number) {
 }
 export async function unlikeResource(id: number) {
 	return http.delete<{ like_count: number }>(`/resources/${id}/like`)
+}
+
+// 删除资源
+export async function deleteResource(id: number) {
+	return http.delete(`/resources/${id}`)
+}
+
+// 更新资源状态
+export async function updateResourceStatus(id: number, status: string) {
+	return http.put(`/resources/${id}/status`, { status })
+}
+
+// 更新资源内容
+export async function updateResource(id: number, data: {
+	title?: string
+	name?: string
+	description?: string
+	version?: string
+	category_id?: number
+	tags?: string[]
+	requirements?: string[]
+}) {
+	return http.put(`/resources/${id}`, data)
 } 

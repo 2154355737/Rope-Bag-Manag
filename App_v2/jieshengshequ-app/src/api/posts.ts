@@ -33,4 +33,23 @@ export async function getPostLikeStatus(id: number) {
 }
 export async function getPostBookmarkStatus(id: number) {
 	return http.get<{ favorited: boolean }>(`/posts/${id}/bookmark-status`)
+}
+
+// 删除帖子
+export async function deletePost(id: number) {
+	return http.delete(`/posts/${id}`)
+}
+
+// 更新帖子状态
+export async function updatePostStatus(id: number, status: string) {
+	return http.put(`/posts/${id}/status`, { status })
+}
+
+// 更新帖子内容
+export async function updatePost(id: number, data: {
+	title?: string
+	content?: string
+	tags?: string[]
+}) {
+	return http.put(`/posts/${id}`, data)
 } 

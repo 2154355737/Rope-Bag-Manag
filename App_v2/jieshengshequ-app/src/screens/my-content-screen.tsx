@@ -25,6 +25,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
 import { getMyResources, getMyPosts, getMyComments } from '@/api/user'
+import { deletePost, updatePostStatus } from '@/api/posts'
+import { deleteResource, updateResourceStatus } from '@/api/resources'
+import { deleteComment } from '@/api/comments'
 
 const MyContentScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -124,12 +127,17 @@ const MyContentScreen: React.FC = () => {
 
   // 处理编辑
   const handleEdit = (type: string, id: number) => {
-    toast({
-      title: "跳转编辑页面",
-      description: `正在编辑${type} ID: ${id}`
-    })
-    // 这里应该导航到对应的编辑页面
-    // navigate(`/edit-${type}/${id}`)
+    if (type === 'post') {
+      navigate(`/publish?type=post&id=${id}`)
+    } else if (type === 'resource') {
+      navigate(`/publish?type=resource&id=${id}`)
+    } else if (type === 'comment') {
+      toast({
+        title: "暂不支持",
+        description: "评论编辑功能正在开发中",
+        variant: "destructive"
+      })
+    }
   }
 
   // 处理删除
@@ -139,23 +147,67 @@ const MyContentScreen: React.FC = () => {
   }
 
   // 确认删除
-  const confirmDelete = () => {
-    if (deleteTarget) {
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    
+    try {
+      const { type, id, title } = deleteTarget
+      
+      if (type === 'post') {
+        await deletePost(id)
+        setMyPosts(prev => prev.filter(item => item.id !== id))
+      } else if (type === 'resource') {
+        await deleteResource(id)
+        setMyResources(prev => prev.filter(item => item.id !== id))
+      } else if (type === 'comment') {
+        await deleteComment(id)
+        setMyComments(prev => prev.filter(item => item.id !== id))
+      }
+      
       toast({
         title: "删除成功",
-        description: `${deleteTarget.title} 已被删除`
+        description: `${title} 已被删除`
       })
+    } catch (error) {
+      console.error('删除失败:', error)
+      toast({
+        title: "删除失败",
+        description: "操作失败，请稍后重试",
+        variant: "destructive"
+      })
+    } finally {
       setShowDeleteDialog(false)
       setDeleteTarget(null)
     }
   }
 
   // 处理状态变更
-  const handleStatusChange = (type: string, id: number, newStatus: string) => {
-    toast({
-      title: "状态已更新",
-      description: `内容状态已更改为: ${getStatusInfo(newStatus).text}`
-    })
+  const handleStatusChange = async (type: string, id: number, newStatus: string) => {
+    try {
+      if (type === 'post') {
+        await updatePostStatus(id, newStatus)
+        setMyPosts(prev => prev.map(item => 
+          item.id === id ? { ...item, status: newStatus } : item
+        ))
+      } else if (type === 'resource') {
+        await updateResourceStatus(id, newStatus)
+        setMyResources(prev => prev.map(item => 
+          item.id === id ? { ...item, status: newStatus } : item
+        ))
+      }
+      
+      toast({
+        title: "状态已更新",
+        description: `内容状态已更改为: ${getStatusInfo(newStatus).text}`
+      })
+    } catch (error) {
+      console.error('状态更新失败:', error)
+      toast({
+        title: "更新失败",
+        description: "状态更新失败，请稍后重试",
+        variant: "destructive"
+      })
+    }
   }
 
   // 处理批量操作
@@ -223,34 +275,37 @@ const MyContentScreen: React.FC = () => {
               <h3 className="font-medium text-sm line-clamp-2 flex-1 min-w-0 pr-2">{resource.name}</h3>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical size={12} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEdit('resource', resource.id)}>
-                    <Edit3 size={14} className="mr-2" />
-                    编辑
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(`/resource/${resource.id}`)}>
+                  {/* 只有草稿和已发布状态可以编辑 */}
+                  {(resource.status === 'draft' || resource.status === 'published' || resource.status === 'Active') && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit('resource', resource.id) }}>
+                      <Edit3 size={14} className="mr-2" />
+                      编辑
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/resource/${resource.id}`) }}>
                     <Eye size={14} className="mr-2" />
                     查看
                   </DropdownMenuItem>
                   {(resource.status === 'published' || resource.status === 'Active') && (
-                    <DropdownMenuItem onClick={() => handleStatusChange('resource', resource.id, 'draft')}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange('resource', resource.id, 'draft') }}>
                       <EyeOff size={14} className="mr-2" />
                       下架
                     </DropdownMenuItem>
                   )}
                   {resource.status === 'draft' && (
-                    <DropdownMenuItem onClick={() => handleStatusChange('resource', resource.id, 'reviewing')}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange('resource', resource.id, 'reviewing') }}>
                       <CheckCircle size={14} className="mr-2" />
                       提交审核
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem 
-                    onClick={() => handleDelete('resource', resource.id, resource.name)}
+                    onClick={(e) => { e.stopPropagation(); handleDelete('resource', resource.id, resource.name) }}
                     className="text-destructive"
                   >
                     <Trash2 size={14} className="mr-2" />
@@ -323,34 +378,37 @@ const MyContentScreen: React.FC = () => {
                   <h3 className="font-medium text-sm line-clamp-2 flex-1 min-w-0 break-words">{post.title}</h3>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <MoreVertical size={12} />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit('post', post.id)}>
-                        <Edit3 size={14} className="mr-2" />
-                        编辑
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => navigate(`/post/${post.id}`)}>
+                      {/* 只有草稿和已发布状态可以编辑 */}
+                      {(post.status === 'draft' || post.status === 'Draft' || post.status === 'published' || post.status === 'Published') && (
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit('post', post.id) }}>
+                          <Edit3 size={14} className="mr-2" />
+                          编辑
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`) }}>
                         <Eye size={14} className="mr-2" />
                         查看
                       </DropdownMenuItem>
                       {(post.status === 'published' || post.status === 'Published') && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('post', post.id, 'draft')}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange('post', post.id, 'draft') }}>
                           <EyeOff size={14} className="mr-2" />
                           下架
                         </DropdownMenuItem>
                       )}
                       {(post.status === 'draft' || post.status === 'Draft') && (
-                        <DropdownMenuItem onClick={() => handleStatusChange('post', post.id, 'reviewing')}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange('post', post.id, 'reviewing') }}>
                           <CheckCircle size={14} className="mr-2" />
                           提交审核
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
-                        onClick={() => handleDelete('post', post.id, post.title)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete('post', post.id, post.title) }}
                         className="text-destructive"
                       >
                         <Trash2 size={14} className="mr-2" />
@@ -378,7 +436,7 @@ const MyContentScreen: React.FC = () => {
                   <div className="flex items-center gap-2 shrink-0 text-xs">
                     <div className="flex items-center gap-1">
                       <Eye size={10} />
-                      <span>{post.view_count || 0}</span>
+                      <span>{post.view_count || post.views || post.views_count || 0}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Heart size={10} />
@@ -409,10 +467,21 @@ const MyContentScreen: React.FC = () => {
         className="cursor-pointer"
         onClick={() => {
           // 根据评论的目标类型跳转到对应页面
-          if (comment.target_type === 'post') {
-            navigate(`/post/${comment.target_id}`)
-          } else if (comment.target_type === 'resource') {
-            navigate(`/resource/${comment.target_id}`)
+          const targetId = comment.target_id || comment.post_id || comment.resource_id
+          const targetType = comment.target_type || comment.type || 
+                           (comment.post_id ? 'post' : comment.resource_id ? 'resource' : 'post')
+          
+          if (targetId) {
+            if (targetType === 'post' || targetType === 'Post') {
+              navigate(`/post/${targetId}`)
+            } else if (targetType === 'resource' || targetType === 'Resource') {
+              navigate(`/resource/${targetId}`)
+            } else {
+              // 默认按帖子处理
+              navigate(`/post/${targetId}`)
+            }
+          } else {
+            console.warn('评论数据缺少目标ID:', comment)
           }
         }}
       >
@@ -424,17 +493,17 @@ const MyContentScreen: React.FC = () => {
               </h4>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => e.stopPropagation()}>
                     <MoreVertical size={12} />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEdit('comment', comment.id)}>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit('comment', comment.id) }}>
                     <Edit3 size={14} className="mr-2" />
                     编辑
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    onClick={() => handleDelete('comment', comment.id, comment.content.slice(0, 20) + '...')}
+                    onClick={(e) => { e.stopPropagation(); handleDelete('comment', comment.id, comment.content.slice(0, 20) + '...') }}
                     className="text-destructive"
                   >
                     <Trash2 size={14} className="mr-2" />

@@ -134,7 +134,7 @@ const App: React.FC = () => {
     // 启动页显示时间（模拟加载时间）
     const splashTimer = setTimeout(() => {
       setShowSplash(false)
-    }, 3000)
+    }, 1500)
 
     return () => clearTimeout(splashTimer)
   }, [])

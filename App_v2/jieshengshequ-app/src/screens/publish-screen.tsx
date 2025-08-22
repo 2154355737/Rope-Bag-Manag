@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ArrowLeft, Send, FileText, Package, Upload, Hash, Folder, Tag, Code, Image, Bold, Italic, Link, Camera, X, Eye, Edit3, Info, Clock, CheckCircle, AlertCircle, Monitor, Smartphone, Globe, Settings, Star, List, Plus } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
@@ -14,13 +14,23 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import TopNavigation from '@/components/ui/top-navigation'
 import { getCategories, Category } from '@/api/categories'
+import { getPost, updatePost } from '@/api/posts'
+import { getResource, updateResource } from '@/api/resources'
 
 type PublishType = 'resource' | 'post'
 
 const PublishScreen: React.FC = () => {
   const navigate = useNavigate()
-  const [publishType, setPublishType] = useState<PublishType>('resource')
+  const [searchParams] = useSearchParams()
+  
+  // 编辑模式状态
+  const editId = searchParams.get('id')
+  const editType = searchParams.get('type') as PublishType || 'resource'
+  const isEditMode = !!editId
+  
+  const [publishType, setPublishType] = useState<PublishType>(editType)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isLoading, setIsLoading] = useState(isEditMode)
 
   // 通用字段
   const [title, setTitle] = useState('')
@@ -88,6 +98,129 @@ const PublishScreen: React.FC = () => {
     loadCategories()
   }, [])
 
+  // 加载编辑数据
+  useEffect(() => {
+    if (isEditMode && editId) {
+      loadEditData()
+    }
+  }, [isEditMode, editId, editType])
+
+  const loadEditData = async () => {
+    try {
+      setIsLoading(true)
+      
+      if (editType === 'post') {
+        const data = await getPost(parseInt(editId!))
+        
+        // 检查状态是否允许编辑
+        const status = data.status
+        if (status === 'reviewing' || status === 'under_review' || status === 'pending') {
+          toast.error('内容正在审核中，无法编辑')
+          navigate('/my-content')
+          return
+        }
+        
+        // 填充帖子数据
+        setTitle(data.title || '')
+        setContent(data.content || '')
+        setTags(data.tags || [])
+        
+        // 处理现有图片 - 转换URL为显示用的路径
+        if (data.images && data.images.length > 0) {
+          const existingImagePaths: Record<string, string> = {}
+          data.images.forEach((imageUrl, index) => {
+            const fileName = `existing_image_${index}.${imageUrl.split('.').pop() || 'jpg'}`
+            existingImagePaths[fileName] = imageUrl
+          })
+          setImagePaths(existingImagePaths)
+          
+          // 设置上传状态为成功
+          const existingImageStatus: Record<string, 'success'> = {}
+          Object.keys(existingImagePaths).forEach(fileName => {
+            existingImageStatus[fileName] = 'success'
+          })
+          setImageUploadStatus(existingImageStatus)
+        }
+      } else if (editType === 'resource') {
+        const data = await getResource(parseInt(editId!))
+        
+        // 检查状态是否允许编辑
+        const status = data.status
+        if (status === 'reviewing' || status === 'under_review' || status === 'pending') {
+          toast.error('内容正在审核中，无法编辑')
+          navigate('/my-content')
+          return
+        }
+        
+        // 填充资源数据
+        setTitle(data.name || data.title || '')
+        setContent(data.description || '')
+        setVersion(data.version || '')
+        setTags(data.tags || [])
+        setRequirements(data.requirements || [])
+        setCategory(data.category_id?.toString() || '')
+        
+        // 处理现有文件
+        if (data.files && data.files.length > 0) {
+          const existingFilePaths: Record<string, string> = {}
+          data.files.forEach((file: any, index: number) => {
+            const fileName = file.name || `existing_file_${index}`
+            existingFilePaths[fileName] = file.url || file.path || ''
+          })
+          setFilePaths(existingFilePaths)
+          
+          // 设置文件上传状态为成功
+          const existingFileStatus: Record<string, 'success'> = {}
+          Object.keys(existingFilePaths).forEach(fileName => {
+            existingFileStatus[fileName] = 'success'
+          })
+          setFileUploadStatus(existingFileStatus)
+        }
+        
+        // 处理现有截图
+        if (data.screenshots && data.screenshots.length > 0) {
+          const existingScreenshotPaths: Record<string, string> = {}
+          data.screenshots.forEach((screenshotUrl: string, index: number) => {
+            const fileName = `existing_screenshot_${index}.${screenshotUrl.split('.').pop() || 'jpg'}`
+            existingScreenshotPaths[fileName] = screenshotUrl
+          })
+          setScreenshotPaths(existingScreenshotPaths)
+          
+          // 设置截图上传状态为成功
+          const existingScreenshotStatus: Record<string, 'success'> = {}
+          Object.keys(existingScreenshotPaths).forEach(fileName => {
+            existingScreenshotStatus[fileName] = 'success'
+          })
+          setScreenshotUploadStatus(existingScreenshotStatus)
+        }
+      }
+      
+      toast.success('数据加载成功')
+    } catch (error) {
+      console.error('加载编辑数据失败:', error)
+      toast.error('加载数据失败，请稍后重试')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // 文件类型验证
+  const validateFileType = (file: File, allowedTypes: string[], maxSizeMB: number = 50): boolean => {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase()
+    if (!fileExtension || !allowedTypes.includes(fileExtension)) {
+      toast.error(`不支持的文件格式。允许的格式：${allowedTypes.join(', ')}`)
+      return false
+    }
+    
+    const maxSizeBytes = maxSizeMB * 1024 * 1024
+    if (file.size > maxSizeBytes) {
+      toast.error(`文件大小超过限制（最大 ${maxSizeMB}MB）`)
+      return false
+    }
+    
+    return true
+  }
+
   const handleAddTag = () => {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
       setTags([...tags, newTag.trim()])
@@ -102,21 +235,54 @@ const PublishScreen: React.FC = () => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = event.target.files
     if (uploadedFiles) {
-      setFiles([...files, ...Array.from(uploadedFiles)])
+      const validFiles: File[] = []
+      
+      Array.from(uploadedFiles).forEach(file => {
+        // 资源文件只允许 zip 格式
+        if (validateFileType(file, ['zip'], 100)) {
+          validFiles.push(file)
+        }
+      })
+      
+      if (validFiles.length > 0) {
+        setFiles([...files, ...validFiles])
+      }
     }
   }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedImages = event.target.files
     if (uploadedImages) {
-      setImages([...images, ...Array.from(uploadedImages)])
+      const validImages: File[] = []
+      
+      Array.from(uploadedImages).forEach(file => {
+        // 图片只允许常见格式
+        if (validateFileType(file, ['jpg', 'jpeg', 'png', 'gif', 'webp'], 10)) {
+          validImages.push(file)
+        }
+      })
+      
+      if (validImages.length > 0) {
+        setImages([...images, ...validImages])
+      }
     }
   }
 
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedScreenshots = event.target.files
     if (uploadedScreenshots) {
-      setScreenshots([...screenshots, ...Array.from(uploadedScreenshots)])
+      const validScreenshots: File[] = []
+      
+      Array.from(uploadedScreenshots).forEach(file => {
+        // 截图只允许图片格式
+        if (validateFileType(file, ['jpg', 'jpeg', 'png', 'gif', 'webp'], 5)) {
+          validScreenshots.push(file)
+        }
+      })
+      
+      if (validScreenshots.length > 0) {
+        setScreenshots([...screenshots, ...validScreenshots])
+      }
     }
   }
 
@@ -304,6 +470,49 @@ const PublishScreen: React.FC = () => {
   const handlePublish = async () => {
     if (!title.trim() || !content.trim()) {
       toast.error('请填写标题和内容')
+      return
+    }
+
+    // 编辑模式的处理
+    if (isEditMode && editId) {
+      setIsPublishing(true)
+      try {
+        if (editType === 'post') {
+          await updatePost(parseInt(editId), {
+            title: title.trim(),
+            content: content.trim(),
+            tags
+          })
+          toast.success('帖子更新成功')
+        } else if (editType === 'resource') {
+          if (!version.trim() || !category) {
+            toast.error('请填写版本信息和选择分类')
+            setIsPublishing(false)
+            return
+          }
+          await updateResource(parseInt(editId), {
+            title: title.trim(),
+            name: title.trim(),
+            description: content.trim(),
+            version: version.trim(),
+            category_id: parseInt(category),
+            tags,
+            requirements
+          })
+          toast.success('资源更新成功')
+        }
+        
+        // 延迟跳转回我的内容页
+        setTimeout(() => {
+          navigate('/my-content')
+        }, 2000)
+        
+      } catch (error: any) {
+        console.error('更新失败:', error)
+        toast.error(error.message || '更新失败，请重试')
+      } finally {
+        setIsPublishing(false)
+      }
       return
     }
     
@@ -496,24 +705,32 @@ const PublishScreen: React.FC = () => {
     <div className="min-h-screen bg-background">
       {/* 顶部导航栏 */}
       <TopNavigation
-        title="发布内容"
-        subtitle={publishType === 'resource' ? '分享资源' : '发布帖子'}
+        title={isEditMode ? "编辑内容" : "发布内容"}
+        subtitle={isEditMode 
+          ? (publishType === 'resource' ? '编辑资源' : '编辑帖子')
+          : (publishType === 'resource' ? '分享资源' : '发布帖子')
+        }
         showBackButton
         rightAction={
           <Button
             onClick={handlePublish}
-            disabled={!title || !content || isPublishing}
+            disabled={!title || !content || isPublishing || isLoading}
             className="px-6"
           >
-            {isPublishing ? (
+            {isLoading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                发布中...
+                加载中...
+              </>
+            ) : isPublishing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                {isEditMode ? '保存中...' : '发布中...'}
               </>
             ) : (
               <>
                 <Send size={16} className="mr-2" />
-                发布
+                {isEditMode ? '保存' : '发布'}
               </>
             )}
           </Button>
@@ -523,26 +740,40 @@ const PublishScreen: React.FC = () => {
       {/* 内容区域 - 为固定导航栏留出空间 */}
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         <div className="container max-w-2xl mx-auto p-4 space-y-6">
-        {/* 发布类型选择 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">发布类型</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={publishType} onValueChange={(value) => setPublishType(value as PublishType)}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="resource" className="flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  资源
-                </TabsTrigger>
-                <TabsTrigger value="post" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  帖子
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
+        
+        {/* 编辑模式加载状态 */}
+        {isLoading && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center py-8">
+                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3" />
+                <span>正在加载编辑数据...</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {/* 发布类型选择 - 编辑模式下不显示 */}
+        {!isEditMode && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">发布类型</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={publishType} onValueChange={(value) => setPublishType(value as PublishType)}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="resource" className="flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    资源
+                  </TabsTrigger>
+                  <TabsTrigger value="post" className="flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    帖子
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 温馨提示 */}
         <Alert>
@@ -734,10 +965,11 @@ const PublishScreen: React.FC = () => {
                     <div className="text-center">
                       <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground">点击上传资源文件</p>
-                      <p className="text-xs text-muted-foreground mt-1">支持所有文件格式，单文件不超过100MB</p>
+                      <p className="text-xs text-muted-foreground mt-1">仅支持ZIP格式，单文件不超过100MB</p>
                     </div>
                     <input
                       type="file"
+                      accept=".zip"
                       multiple
                       onChange={handleFileUpload}
                       className="hidden"
@@ -834,12 +1066,12 @@ const PublishScreen: React.FC = () => {
                     <div className="text-center">
                       <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground">添加预览截图</p>
-                      <p className="text-xs text-muted-foreground mt-1">JPG/PNG格式，建议尺寸16:9</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPG/PNG/GIF/WebP格式，建议尺寸16:9，单文件不超过5MB</p>
                     </div>
                     <input
                       type="file"
                       multiple
-                      accept="image/jpeg,image/png"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                       onChange={handleScreenshotUpload}
                       className="hidden"
                     />
@@ -1169,7 +1401,7 @@ const PublishScreen: React.FC = () => {
                     <input
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
                       onChange={handleImageUpload}
                       className="hidden"
                     />
@@ -1294,7 +1526,7 @@ const PublishScreen: React.FC = () => {
             </Button>
           </div>
         </div>
-      </div>
+        </div>
       </div> {/* 结束内容区域 */}
 
       {/* 底部安全区域 */}
