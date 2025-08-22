@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  ArrowLeft, Share2, MoreHorizontal, Download, 
+  ArrowLeft, Share2, MoreHorizontal, Download,
   Heart, MessageSquare, Eye, CheckCircle, Shield, Hash,
-  FileText, Loader2, Calendar, X, ZoomIn
+  FileText, Loader2, Calendar, X, ZoomIn, Settings
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -721,7 +721,7 @@ const UniversalDetailScreen: React.FC = () => {
       <div className="flex-1 pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         <ScrollArea className="h-full">
           <motion.div 
-            className="container max-w-2xl mx-auto p-4 space-y-4 pb-safe-bottom"
+            className="container max-w-2xl mx-auto px-4 py-3 space-y-3 pb-safe-bottom"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -1009,23 +1009,28 @@ const ContentRenderer: React.FC<{
           {/* 系统要求 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">系统要求</CardTitle>
+              <CardTitle className="text-base flex items-center">
+                <Settings className="h-4 w-4 mr-2" />
+                系统要求
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {item.requirements && item.requirements.length > 0 ? (
-                <ul className="space-y-2">
-                  {item.requirements.map((req, idx) => (
-                    <li key={idx} className="flex items-start text-sm">
-                      <CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span>{req}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <span className="text-sm">暂无系统要求</span>
-                </div>
-              )}
+            <CardContent>
+              <div className="space-y-3">
+                {item.requirements && item.requirements.length > 0 ? (
+                  <div className="space-y-2">
+                    {item.requirements.map((req, index) => (
+                      <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm">{req}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <span className="text-sm">暂无系统要求</span>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
