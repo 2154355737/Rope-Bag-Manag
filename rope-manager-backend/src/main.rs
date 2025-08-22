@@ -196,18 +196,42 @@ async fn main() -> std::io::Result<()> {
         }
     ));
     
-    // 初始化存储服务
+    // 初始化存储服务（改进版本）
     let storage_db_url = db_url.clone();
     tokio::spawn(async move {
+        log::info!("🚀 正在初始化存储服务...");
         match services::package_storage_service::PackageStorageService::new(&storage_db_url) {
             Ok(mut storage_service) => {
-                log::info!("🚀 正在初始化AList存储服务...");
+                log::info!("📡 开始连接远程存储系统...");
                 match storage_service.initialize_storage().await {
-                    Ok(_) => log::info!("✅ AList存储服务初始化成功"),
-                    Err(e) => log::warn!("⚠️  AList存储服务初始化失败，但服务将继续运行: {}", e),
+                    Ok(_) => {
+                        log::info!("✅ 存储服务初始化成功");
+                        
+                        // 启动定期健康检查
+                        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30 * 60)); // 30分钟检查一次
+                        loop {
+                            interval.tick().await;
+                            log::debug!("🔄 执行存储服务定期健康检查");
+                            if !storage_service.health_check().await {
+                                log::warn!("⚠️ 存储服务健康检查失败，尝试重新初始化");
+                                if let Err(e) = storage_service.initialize_storage().await {
+                                    log::error!("❌ 存储服务重新初始化失败: {}", e);
+                                } else {
+                                    log::info!("✅ 存储服务重新初始化成功");
+                                }
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        log::error!("❌ 存储服务初始化失败: {}", e);
+                        log::warn!("⚠️ 系统将继续运行，但文件上传功能可能不可用");
+                    }
                 }
+            },
+            Err(e) => {
+                log::error!("❌ 创建存储服务实例失败: {}", e);
+                log::warn!("⚠️ 系统将继续运行，但文件上传功能可能不可用");
             }
-            Err(e) => log::warn!("⚠️  创建AList存储服务失败: {}", e),
         }
     });
     
@@ -308,6 +332,11 @@ async fn main() -> std::io::Result<()> {
                     .allowed_origin("https://39.105.113.219")
                     // 安卓 WebView 资源源（Tauri Android）
                     .allowed_origin("https://appassets.androidplatform.net")
+                    // Capacitor Android 应用
+                    .allowed_origin("http://localhost")
+                    .allowed_origin("https://localhost")
+                    .allowed_origin("capacitor://localhost")
+                    .allowed_origin("ionic://localhost")
                     // 允许 Tauri WebView（tauri:// 协议）
                     .allowed_origin_fn(|origin, _req_head| {
                         let o = origin.as_bytes();

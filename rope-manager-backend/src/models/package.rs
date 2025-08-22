@@ -6,6 +6,7 @@ pub struct PackageFile {
     pub name: String,
     pub size: i64,
     pub file_type: String,
+    pub download_url: Option<String>,
 }
 
 // 自定义序列化函数：将Option<Vec<String>>中的None转换为空数组

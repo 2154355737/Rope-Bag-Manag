@@ -38,6 +38,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(list_files)
             .service(get_storage_stats)
             .service(cleanup_storage)
+            .service(verify_file)
     );
     // 上传预签名（对齐前端约定，复用现有 /storage/upload）
     cfg.service(presign_upload);
@@ -59,6 +60,18 @@ pub struct UploadResponse {
 #[derive(Deserialize)]
 pub struct FilePathRequest {
     pub file_path: String,
+}
+
+#[derive(Deserialize)]
+pub struct VerifyFileRequest {
+    pub file_path: String,
+}
+
+#[derive(Serialize)]
+pub struct VerifyFileResponse {
+    pub exists: bool,
+    pub file_size: Option<i64>,
+    pub download_url: Option<String>,
 }
 
 // 统一的“预签名”接口：前端拿到 uploadUrl 后，直接以 multipart/form-data 向该地址上传
@@ -83,10 +96,10 @@ async fn upload_file(
     _auth_user: AuthenticatedUser,
 ) -> Result<HttpResponse> {
     let db_path = "data.db"; // 从配置中获取
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
-            log::error!("创建存储服务失败: {}", e);
+            log::error!("获取存储服务实例失败: {}", e);
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
                 500, "存储服务初始化失败"
             )));
@@ -234,9 +247,22 @@ async fn upload_file(
                         if let Some(f) = included_files.iter_mut().find(|f| f.name == file_name) {
                             f.size = result.file_size;
                             f.file_type = file_type.clone();
+                            f.download_url = Some(result.download_url.clone());
                         } else {
-                            included_files.push(PackageFile { name: file_name.clone(), size: result.file_size, file_type: file_type.clone() });
+                            included_files.push(PackageFile { 
+                                name: file_name.clone(), 
+                                size: result.file_size, 
+                                file_type: file_type.clone(),
+                                download_url: Some(result.download_url.clone())
+                            });
                         }
+
+                        // 对于第一个上传的文件，或者当前没有主文件URL时，设置为主文件
+                        let file_url_value = if package.file_url.is_none() || included_files.len() == 1 {
+                            Some(result.download_url.clone())
+                        } else {
+                            package.file_url.clone()
+                        };
 
                         let update_req = crate::models::UpdatePackageRequest {
                             name: None,
@@ -244,7 +270,7 @@ async fn upload_file(
                             description: None,
                             category_id: None,
                             status: None,
-                            file_url: Some(result.download_url.clone()),
+                            file_url: file_url_value,
                             file_size: Some(result.file_size),
                             is_pinned: None,
                             is_featured: None,
@@ -316,7 +342,7 @@ async fn get_download_link(
     _auth_user: AuthenticatedUser,
 ) -> Result<HttpResponse> {
     let db_path = "data.db";
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
@@ -377,7 +403,7 @@ async fn delete_file(
     }
 
     let db_path = "data.db";
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
@@ -414,7 +440,7 @@ async fn list_files(
     }
 
     let db_path = "data.db";
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
@@ -453,7 +479,7 @@ async fn get_storage_stats(
     }
 
     let db_path = "data.db";
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
@@ -488,7 +514,7 @@ async fn cleanup_storage(
     }
 
     let db_path = "data.db";
-    let mut storage_service = match PackageStorageService::new(db_path) {
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
         Ok(service) => service,
         Err(e) => {
             return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
@@ -510,4 +536,164 @@ async fn cleanup_storage(
             )))
         }
     }
-} 
+}
+
+// 验证文件是否存在于存储系统中
+#[actix_web::post("/verify")]
+async fn verify_file(
+    req: web::Json<VerifyFileRequest>,
+    _auth_user: AuthenticatedUser,
+) -> Result<HttpResponse> {
+    let db_path = "data.db";
+    let mut storage_service = match PackageStorageService::get_instance(db_path).await {
+        Ok(service) => service,
+        Err(e) => {
+            log::error!("获取存储服务实例失败: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+                500, &format!("存储服务初始化失败: {}", e)
+            )));
+        }
+    };
+
+    // 验证文件是否存在
+    let file_path = &req.file_path;
+    log::info!("🔍 验证文件是否存在: {}", file_path);
+    
+    // 改进的重试机制，最多尝试5次，逐步增加间隔时间
+    let max_attempts = 5;
+    let mut attempt = 0;
+    
+    // 尝试标准化文件路径
+    let normalized_path = if file_path.starts_with("http://") || file_path.starts_with("https://") {
+        // 如果是完整URL，提取路径部分
+        if let Some(path_part) = file_path.split("/d").nth(1) {
+            path_part.to_string()
+        } else {
+            file_path.clone()
+        }
+    } else {
+        file_path.clone()
+    };
+    
+    log::info!("🔍 标准化后的文件路径: {}", normalized_path);
+    
+    while attempt < max_attempts {
+        attempt += 1;
+        
+        // 指数退避策略：1秒、2秒、4秒、8秒...
+        let wait_time = if attempt > 1 {
+            2u64.pow((attempt - 2) as u32)
+        } else {
+            1
+        };
+        
+        match storage_service.verify_file_exists(&normalized_path).await {
+            Ok(exists) => {
+                if exists {
+                    // 如果文件存在，获取文件信息和下载链接
+                    match storage_service.get_file_info(&normalized_path).await {
+                        Ok(file_size) => {
+                            // 获取下载链接
+                            let download_url = match storage_service.get_package_download_url(&normalized_path).await {
+                                Ok(url) => Some(url),
+                                Err(e) => {
+                                    log::warn!("获取文件下载链接失败: {}", e);
+                                    None
+                                }
+                            };
+                            
+                            let response = VerifyFileResponse {
+                                exists: true,
+                                file_size: Some(file_size),
+                                download_url,
+                            };
+                            
+                            log::info!("✅ 文件验证成功: {} ({}字节)", normalized_path, file_size);
+                            return Ok(HttpResponse::Ok().json(ApiResponse::success(response)));
+                        },
+                        Err(e) => {
+                            log::warn!("获取文件信息失败，但文件存在: {}", e);
+                            let response = VerifyFileResponse {
+                                exists: true,
+                                file_size: None,
+                                download_url: None,
+                            };
+                            return Ok(HttpResponse::Ok().json(ApiResponse::success(response)));
+                        }
+                    }
+                } else if attempt < max_attempts {
+                    // 文件不存在，但还有重试机会
+                    log::info!("⏳ 文件验证尝试 {}/{}: 文件暂不存在，等待{}秒后重试...", attempt, max_attempts, wait_time);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(wait_time)).await;
+                    continue;
+                } else {
+                    // 最后一次尝试仍不存在
+                    log::warn!("❌ 文件不存在 (尝试{}次后): {}", attempt, normalized_path);
+                    
+                    // 尝试回退策略：查找最近上传的同名文件
+                    let file_name = std::path::Path::new(&normalized_path)
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("");
+                        
+                    if !file_name.is_empty() {
+                        log::info!("🔍 尝试按文件名查找: {}", file_name);
+                        match storage_service.list_storage_file_paths().await {
+                            Ok(paths) => {
+                                // 查找包含相同文件名的路径
+                                if let Some(found_path) = paths.into_iter().filter(|p| p.ends_with(file_name)).last() {
+                                    log::info!("🔍 找到可能匹配的文件: {}", found_path);
+                                    match storage_service.get_file_info(&found_path).await {
+                                        Ok(file_size) => {
+                                            let download_url = match storage_service.get_package_download_url(&found_path).await {
+                                                Ok(url) => Some(url),
+                                                Err(_) => None,
+                                            };
+                                            
+                                            let response = VerifyFileResponse {
+                                                exists: true,
+                                                file_size: Some(file_size),
+                                                download_url,
+                                            };
+                                            
+                                            log::info!("✅ 通过文件名找到匹配文件: {} ({}字节)", found_path, file_size);
+                                            return Ok(HttpResponse::Ok().json(ApiResponse::success(response)));
+                                        },
+                                        Err(_) => {}
+                                    }
+                                }
+                            },
+                            Err(e) => log::error!("列出存储文件失败: {}", e),
+                        }
+                    }
+                    
+                    let response = VerifyFileResponse {
+                        exists: false,
+                        file_size: None,
+                        download_url: None,
+                    };
+                    return Ok(HttpResponse::Ok().json(ApiResponse::success(response)));
+                }
+            },
+            Err(e) => {
+                if attempt < max_attempts {
+                    // 验证失败，但还有重试机会
+                    log::warn!("⚠️ 文件验证尝试 {}/{} 失败: {}，等待{}秒后重试...", attempt, max_attempts, e, wait_time);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(wait_time)).await;
+                    continue;
+                } else {
+                    // 最后一次尝试仍失败
+                    log::error!("❌ 验证文件存在性失败 (尝试{}次后): {}", attempt, e);
+                    return Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+                        500, &format!("验证文件失败: {}", e)
+                    )));
+                }
+            }
+        }
+    }
+    
+    // 这里不应该被执行到，但为了编译器满意
+    Ok(HttpResponse::InternalServerError().json(ApiResponse::<()>::error(
+        500, "验证文件过程中发生未知错误"
+    )))
+}

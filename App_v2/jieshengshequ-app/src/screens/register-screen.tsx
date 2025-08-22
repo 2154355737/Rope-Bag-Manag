@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from '@/hooks/use-toast'
+import { register, RegisterRequest, sendRegisterCode } from '@/api/auth'
 
 const RegisterScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -26,9 +27,15 @@ const RegisterScreen: React.FC = () => {
     qq: '',
     password: '',
     confirmPassword: '',
+    verification_code: '',
     agreeTerms: false,
     agreePrivacy: false
   })
+  
+  // 验证码相关状态
+  const [codeSent, setCodeSent] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [sendingCode, setSendingCode] = useState(false)
   
   // 表单验证
   const validateForm = () => {
@@ -141,7 +148,81 @@ const RegisterScreen: React.FC = () => {
       return false
     }
     
+    // 验证码验证
+    if (!registerForm.verification_code.trim()) {
+      toast({
+        title: "验证失败",
+        description: "请输入邮箱验证码",
+        variant: "destructive"
+      })
+      return false
+    }
+    
+    if (registerForm.verification_code.length !== 6) {
+      toast({
+        title: "验证失败",
+        description: "请输入6位验证码",
+        variant: "destructive"
+      })
+      return false
+    }
+    
     return true
+  }
+  
+  // 发送验证码
+  const handleSendCode = async () => {
+    if (!registerForm.email.trim()) {
+      toast({
+        title: "请先输入邮箱",
+        description: "需要邮箱地址才能发送验证码",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(registerForm.email)) {
+      toast({
+        title: "邮箱格式错误",
+        description: "请输入正确的邮箱地址",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    setSendingCode(true)
+    try {
+      await sendRegisterCode(registerForm.email)
+      setCodeSent(true)
+      setCountdown(60)
+      
+      // 开始倒计时
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      
+      toast({
+        title: "验证码已发送",
+        description: "请查收邮箱中的验证码",
+        variant: "default"
+      })
+    } catch (error: any) {
+      console.error('发送验证码失败:', error)
+      toast({
+        title: "发送失败",
+        description: error.message || "验证码发送失败，请重试",
+        variant: "destructive"
+      })
+    } finally {
+      setSendingCode(false)
+    }
   }
   
   // 注册处理
@@ -151,19 +232,34 @@ const RegisterScreen: React.FC = () => {
     
     setIsLoading(true)
     try {
-      // 模拟注册API调用
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // 调用真实的注册API
+      const registerData: RegisterRequest = {
+        username: registerForm.username,
+        email: registerForm.email,
+        password: registerForm.password,
+        verification_code: registerForm.verification_code,
+        nickname: registerForm.username, // 默认昵称为用户名
+        qq_number: registerForm.qq || undefined
+      }
+      
+      const response = await register(registerData)
       
       setIsRegistered(true)
       toast({
         title: "注册成功",
-        description: "欢迎加入结绳社区！",
+        description: `欢迎加入结绳社区，${response.user.username}！`,
         variant: "default"
       })
-    } catch (error) {
+      
+      // 注册成功后，延迟跳转到首页
+      setTimeout(() => {
+        navigate('/')
+      }, 2000)
+    } catch (error: any) {
+      console.error('注册失败:', error)
       toast({
         title: "注册失败",
-        description: "用户名或邮箱已存在，请重试",
+        description: error.message || "用户名或邮箱已存在，请重试",
         variant: "destructive"
       })
     } finally {
@@ -265,6 +361,45 @@ const RegisterScreen: React.FC = () => {
                       disabled={isLoading}
                     />
                   </div>
+                </div>
+                
+                {/* 邮箱验证码 */}
+                <div className="space-y-2">
+                  <Label htmlFor="verification_code">邮箱验证码 *</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="verification_code"
+                        type="text"
+                        placeholder="请输入6位验证码"
+                        value={registerForm.verification_code}
+                        onChange={(e) => setRegisterForm(prev => ({ ...prev, verification_code: e.target.value }))}
+                        disabled={isLoading}
+                        maxLength={6}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleSendCode}
+                      disabled={sendingCode || countdown > 0 || isLoading}
+                      className="whitespace-nowrap"
+                    >
+                      {sendingCode 
+                        ? "发送中..." 
+                        : countdown > 0 
+                        ? `${countdown}s`
+                        : codeSent 
+                        ? "重新发送" 
+                        : "发送验证码"
+                      }
+                    </Button>
+                  </div>
+                  {codeSent && (
+                    <p className="text-sm text-muted-foreground">
+                      验证码已发送至您的邮箱，请查收
+                    </p>
+                  )}
                 </div>
                 
                 {/* QQ号（可选） */}

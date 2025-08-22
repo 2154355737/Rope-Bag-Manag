@@ -10,6 +10,9 @@ export interface RegisterRequest {
   username: string
   email: string
   password: string
+  verification_code: string
+  nickname?: string
+  qq_number?: string
 }
 
 export interface User {
@@ -38,6 +41,11 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   setToken(response.token)
   localStorage.setItem('user', JSON.stringify(response.user))
   return response
+}
+
+// 发送注册验证码
+export async function sendRegisterCode(email: string): Promise<void> {
+  return http.post<void>('/auth/send-register-code', { email })
 }
 
 // 注册

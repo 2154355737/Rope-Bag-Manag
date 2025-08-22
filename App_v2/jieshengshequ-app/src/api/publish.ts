@@ -1,5 +1,16 @@
 import { http } from './client'
 
+// 文件验证接口
+export interface VerifyFileRequest {
+  file_path: string
+}
+
+export interface VerifyFileResponse {
+  exists: boolean
+  file_size?: number
+  download_url?: string
+}
+
 // 发布数据类型定义
 export interface PublishFileInfo {
   name: string
@@ -69,3 +80,8 @@ export async function uploadPostImage(file: File, postId: number): Promise<{ fil
   formData.append('post_id', String(postId))
   return http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
 } 
+
+// 验证文件是否已成功上传到存储系统
+export async function verifyFile(filePath: string): Promise<VerifyFileResponse> {
+  return http.post<VerifyFileResponse>('/storage/verify', { file_path: filePath })
+}

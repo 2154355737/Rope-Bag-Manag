@@ -4,7 +4,7 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
 
 // 根据环境配置API基础URL
 const API_BASE = import.meta.env.PROD 
-  ? 'http://127.0.0.1:15201/api/v1'  // 生产环境直接连接后端
+  ? 'http://39.105.113.219:15201/api/v1'  // 生产环境连接到云服务器
   : '/api/v1'  // 开发环境使用代理
 
 function buildQuery(params?: Record<string, any>): string {

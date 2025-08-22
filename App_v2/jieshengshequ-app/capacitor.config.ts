@@ -5,11 +5,12 @@ const config: CapacitorConfig = {
   appName: '结绳社区',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'http'
   },
   android: {
     allowMixedContent: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: true,
+    appendUserAgent: 'CapacitorApp'
   },
   plugins: {
     Keyboard: {

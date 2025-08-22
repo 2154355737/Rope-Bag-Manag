@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from '@/hooks/use-toast'
-import { login, register, LoginRequest, RegisterRequest } from '@/api/auth'
+import { login, register, sendRegisterCode, LoginRequest, RegisterRequest } from '@/api/auth'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 
@@ -29,8 +29,14 @@ const LoginScreen: React.FC = () => {
     username: '',
     email: '',
     password: '',
+    verification_code: '',
     confirmPassword: ''
   })
+  
+  // 验证码相关状态
+  const [codeSent, setCodeSent] = useState(false)
+  const [countdown, setCountdown] = useState(0)
+  const [sendingCode, setSendingCode] = useState(false)
 
   // 处理登录
   const handleLogin = async (e: React.FormEvent) => {
@@ -71,11 +77,66 @@ const LoginScreen: React.FC = () => {
     }
   }
 
+  // 发送验证码
+  const handleSendCode = async () => {
+    if (!registerForm.email.trim()) {
+      toast({
+        title: "请先输入邮箱",
+        description: "需要邮箱地址才能发送验证码",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(registerForm.email)) {
+      toast({
+        title: "邮箱格式错误",
+        description: "请输入正确的邮箱地址",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    setSendingCode(true)
+    try {
+      await sendRegisterCode(registerForm.email)
+      setCodeSent(true)
+      setCountdown(60)
+      
+      // 开始倒计时
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+      
+      toast({
+        title: "验证码已发送",
+        description: "请查收邮箱中的验证码",
+        variant: "default"
+      })
+    } catch (error: any) {
+      console.error('发送验证码失败:', error)
+      toast({
+        title: "发送失败",
+        description: error.message || "验证码发送失败，请重试",
+        variant: "destructive"
+      })
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
   // 处理注册
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!registerForm.username || !registerForm.email || !registerForm.password) {
+    if (!registerForm.username || !registerForm.email || !registerForm.password || !registerForm.verification_code) {
       toast({
         title: "请填写完整信息",
         description: "所有字段都不能为空",
@@ -292,6 +353,41 @@ const LoginScreen: React.FC = () => {
                         disabled={isLoading}
                       >
                         {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="register-verification-code">邮箱验证码</Label>
+                    <div className="flex space-x-2">
+                      <Input
+                        id="register-verification-code"
+                        type="text"
+                        placeholder="请输入邮箱验证码"
+                        className="flex-1"
+                        value={registerForm.verification_code}
+                        onChange={(e) => setRegisterForm(prev => ({ ...prev, verification_code: e.target.value }))}
+                        disabled={isLoading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="whitespace-nowrap"
+                        onClick={handleSendCode}
+                        disabled={sendingCode || countdown > 0 || !registerForm.email}
+                      >
+                        {sendingCode ? (
+                          <>
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                            发送中
+                          </>
+                        ) : countdown > 0 ? (
+                          `${countdown}秒后重发`
+                        ) : codeSent ? (
+                          '重新发送'
+                        ) : (
+                          '发送验证码'
+                        )}
                       </Button>
                     </div>
                   </div>

@@ -32,14 +32,26 @@ const PublishScreen: React.FC = () => {
   const [version, setVersion] = useState('')
   const [category, setCategory] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [fileUploadStatus, setFileUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'verifying' | 'success' | 'failed'>>({})
+  const [fileVerificationAttempts, setFileVerificationAttempts] = useState<Record<string, number>>({})
+  const [filePaths, setFilePaths] = useState<Record<string, string>>({})
   const [screenshots, setScreenshots] = useState<File[]>([])
+  const [screenshotUploadStatus, setScreenshotUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'verifying' | 'success' | 'failed'>>({})
+  const [screenshotVerificationAttempts, setScreenshotVerificationAttempts] = useState<Record<string, number>>({})
+  const [screenshotPaths, setScreenshotPaths] = useState<Record<string, string>>({})
   const [requirements, setRequirements] = useState<string[]>([])
   const [newRequirement, setNewRequirement] = useState('')
 
   // 帖子专用字段  
   const [images, setImages] = useState<File[]>([])
+  const [imageUploadStatus, setImageUploadStatus] = useState<Record<string, 'pending' | 'uploading' | 'verifying' | 'success' | 'failed'>>({})
+  const [imageVerificationAttempts, setImageVerificationAttempts] = useState<Record<string, number>>({})
+  const [imagePaths, setImagePaths] = useState<Record<string, string>>({})
   const [codeSnippet, setCodeSnippet] = useState('')
   const [showCodeEditor, setShowCodeEditor] = useState(false)
+  
+  // 最大验证尝试次数
+  const MAX_VERIFICATION_ATTEMPTS = 2
   
   // 富文本编辑器状态
   const [showPreview, setShowPreview] = useState(false)
@@ -186,10 +198,125 @@ const PublishScreen: React.FC = () => {
       .replace(/\n/g, '<br>')
   }
 
+  // 处理文件验证重试
+  const handleRetryVerification = async (fileName: string, fileType: 'file' | 'screenshot' | 'image' = 'file') => {
+    const { verifyFile } = await import('@/api/publish')
+    
+    // 获取对应的文件路径
+    let filePath = ''
+    
+    if (fileType === 'file') {
+      // 从存储的文件路径中获取
+      filePath = filePaths[fileName] || ''
+      setFileUploadStatus(prev => ({ ...prev, [fileName]: 'verifying' }))
+      
+      // 增加验证尝试次数
+      const currentAttempts = fileVerificationAttempts[fileName] || 0
+      setFileVerificationAttempts(prev => ({ ...prev, [fileName]: currentAttempts + 1 }))
+      
+      // 如果超过最大尝试次数，提示用户重新上传
+      if (currentAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+        toast.error(`文件 ${fileName} 验证失败次数过多，请删除后重新上传`, {
+          duration: 5000,
+        })
+        setFileUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        return
+      }
+    } else if (fileType === 'screenshot') {
+      // 从存储的截图路径中获取
+      filePath = screenshotPaths[fileName] || ''
+      setScreenshotUploadStatus(prev => ({ ...prev, [fileName]: 'verifying' }))
+      
+      const currentAttempts = screenshotVerificationAttempts[fileName] || 0
+      setScreenshotVerificationAttempts(prev => ({ ...prev, [fileName]: currentAttempts + 1 }))
+      
+      if (currentAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+        toast.error(`截图 ${fileName} 验证失败次数过多，请删除后重新上传`, {
+          duration: 5000,
+        })
+        setScreenshotUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        return
+      }
+    } else if (fileType === 'image') {
+      // 从存储的图片路径中获取
+      filePath = imagePaths[fileName] || ''
+      setImageUploadStatus(prev => ({ ...prev, [fileName]: 'verifying' }))
+      
+      const currentAttempts = imageVerificationAttempts[fileName] || 0
+      setImageVerificationAttempts(prev => ({ ...prev, [fileName]: currentAttempts + 1 }))
+      
+      if (currentAttempts >= MAX_VERIFICATION_ATTEMPTS) {
+        toast.error(`图片 ${fileName} 验证失败次数过多，请删除后重新上传`, {
+          duration: 5000,
+        })
+        setImageUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        return
+      }
+    }
+    
+    // 检查是否有文件路径
+    if (!filePath) {
+      toast.error(`无法获取 ${fileName} 的文件路径，请删除后重新上传`)
+      return
+    }
+    
+    try {
+      // 验证文件是否成功上传到存储系统
+      const verifyResult = await verifyFile(filePath)
+      
+      if (!verifyResult.exists) {
+        console.warn(`文件 ${fileName} 重新验证失败，文件可能未成功保存`)
+        toast.warning(`文件 ${fileName} 验证失败，请检查网络连接`)
+        
+        if (fileType === 'file') {
+          setFileUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        } else if (fileType === 'screenshot') {
+          setScreenshotUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        } else {
+          setImageUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+        }
+      } else {
+        console.log(`文件 ${fileName} 重新验证成功`)
+        toast.success(`文件 ${fileName} 验证成功`)
+        
+        if (fileType === 'file') {
+          setFileUploadStatus(prev => ({ ...prev, [fileName]: 'success' }))
+        } else if (fileType === 'screenshot') {
+          setScreenshotUploadStatus(prev => ({ ...prev, [fileName]: 'success' }))
+        } else {
+          setImageUploadStatus(prev => ({ ...prev, [fileName]: 'success' }))
+        }
+      }
+    } catch (error) {
+      console.error(`文件 ${fileName} 验证出错:`, error)
+      toast.error(`文件 ${fileName} 验证出错，请重试`)
+      
+      if (fileType === 'file') {
+        setFileUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+      } else if (fileType === 'screenshot') {
+        setScreenshotUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+      } else {
+        setImageUploadStatus(prev => ({ ...prev, [fileName]: 'failed' }))
+      }
+    }
+  }
+
   const handlePublish = async () => {
     if (!title.trim() || !content.trim()) {
       toast.error('请填写标题和内容')
       return
+    }
+    
+    // 检查是否有验证失败的文件
+    const hasFailedFiles = Object.values(fileUploadStatus).some(status => status === 'failed')
+    const hasFailedScreenshots = Object.values(screenshotUploadStatus).some(status => status === 'failed')
+    const hasFailedImages = Object.values(imageUploadStatus).some(status => status === 'failed')
+    
+    if (hasFailedFiles || hasFailedScreenshots || hasFailedImages) {
+      const confirmPublish = window.confirm('有文件验证失败，继续发布可能导致文件无法访问。是否仍要继续？')
+      if (!confirmPublish) {
+        return
+      }
     }
     
     if (isPublishing) return // 防止重复提交
@@ -220,26 +347,70 @@ const PublishScreen: React.FC = () => {
           screenshots: screenshots.map(s => ({ name: s.name, size: s.size }))
         })
         
-        // 如果有文件，逐个上传
+        // 如果有文件，逐个上传并验证
         if (files.length > 0) {
-          const { uploadResourceFile } = await import('@/api/publish')
+          const { uploadResourceFile, verifyFile } = await import('@/api/publish')
           for (const file of files) {
             try {
-              await uploadResourceFile(response.id, file)
+              // 更新上传状态为上传中
+              setFileUploadStatus(prev => ({ ...prev, [file.name]: 'uploading' }))
+              
+              const uploadResult = await uploadResourceFile(response.id, file)
+              
+              // 保存文件路径用于后续验证
+              setFilePaths(prev => ({ ...prev, [file.name]: uploadResult.file_path }))
+              
+              // 更新上传状态为验证中
+              setFileUploadStatus(prev => ({ ...prev, [file.name]: 'verifying' }))
+              
+              // 验证文件是否成功上传到存储系统
+              const verifyResult = await verifyFile(uploadResult.file_path)
+              if (!verifyResult.exists) {
+                console.warn(`文件 ${file.name} 上传验证失败，文件可能未成功保存`)
+                toast.warning(`文件 ${file.name} 上传可能不完整，请在发布后检查`)
+                setFileUploadStatus(prev => ({ ...prev, [file.name]: 'failed' }))
+              } else {
+                console.log(`文件 ${file.name} 上传验证成功`)
+                setFileUploadStatus(prev => ({ ...prev, [file.name]: 'success' }))
+              }
             } catch (error) {
               console.warn(`文件 ${file.name} 上传失败:`, error)
+              toast.error(`文件 ${file.name} 上传失败，请重试`)
+              setFileUploadStatus(prev => ({ ...prev, [file.name]: 'failed' }))
             }
           }
         }
         
-        // 如果有截图，上传截图
+        // 如果有截图，上传截图并验证
         if (screenshots.length > 0) {
-          const { uploadImage } = await import('@/api/publish')
+          const { uploadImage, verifyFile } = await import('@/api/publish')
           for (const screenshot of screenshots) {
             try {
-              await uploadImage(screenshot, response.id)
+              // 更新上传状态为上传中
+              setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'uploading' }))
+              
+              const uploadResult = await uploadImage(screenshot, response.id)
+              
+              // 保存截图路径用于后续验证
+              setScreenshotPaths(prev => ({ ...prev, [screenshot.name]: uploadResult.file_path }))
+              
+              // 更新上传状态为验证中
+              setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'verifying' }))
+              
+              // 验证截图是否成功上传到存储系统
+              const verifyResult = await verifyFile(uploadResult.file_path)
+              if (!verifyResult.exists) {
+                console.warn(`截图 ${screenshot.name} 上传验证失败，文件可能未成功保存`)
+                setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'failed' }))
+                toast.warning(`截图 ${screenshot.name} 上传可能不完整`)
+              } else {
+                console.log(`截图 ${screenshot.name} 上传验证成功`)
+                setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'success' }))
+              }
             } catch (error) {
               console.warn(`截图 ${screenshot.name} 上传失败:`, error)
+              setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'failed' }))
+              toast.error(`截图 ${screenshot.name} 上传失败`)
             }
           }
         }
@@ -254,14 +425,36 @@ const PublishScreen: React.FC = () => {
           code_snippet: codeSnippet
         })
         
-        // 如果有图片，上传图片
+        // 如果有图片，上传图片并验证
         if (images.length > 0) {
-          const { uploadPostImage } = await import('@/api/publish')
+          const { uploadPostImage, verifyFile } = await import('@/api/publish')
           for (const image of images) {
             try {
-              await uploadPostImage(image, response.id)
+              // 更新上传状态为上传中
+              setImageUploadStatus(prev => ({ ...prev, [image.name]: 'uploading' }))
+              
+              const uploadResult = await uploadPostImage(image, response.id)
+              
+              // 保存图片路径用于后续验证
+              setImagePaths(prev => ({ ...prev, [image.name]: uploadResult.file_path }))
+              
+              // 更新上传状态为验证中
+              setImageUploadStatus(prev => ({ ...prev, [image.name]: 'verifying' }))
+              
+              // 验证图片是否成功上传到存储系统
+              const verifyResult = await verifyFile(uploadResult.file_path)
+              if (!verifyResult.exists) {
+                console.warn(`图片 ${image.name} 上传验证失败，文件可能未成功保存`)
+                setImageUploadStatus(prev => ({ ...prev, [image.name]: 'failed' }))
+                toast.warning(`图片 ${image.name} 上传可能不完整`)
+              } else {
+                console.log(`图片 ${image.name} 上传验证成功`)
+                setImageUploadStatus(prev => ({ ...prev, [image.name]: 'success' }))
+              }
             } catch (error) {
               console.warn(`图片 ${image.name} 上传失败:`, error)
+              setImageUploadStatus(prev => ({ ...prev, [image.name]: 'failed' }))
+              toast.error(`图片 ${image.name} 上传失败`)
             }
           }
         }
@@ -478,24 +671,63 @@ const PublishScreen: React.FC = () => {
                 <div className="space-y-3">
                   {files.length > 0 && (
                     <div className="space-y-2">
-                      {files.map((file, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">{file.name}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                            </span>
+                      {files.map((file, index) => {
+                        const status = fileUploadStatus[file.name] || 'pending';
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{file.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                              </span>
+                              {status === 'uploading' && (
+                                <div className="flex items-center">
+                                  <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin mr-1"></div>
+                                  <span className="text-xs text-primary">上传中...</span>
+                                </div>
+                              )}
+                              {status === 'verifying' && (
+                                <div className="flex items-center">
+                                  <div className="w-3 h-3 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mr-1"></div>
+                                  <span className="text-xs text-amber-500">验证中...</span>
+                                </div>
+                              )}
+                              {status === 'success' && (
+                                <div className="flex items-center">
+                                  <CheckCircle className="w-3 h-3 text-green-500 mr-1" />
+                                  <span className="text-xs text-green-500">已上传</span>
+                                </div>
+                              )}
+                              {status === 'failed' && (
+                              <div className="flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-red-500 mr-1" />
+                                <span className="text-xs text-red-500">上传失败</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-5 px-1 text-xs text-red-500 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRetryVerification(file.name);
+                                  }}
+                                >
+                                  重试
+                                </Button>
+                              </div>
+                              )}
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveFile(index)}
+                              disabled={status === 'uploading' || status === 'verifying'}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveFile(index)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                   <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
@@ -538,23 +770,64 @@ const PublishScreen: React.FC = () => {
                 <div className="space-y-3">
                   {screenshots.length > 0 && (
                     <div className="grid grid-cols-2 gap-3">
-                      {screenshots.map((screenshot, index) => (
-                        <div key={index} className="relative">
-                          <img
-                            src={URL.createObjectURL(screenshot)}
-                            alt={`Screenshot ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border"
-                          />
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-1 right-1 h-6 w-6 p-0"
-                            onClick={() => removeScreenshot(index)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
+                      {screenshots.map((screenshot, index) => {
+                        const status = screenshotUploadStatus[screenshot.name] || 'pending';
+                        return (
+                          <div key={index} className="relative">
+                            <img
+                              src={URL.createObjectURL(screenshot)}
+                              alt={`Screenshot ${index + 1}`}
+                              className={`w-full h-32 object-cover rounded-lg border ${status === 'failed' ? 'border-red-500' : ''}`}
+                            />
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 w-6 p-0"
+                              onClick={() => removeScreenshot(index)}
+                              disabled={status === 'uploading' || status === 'verifying'}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            
+                            {/* 上传状态指示器 */}
+                            {status === 'uploading' && (
+                              <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs p-1 rounded flex items-center justify-center">
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                                上传中...
+                              </div>
+                            )}
+                            {status === 'verifying' && (
+                              <div className="absolute bottom-1 left-1 right-1 bg-amber-500/70 text-white text-xs p-1 rounded flex items-center justify-center">
+                                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                                验证中...
+                              </div>
+                            )}
+                            {status === 'success' && (
+                              <div className="absolute bottom-1 left-1 right-1 bg-green-500/70 text-white text-xs p-1 rounded flex items-center justify-center">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                已上传
+                              </div>
+                            )}
+                            {status === 'failed' && (
+                              <div className="absolute bottom-1 left-1 right-1 bg-red-500/70 text-white text-xs p-1 rounded flex items-center justify-center gap-1">
+                                <AlertCircle className="w-3 h-3 mr-1" />
+                                上传失败
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="h-5 px-1 text-xs text-white hover:text-white/80"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRetryVerification(screenshot.name, 'screenshot');
+                                  }}
+                                >
+                                  重试
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
@@ -832,23 +1105,64 @@ const PublishScreen: React.FC = () => {
               </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-2 mb-4">
-                {images.map((image, index) => (
-                  <div key={index} className="relative aspect-square bg-muted rounded-lg overflow-hidden">
-                    <img
-                      src={URL.createObjectURL(image)}
-                      alt={`上传图片 ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-1 right-1 h-6 w-6 p-0 bg-black/50 hover:bg-black/70"
-                      onClick={() => handleRemoveImage(index)}
-                    >
-                      <X className="h-3 w-3 text-white" />
-                    </Button>
-                  </div>
-                ))}
+                {images.map((image, index) => {
+                  const status = imageUploadStatus[image.name] || 'pending';
+                  return (
+                    <div key={index} className="relative aspect-square bg-muted rounded-lg overflow-hidden">
+                      <img
+                        src={URL.createObjectURL(image)}
+                        alt={`上传图片 ${index + 1}`}
+                        className={`w-full h-full object-cover ${status === 'failed' ? 'opacity-70' : ''}`}
+                      />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-1 right-1 h-6 w-6 p-0 bg-black/50 hover:bg-black/70"
+                        onClick={() => handleRemoveImage(index)}
+                        disabled={status === 'uploading' || status === 'verifying'}
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </Button>
+                      
+                      {/* 上传状态指示器 */}
+                      {status === 'uploading' && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs p-1 flex items-center justify-center">
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                          上传中...
+                        </div>
+                      )}
+                      {status === 'verifying' && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-amber-500/70 text-white text-xs p-1 flex items-center justify-center">
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                          验证中...
+                        </div>
+                      )}
+                      {status === 'success' && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-green-500/70 text-white text-xs p-1 flex items-center justify-center">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          已上传
+                        </div>
+                      )}
+                      {status === 'failed' && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-red-500/70 text-white text-xs p-1 flex items-center justify-center gap-1">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          上传失败
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-5 px-1 text-xs text-white hover:text-white/80"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRetryVerification(image.name, 'image');
+                            }}
+                          >
+                            重试
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {images.length < 9 && (
                   <label className="aspect-square border-2 border-dashed border-muted-foreground/25 rounded-lg flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors">
                     <Camera className="h-6 w-6 text-muted-foreground" />
