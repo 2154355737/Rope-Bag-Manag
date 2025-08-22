@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
@@ -23,6 +23,7 @@ import InteractionButtons, {
 import { getPostRecommendations } from '@/utils/recommendations'
 import { getPost, toggleLikePost, reportPost, getPostLikeStatus } from '../api/posts'
 import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment, getCommentReplies as apiGetCommentReplies, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '../api/comments'
+import { getLocalUser } from '../api/auth'
 
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -132,6 +133,8 @@ const PostDetailScreen: React.FC = () => {
         
         // 加载第一页评论
         const cr = await apiGetComments('post', p.id, 1, 10, true)
+        const me = getLocalUser()
+        const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
         const mapped = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
@@ -139,8 +142,8 @@ const PostDetailScreen: React.FC = () => {
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
-          canEdit: true,
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+          canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id),
         }))
         setAllComments(mapped)
         setCommentTotal(cr.total || mapped.length)
@@ -158,6 +161,7 @@ const PostDetailScreen: React.FC = () => {
     
     try {
       const cr = await apiGetComments('post', post.id, page, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
@@ -165,8 +169,8 @@ const PostDetailScreen: React.FC = () => {
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
-        canEdit: true,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id),
       }))
       
       setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
@@ -228,8 +232,6 @@ const PostDetailScreen: React.FC = () => {
   const handleReportComment = (commentId: number) => {
     console.log('举报评论:', commentId)
   }
-
-  const editableComments = useMemo(() => allComments.map(c => ({ ...c, canEdit: true })), [allComments])
 
   // 格式化数字
   const formatNumber = (num: number) => {
@@ -444,7 +446,7 @@ const PostDetailScreen: React.FC = () => {
 
           {/* 评论区 */}
           <CommentSection
-            comments={editableComments}
+            comments={allComments}
             totalCount={commentTotal}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}

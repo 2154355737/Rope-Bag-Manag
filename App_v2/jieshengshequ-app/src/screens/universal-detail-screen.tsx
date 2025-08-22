@@ -30,6 +30,7 @@ import { getPost, toggleLikePost, reportPost, getPostLikeStatus } from '../api/p
 import { getResource, downloadResource, toggleLikeResource, getResourceLikeStatus, reportResource } from '../api/resources'
 import { getAnnouncement } from '../api/announcements'
 import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
+import { getLocalUser } from '../api/auth'
 import { getPostRecommendations, getResourceRecommendations, getAnnouncementRecommendations } from '@/utils/recommendations'
 
 // 通用详情项目类型
@@ -289,6 +290,7 @@ const UniversalDetailScreen: React.FC = () => {
         // 加载评论
         const targetType = type === 'resource' ? 'package' : type
         const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
+        const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
         const mapped = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
@@ -296,8 +298,8 @@ const UniversalDetailScreen: React.FC = () => {
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
-          canEdit: true
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+          canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
         }))
         setComments(mapped)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
@@ -429,6 +431,7 @@ const UniversalDetailScreen: React.FC = () => {
       
       // 重新加载评论
       const cr = await apiGetComments(item.type === 'resource' ? 'package' : item.type as any, item.id, 1, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
@@ -436,7 +439,8 @@ const UniversalDetailScreen: React.FC = () => {
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false }))
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
       }))
       setComments(mapped)
       setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
@@ -454,7 +458,8 @@ const UniversalDetailScreen: React.FC = () => {
       // 重新加载评论
       const targetType = type === 'resource' ? 'package' : type
       const cr = await apiGetComments(targetType as any, parseInt(id!), 1, 10, true)
-      const updated = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
+      const me2 = getLocalUser(); const isPriv2 = (role?: string) => (role === 'admin' || role === 'elder')
+      const updated = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me2 && (isPriv2(me2.role) || me2.id === r.user_id) })), canEdit: !!me2 && (isPriv2(me2.role) || me2.id === c.user_id) }))
       setComments(updated)
       setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
       setCommentTotal(cr.total || updated.length)
@@ -470,6 +475,7 @@ const UniversalDetailScreen: React.FC = () => {
     try {
       const targetType = type === 'resource' ? 'package' : type
       const cr = await apiGetComments(targetType as any, parseInt(id!), page, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
@@ -477,7 +483,8 @@ const UniversalDetailScreen: React.FC = () => {
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false }))
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
       }))
       setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
       setCommentTotal(cr.total || 0)
@@ -498,7 +505,7 @@ const UniversalDetailScreen: React.FC = () => {
     }
   }
 
-  const editableComments = useMemo(() => comments.map(c => ({ ...c, canEdit: true })), [comments])
+  const editableComments = useMemo(() => comments, [comments])
 
   if (loading) {
     return (
