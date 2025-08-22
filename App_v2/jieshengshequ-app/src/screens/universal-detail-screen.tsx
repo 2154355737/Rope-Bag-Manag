@@ -1,22 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   ArrowLeft, Share2, MoreHorizontal, Download, 
-  Heart, MessageSquare, Eye, Star, CheckCircle, Shield, Hash,
-  FileText, ChevronDown, Loader2, Calendar, User, Tag, X, ZoomIn
+  Heart, MessageSquare, Eye, CheckCircle, Shield, Hash,
+  FileText, Loader2, Calendar, X, ZoomIn
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Progress } from '@/components/ui/progress'
 import { toast } from '@/hooks/use-toast'
 
 import TopNavigation from '@/components/ui/top-navigation'
+import MarkdownRenderer from '@/components/ui/markdown-renderer'
 import CommentSection, { Comment } from '@/components/comment-section'
 import RelatedRecommendations from '@/components/related-recommendations'
 import InteractionButtons, { 
@@ -25,26 +25,25 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 
-// API imports
-import { getPost, toggleLikePost, reportPost, getPostLikeStatus } from '../api/posts'
-import { getResource, downloadResource, toggleLikeResource, getResourceLikeStatus, reportResource } from '../api/resources'
-import { getAnnouncement } from '../api/announcements'
-import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
-import { getLocalUser } from '../api/auth'
-import { getPostRecommendations, getResourceRecommendations, getAnnouncementRecommendations } from '@/utils/recommendations'
+// API 导入
+import { getPost, toggleLikePost, getPostLikeStatus } from '@/api/posts'
+import { getResource, toggleLikeResource, getResourceLikeStatus, downloadResource } from '@/api/resources'
+import { getAnnouncement } from '@/api/announcements'
+import { createComment as apiCreateComment, replyComment as apiReplyComment, getComments as apiGetComments } from '@/api/comments'
+import { getLocalUser } from '@/api/auth'
+import { getContentBasedRecommendations } from '@/utils/recommendations'
 
-// 通用详情项目类型
-type ItemType = 'post' | 'resource' | 'announcement'
-
-// 通用详情数据接口
+// 通用数据类型
 interface UniversalDetailItem {
   id: number
-  type: ItemType
+  type: 'post' | 'resource' | 'announcement'
   title: string
   author: {
+    id: number
     name: string
     avatar: string
     verified?: boolean
+    role?: string
   }
   content?: string
   description?: string
@@ -70,249 +69,250 @@ interface UniversalDetailItem {
   
   // 帖子特有字段
   images?: string[]
-  code?: string
+  codeSnippet?: string
   
   // 公告特有字段
-  priority?: 'low' | 'medium' | 'high'
-  validUntil?: string
+  type_detail?: string
+  priority?: string
+  isPinned?: boolean
+  effectiveDate?: string
+  expiryDate?: string
+  attachments?: Array<{ name: string; size: string; url: string }>
+  relatedLinks?: Array<{ title: string; url: string; description?: string }>
 }
 
 const UniversalDetailScreen: React.FC = () => {
-  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
+  const navigate = useNavigate()
   
-  // 从当前路径推断类型
-  const getCurrentType = (): ItemType => {
-    const path = window.location.pathname
-    if (path.includes('/post/')) return 'post'
-    if (path.includes('/resource/')) return 'resource'
-    if (path.includes('/announcement/')) return 'announcement'
-    return 'post' // 默认值
+  // 从路径中提取类型
+  const getTypeFromPath = (): string | null => {
+    const pathname = location.pathname
+    if (pathname.startsWith('/post/')) return 'post'
+    if (pathname.startsWith('/resource/')) return 'resource'  
+    if (pathname.startsWith('/announcement/')) return 'announcement'
+    return null
   }
   
-  const type = getCurrentType()
+  const type = getTypeFromPath()
   
   const [item, setItem] = useState<UniversalDetailItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<{ type: 'forbidden' | 'not-found' | 'general', message: string } | null>(null)
-  const [comments, setComments] = useState<Comment[]>([])
-  const [hasMoreComments, setHasMoreComments] = useState(false)
-  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
   
   // 图片查看器状态
   const [imageViewerOpen, setImageViewerOpen] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageList, setImageList] = useState<string[]>([])
   
+  // 文件大小格式化函数
+  const formatFileSize = (size: string | number): string => {
+    if (!size) return ''
+    
+    // 转换为字符串处理
+    const sizeStr = String(size)
+    
+    // 移除已有的单位，只保留数字和小数点
+    const cleanSize = sizeStr.replace(/[^\d.]/g, '')
+    const sizeNumber = parseFloat(cleanSize)
+    
+    if (isNaN(sizeNumber)) return sizeStr
+    
+    // 如果数字很小，假设是字节
+    if (sizeNumber < 1024) {
+      return `${sizeNumber}B`
+    }
+    // 如果在1024-1048576之间，假设是KB
+    else if (sizeNumber < 1048576) {
+      return `${(sizeNumber / 1024).toFixed(1)}KB`
+    }
+    // 如果更大，转换为MB
+    else {
+      return `${(sizeNumber / 1048576).toFixed(1)}MB`
+    }
+  }
+  
   // 交互状态
   const [isLiked, setIsLiked] = useState(false)
-  const [isBookmarked, setIsBookmarked] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
   const [downloadProgress, setDownloadProgress] = useState(0)
+  const [comments, setComments] = useState<Comment[]>([])
   const [commentTotal, setCommentTotal] = useState(0)
+  const [hasMoreComments, setHasMoreComments] = useState(false)
   const [isLoadingComments, setIsLoadingComments] = useState(false)
+  const [recommendedItems, setRecommendedItems] = useState<any[]>([])
 
-  // 格式化数字
-  const formatNumber = (num: number | undefined | null) => {
-    if (num == null || isNaN(num)) return '0'
-    if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
-    return num.toString()
-  }
-  const humanFileSize = (size?: string) => {
-    if (!size) return ''
-    // 如果是纯数字字符串，转成 KB/MB
-    const n = parseInt(size)
-    if (!isNaN(n) && n > 0) {
-      return n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`
-    }
-    return size
-  }
-
-  // 时间格式: 仅显示到时:分:秒
-  const formatTimeOfDay = (t: any) => {
-    try { const d = new Date(t); if (!isNaN(d.getTime())) return d.toLocaleTimeString('zh-CN', { hour12: false }); } catch {}
-    const s = String(t || ''); return s.length >= 19 ? s.slice(11, 19) : s
-  }
-
-  // 获取页面标题
-  const getPageTitle = () => {
-    switch (type) {
-      case 'post': return '帖子详情'
-      case 'resource': return '资源详情'
-      case 'announcement': return '公告详情'
-      default: return '详情'
-    }
-  }
-
-  // 获取数据
+  // 加载数据
   useEffect(() => {
     const loadData = async () => {
       if (!type || !id) return
       
       try {
         setLoading(true)
+        setError(null)
         let data: any
-        let recommendations: any[] = []
-        
-        // 统一处理：可展示文件名生成
-        const extractNameFromUrl = (url?: string) => {
-          if (!url) return ''
-          const clean = url.split('?')[0].split('#')[0]
-          const last = clean.split('/').pop() || ''
-          try { return decodeURIComponent(last) } catch { return last }
-        }
-        const stripHashedPrefix = (name: string) => name
-          .replace(/^([0-9a-fA-F]{8,})_([0-9a-fA-F]{8,})_/, '')
-          .replace(/^\d{10,}_/, '')
-          .replace(/^[0-9A-Za-z]{8,}_/, '')
-          .replace(/^[0-9A-Za-z]{6,}_(.+)$/,(m, p1)=>m) // 占位，不改变值
-          // 若还有 <hash>_原名 的形式，保留“_”右边
-          .replace(/^([0-9A-Za-z]{6,})_(.+)$/,'$2')
-        const getDisplayName = (given?: string, fallbackUrl?: string) => {
-          const base = (given && given.trim()) ? given : extractNameFromUrl(fallbackUrl)
-          return stripHashedPrefix(base)
-        }
 
         switch (type) {
           case 'post':
             data = await getPost(parseInt(id))
-            recommendations = await getPostRecommendations(data.id, data.tags || [])
-            setItem({
-              id: data.id,
-              type: 'post',
-              title: data.title || data.content?.substring(0, 50) + '...',
-              author: { 
-                name: data.author_detail?.name || data.author_name || (typeof data.author === 'string' ? data.author : data.author?.name) || '用户', 
-                avatar: data.author_detail?.avatar || data.author_avatar || (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
-                verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
-              },
-              content: data.content,
-              tags: data.tags || [],
-              stats: {
-                likes: data.like_count || 0,
-                comments: data.comment_count || 0,
-                views: data.view_count || 0
-              },
-              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
-              images: data.images || [],
-              code: data.code
-            })
-            // 初始化点赞状态
-            try { const ls = await getPostLikeStatus(data.id); setIsLiked(!!ls?.liked) } catch {}
             break
             
           case 'resource':
             data = await getResource(parseInt(id))
-            recommendations = await getResourceRecommendations(data.id, data.tags || [])
             // 兼容后端：将 included_files 正常化为 files
             const normalizedFiles = Array.isArray(data.files) && data.files.length
               ? data.files
               : (Array.isArray(data.included_files) ? data.included_files : [])
             const mapped = normalizedFiles.map((f: any) => ({
-              name: getDisplayName(f?.name ?? String(f ?? ''), data.file_url),
-              type: f?.type ?? f?.file_type ?? '未知',
+              name: f?.name || '未知文件',
+              type: f?.type || f?.file_type || '未知',
               size: typeof f?.size === 'number' ? `${f.size}` : (f?.size || '')
             }))
             // 回退主文件
             const fallback: Array<{ name: string; type: string; size: string }> = []
             if ((!mapped || mapped.length === 0) && data.file_url) {
-              const fileName = getDisplayName(undefined, data.file_url)
+              const fileName = data.file_url.split('/').pop() || '下载文件'
               const ext = fileName.split('.').pop()?.toLowerCase() || ''
-              let fileType = '未知'
-              if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) fileType = '压缩包'
-              else if (['exe', 'msi', 'dmg', 'pkg'].includes(ext)) fileType = '安装程序'
-              else if (['apk', 'ipa'].includes(ext)) fileType = '移动应用'
-              else if (['pdf', 'doc', 'docx', 'txt', 'md'].includes(ext)) fileType = '文档'
-              const humanSize = typeof data.file_size === 'number' && data.file_size > 0
-                ? (data.file_size >= 1024 * 1024
-                    ? `${(data.file_size / (1024 * 1024)).toFixed(1)} MB`
-                    : `${Math.max(1, Math.round(data.file_size / 1024))} KB`)
-                : ''
-              fallback.push({ name: fileName, type: fileType, size: humanSize })
+              const typeMap: Record<string, string> = { zip: 'ZIP压缩包', apk: 'Android应用', exe: 'Windows程序', dmg: 'macOS应用', pdf: 'PDF文档' }
+              fallback.push({ name: fileName, type: typeMap[ext] || '文件', size: data.file_size || '' })
             }
-            const nameSet = new Set(mapped.map(f => f.name))
-            const files = mapped.concat(fallback.filter(f => !nameSet.has(f.name)))
-            setItem({
-              id: data.id,
-              type: 'resource',
-              title: data.name || data.title,
-              author: { 
-                name: data.author_detail?.name || data.author_name || (typeof data.author === 'string' ? data.author : data.author?.name) || '开发者', 
-                avatar: data.author_detail?.avatar || data.author_avatar || (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
-                verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
-              },
-              description: data.description || '',
-              tags: data.tags || [],
-              stats: {
-                likes: data.like_count || 0,
-                comments: data.comment_count || 0,
-                views: data.view_count || 0,
-                downloads: data.download_count || 0,
-                rating: data.rating || 4.5
-              },
-              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
-              category: data.category?.name || '其他',
-              version: data.version || '1.0.0',
-              fileSize: data.file_size?.toString() || '0',
-              downloadUrl: data.file_url,
-              files,
-              requirements: data.requirements || [],
-              screenshots: data.screenshots || [],
-              safetyStatus: data.safety_status || 'unknown'
-            })
-            // 初始化点赞状态
-            try { const ls = await getResourceLikeStatus(data.id); setIsLiked(!!ls?.liked) } catch {}
+            data.files = mapped.length > 0 ? mapped : fallback
             break
             
           case 'announcement':
             data = await getAnnouncement(parseInt(id))
-            recommendations = await getAnnouncementRecommendations(data.id, data.tags || [])
-            setItem({
-              id: data.id,
-              type: 'announcement',
-              title: data.title,
-              author: { 
-                name: (typeof data.author === 'string' ? data.author : data.author?.name) || '系统公告', 
-                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
-                verified: (typeof data.author === 'object' ? data.author?.verified : true) || true 
-              },
-              content: data.content,
-              tags: data.tags || [],
-              stats: {
-                likes: 0,
-                comments: data.comment_count || 0,
-                views: data.view_count || 0
-              },
-              publishDate: new Date(data.created_at || Date.now()).toLocaleDateString('zh-CN'),
-              priority: data.priority || 'medium',
-              validUntil: data.valid_until
-            })
             break
+            
+          default:
+            throw new Error('不支持的内容类型')
         }
         
-        setRecommendedItems(recommendations)
+        // 统一数据格式
+        const unifiedItem: UniversalDetailItem = {
+              id: data.id,
+          type: type as any,
+          title: data.title || data.name,
+              author: { 
+            id: data.author?.id || data.user_id || 1,
+            name: data.author?.name || data.author_name || data.username || '系统',
+            avatar: data.author?.avatar || data.author_avatar || '',
+            verified: data.author?.verified,
+            role: data.author?.role
+              },
+              content: data.content,
+          description: data.description,
+              tags: data.tags || [],
+              stats: {
+            likes: data.like_count || data.likes || 0,
+            comments: data.comment_count || data.comments || 0,
+            views: data.view_count || data.views || data.views_count || 0,
+            downloads: data.download_count || data.downloads,
+            rating: data.rating
+          },
+          publishDate: data.created_at || data.publishedAt || data.published_at || data.publishDate || new Date().toISOString(),
+          category: data.category || data.category_name,
+          
+          // 资源特有
+          version: data.version,
+          fileSize: data.file_size,
+          downloadUrl: data.download_url || data.file_url,
+          files: data.files,
+          requirements: data.requirements,
+          screenshots: data.screenshots,
+          safetyStatus: data.safety_status,
+          
+          // 帖子特有
+          images: data.images,
+          codeSnippet: data.code_snippet,
+          
+          // 公告特有
+          type_detail: data.type,
+          priority: data.priority,
+          isPinned: data.is_pinned,
+          effectiveDate: data.effective_date,
+          expiryDate: data.expiry_date,
+          attachments: data.attachments,
+          relatedLinks: data.related_links
+        }
+        
+        setItem(unifiedItem)
+        
+        // 加载点赞状态
+        try {
+          if (type === 'post') {
+            const likeStatus = await getPostLikeStatus(parseInt(id))
+            setIsLiked(!!likeStatus?.liked)
+          } else if (type === 'resource') {
+            const likeStatus = await getResourceLikeStatus(parseInt(id))
+            setIsLiked(!!likeStatus?.liked)
+          }
+        } catch (error) {
+          console.log('获取点赞状态失败:', error)
+        }
         
         // 加载评论
+        try {
         const targetType = type === 'resource' ? 'package' : type
-        const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
-        const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
-        const mapped = (cr.list || []).map((c: any) => ({
+          const commentResponse = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
+          const user = getLocalUser()
+          const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+          
+          const mappedComments = (commentResponse.list || []).map((c: any) => ({
           id: c.id,
-          author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+            author: { 
+              name: c.author_name || '用户', 
+              avatar: c.author_avatar || '' 
+            },
           content: c.content,
           time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
-          canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
-        }))
-        setComments(mapped)
-        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
-        setCommentTotal(cr.total || mapped.length)
+            replies: (c.replies || []).map((r: any) => ({
+              id: r.id,
+              author: { 
+                name: r.author_name || '用户', 
+                avatar: r.author_avatar || '' 
+              },
+              content: r.content,
+              time: formatTimeOfDay(r.created_at || ''),
+              likes: r.likes || 0,
+              isLiked: false,
+              canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id)
+            })),
+            canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id)
+          }))
+          
+          setComments(mappedComments)
+          setHasMoreComments((commentResponse.total || 0) > (commentResponse.page || 1) * (commentResponse.size || 10))
+          setCommentTotal(commentResponse.total || mappedComments.length)
+      } catch (error) {
+          console.log('加载评论失败:', error)
+        }
+        
+        // 获取真实推荐数据
+        try {
+          const includeTypes: ('post' | 'resource' | 'announcement')[] = type === 'resource' 
+            ? ['resource', 'post'] 
+            : type === 'post' 
+            ? ['post', 'resource'] 
+            : ['announcement', 'post']
+            
+          const recommendations = await getContentBasedRecommendations({
+            currentItemId: parseInt(id),
+            currentItemType: type as 'post' | 'resource' | 'announcement',
+            currentItemTags: unifiedItem.tags,
+            limit: 6,
+            includeTypes
+          })
+          setRecommendedItems(recommendations)
+        } catch (error) {
+          console.log('获取推荐数据失败:', error)
+          setRecommendedItems([])
+        }
         
       } catch (error: any) {
-        console.error('加载详情失败:', error)
+        console.error('Universal Detail: 加载详情失败:', error)
         
         // 根据错误类型设置不同的错误状态
         if (error?.message?.includes('未审核通过') || error?.message?.includes('Forbidden')) {
@@ -340,11 +340,11 @@ const UniversalDetailScreen: React.FC = () => {
             type: 'general',
             message: '无法加载详情信息，请稍后重试'
           })
-          toast({
-            title: "加载失败",
-            description: "无法加载详情信息，请稍后重试",
-            variant: "destructive"
-          })
+        toast({
+          title: "加载失败",
+          description: "无法加载详情信息，请稍后重试",
+          variant: "destructive"
+        })
         }
       } finally {
         setLoading(false)
@@ -354,250 +354,271 @@ const UniversalDetailScreen: React.FC = () => {
     loadData()
   }, [type, id])
 
-  // 交互事件处理
-  const handleLike = async () => {
-    if (!item) return
-    try {
-      if (item.type === 'resource') {
-        const res = isLiked ? await (await import('../api/resources')).unlikeResource(item.id) : await (await import('../api/resources')).likeResource(item.id)
-        setIsLiked(!isLiked)
-        setItem(prev => prev ? ({ ...prev, stats: { ...prev.stats, likes: typeof (res as any)?.like_count === 'number' ? (res as any).like_count : prev.stats.likes + (isLiked ? -1 : 1) } }) : prev)
-      } else if (item.type === 'post') {
-        const res = isLiked ? await (await import('../api/posts')).unlikePost(item.id) : await toggleLikePost(item.id)
-        setIsLiked(!isLiked)
-        setItem(prev => prev ? ({ ...prev, stats: { ...prev.stats, likes: typeof (res as any)?.like_count === 'number' ? (res as any).like_count : prev.stats.likes + (isLiked ? -1 : 1) } }) : prev)
-      } else {
-        // 公告暂不支持点赞，做前端提示
-        toast({ title: '暂不支持', description: '公告暂不支持点赞', duration: 2000 })
-        return
-      }
-      toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消点赞' : '感谢您的支持', duration: 2000 })
-    } catch (e) {
-      toast({ title: '操作失败', description: '请稍后重试', variant: 'destructive' })
-    }
-  }
-
-  // 收藏暂不开发，去掉按钮
-
-  const handleShare = () => {
-    try {
-      const url = window.location.href
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url)
-      }
-      toast({ title: '分享链接已复制', description: '可以分享给更多朋友了', duration: 2000 })
-    } catch {
-      toast({ title: '分享', description: '请手动复制地址栏链接', duration: 2000 })
-    }
-  }
-
-  const handleReport = async () => {
-    if (!item) return
-    try {
-      if (item.type === 'resource') {
-        await reportResource(item.id)
-      } else if (item.type === 'post') {
-        await reportPost(item.id)
-      } else {
-        toast({ title: '已收到', description: '公告的反馈已记录', duration: 2000 })
-        return
-      }
-      toast({ title: '举报已提交', description: '我们会尽快处理您的举报', duration: 2000 })
-    } catch (e) {
-      toast({ title: '举报失败', description: '请稍后重试', variant: 'destructive' })
-    }
-  }
-
-  const handleDownload = async () => {
-    if (item?.type !== 'resource') return
-    setIsDownloading(true)
-    setDownloadProgress(15)
-    try {
-      // 调用后端获取真实下载地址
-      const url = await downloadResource(item.id)
-      setDownloadProgress(60)
-      const finalUrl = typeof url === 'string' ? url : (url as any)?.url || item.downloadUrl
-      if (!finalUrl) throw new Error('下载链接不可用')
-
-      // 触发浏览器下载
-      const a = document.createElement('a')
-      a.href = finalUrl
-      a.target = '_blank'
-      a.rel = 'noopener noreferrer'
-      const fileName = (finalUrl.split('/').pop() || item.title || 'download')
-      a.download = fileName
-      document.body.appendChild(a)
-      setDownloadProgress(85)
-      a.click()
-      document.body.removeChild(a)
-      setDownloadProgress(100)
-      toast({ title: '下载开始', description: '文件已开始下载', duration: 2500 })
-    } catch (e) {
-      // 回退：若API失败，尝试直接用原始URL
-      try {
-        if (item.downloadUrl) {
-          const a = document.createElement('a')
-          a.href = item.downloadUrl
-          a.target = '_blank'
-          a.rel = 'noopener noreferrer'
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          toast({ title: '使用备用下载', description: '正在使用直链下载', duration: 2500 })
-        } else {
-          throw new Error('无可用下载链接')
-        }
-      } catch (fallbackError) {
-        toast({ title: '下载失败', description: '请检查网络或稍后重试', variant: 'destructive' })
-      }
-    } finally {
-      setTimeout(() => { setIsDownloading(false); setDownloadProgress(0) }, 800)
-    }
-  }
-
-  // 图片点击处理
+  // 图片查看器功能
   const handleImageClick = (images: string[], index: number) => {
     setImageList(images)
     setCurrentImageIndex(index)
     setImageViewerOpen(true)
   }
 
-  // 图片查看器导航
   const navigateImage = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
       setCurrentImageIndex(prev => prev > 0 ? prev - 1 : imageList.length - 1)
-    } else {
+      } else {
       setCurrentImageIndex(prev => prev < imageList.length - 1 ? prev + 1 : 0)
     }
   }
 
+  // 工具函数
+  const formatNumber = (num: number): string => {
+    if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+    return num.toString()
+  }
+
+  const getPageTitle = (): string => {
+    if (!item) return '加载中...'
+    switch (item.type) {
+      case 'post': return '帖子详情'
+      case 'resource': return '资源详情'
+      case 'announcement': return '公告详情'
+      default: return '详情'
+    }
+  }
+
+  const handleShare = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: item?.title,
+        url: window.location.href
+      })
+    } else {
+      navigator.clipboard.writeText(window.location.href)
+      toast({ title: '链接已复制', description: '分享链接已复制到剪贴板' })
+    }
+  }
+
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    } catch {
+      return '未知时间'
+    }
+  }
+
+  const formatTimeOfDay = (dateString: string): string => {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diffMs = now.getTime() - date.getTime()
+      const diffMins = Math.floor(diffMs / (1000 * 60))
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+      if (diffMins < 1) return '刚刚'
+      if (diffMins < 60) return `${diffMins}分钟前`
+      if (diffHours < 24) return `${diffHours}小时前`
+      if (diffDays < 7) return `${diffDays}天前`
+      return formatDate(dateString)
+    } catch {
+      return '未知时间'
+    }
+  }
+
+  // 交互处理函数
+  const handleLike = async () => {
+    if (!item) return
+    try {
+      if (item.type === 'post') {
+        await toggleLikePost(item.id)
+      } else if (item.type === 'resource') {
+        await toggleLikeResource(item.id)
+      }
+      setIsLiked(!isLiked)
+      // 更新本地计数
+      setItem(prev => prev ? {
+        ...prev,
+        stats: {
+          ...prev.stats,
+          likes: prev.stats.likes + (isLiked ? -1 : 1)
+        }
+      } : null)
+    } catch (error) {
+      console.error('点赞失败:', error)
+      toast({
+        title: "操作失败",
+        description: "点赞操作失败，请稍后重试",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleReport = () => {
+    toast({
+      title: "举报已提交",
+      description: "我们会尽快处理您的举报"
+    })
+  }
+
   const handleSubmitComment = async (content: string) => {
     if (!item) return
-    
     try {
-      const targetType = item.type === 'resource' ? 'Package' : 
-                        item.type === 'post' ? 'Post' : 'Announcement'
+      const targetType = item.type === 'resource' ? 'package' : item.type
       await apiCreateComment(targetType as any, item.id, content)
-      
       // 重新加载评论
-      const cr = await apiGetComments(item.type === 'resource' ? 'package' : item.type as any, item.id, 1, 10, true)
-      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
-      const mapped = (cr.list || []).map((c: any) => ({
-        id: c.id,
-        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
-        content: c.content,
-        time: formatTimeOfDay(c.created_at || ''),
-        likes: c.likes || 0,
-        isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
-        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
-      }))
-      setComments(mapped)
-      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
-      setCommentTotal(cr.total || mapped.length)
-      
-      toast({ title: '评论发送成功', description: '您的评论已发布' })
+      // 这里可以优化为直接添加到本地状态
+      toast({
+        title: "评论成功",
+        description: "您的评论已发布"
+      })
     } catch (error) {
-      toast({ title: '评论发送失败', description: '请稍后重试', variant: 'destructive' })
+      console.error('评论失败:', error)
+      toast({
+        title: "评论失败",
+        description: "发布评论失败，请稍后重试",
+        variant: "destructive"
+      })
     }
   }
 
-  const handleSubmitReply = async (commentId: number, content: string) => {
+  const handleReplyComment = async (commentId: number, content: string) => {
+    if (!item) return
     try {
       await apiReplyComment(commentId, content)
-      // 重新加载评论
-      const targetType = type === 'resource' ? 'package' : type
-      const cr = await apiGetComments(targetType as any, parseInt(id!), 1, 10, true)
-      const me2 = getLocalUser(); const isPriv2 = (role?: string) => (role === 'admin' || role === 'elder')
-      const updated = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me2 && (isPriv2(me2.role) || me2.id === r.user_id) })), canEdit: !!me2 && (isPriv2(me2.role) || me2.id === c.user_id) }))
-      setComments(updated)
-      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
-      setCommentTotal(cr.total || updated.length)
-      toast({ title: '回复发送成功', description: '您的回复已发布' })
+      toast({
+        title: "回复成功",
+        description: "您的回复已发布"
+      })
     } catch (error) {
-      toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
+      console.error('回复失败:', error)
+      toast({
+        title: "回复失败",
+        description: "发布回复失败，请稍后重试",
+        variant: "destructive"
+      })
     }
   }
 
-  // 加载更多评论
+  // 处理下载
+  const handleDownload = async () => {
+    if (!item || item.type !== 'resource' || !item.downloadUrl) {
+      toast({ 
+        title: '下载失败', 
+        description: '下载链接不可用', 
+        variant: 'destructive' 
+      })
+      return
+    }
+
+    setIsDownloading(true)
+    setDownloadProgress(20)
+    
+    try {
+      // 先尝试获取下载URL
+      const url = await downloadResource(item.id)
+      setDownloadProgress(60)
+      
+      if (url) {
+        // 创建一个临时链接来触发下载
+        const link = document.createElement('a')
+        link.href = url
+        link.target = '_blank'
+        link.rel = 'noopener noreferrer'
+        
+        // 尝试从URL中提取文件名
+        const fileName = url.split('/').pop() || item.title || 'download'
+        link.download = fileName
+        
+        document.body.appendChild(link)
+        setDownloadProgress(80)
+        
+        link.click()
+        document.body.removeChild(link)
+        
+        setDownloadProgress(100)
+        
+        // 更新下载计数
+        setItem(prev => prev ? {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            downloads: (prev.stats.downloads || 0) + 1
+          }
+        } : null)
+        
+        toast({
+          title: '下载成功',
+          description: '文件下载已开始'
+        })
+      } else {
+        throw new Error('无法获取下载链接')
+      }
+    } catch (error: any) {
+      console.error('下载失败:', error)
+      toast({
+        title: '下载失败',
+        description: error.message || '下载过程中出现错误，请稍后重试',
+        variant: 'destructive'
+      })
+    } finally {
+      setTimeout(() => {
+        setIsDownloading(false)
+        setDownloadProgress(0)
+      }, 1000)
+    }
+  }
+
   const handleLoadMoreComments = async (page: number): Promise<Comment[]> => {
+    // 实现加载更多评论
     setIsLoadingComments(true)
     try {
-      const targetType = type === 'resource' ? 'package' : type
-      const cr = await apiGetComments(targetType as any, parseInt(id!), page, 10, true)
-      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
-      const mapped = (cr.list || []).map((c: any) => ({
+      if (!item) return []
+      const targetType = item.type === 'resource' ? 'package' : item.type
+      const commentResponse = await apiGetComments(targetType as any, item.id, page, 10, true)
+      const user = getLocalUser()
+      const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      
+      const newComments = (commentResponse.list || []).map((c: any) => ({
         id: c.id,
-        author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
+        author: { 
+          name: c.author_name || '用户', 
+          avatar: c.author_avatar || '' 
+        },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
-        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id)
+        replies: (c.replies || []).map((r: any) => ({
+          id: r.id,
+          author: { 
+            name: r.author_name || '用户', 
+            avatar: r.author_avatar || '' 
+          },
+          content: r.content,
+          time: formatTimeOfDay(r.created_at || ''),
+          likes: r.likes || 0,
+          isLiked: false,
+          canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id)
+        })),
+        canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id)
       }))
-      setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
-      setCommentTotal(cr.total || 0)
-      setIsLoadingComments(false)
-      return mapped
-    } catch (e) {
-      setIsLoadingComments(false)
-      return []
-    }
-  }
-
-  const handleLikeComment = async (commentId: number) => {
-    try {
-      await apiLikeComment(commentId, true)
-      toast({ title: '点赞成功' })
+      
+      // 更新本地状态
+      setComments(prev => [...prev, ...newComments])
+      setHasMoreComments((commentResponse.total || 0) > page * (commentResponse.size || 10))
+      
+      return newComments
     } catch (error) {
-      toast({ title: '点赞失败', description: '请稍后重试', variant: 'destructive' })
+      console.error('加载更多评论失败:', error)
+      return []
+    } finally {
+      setIsLoadingComments(false)
     }
-  }
-
-  const editableComments = useMemo(() => comments, [comments])
-
-  if (loading) {
-    return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <TopNavigation title={getPageTitle()} showBackButton />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      </div>
-    )
-  }
-
-  if (!item) {
-    return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <TopNavigation title={getPageTitle()} showBackButton />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-lg font-medium mb-2">内容不存在</h2>
-            <p className="text-muted-foreground mb-4">该内容可能已被删除或不存在</p>
-            <Button onClick={() => navigate(-1)}>返回上一页</Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // 调试检查：确保author是正确的对象结构
-  if (item.author && typeof item.author !== 'object') {
-    console.error('Author is not an object:', item.author)
-    return (
-      <div className="flex flex-col min-h-screen bg-background">
-        <TopNavigation title={getPageTitle()} showBackButton />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-lg font-medium mb-2">数据格式错误</h2>
-            <p className="text-muted-foreground mb-4">作者信息格式不正确</p>
-            <Button onClick={() => navigate(-1)}>返回上一页</Button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   // 错误状态显示
@@ -646,6 +667,38 @@ const UniversalDetailScreen: React.FC = () => {
     )
   }
 
+  // 加载状态
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background pb-16">
+        <TopNavigation
+          title="加载中..."
+          showBackButton
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!item) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background pb-16">
+        <TopNavigation
+          title="未找到内容"
+          showBackButton
+        />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">内容不存在或已被删除</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background pb-16">
       {/* 顶部导航栏 */}
@@ -664,81 +717,49 @@ const UniversalDetailScreen: React.FC = () => {
         }
       />
 
-      {/* 内容区域 */}
-      <div className="pt-nav">
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-4 content-container">
-            
-            {/* 基本信息 */}
+      {/* 内容区域 - 为固定导航栏留出空间 */}
+      <div className="flex-1 pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
+        <ScrollArea className="h-full">
+          <motion.div 
+            className="container max-w-2xl mx-auto p-4 space-y-4 pb-safe-bottom"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+          
+          {/* 标题和作者信息 */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center flex-1 min-w-0">
-                    <Avatar className="h-12 w-12 mr-3 flex-shrink-0">
-                                              <AvatarImage src={item.author?.avatar || ''} />
-                      <AvatarFallback>{item.author?.name?.[0] || 'U'}</AvatarFallback>
+              <div className="flex items-start gap-3 mb-4">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={item.author.avatar} />
+                  <AvatarFallback>{item.author.name[0]}</AvatarFallback>
                     </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center">
-                        <span className="font-medium text-overflow-protection truncate">{item.author?.name || '用户'}</span>
-                        {item.author?.verified && (
-                          <CheckCircle size={16} className="ml-1 text-blue-500 flex-shrink-0" />
-                        )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-sm">{item.author.name}</span>
+                    {item.author.verified && <CheckCircle size={14} className="text-blue-500" />}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        发布于 {item.publishDate}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar size={12} />
+                    <span>{formatDate(item.publishDate)}</span>
                       </div>
                     </div>
-                  </div>
-                  {item.category && (
-                    <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">
-                      {item.category}
-                    </Badge>
-                  )}
-                  {item.priority && (
-                    <Badge 
-                      variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'default' : 'secondary'} 
-                      className="text-xs flex-shrink-0 ml-2"
-                    >
-                      {item.priority === 'high' ? '重要' : item.priority === 'medium' ? '普通' : '一般'}
-                    </Badge>
-                  )}
                 </div>
 
-                <h2 className="text-xl font-bold mb-2 text-overflow-protection">{item.title}</h2>
-                
-                {/* 版本信息（仅资源） */}
-                {item.type === 'resource' && item.version && (
-                  <div className="flex items-center mb-3">
-                    <Badge variant="outline" className="text-xs mr-2">
-                      {item.version}
-                    </Badge>
-                    <div className="flex items-center">
-                      <Star size={14} className="text-yellow-500 mr-1" />
-                      <span className="text-sm font-medium">{item.stats.rating}</span>
-                      <span className="text-xs text-muted-foreground ml-1">(0 评价)</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 安全状态（仅资源） */}
-                {item.type === 'resource' && (
-                  <Alert className="mb-4">
-                    <Shield size={16} />
-                    <AlertDescription>
-                      此资源已通过安全检测，可放心下载使用
-                    </AlertDescription>
-                  </Alert>
-                )}
+              <h1 className="text-xl font-bold mb-3 leading-tight">{item.title}</h1>
 
                 {/* 标签 */}
                 {item.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 mb-4">
+                  <Hash size={14} className="text-muted-foreground" />
+                  <div className="flex flex-wrap gap-1">
                     {item.tags.map((tag, idx) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
-                        <Hash size={10} className="mr-1" /> {tag}
+                      <Badge key={idx} variant="secondary" className="text-xs">
+                        {tag}
                       </Badge>
                     ))}
+                  </div>
                   </div>
                 )}
               </CardContent>
@@ -777,117 +798,81 @@ const UniversalDetailScreen: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* 内容详情渲染 */}
-            <ContentRenderer item={item} onImageClick={handleImageClick} />
+          {/* 内容渲染区域 */}
+          <ContentRenderer 
+            item={item} 
+            onImageClick={handleImageClick} 
+            isDownloading={isDownloading}
+            downloadProgress={downloadProgress}
+            onDownload={handleDownload}
+            formatFileSize={formatFileSize}
+          />
 
-            {/* 下载按钮（仅资源） */}
-            {item.type === 'resource' && (
-              <Card>
-                <CardContent className="p-4">
-                  {isDownloading ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">下载中...</span>
-                        <span className="text-sm">{Math.round(downloadProgress)}%</span>
-                      </div>
-                      <Progress value={downloadProgress} className="w-full" />
-                    </div>
-                  ) : (
-                    <Button 
-                      className="w-full" 
-                      size="lg"
-                      onClick={handleDownload}
-                    >
-                      <Download size={18} className="mr-2" />
-                      免费下载{humanFileSize(item.fileSize) ? ` (${humanFileSize(item.fileSize)})` : ''}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* 操作按钮 */}
+          {/* 互动按钮 */}
             <InteractionButtons
               buttons={[
-                createLikeButton(item.stats.likes + (isLiked ? 1 : 0), isLiked, handleLike),
+              createLikeButton(item.stats.likes, isLiked, handleLike),
                 createShareButton(handleShare),
                 createReportButton(handleReport)
               ]}
               compact={true}
             />
 
-            {/* 评论区 */}
-            <CommentSection
-              comments={editableComments}
-              totalCount={commentTotal || item.stats.comments}
-              onSubmitComment={handleSubmitComment}
-              onSubmitReply={handleSubmitReply}
-              onLikeComment={handleLikeComment}
-              onReportComment={(commentId) => console.log('举报评论:', commentId)}
-              onLoadMoreComments={handleLoadMoreComments}
-              hasMoreComments={hasMoreComments}
-              isLoadingComments={isLoadingComments}
-              placeholder="发表评论..."
-              maxLength={200}
-              initialCommentsToShow={5}
-              onEditComment={async (commentId, content) => {
-                const m = await import('../api/comments'); await m.updateComment(commentId, content)
-              }}
-              onDeleteComment={async (commentId) => {
-                const m = await import('../api/comments'); await m.deleteComment(commentId)
-              }}
-            />
-
-            {/* 相关推荐 */}
+          {/* 相关推荐 */}
+          {recommendedItems.length > 0 && (
             <RelatedRecommendations
-              title={`相关${item.type === 'post' ? '帖子' : item.type === 'resource' ? '资源' : '公告'}推荐`}
+              title={`相关${item.type === 'resource' ? '资源' : item.type === 'post' ? '帖子' : '公告'}推荐`}
               items={recommendedItems}
               currentItemId={item.id}
               maxItems={3}
-              showMoreButton={true}
               compact={true}
               onMoreClick={() => navigate('/category')}
             />
-          </div>
-        </ScrollArea>
-      </div>
+          )}
 
-      {/* 图片查看器模态框 */}
+            {/* 评论区 */}
+            <CommentSection
+            comments={comments}
+            totalCount={commentTotal}
+              onSubmitComment={handleSubmitComment}
+            onSubmitReply={handleReplyComment}
+              onLoadMoreComments={handleLoadMoreComments}
+              hasMoreComments={hasMoreComments}
+              isLoadingComments={isLoadingComments}
+            placeholder="写下你的看法..."
+              maxLength={200}
+              initialCommentsToShow={5}
+          />
+          
+          </motion.div>
+        </ScrollArea>
+      </div> {/* 结束内容区域 */}
+
+      {/* 图片查看器 */}
       {imageViewerOpen && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-          <div className="relative max-w-full max-h-full p-4">
-            {/* 关闭按钮 */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 z-10 bg-black/50 hover:bg-black/70 text-white"
-              onClick={() => setImageViewerOpen(false)}
-            >
-              <X size={24} />
-            </Button>
-
-            {/* 图片计数 */}
-            {imageList.length > 1 && (
-              <div className="absolute top-4 left-4 z-10 bg-black/50 text-white px-3 py-1 rounded-md text-sm">
-                {currentImageIndex + 1} / {imageList.length}
-              </div>
-            )}
-
-            {/* 主图片 */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 right-4 text-white hover:bg-white/20"
+            onClick={() => setImageViewerOpen(false)}
+          >
+            <X size={24} />
+          </Button>
+          
+          <div className="relative w-full h-full flex items-center justify-center p-4">
             <img
               src={imageList[currentImageIndex]}
               alt={`图片 ${currentImageIndex + 1}`}
               className="max-w-full max-h-full object-contain"
-              onClick={(e) => e.stopPropagation()}
             />
-
-            {/* 导航按钮 */}
+            
             {imageList.length > 1 && (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
                   onClick={() => navigateImage('prev')}
                 >
                   <ArrowLeft size={24} />
@@ -895,185 +880,33 @@ const UniversalDetailScreen: React.FC = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
                   onClick={() => navigateImage('next')}
                 >
                   <ArrowLeft size={24} className="rotate-180" />
                 </Button>
+                
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-3 py-1 rounded">
+                  {currentImageIndex + 1} / {imageList.length}
+          </div>
               </>
             )}
           </div>
-
-          {/* 点击背景关闭 */}
-          <div 
-            className="absolute inset-0 -z-10" 
-            onClick={() => setImageViewerOpen(false)}
-          />
-        </div>
+          </div>
       )}
-    </div>
-  )
-}
-
+          </div>
+        )
+      }
+      
 // 内容渲染组件
 const ContentRenderer: React.FC<{ 
   item: UniversalDetailItem
-  onImageClick?: (images: string[], index: number) => void 
-}> = ({ item, onImageClick }) => {
-  const renderContent = (content: string) => {
-    // 检查是否是HTML内容
-    const isHtmlContent = content.includes('<') && content.includes('>')
-    
-    if (isHtmlContent) {
-      // 对于HTML内容，使用dangerouslySetInnerHTML但需要清理
-      const sanitizedHtml = content
-        .replace(/<script[^>]*>.*?<\/script>/gi, '') // 移除script标签
-        .replace(/javascript:/gi, '') // 移除javascript: 协议
-        .replace(/on\w+\s*=/gi, '') // 移除事件处理器
-      
-      return (
-        <div 
-          className="prose prose-sm max-w-none dark:prose-invert 
-                     prose-headings:text-foreground prose-p:text-foreground 
-                     prose-strong:text-foreground prose-em:text-foreground
-                     prose-code:text-foreground prose-code:bg-muted prose-code:px-1 prose-code:rounded
-                     prose-pre:bg-muted prose-pre:border prose-pre:rounded-lg
-                     prose-blockquote:border-l-primary prose-blockquote:text-muted-foreground
-                     prose-a:text-primary hover:prose-a:text-primary/80
-                     prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-      )
-    }
-
-    // 对于纯文本内容，解析简单的Markdown语法
-    return content.split('\n').map((line, idx) => {
-      const trimmedLine = line.trim()
-      if (!trimmedLine) return <div key={idx} className="h-3" />
-      
-      // Markdown标题 (### ## #)
-      if (trimmedLine.startsWith('###')) {
-        return (
-          <h3 key={idx} className="text-lg font-semibold text-foreground mt-6 mb-3">
-            {trimmedLine.substring(3).trim()}
-          </h3>
-        )
-      }
-      if (trimmedLine.startsWith('##')) {
-        return (
-          <h2 key={idx} className="text-xl font-semibold text-foreground mt-6 mb-4">
-            {trimmedLine.substring(2).trim()}
-          </h2>
-        )
-      }
-      if (trimmedLine.startsWith('#')) {
-        return (
-          <h1 key={idx} className="text-2xl font-bold text-foreground mt-6 mb-4">
-            {trimmedLine.substring(1).trim()}
-          </h1>
-        )
-      }
-      
-      // Markdown代码块 (```)
-      if (trimmedLine.startsWith('```')) {
-        const language = trimmedLine.substring(3).trim()
-        return (
-          <div key={idx} className="my-4 p-4 bg-muted rounded-lg border">
-            {language && (
-              <div className="text-xs text-muted-foreground mb-2 font-mono">{language}</div>
-            )}
-            <code className="text-sm font-mono text-foreground block">
-              {/* 这里应该收集后续行直到遇到结束的``` */}
-              代码块开始...
-            </code>
-          </div>
-        )
-      }
-      
-      // Markdown引用 (>)
-      if (trimmedLine.startsWith('>')) {
-        return (
-          <blockquote key={idx} className="border-l-4 border-primary pl-4 my-3 text-muted-foreground italic">
-            {trimmedLine.substring(1).trim()}
-          </blockquote>
-        )
-      }
-      
-      // Markdown列表 (- 或 *)
-      if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-        return (
-          <div key={idx} className="flex items-start my-1">
-            <span className="text-primary mr-2">•</span>
-            <span className="text-sm text-foreground">
-              {renderInlineMarkdown(trimmedLine.substring(2).trim())}
-            </span>
-          </div>
-        )
-      }
-      
-      // Markdown数字列表 (1. 2. 等)
-      if (/^\d+\.\s/.test(trimmedLine)) {
-        const match = trimmedLine.match(/^(\d+)\.\s(.*)/)
-        if (match) {
-          return (
-            <div key={idx} className="flex items-start my-1">
-              <span className="text-primary mr-2 font-mono text-sm">{match[1]}.</span>
-              <span className="text-sm text-foreground">
-                {renderInlineMarkdown(match[2])}
-              </span>
-            </div>
-          )
-        }
-      }
-      
-      // 内联代码 (`code`)
-      if (trimmedLine.includes('`')) {
-        return (
-          <p key={idx} className="text-sm text-foreground leading-relaxed my-2">
-            {renderInlineMarkdown(trimmedLine)}
-          </p>
-        )
-      }
-      
-      // URL检测
-      if (trimmedLine.startsWith('http://') || trimmedLine.startsWith('https://')) {
-        return (
-          <div key={idx} className="my-3">
-            <a 
-              href={trimmedLine} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:text-primary/80 underline break-all"
-            >
-              {trimmedLine}
-            </a>
-          </div>
-        )
-      }
-      
-      // 普通段落
-      return (
-        <p key={idx} className="text-sm text-foreground leading-relaxed my-2">
-          {renderInlineMarkdown(trimmedLine)}
-        </p>
-      )
-    })
-  }
-
-  // 渲染内联Markdown语法
-  const renderInlineMarkdown = (text: string): React.ReactNode => {
-    // **粗体**
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    // *斜体*
-    text = text.replace(/\*(.*?)\*/g, '<em>$1</em>')
-    // `代码`
-    text = text.replace(/`(.*?)`/g, '<code class="bg-muted px-1 rounded text-sm font-mono">$1</code>')
-    // [链接](url)
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-primary hover:text-primary/80 underline">$1</a>')
-    
-    return <span dangerouslySetInnerHTML={{ __html: text }} />
-  }
-
+  onImageClick?: (images: string[], index: number) => void
+  isDownloading?: boolean
+  downloadProgress?: number
+  onDownload?: () => void
+  formatFileSize?: (size: string | number) => string
+}> = ({ item, onImageClick, isDownloading = false, downloadProgress = 0, onDownload, formatFileSize }) => {
   switch (item.type) {
     case 'post':
       return (
@@ -1082,49 +915,37 @@ const ContentRenderer: React.FC<{
           {item.content && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">帖子内容</CardTitle>
+                <CardTitle className="text-lg">详细说明</CardTitle>
               </CardHeader>
-              <CardContent className="p-4 pt-0 content-container">
-                <div className="space-y-3 text-overflow-protection">
-                  {renderContent(item.content)}
-                </div>
+              <CardContent className="p-4 pt-0 overflow-hidden">
+                <MarkdownRenderer 
+                  content={item.content} 
+                  onImageClick={onImageClick}
+                  className="text-foreground"
+                />
               </CardContent>
             </Card>
           )}
 
-          {/* 代码展示 */}
-          {item.code && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">代码示例</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm">
-                  <code>{item.code}</code>
-                </pre>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 图片展示 */}
+          {/* 帖子图片 */}
           {item.images && item.images.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">图片</CardTitle>
+                <CardTitle className="text-lg">相关图片</CardTitle>
               </CardHeader>
               <CardContent className="p-4 pt-0">
-                <div className="grid grid-cols-1 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   {item.images.map((image, idx) => (
                     <div 
-                      key={idx} 
+                      key={idx}
                       className="relative group cursor-pointer"
-                      onClick={() => onImageClick?.(item.images!, idx)}
+                      onClick={() => onImageClick && onImageClick(item.images!, idx)}
                     >
-                      <img
-                        src={image}
-                        alt={`图片 ${idx + 1}`}
+                      <img 
+                      src={image}
+                      alt={`图片 ${idx + 1}`}
                         className="rounded-md w-full h-48 object-cover transition-transform group-hover:scale-105"
-                      />
+                    />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
                         <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
                       </div>
@@ -1140,23 +961,39 @@ const ContentRenderer: React.FC<{
     case 'resource':
       return (
         <>
-          {/* 截图展示 */}
+          {/* 资源内容 */}
+          {item.description && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">预览截图</CardTitle>
+                <CardTitle className="text-lg">详细说明</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0">
-              {item.screenshots && item.screenshots.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3">
+              <CardContent className="p-4 pt-0 overflow-hidden">
+                <MarkdownRenderer 
+                  content={item.description} 
+                  onImageClick={onImageClick}
+                  className="text-foreground"
+                />
+            </CardContent>
+          </Card>
+          )}
+
+          {/* 资源截图 */}
+          {item.screenshots && item.screenshots.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">应用截图</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="grid grid-cols-2 gap-3">
                   {item.screenshots.map((screenshot, idx) => (
                     <div 
                       key={idx} 
                       className="relative group cursor-pointer"
-                      onClick={() => onImageClick?.(item.screenshots!, idx)}
+                      onClick={() => onImageClick && onImageClick(item.screenshots!, idx)}
                     >
-                      <img
-                        src={screenshot}
-                        alt={`Screenshot ${idx + 1}`}
+                      <img 
+                        src={screenshot} 
+                        alt={`截图 ${idx + 1}`} 
                         className="rounded-md w-full h-48 object-cover transition-transform group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors rounded-md flex items-center justify-center">
@@ -1164,24 +1001,6 @@ const ContentRenderer: React.FC<{
                       </div>
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <span className="text-sm">暂无预览截图</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 详细描述 */}
-          {item.description && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">详细介绍</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0 content-container">
-                <div className="space-y-3 text-overflow-protection">
-                  {renderContent(item.description)}
                 </div>
               </CardContent>
             </Card>
@@ -1192,13 +1011,13 @@ const ContentRenderer: React.FC<{
             <CardHeader>
               <CardTitle className="text-lg">系统要求</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0 content-container">
+            <CardContent className="p-4 pt-0">
               {item.requirements && item.requirements.length > 0 ? (
                 <ul className="space-y-2">
                   {item.requirements.map((req, idx) => (
                     <li key={idx} className="flex items-start text-sm">
                       <CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                      <span className="text-overflow-protection">{req}</span>
+                      <span>{req}</span>
                     </li>
                   ))}
                 </ul>
@@ -1215,16 +1034,19 @@ const ContentRenderer: React.FC<{
             <CardHeader>
               <CardTitle className="text-lg">包含文件</CardTitle>
             </CardHeader>
-            <CardContent className="p-4 pt-0 content-container">
+            <CardContent className="p-4 pt-0">
               {item.files && item.files.length > 0 ? (
                 <div className="space-y-3">
                   {item.files.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-muted rounded border">
-                      <div className="flex items-center flex-1 min-w-0">
-                        <FileText size={16} className="text-blue-500 mr-2 flex-shrink-0" />
+                    <div key={idx} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center min-w-0 flex-1">
+                        <FileText size={16} className="text-primary mr-3 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm text-overflow-protection truncate">{file.name}</div>
-                          <div className="text-xs text-muted-foreground">{file.type} • {file.size}</div>
+                          <div className="font-medium text-sm">{file.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {file.type && <span className="mr-2">{file.type}</span>}
+                            {file.size && <span>{formatFileSize ? formatFileSize(file.size) : file.size}</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1232,47 +1054,54 @@ const ContentRenderer: React.FC<{
                 </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
+                  <FileText size={32} className="mx-auto mb-2 opacity-50" />
                   <span className="text-sm">暂无文件信息</span>
                 </div>
               )}
             </CardContent>
           </Card>
-        </>
-      )
 
-    case 'announcement':
-      return (
-        <>
-          {/* 公告内容 */}
-          {item.content && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">公告内容</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 pt-0 content-container">
-                <div className="space-y-3 text-overflow-protection">
-                  {renderContent(item.content)}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 有效期 */}
-          {item.validUntil && (
+          {/* 下载按钮 */}
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Calendar size={16} className="mr-2" />
-                  有效期至：{new Date(item.validUntil).toLocaleDateString('zh-CN')}
+              {isDownloading ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-center text-sm text-muted-foreground">
+                    <Download size={16} className="mr-2 animate-pulse" />
+                    下载中... {downloadProgress}%
                 </div>
+                  <Progress value={downloadProgress} className="w-full" />
+                </div>
+              ) : (
+                <Button 
+                  className="w-full" 
+                  size="lg"
+                  onClick={onDownload}
+                >
+                  <Download size={18} className="mr-2" />
+                  免费下载{item.fileSize ? ` (${formatFileSize ? formatFileSize(item.fileSize) : item.fileSize})` : ''}
+                </Button>
+              )}
               </CardContent>
             </Card>
-          )}
         </>
       )
 
     default:
-      return null
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">详细说明</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <MarkdownRenderer 
+              content={item.description || item.content || '暂无详细说明'} 
+              onImageClick={onImageClick}
+              className="text-foreground"
+            />
+          </CardContent>
+        </Card>
+      )
   }
 }
 
