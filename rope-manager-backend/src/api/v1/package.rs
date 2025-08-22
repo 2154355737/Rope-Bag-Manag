@@ -10,6 +10,7 @@ use crate::utils::auth_helper::AuthHelper;
 use futures_util::StreamExt;
 use crate::services::user_action_service::UserActionService;
 use crate::models::user_action::CreateUserActionRequest;
+use crate::repositories::user_repo::UserRepository;
 
 
 #[derive(Debug, Deserialize, Clone)]
@@ -460,17 +461,37 @@ async fn get_packages(
         query.search.clone(),
         status_filter
     ).await {
-        Ok((packages, total)) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {
-                "list": packages,
-                "total": total,
-                "page": page,
-                "pageSize": page_size,
-                "totalPages": (total as f64 / page_size as f64).ceil() as u32
+        Ok((packages, total)) => {
+            // 为每个资源补充作者昵称与头像
+            let mut enriched: Vec<serde_json::Value> = Vec::with_capacity(packages.len());
+            let user_repo = UserRepository::new("data.db").ok();
+            for p in packages {
+                let mut v = serde_json::to_value(&p).unwrap_or_else(|_| json!({}));
+                if let Some(repo) = &user_repo {
+                    if let Ok(Some(u)) = repo.find_by_username(&p.author).await {
+                        if let serde_json::Value::Object(ref mut map) = v {
+                            let name = u.nickname.clone().unwrap_or(u.username.clone());
+                            let avatar = u.avatar_url.clone().unwrap_or_default();
+                            map.insert("author_name".to_string(), json!(name));
+                            map.insert("author_avatar".to_string(), json!(avatar));
+                            map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+                        }
+                    }
+                }
+                enriched.push(v);
             }
-        }))),
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {
+                    "list": enriched,
+                    "total": total,
+                    "page": page,
+                    "pageSize": page_size,
+                    "totalPages": (total as f64 / page_size as f64).ceil() as u32
+                }
+            })))
+        },
         Err(e) => {
             log::error!("❌ get_packages error: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({
@@ -549,6 +570,17 @@ async fn get_package(
         if let Ok((views, comments)) = package_service.get_view_and_comment_counts(package_id).await {
             map.entry("view_count").or_insert(json!(views));
             map.entry("comment_count").or_insert(json!(comments));
+        }
+
+        // 补充作者昵称与头像
+        if let Ok(repo) = UserRepository::new("data.db") {
+            if let Ok(Some(u)) = repo.find_by_username(&package.author).await {
+                let name = u.nickname.clone().unwrap_or(u.username.clone());
+                let avatar = u.avatar_url.clone().unwrap_or_default();
+                map.insert("author_name".to_string(), json!(name));
+                map.insert("author_avatar".to_string(), json!(avatar));
+                map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+            }
         }
     }
 

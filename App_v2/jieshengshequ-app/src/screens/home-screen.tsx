@@ -123,7 +123,7 @@ const HomeScreen: React.FC = () => {
         title: i.title,
         description: i.description,
         tags: i.tags || [],
-        author: i.author || { name: '用户', avatar: '' },
+        author: i.author_detail || { name: i.author_name || (typeof i.author === 'string' ? i.author : i.author?.name) || '用户', avatar: i.author_avatar || i.author?.avatar || '' },
         likes: i.stats?.likes || 0,
         comments: i.stats?.comments || 0,
         views: i.stats?.views || 0,

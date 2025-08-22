@@ -174,8 +174,8 @@ const UniversalDetailScreen: React.FC = () => {
               type: 'post',
               title: data.title || data.content?.substring(0, 50) + '...',
               author: { 
-                name: (typeof data.author === 'string' ? data.author : data.author?.name) || data.author_name || '用户', 
-                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
+                name: data.author_detail?.name || data.author_name || (typeof data.author === 'string' ? data.author : data.author?.name) || '用户', 
+                avatar: data.author_detail?.avatar || data.author_avatar || (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
                 verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
               },
               content: data.content,
@@ -229,8 +229,8 @@ const UniversalDetailScreen: React.FC = () => {
               type: 'resource',
               title: data.name || data.title,
               author: { 
-                name: (typeof data.author === 'string' ? data.author : data.author?.name) || '开发者', 
-                avatar: (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
+                name: data.author_detail?.name || data.author_name || (typeof data.author === 'string' ? data.author : data.author?.name) || '开发者', 
+                avatar: data.author_detail?.avatar || data.author_avatar || (typeof data.author === 'object' ? data.author?.avatar : '') || '', 
                 verified: (typeof data.author === 'object' ? data.author?.verified : false) || false 
               },
               description: data.description || '',

@@ -187,7 +187,7 @@ const ResourceDetailScreen = (): JSX.Element => {
         setResource({
           id: r.id,
           title: r.name || r.title,
-          author: { name: r.author || '开发者', avatar: '', verified: false },
+          author: { name: r.author_name || r.author || '开发者', avatar: r.author_avatar || '', verified: false },
           description: r.description || '',
           downloadUrl: r.file_url,
           fileSize: (typeof r.file_size === 'number' && r.file_size > 0) ? formatFileSize(r.file_size) : '',

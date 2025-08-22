@@ -34,7 +34,7 @@ import { getResources } from '../api/resources'
 interface Resource {
   id: number
   title: string
-  author?: string
+  author?: { name: string; avatar?: string }
   description?: string
   image?: string
   tags: string[]
@@ -110,7 +110,7 @@ const CategoryScreen: React.FC = () => {
       const resourceList = (response.list || []).map((item: any): Resource => ({
         id: item.id,
         title: item.name || item.title || '未命名资源',
-        author: item.author || '匿名用户',
+        author: item.author_detail || { name: item.author_name || item.author || '匿名用户', avatar: item.author_avatar || '' },
         description: item.description || '',
         image: item.screenshots?.[0] || item.image || '',
         tags: Array.isArray(item.tags) ? item.tags : [],
@@ -142,7 +142,7 @@ const CategoryScreen: React.FC = () => {
       const query = searchQuery.toLowerCase().trim()
       filtered = filtered.filter(resource =>
         resource.title.toLowerCase().includes(query) ||
-        resource.author?.toLowerCase().includes(query) ||
+        resource.author?.name?.toLowerCase().includes(query) ||
         resource.description?.toLowerCase().includes(query) ||
         resource.tags.some(tag => tag.toLowerCase().includes(query))
       )
@@ -292,7 +292,7 @@ const CategoryScreen: React.FC = () => {
               </h3>
               {resource.author && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  by {resource.author}
+                  by {resource.author.name}
                 </p>
               )}
             </div>
@@ -384,7 +384,7 @@ const CategoryScreen: React.FC = () => {
                   </h3>
                   {resource.author && (
                     <p className="text-xs text-muted-foreground">
-                      by {resource.author}
+                      by {resource.author.name}
                     </p>
                   )}
                 </div>
