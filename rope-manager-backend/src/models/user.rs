@@ -179,4 +179,9 @@ pub struct UpdateUserRequest {
     pub role: Option<UserRole>,
     pub qq_number: Option<String>,
     pub avatar_url: Option<String>,
+    // 新增：资料字段
+    pub bio: Option<String>,
+    pub location: Option<String>,
+    pub website: Option<String>,
+    pub skills: Option<String>,
 } 

@@ -336,13 +336,18 @@ impl UserRepository {
     pub async fn update_user(&self, user: &User) -> Result<()> {
         let conn = self.conn.lock().await;
         conn.execute(
-            "UPDATE users SET username = ?, password_hash = ?, nickname = ?, role = ?, 
+            "UPDATE users SET username = ?, email = ?, password_hash = ?, nickname = ?, bio = ?, location = ?, website = ?, skills = ?, role = ?, 
                     star = ?, ban_status = ?, ban_reason = ?, qq_number = ?, avatar_url = ?, 
                     created_at = ?, last_login = ?, is_admin = ? WHERE id = ?",
             params![
                 user.username,
+                user.email,
                 user.password_hash,
                 user.nickname,
+                user.bio,
+                user.location,
+                user.website,
+                user.skills,
                 match user.role {
                     crate::models::UserRole::Admin => "admin",
                     crate::models::UserRole::Moderator => "moderator",

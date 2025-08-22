@@ -37,6 +37,10 @@ impl UserService {
         let mut updated_user = user.clone();
         if let Some(email) = &req.email { updated_user.email = email.clone(); }
         if let Some(nickname) = &req.nickname { updated_user.nickname = Some(nickname.clone()); }
+        if let Some(bio) = &req.bio { updated_user.bio = Some(bio.clone()); }
+        if let Some(location) = &req.location { updated_user.location = Some(location.clone()); }
+        if let Some(website) = &req.website { updated_user.website = Some(website.clone()); }
+        if let Some(skills) = &req.skills { updated_user.skills = Some(skills.clone()); }
         if let Some(star) = req.star { updated_user.star = star; }
         if let Some(ban_status) = &req.ban_status { updated_user.ban_status = ban_status.clone(); }
         if let Some(ban_reason) = &req.ban_reason { updated_user.ban_reason = Some(ban_reason.clone()); }

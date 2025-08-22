@@ -844,6 +844,10 @@ async fn upload_avatar(
                 role: None,
                 qq_number: None,
                 avatar_url: Some(avatar_url.clone()),
+                bio: None,
+                location: None,
+                website: None,
+                skills: None,
             };
             
             match user_service.update_user(user.id, &update_req).await {
