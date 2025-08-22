@@ -343,6 +343,11 @@ impl CommentService {
         self.comment_repo.get_user_comments(user_id, page, size).await
     }
 
+    // 获取特定目标的顶层评论（仅 Active，排除回复）
+    pub async fn get_top_level_comments(&self, target_type: &str, target_id: i32, page: i32, size: i32) -> Result<(Vec<Comment>, i64)> {
+        self.comment_repo.get_top_level_comments_by_target(target_type, target_id, page, size).await
+    }
+
     // 置顶评论（仅资源作者、管理员和元老可用）
     pub async fn pin_comment(&self, comment_id: i32, user_id: i32, pinned: bool) -> Result<Comment> {
         // 获取评论信息

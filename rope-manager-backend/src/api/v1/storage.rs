@@ -8,6 +8,9 @@ use crate::middleware::auth::AuthenticatedUser;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use crate::models::PackageFile;
+use crate::services::post_service::PostService;
+use crate::models::UpdatePostRequest;
+use rusqlite::OptionalExtension;
 
 #[derive(Deserialize)]
 pub struct PresignRequest {
@@ -93,6 +96,7 @@ async fn upload_file(
     let mut file_name = String::new();
     let mut file_data = Vec::new();
     let mut package_id: Option<i32> = None;
+    let mut post_id: Option<i32> = None;
 
     // 处理multipart数据
     while let Some(item) = payload.next().await {
@@ -116,6 +120,14 @@ async fn upload_file(
                     let data = chunk?;
                     if let Ok(id_str) = std::str::from_utf8(&data) {
                         package_id = id_str.parse().ok();
+                    }
+                }
+            }
+            "post_id" => {
+                while let Some(chunk) = field.next().await {
+                    let data = chunk?;
+                    if let Ok(id_str) = std::str::from_utf8(&data) {
+                        post_id = id_str.parse().ok();
                     }
                 }
             }
@@ -158,7 +170,7 @@ async fn upload_file(
 
     match upload_result {
         Ok(result) => {
-            // 根据上传类型更新Package信息
+            // 根据上传类型更新Package/帖子信息
             if let Some(pkg_id) = package_id {
                 let package_repo = crate::repositories::PackageRepository::new(db_path).unwrap();
                 let package_service = PackageService::new(package_repo, "uploads".to_string());
@@ -252,7 +264,32 @@ async fn upload_file(
                     }
                 }
             }
-            
+            // 如果是帖子图片上传：将图片URL追加到 posts.images
+            if post_id.is_some() && is_image {
+                let pid = post_id.unwrap();
+                let post_service = PostService::new(db_path.to_string());
+                // 读取现有帖子
+                if let Ok(Some(post)) = post_service.get_post(pid).await {
+                    let mut imgs = post.images.unwrap_or_else(Vec::new);
+                    imgs.push(result.download_url.clone());
+                    let update_req = UpdatePostRequest {
+                        title: None,
+                        content: None,
+                        category_id: None,
+                        tags: None,
+                        status: None,
+                        is_pinned: None,
+                        is_featured: None,
+                        images: Some(imgs),
+                        code_snippet: None,
+                    };
+                    match post_service.update_post(pid, update_req).await {
+                        Ok(_) => log::info!("🖼 已将图片添加到帖子 {} 的 images: {}", pid, result.download_url),
+                        Err(e) => log::error!("❌ 更新帖子 {} 的 images 失败: {}", pid, e),
+                    }
+                }
+            }
+
             let response = UploadResponse {
                 file_path: result.file_path,
                 download_url: result.download_url,

@@ -39,6 +39,7 @@ const InteractionButtons: React.FC<InteractionButtonsProps> = ({
     setPressedButton(button.label)
     setTimeout(() => setPressedButton(null), 150)
     
+    try { console.debug('[interaction]', button.variant || 'custom', button.label) } catch {}
     button.onClick?.()
     
     // 触觉反馈（移动端）

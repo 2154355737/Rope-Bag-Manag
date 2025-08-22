@@ -3,6 +3,7 @@ use crate::models::{Post, CreatePostRequest, UpdatePostRequest, PostQueryParams,
 use crate::repositories::user_repo::UserRepository;
 use chrono::{DateTime, Utc};
 use crate::services::notification_service::NotificationService;
+use serde_json;
 
 pub struct PostService {
     db_path: String,
@@ -25,6 +26,15 @@ impl PostService {
     pub async fn create_post(&self, req: CreatePostRequest, author_id: i32) -> SqliteResult<i32> {
         let conn = Connection::open(&self.db_path)?;
         
+        // 重复提交保护：60秒内相同作者与标题，直接返回已有帖子ID
+        if let Ok(existing_id) = conn.query_row(
+            "SELECT id FROM posts WHERE author_id = ? AND title = ? AND julianday('now') - julianday(created_at) < (60.0/86400.0) ORDER BY id DESC LIMIT 1",
+            params![author_id, req.title],
+            |r| r.get::<_, i32>(0),
+        ) {
+            return Ok(existing_id);
+        }
+        
         // 获取作者信息
         let user_repo = UserRepository::new(&self.db_path).map_err(|e| rusqlite::Error::InvalidPath(std::path::PathBuf::from(e.to_string())))?;
         let author = user_repo.find_by_id(author_id).await.map_err(|e| rusqlite::Error::InvalidPath(std::path::PathBuf::from(e.to_string())))?;
@@ -37,8 +47,8 @@ impl PostService {
         let now = Utc::now();
         let status = req.status.unwrap_or_default();
         
-        let post_id = conn.execute(
-            "INSERT INTO posts (title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        conn.execute(
+            "INSERT INTO posts (title, content, author_id, author_name, category_id, status, view_count, like_count, comment_count, is_pinned, is_featured, created_at, updated_at, review_status, images, code_snippet, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 req.title,
                 req.content,
@@ -53,16 +63,20 @@ impl PostService {
                 false, // is_featured
                 now,
                 now,
-                "pending"
+                "pending",
+                req.images.as_ref().map(|v| serde_json::to_string(v).unwrap_or("[]".to_string())).unwrap_or("[]".to_string()),
+                req.code_snippet,
+                req.tags.as_ref().map(|v| serde_json::to_string(v).unwrap_or("[]".to_string())).unwrap_or("[]".to_string()),
             ]
         )?;
+        let post_id = conn.last_insert_rowid() as i32;
 
         // 处理标签
         if let Some(tags) = req.tags {
-            self.add_tags_to_post(post_id as i32, &tags).await?;
+            self.add_tags_to_post(post_id, &tags).await?;
         }
-
-        Ok(post_id as i32)
+        
+        Ok(post_id)
     }
 
     // 更新帖子
@@ -89,6 +103,17 @@ impl PostService {
         if let Some(content) = req.content {
             updates.push("content = ?");
             params.push(Box::new(content));
+        }
+
+        if let Some(images) = req.images {
+            let json = serde_json::to_string(&images).unwrap_or("[]".to_string());
+            updates.push("images = ?");
+            params.push(Box::new(json));
+        }
+
+        if let Some(code_snippet) = req.code_snippet {
+            updates.push("code_snippet = ?");
+            params.push(Box::new(code_snippet));
         }
 
         if let Some(category_id) = req.category_id {
@@ -133,8 +158,11 @@ impl PostService {
             stmt.execute(rusqlite::params_from_iter(params.iter().map(|p| p.as_ref())))?;
         }
 
-        // 处理标签更新
+        // 处理标签更新（列 + 关联表）
         if let Some(tags) = req.tags {
+            let json = serde_json::to_string(&tags).unwrap_or("[]".to_string());
+            let mut stmt2 = conn.prepare("UPDATE posts SET tags = ? WHERE id = ?")?;
+            stmt2.execute(params![json, post_id])?;
             self.update_post_tags(post_id, &tags).await?;
         }
 

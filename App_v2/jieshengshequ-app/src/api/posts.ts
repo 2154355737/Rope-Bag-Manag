@@ -14,6 +14,10 @@ export async function toggleLikePost(id: number) {
 	return http.post<{ like_count?: number }>(`/posts/${id}/like`)
 }
 
+export async function unlikePost(id: number) {
+	return http.delete<{ like_count?: number }>(`/posts/${id}/like`)
+}
+
 export async function toggleBookmarkPost(id: number) {
 	// 后端采用 POST/DELETE /posts/{id}/bookmark；做成幂等：先尝试 POST，失败再 DELETE
 	try { return await http.post<{ favorite_count?: number }>(`/posts/${id}/bookmark`) } catch { return await http.delete<{ favorite_count?: number }>(`/posts/${id}/bookmark`) }
@@ -21,4 +25,12 @@ export async function toggleBookmarkPost(id: number) {
 
 export async function reportPost(id: number) {
 	return http.post(`/posts/${id}/report`, {})
+}
+
+// 状态查询
+export async function getPostLikeStatus(id: number) {
+	return http.get<{ liked: boolean }>(`/posts/${id}/like-status`)
+}
+export async function getPostBookmarkStatus(id: number) {
+	return http.get<{ favorited: boolean }>(`/posts/${id}/bookmark-status`)
 } 

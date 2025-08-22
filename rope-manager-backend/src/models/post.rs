@@ -1,6 +1,17 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
+// 自定义序列化：将 Option<Vec<String>> 的 None 序列化为空数组
+fn serialize_option_vec<S>(option: &Option<Vec<String>>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match option {
+        Some(v) => v.serialize(serializer),
+        None => Vec::<String>::new().serialize(serializer),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Post {
     pub id: i32,
@@ -23,8 +34,10 @@ pub struct Post {
     pub reviewer_id: Option<i32>,
     pub reviewed_at: Option<DateTime<Utc>>,
     // 新增字段 - 支持前端发布页面
+    #[serde(serialize_with = "serialize_option_vec")]
     pub images: Option<Vec<String>>,    // 图片URLs
     pub code_snippet: Option<String>,   // 代码片段
+    #[serde(serialize_with = "serialize_option_vec")]
     pub tags: Option<Vec<String>>,      // 标签列表
 }
 

@@ -23,6 +23,7 @@ export interface Comment {
   replies?: Comment[]
   rating?: number // 评分（1-5星，可选）
   helpful?: number // 有用数量（用于评价类评论）
+  canEdit?: boolean
 }
 
 interface CommentSectionProps {
@@ -33,6 +34,8 @@ interface CommentSectionProps {
   onLikeComment?: (commentId: number) => void
   onReportComment?: (commentId: number) => void
   onLoadMoreComments?: (page: number) => Promise<Comment[]>
+  onEditComment?: (commentId: number, content: string) => Promise<void> | void
+  onDeleteComment?: (commentId: number) => Promise<void> | void
   placeholder?: string
   maxLength?: number
   className?: string
@@ -51,6 +54,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   onLikeComment,
   onReportComment,
   onLoadMoreComments,
+  onEditComment,
+  onDeleteComment,
   placeholder = "发表评论...",
   maxLength = 200,
   className = "",
@@ -68,6 +73,8 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   const [showAllComments, setShowAllComments] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
 
   // 初始化显示的评论
   useEffect(() => {
@@ -119,18 +126,14 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     }
   }
 
-  // 计算是否需要显示"查看更多"按钮  
-  const shouldShowMoreButton = !showAllComments && comments.length > initialCommentsToShow
-  const shouldShowLoadMoreButton = showAllComments && hasMoreComments && onLoadMoreComments
-
   // 调试信息 (开发环境)
   if (process.env.NODE_ENV === 'development') {
     console.log('CommentSection 状态:', {
       commentsLength: comments.length,
       initialCommentsToShow,
       showAllComments,
-      shouldShowMoreButton,
-      shouldShowLoadMoreButton,
+      shouldShowMoreButton: !showAllComments && comments.length > initialCommentsToShow,
+      shouldShowLoadMoreButton: showAllComments && hasMoreComments && onLoadMoreComments,
       displayedCommentsLength: displayedComments.length
     })
   }
@@ -188,6 +191,53 @@ const CommentSection: React.FC<CommentSectionProps> = ({
     })
   }
 
+  // 开始编辑
+  const startEdit = (c: Comment) => {
+    setEditingId(c.id)
+    setEditText(c.content)
+  }
+
+  // 保存编辑
+  const saveEdit = async (commentId: number) => {
+    if (!editText.trim()) {
+      toast({ title: '内容不能为空', variant: 'destructive' })
+      return
+    }
+    try {
+      await onEditComment?.(commentId, editText.trim())
+      // 乐观更新本地显示（同时处理顶层与回复）
+      setDisplayedComments(prev => prev.map(c => {
+        if (c.id === commentId) return { ...c, content: editText.trim() }
+        const updatedReplies = (c.replies || []).map(r => r.id === commentId ? { ...r, content: editText.trim() } : r)
+        if (updatedReplies !== c.replies) return { ...c, replies: updatedReplies }
+        return c
+      }))
+      setEditingId(null)
+      setEditText('')
+      toast({ title: '已保存' })
+    } catch (e) {
+      toast({ title: '保存失败', variant: 'destructive' })
+    }
+  }
+
+  // 删除评论
+  const removeComment = async (commentId: number) => {
+    try {
+      await onDeleteComment?.(commentId)
+      setDisplayedComments(prev => {
+        // 先尝试作为顶层评论删除
+        if (prev.some(c => c.id === commentId)) {
+          return prev.filter(c => c.id !== commentId)
+        }
+        // 否则尝试从任一顶层评论的回复中删除
+        return prev.map(c => ({ ...c, replies: (c.replies || []).filter(r => r.id !== commentId) }))
+      })
+      toast({ title: '已删除' })
+    } catch (e) {
+      toast({ title: '删除失败', variant: 'destructive' })
+    }
+  }
+
   // 切换回复展开状态
   const toggleReplies = (commentId: number) => {
     const newExpanded = new Set(expandedReplies)
@@ -236,9 +286,25 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                 </div>
               </div>
               
-              <p className={`${isReply ? 'text-sm' : 'text-sm'} mb-2 break-words`}>
-                {comment.content}
-              </p>
+              {editingId === comment.id ? (
+                <div className="mb-2 flex items-center gap-2">
+                  <Input
+                    className="text-sm h-8"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    maxLength={maxLength}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') saveEdit(comment.id)
+                    }}
+                  />
+                  <Button size="sm" className="h-8 px-3" onClick={() => saveEdit(comment.id)}>保存</Button>
+                  <Button size="sm" variant="outline" className="h-8 px-3" onClick={() => { setEditingId(null); setEditText('') }}>取消</Button>
+                </div>
+              ) : (
+                <p className={`${isReply ? 'text-sm' : 'text-sm'} mb-2 break-words`}>
+                  {comment.content}
+                </p>
+              )}
               
               <div className="flex items-center gap-0.5">
                 <Button 
@@ -261,6 +327,27 @@ const CommentSection: React.FC<CommentSectionProps> = ({
                     <MessageSquare size={10} className="mr-0.5" /> 
                     回复
                   </Button>
+                )}
+                
+                {comment.canEdit && (
+                  <>
+                    <Button 
+                      variant="minimal" 
+                      size="compact" 
+                      className="text-[10px]"
+                      onClick={() => startEdit(comment)}
+                    >
+                      编辑
+                    </Button>
+                    <Button 
+                      variant="minimal" 
+                      size="compact" 
+                      className="text-[10px]"
+                      onClick={() => removeComment(comment.id)}
+                    >
+                      删除
+                    </Button>
+                  </>
                 )}
                 
                 <Button 
@@ -418,7 +505,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             </AnimatePresence>
 
             {/* 查看更多评论按钮 */}
-            {shouldShowMoreButton && (
+            {!showAllComments && comments.length > initialCommentsToShow && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -437,7 +524,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             )}
 
             {/* 加载更多评论按钮 */}
-            {shouldShowLoadMoreButton && (
+            {showAllComments && hasMoreComments && onLoadMoreComments && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}

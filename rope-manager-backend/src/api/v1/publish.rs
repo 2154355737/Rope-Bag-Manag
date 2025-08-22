@@ -128,33 +128,40 @@ async fn publish_post(
         })));
     }
     
-    // 创建Post记录
+    // 创建Post记录：默认草稿，审核中
     let create_req = CreatePostRequest {
         title: req.title.clone(),
         content: req.content.clone(),
-        category_id: None, // 帖子默认无分类，或者可以添加分类逻辑
+        category_id: None,
         tags: req.tags.clone(),
-        status: Some(PostStatus::Published), // 帖子发布后直接设为已发布状态
-        // 新增字段
-        images: req.images.as_ref().map(|imgs| 
-            imgs.iter().map(|_| String::new()).collect() // 发布时图片为空，后续通过上传接口填充
-        ),
+        status: Some(PostStatus::Draft),
+        images: None, // 发布时不写入图片，占位使用 []
         code_snippet: req.code_snippet.clone(),
     };
     
     match post_service.create_post(create_req, user.id).await {
         Ok(post_id) => {
-            log::info!("✅ 帖子发布成功: post_id={}", post_id);
-            Ok(HttpResponse::Ok().json(json!({
-                "code": 0,
-                "message": "帖子发布成功",
-                "data": {
-                    "id": post_id,
-                    "title": req.title.clone(),
-                    "status": "published",
-                    "created_at": chrono::Utc::now().to_rfc3339()
+            // 读取完整帖子对象返回（包含 images/tags -> [] 而非 null）
+            match post_service.get_post(post_id).await {
+                Ok(Some(post)) => Ok(HttpResponse::Ok().json(json!({
+                    "code": 0,
+                    "message": "帖子已提交，等待审核",
+                    "data": post
+                }))),
+                Ok(None) => Ok(HttpResponse::Ok().json(json!({
+                    "code": 0,
+                    "message": "帖子已提交，等待审核",
+                    "data": {"id": post_id, "title": req.title, "status": "pending"}
+                }))),
+                Err(e) => {
+                    log::warn!("读取帖子失败: {}", e);
+                    Ok(HttpResponse::Ok().json(json!({
+                        "code": 0,
+                        "message": "帖子已提交，等待审核",
+                        "data": {"id": post_id, "title": req.title, "status": "pending"}
+                    })))
                 }
-            })))
+            }
         },
         Err(e) => {
             log::error!("❌ 帖子发布失败: {}", e);

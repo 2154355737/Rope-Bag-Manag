@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
-  ArrowLeft, Share2, MoreHorizontal, Bookmark, Download, 
+  ArrowLeft, Share2, MoreHorizontal, Download, 
   Heart, MessageSquare, Eye, Star, CheckCircle, Shield, Hash,
   FileText, ChevronDown, Loader2, Calendar, User, Tag
 } from 'lucide-react'
@@ -22,13 +22,12 @@ import RelatedRecommendations from '@/components/related-recommendations'
 import InteractionButtons, { 
   createLikeButton, 
   createShareButton, 
-  createBookmarkButton, 
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 
 // API imports
-import { getPost } from '../api/posts'
-import { getResource, downloadResource } from '../api/resources'
+import { getPost, toggleLikePost, reportPost, getPostLikeStatus } from '../api/posts'
+import { getResource, downloadResource, toggleLikeResource, getResourceLikeStatus, reportResource } from '../api/resources'
 import { getAnnouncement } from '../api/announcements'
 import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
 import { getPostRecommendations, getResourceRecommendations, getAnnouncementRecommendations } from '@/utils/recommendations'
@@ -121,6 +120,12 @@ const UniversalDetailScreen: React.FC = () => {
     return size
   }
 
+  // 时间格式: 仅显示到时:分:秒
+  const formatTimeOfDay = (t: any) => {
+    try { const d = new Date(t); if (!isNaN(d.getTime())) return d.toLocaleTimeString('zh-CN', { hour12: false }); } catch {}
+    const s = String(t || ''); return s.length >= 19 ? s.slice(11, 19) : s
+  }
+
   // 获取页面标题
   const getPageTitle = () => {
     switch (type) {
@@ -184,6 +189,8 @@ const UniversalDetailScreen: React.FC = () => {
               images: data.images || [],
               code: data.code
             })
+            // 初始化点赞状态
+            try { const ls = await getPostLikeStatus(data.id); setIsLiked(!!ls?.liked) } catch {}
             break
             
           case 'resource':
@@ -198,7 +205,7 @@ const UniversalDetailScreen: React.FC = () => {
               type: f?.type ?? f?.file_type ?? '未知',
               size: typeof f?.size === 'number' ? `${f.size}` : (f?.size || '')
             }))
-            // 回退：当服务端无文件数组时，基于 file_url / file_size 补充一个主文件
+            // 回退主文件
             const fallback: Array<{ name: string; type: string; size: string }> = []
             if ((!mapped || mapped.length === 0) && data.file_url) {
               const fileName = getDisplayName(undefined, data.file_url)
@@ -215,7 +222,6 @@ const UniversalDetailScreen: React.FC = () => {
                 : ''
               fallback.push({ name: fileName, type: fileType, size: humanSize })
             }
-            // 合并并去重（按名称）
             const nameSet = new Set(mapped.map(f => f.name))
             const files = mapped.concat(fallback.filter(f => !nameSet.has(f.name)))
             setItem({
@@ -246,6 +252,8 @@ const UniversalDetailScreen: React.FC = () => {
               screenshots: data.screenshots || [],
               safetyStatus: data.safety_status || 'unknown'
             })
+            // 初始化点赞状态
+            try { const ls = await getResourceLikeStatus(data.id); setIsLiked(!!ls?.liked) } catch {}
             break
             
           case 'announcement':
@@ -279,14 +287,20 @@ const UniversalDetailScreen: React.FC = () => {
         // 加载评论
         const targetType = type === 'resource' ? 'package' : type
         const cr = await apiGetComments(targetType as any, parseInt(id), 1, 10)
-        const mapped = (cr.list || []).map((c: any) => ({
+        const base = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
           content: c.content,
-          time: c.created_at || '',
+          time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
           replies: []
+        }))
+        const repliesArr = await Promise.all(base.map(c => import('../api/comments').then(m => m.getCommentReplies(c.id)).catch(() => [])))
+        const mapped = base.map((c, idx) => ({
+          ...c,
+          replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+          canEdit: true
         }))
         setComments(mapped)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
@@ -307,38 +321,57 @@ const UniversalDetailScreen: React.FC = () => {
   }, [type, id])
 
   // 交互事件处理
-  const handleLike = () => {
-    setIsLiked(!isLiked)
-    toast({ 
-      title: isLiked ? '已取消点赞' : '点赞成功', 
-      description: isLiked ? '已取消点赞' : '感谢您的支持', 
-      duration: 2000 
-    })
+  const handleLike = async () => {
+    if (!item) return
+    try {
+      if (item.type === 'resource') {
+        const res = isLiked ? await (await import('../api/resources')).unlikeResource(item.id) : await (await import('../api/resources')).likeResource(item.id)
+        setIsLiked(!isLiked)
+        setItem(prev => prev ? ({ ...prev, stats: { ...prev.stats, likes: typeof (res as any)?.like_count === 'number' ? (res as any).like_count : prev.stats.likes + (isLiked ? -1 : 1) } }) : prev)
+      } else if (item.type === 'post') {
+        const res = isLiked ? await (await import('../api/posts')).unlikePost(item.id) : await toggleLikePost(item.id)
+        setIsLiked(!isLiked)
+        setItem(prev => prev ? ({ ...prev, stats: { ...prev.stats, likes: typeof (res as any)?.like_count === 'number' ? (res as any).like_count : prev.stats.likes + (isLiked ? -1 : 1) } }) : prev)
+      } else {
+        // 公告暂不支持点赞，做前端提示
+        toast({ title: '暂不支持', description: '公告暂不支持点赞', duration: 2000 })
+        return
+      }
+      toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消点赞' : '感谢您的支持', duration: 2000 })
+    } catch (e) {
+      toast({ title: '操作失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked)
-    toast({ 
-      title: isBookmarked ? '已取消收藏' : '收藏成功', 
-      description: isBookmarked ? '已从收藏夹中移除' : '已添加到您的收藏夹', 
-      duration: 2000 
-    })
-  }
+  // 收藏暂不开发，去掉按钮
 
   const handleShare = () => {
-    toast({
-      title: "分享链接已复制",
-      description: "可以分享给更多朋友了",
-      duration: 2000,
-    })
+    try {
+      const url = window.location.href
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+      }
+      toast({ title: '分享链接已复制', description: '可以分享给更多朋友了', duration: 2000 })
+    } catch {
+      toast({ title: '分享', description: '请手动复制地址栏链接', duration: 2000 })
+    }
   }
 
-  const handleReport = () => {
-    toast({
-      title: "举报已提交",
-      description: "我们会尽快处理您的举报",
-      duration: 2000,
-    })
+  const handleReport = async () => {
+    if (!item) return
+    try {
+      if (item.type === 'resource') {
+        await reportResource(item.id)
+      } else if (item.type === 'post') {
+        await reportPost(item.id)
+      } else {
+        toast({ title: '已收到', description: '公告的反馈已记录', duration: 2000 })
+        return
+      }
+      toast({ title: '举报已提交', description: '我们会尽快处理您的举报', duration: 2000 })
+    } catch (e) {
+      toast({ title: '举报失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   const handleDownload = async () => {
@@ -402,7 +435,7 @@ const UniversalDetailScreen: React.FC = () => {
         id: c.id,
         author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
         content: c.content,
-        time: c.created_at || '',
+        time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
         replies: []
@@ -418,6 +451,13 @@ const UniversalDetailScreen: React.FC = () => {
   const handleSubmitReply = async (commentId: number, content: string) => {
     try {
       await apiReplyComment(commentId, content)
+      // 重新加载评论
+      const targetType = type === 'resource' ? 'package' : type
+      const cr = await apiGetComments(targetType as any, parseInt(id!), 1, 10)
+      const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+      const repliesArr = await Promise.all(base.map(c => import('../api/comments').then(m => m.getCommentReplies(c.id)).catch(() => [])))
+      const updated = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
+      setComments(updated)
       toast({ title: '回复发送成功', description: '您的回复已发布' })
     } catch (error) {
       toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
@@ -484,9 +524,6 @@ const UniversalDetailScreen: React.FC = () => {
         showBackButton
         rightAction={
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleBookmark}>
-              <Bookmark size={20} className={isBookmarked ? 'fill-current' : ''} />
-            </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
               <Share2 size={20} />
             </Button>
@@ -644,7 +681,6 @@ const UniversalDetailScreen: React.FC = () => {
               buttons={[
                 createLikeButton(item.stats.likes + (isLiked ? 1 : 0), isLiked, handleLike),
                 createShareButton(handleShare),
-                createBookmarkButton(undefined, isBookmarked, handleBookmark),
                 createReportButton(handleReport)
               ]}
               compact={true}
@@ -652,7 +688,7 @@ const UniversalDetailScreen: React.FC = () => {
 
             {/* 评论区 */}
             <CommentSection
-              comments={comments}
+              comments={comments.map(c => ({ ...c, canEdit: true }))}
               totalCount={item.stats.comments}
               onSubmitComment={handleSubmitComment}
               onSubmitReply={handleSubmitReply}
@@ -663,6 +699,12 @@ const UniversalDetailScreen: React.FC = () => {
               placeholder="发表评论..."
               maxLength={200}
               initialCommentsToShow={5}
+              onEditComment={async (commentId, content) => {
+                const m = await import('../api/comments'); await m.updateComment(commentId, content)
+              }}
+              onDeleteComment={async (commentId) => {
+                const m = await import('../api/comments'); await m.deleteComment(commentId)
+              }}
             />
 
             {/* 相关推荐 */}

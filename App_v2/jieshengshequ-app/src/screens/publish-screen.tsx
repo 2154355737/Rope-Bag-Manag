@@ -191,7 +191,8 @@ const PublishScreen: React.FC = () => {
       toast.error('请填写标题和内容')
       return
     }
-
+    
+    if (isPublishing) return // 防止重复提交
     if (publishType === 'resource') {
       if (!version.trim() || !category) {
         toast.error('请填写版本信息和选择分类')
@@ -258,10 +259,10 @@ const PublishScreen: React.FC = () => {
         
         // 如果有图片，上传图片
         if (images.length > 0) {
-          const { uploadImage } = await import('@/api/publish')
+          const { uploadPostImage } = await import('@/api/publish')
           for (const image of images) {
             try {
-              await uploadImage(image)
+              await uploadPostImage(image, response.id)
             } catch (error) {
               console.warn(`图片 ${image.name} 上传失败:`, error)
             }

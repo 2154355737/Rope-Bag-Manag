@@ -27,10 +27,10 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 import { getResourceRecommendations } from '@/utils/recommendations'
-import { getResource, getResourceComments, createResourceComment, toggleLikeResource, toggleBookmarkResource, reportResource, downloadResource } from '../api/resources'
-import { replyComment as apiReplyComment, likeComment as apiLikeComment, getComments as apiGetComments } from '../api/comments'
+import { getResource, getResourceComments, createResourceComment, toggleLikeResource, toggleBookmarkResource, reportResource, downloadResource, getResourceLikeStatus, getResourceBookmarkStatus } from '../api/resources'
+import { replyComment as apiReplyComment, likeComment as apiLikeComment, getComments as apiGetComments, getCommentReplies as apiGetCommentReplies, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '../api/comments'
 
-const ResourceDetailScreen: React.FC = () => {
+const ResourceDetailScreen = (): JSX.Element => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [isDownloading, setIsDownloading] = useState(false)
@@ -85,6 +85,15 @@ const ResourceDetailScreen: React.FC = () => {
     const load = async () => {
       try {
         const r = await getResource(parseInt(id || '1'))
+        // 初始化点赞/收藏状态
+        try {
+          const [ls, bs] = await Promise.allSettled([
+            getResourceLikeStatus(r.id),
+            getResourceBookmarkStatus(r.id)
+          ])
+          if (ls.status === 'fulfilled') setIsLiked(!!ls.value?.liked)
+          if (bs.status === 'fulfilled') setIsBookmarked(!!bs.value?.favorited)
+        } catch {}
         
         // 统一处理：获取可展示的文件名
         const extractNameFromUrl = (url?: string) => {
@@ -209,13 +218,20 @@ const ResourceDetailScreen: React.FC = () => {
         
         // 加载评论
         const cr = await apiGetComments('resource', r.id, 1, 10)
-        const mapped = (cr.list || []).map((c: any) => ({
+        const base = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
           content: c.content,
-          time: c.created_at || '',
+          time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
-          isLiked: false
+          isLiked: false,
+          replies: [] as any[]
+        }))
+        const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+        const mapped = base.map((c, idx) => ({
+          ...c,
+          replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+          canEdit: true,
         }))
         setComments(mapped)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
@@ -252,6 +268,12 @@ const ResourceDetailScreen: React.FC = () => {
     if (num >= 10000) return `${(num / 10000).toFixed(1)}万`
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
     return num.toString()
+  }
+
+  // 时间格式: 仅显示到时:分:秒
+  const formatTimeOfDay = (t: any) => {
+    try { const d = new Date(t); if (!isNaN(d.getTime())) return d.toLocaleTimeString('zh-CN', { hour12: false }); } catch {}
+    const s = String(t || ''); return s.length >= 19 ? s.slice(11, 19) : s
   }
 
   // 处理下载
@@ -325,7 +347,9 @@ const ResourceDetailScreen: React.FC = () => {
   const handleSubmitComment = async (content: string) => {
     await createResourceComment(resource.id, content)
     const cr = await getResourceComments(resource.id, 1, 10)
-    const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: c.created_at || '', likes: c.likes || 0, isLiked: false }))
+    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+    const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
     setComments(mapped)
     toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
@@ -333,6 +357,13 @@ const ResourceDetailScreen: React.FC = () => {
   const handleSubmitReply = async (commentId: number, content: string) => {
     await apiReplyComment(commentId, content)
     toast({ title: '回复发送成功', description: '您的回复已发布' })
+  }
+
+  const handleEditComment = async (commentId: number, content: string) => {
+    await apiUpdateComment(commentId, content)
+  }
+  const handleDeleteComment = async (commentId: number) => {
+    await apiDeleteComment(commentId)
   }
 
   const handleLikeComment = async (commentId: number) => {
@@ -346,8 +377,10 @@ const ResourceDetailScreen: React.FC = () => {
 
   // 处理点赞
   const handleLike = async () => {
-    await toggleLikeResource(resource.id)
+    const res = await toggleLikeResource(resource.id)
     setIsLiked(!isLiked)
+    // 同步最新计数
+    setResource((prev: any) => ({ ...prev, likes: typeof res?.like_count === 'number' ? res.like_count : prev.likes + (isLiked ? -1 : 1) }))
     toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消对此资源的点赞' : '感谢您的支持', duration: 2000 })
   }
 
@@ -360,11 +393,15 @@ const ResourceDetailScreen: React.FC = () => {
 
   // 处理分享
   const handleShare = () => {
-    toast({
-      title: "分享链接已复制",
-      description: "可以分享给更多朋友了",
-      duration: 2000,
-    })
+    try {
+      const url = window.location.href
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+      }
+      toast({ title: '分享链接已复制', description: '可以分享给更多朋友了', duration: 2000 })
+    } catch {
+      toast({ title: '分享', description: '请手动复制地址栏链接', duration: 2000 })
+    }
   }
 
   // 处理举报
@@ -383,10 +420,7 @@ const ResourceDetailScreen: React.FC = () => {
         showBackButton
         rightAction={
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <Bookmark size={20} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
               <Share2 size={20} />
             </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -701,7 +735,6 @@ const ResourceDetailScreen: React.FC = () => {
             buttons={[
               createLikeButton(resource.likes + (isLiked ? 1 : 0), isLiked, handleLike),
               createShareButton(handleShare),
-              createBookmarkButton(undefined, isBookmarked, handleBookmark),
               createReportButton(handleReport)
             ]}
             compact={true}
@@ -718,7 +751,7 @@ const ResourceDetailScreen: React.FC = () => {
 
           {/* 评论区 */}
           <CommentSection
-            comments={comments}
+            comments={comments.map(c => ({ ...c, canEdit: true }))}
             totalCount={comments.length}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
@@ -726,9 +759,11 @@ const ResourceDetailScreen: React.FC = () => {
             onReportComment={handleReportComment}
             hasMoreComments={hasMoreComments}
             isLoadingComments={false} // Set to false as comments are now loaded in useEffect
-            placeholder="发表评论..."
+            placeholder="写下你的看法..."
             maxLength={200}
             initialCommentsToShow={5}
+            onEditComment={handleEditComment}
+            onDeleteComment={handleDeleteComment}
           />
         </div>
       </ScrollArea>

@@ -220,6 +220,62 @@ impl CommentRepository {
         Ok((comments, total))
     }
 
+    // 获取特定目标的顶层评论（仅 Active，排除回复）
+    pub async fn get_top_level_comments_by_target(
+        &self,
+        target_type: &str,
+        target_id: i32,
+        page: i32,
+        size: i32,
+    ) -> Result<(Vec<Comment>, i64)> {
+        let conn = self.conn.lock().await;
+
+        // 计算总记录数（仅顶层，Active）
+        let count_sql = "SELECT COUNT(*) FROM comments WHERE target_type = ? AND target_id = ? AND status = 'Active' AND parent_id IS NULL";
+        let total: i64 = conn.query_row(count_sql, params![target_type, target_id], |row| row.get(0))?;
+
+        // 查询列表（仅顶层，Active）
+        let sql = "SELECT c.id, c.user_id, c.target_type, c.target_id, c.content, c.status, c.parent_id, \
+                          c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number \
+                   FROM comments c \
+                   LEFT JOIN users u ON c.user_id = u.id \
+                   WHERE c.target_type = ? AND c.target_id = ? AND c.status = 'Active' AND c.parent_id IS NULL \
+                   ORDER BY c.pinned DESC, c.created_at DESC \
+                   LIMIT ? OFFSET ?";
+
+        let mut stmt = conn.prepare(sql)?;
+        let comment_iter = stmt.query_map(
+            params![target_type, target_id, size, (page - 1) * size],
+            |row| {
+                Ok(Comment {
+                    id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    target_type: row.get(2)?,
+                    target_id: row.get(3)?,
+                    content: row.get(4)?,
+                    status: row.get(5)?,
+                    parent_id: row.get(6)?,
+                    likes: row.get(7)?,
+                    dislikes: row.get(8)?,
+                    pinned: row.get::<_, i32>(9)? != 0,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
+                    author_name: row.get(12).ok(),
+                    username: row.get(13).ok(),
+                    author_role: row.get(14).ok(),
+                    author_avatar: row.get(15).ok(),
+                    author_qq: row.get(16).ok(),
+                    target_title: None,
+                })
+            }
+        )?;
+
+        let mut comments = Vec::new();
+        for comment in comment_iter { comments.push(comment?); }
+
+        Ok((comments, total))
+    }
+
     // 获取单个评论
     pub async fn get_comment_by_id(&self, comment_id: i32) -> Result<Option<Comment>> {
         let conn = self.conn.lock().await;

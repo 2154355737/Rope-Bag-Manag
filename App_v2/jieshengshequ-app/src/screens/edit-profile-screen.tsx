@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Camera, Save, X, User, Mail, MapPin, Globe, Tag } from 'lucide-react'
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import { getMyProfile, updateMyProfile, uploadAvatar } from '@/api/user'
 
 const EditProfileScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -17,17 +18,37 @@ const EditProfileScreen: React.FC = () => {
   
   // 用户资料状态
   const [userProfile, setUserProfile] = useState({
-    name: '程序员小王',
-    bio: '结绳语言爱好者，专注移动开发',
-    avatar: 'https://i.pravatar.cc/150?img=5',
-    email: 'xiaowang@example.com',
-    location: '北京市',
-    website: 'https://github.com/xiaowang',
-    skills: 'React, TypeScript, 结绳语言, 移动开发, Tailwind CSS, Node.js'
+    name: '',
+    bio: '',
+    avatar: '',
+    email: '',
+    location: '',
+    website: '',
+    skills: ''
   })
   
   // 表单验证错误
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const me = await getMyProfile()
+        setUserProfile({
+          name: me.nickname || me.username || '',
+          bio: me.bio || '',
+          avatar: me.avatar_url || '',
+          email: me.email || '',
+          location: me.location || '',
+          website: me.website || '',
+          skills: (Array.isArray(me.skills) ? me.skills.join(', ') : (me.skills || ''))
+        })
+      } catch (e) {
+        console.warn(e)
+      }
+    }
+    load()
+  }, [])
   
   // 处理输入变化
   const handleInputChange = (field: string, value: string) => {
@@ -36,7 +57,6 @@ const EditProfileScreen: React.FC = () => {
       [field]: value
     }))
     
-    // 清除对应字段的错误
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -46,43 +66,24 @@ const EditProfileScreen: React.FC = () => {
   }
   
   // 处理头像上传
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // 验证文件类型
       if (!file.type.startsWith('image/')) {
-        toast({
-          title: "上传失败",
-          description: "请选择图片文件",
-          variant: "destructive",
-        })
+        toast({ title: '上传失败', description: '请选择图片文件', variant: 'destructive' })
         return
       }
-      
-      // 验证文件大小（5MB）
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "上传失败",
-          description: "图片大小不能超过5MB",
-          variant: "destructive",
-        })
+        toast({ title: '上传失败', description: '图片大小不能超过5MB', variant: 'destructive' })
         return
       }
-      
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          setUserProfile(prev => ({
-            ...prev,
-            avatar: e.target!.result as string
-          }))
-          toast({
-            title: "头像上传成功",
-            description: "您的头像已更新",
-          })
-        }
+      try {
+        const { avatar_url } = await uploadAvatar(file)
+        setUserProfile(prev => ({ ...prev, avatar: avatar_url }))
+        toast({ title: '头像上传成功' })
+      } catch (e) {
+        toast({ title: '上传失败', description: '请稍后重试', variant: 'destructive' })
       }
-      reader.readAsDataURL(file)
     }
   }
   
@@ -114,34 +115,29 @@ const EditProfileScreen: React.FC = () => {
   
   // 处理保存
   const handleSave = async () => {
-    if (!validateForm()) {
-      return
-    }
-    
+    if (!validateForm()) return
     setIsSaving(true)
-    
     try {
-      // 模拟API调用
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      toast({
-        title: "保存成功",
-        description: "您的个人资料已更新",
-      })
-      
-      // 返回上一页
+      // 将逗号分隔的技能转为数组或直接传字符串，后端会做兼容
+      const payload: any = {
+        nickname: userProfile.name,
+        bio: userProfile.bio,
+        email: userProfile.email,
+        location: userProfile.location,
+        website: userProfile.website,
+        skills: userProfile.skills,
+        avatar_url: userProfile.avatar
+      }
+      await updateMyProfile(payload)
+      toast({ title: '保存成功', description: '您的个人资料已更新' })
       navigate(-1)
     } catch (error) {
-      toast({
-        title: "保存失败",
-        description: "请稍后重试",
-        variant: "destructive",
-      })
+      toast({ title: '保存失败', description: (error as any)?.message || '请稍后重试', variant: 'destructive' })
     } finally {
       setIsSaving(false)
     }
   }
-  
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* 顶部导航栏 */}
@@ -167,7 +163,7 @@ const EditProfileScreen: React.FC = () => {
                   <div className="relative">
                     <Avatar className="h-24 w-24">
                       <AvatarImage src={userProfile.avatar} />
-                      <AvatarFallback className="text-2xl">{userProfile.name[0]}</AvatarFallback>
+                      <AvatarFallback className="text-2xl">{userProfile.name?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <label className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-3 cursor-pointer hover:bg-primary/90 transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-105 border-2 border-background">
                       <Camera size={16} />

@@ -21,8 +21,8 @@ import InteractionButtons, {
   createReportButton 
 } from '@/components/ui/interaction-buttons'
 import { getPostRecommendations } from '@/utils/recommendations'
-import { getPost, toggleLikePost, toggleBookmarkPost, reportPost } from '../api/posts'
-import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment } from '../api/comments'
+import { getPost, toggleLikePost, reportPost, getPostLikeStatus } from '../api/posts'
+import { getComments as apiGetComments, createComment as apiCreateComment, replyComment as apiReplyComment, likeComment as apiLikeComment, getCommentReplies as apiGetCommentReplies, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '../api/comments'
 
 const PostDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>()
@@ -91,18 +91,29 @@ const PostDetailScreen: React.FC = () => {
     return comments
   }
 
+  // 时间格式: 仅显示到时:分:秒
+  const formatTimeOfDay = (t: any) => {
+    try { const d = new Date(t); if (!isNaN(d.getTime())) return d.toLocaleTimeString('zh-CN', { hour12: false }); } catch {}
+    const s = String(t || ''); return s.length >= 19 ? s.slice(11, 19) : s
+  }
+
   useEffect(() => {
     // 加载帖子详情和相关数据
     const load = async () => {
       try {
         const p = await getPost(parseInt(id || '1'))
+        // 初始化点赞状态
+        try {
+          const ls = await getPostLikeStatus(p.id)
+          setIsLiked(!!ls?.liked)
+        } catch {}
         const updatedPost = {
           id: p.id,
           title: p.title || '帖子标题',
           author: { name: p.author?.name || p.author_name || '用户', avatar: p.author?.avatar || '' , verified: false },
           content: p.content || p.title,
-          images: [],
-          code: undefined,
+          images: Array.isArray(p.images) ? p.images : [],
+          code: p.code_snippet || undefined,
           tags: p.tags || [],
           likes: p.like_count || 0,
           comments: p.comment_count || 0,
@@ -118,14 +129,29 @@ const PostDetailScreen: React.FC = () => {
         
         // 加载第一页评论
         const cr = await apiGetComments('post', p.id, 1, 10)
-        const mapped = (cr.list || []).map((c: any) => ({
+        const base = (cr.list || []).map((c: any) => ({
           id: c.id,
           author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
           content: c.content,
-          time: c.created_at || '',
+          time: formatTimeOfDay(c.created_at || ''),
           likes: c.likes || 0,
           isLiked: false,
-          replies: []
+          replies: [] as any[]
+        }))
+        // 并行获取每条评论的回复
+        const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+        const mapped = base.map((c, idx) => ({
+          ...c,
+          replies: (repliesArr[idx] || []).map((r: any) => ({
+            id: r.id,
+            author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' },
+            content: r.content,
+            time: formatTimeOfDay(r.created_at || ''),
+            likes: r.likes || 0,
+            isLiked: false,
+            canEdit: true,
+          })),
+          canEdit: true,
         }))
         setAllComments(mapped)
         setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
@@ -142,14 +168,28 @@ const PostDetailScreen: React.FC = () => {
     
     try {
       const cr = await apiGetComments('post', post.id, page, 10)
-      const mapped = (cr.list || []).map((c: any) => ({
+      const base = (cr.list || []).map((c: any) => ({
         id: c.id,
         author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
         content: c.content,
-        time: c.created_at || '',
+        time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: []
+        replies: [] as any[]
+      }))
+      const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+      const mapped = base.map((c, idx) => ({
+        ...c,
+        replies: (repliesArr[idx] || []).map((r: any) => ({
+          id: r.id,
+          author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' },
+          content: r.content,
+          time: formatTimeOfDay(r.created_at || ''),
+          likes: r.likes || 0,
+          isLiked: false,
+          canEdit: true,
+        })),
+        canEdit: true,
       }))
       
       setHasMoreComments(((cr.total || 0) > page * (cr.size || 10)))
@@ -172,14 +212,33 @@ const PostDetailScreen: React.FC = () => {
   const handleSubmitComment = async (content: string) => {
     await apiCreateComment('Post', post.id, content)
     const cr = await apiGetComments('post', post.id, 1, 10)
-    const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: c.created_at || '', likes: c.likes || 0, isLiked: false }))
+    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+    const mapped = base.map((c, idx) => ({
+      ...c,
+      replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+      canEdit: true,
+    }))
     setAllComments(mapped)
     toast({ title: '评论发送成功', description: '您的评论已发布' })
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {
     await apiReplyComment(commentId, content)
+    // 刷新当前第一页以包含最新回复
+    const cr = await apiGetComments('post', post.id, 1, 10)
+    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+    const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })) }))
+    setAllComments(mapped)
     toast({ title: '回复发送成功', description: '您的回复已发布' })
+  }
+
+  const handleEditComment = async (commentId: number, content: string) => {
+    await apiUpdateComment(commentId, content)
+  }
+  const handleDeleteComment = async (commentId: number) => {
+    await apiDeleteComment(commentId)
   }
 
   const handleLikeComment = async (commentId: number) => {
@@ -200,25 +259,25 @@ const PostDetailScreen: React.FC = () => {
 
   // 处理点赞
   const handleLike = async () => {
-    await toggleLikePost(post.id)
+    const res = await toggleLikePost(post.id)
     setIsLiked(!isLiked)
+    // 同步计数
+    setPost((prev: any) => ({ ...prev, likes: typeof res?.like_count === 'number' ? res.like_count : prev.likes + (isLiked ? -1 : 1) }))
     toast({ title: isLiked ? '已取消点赞' : '点赞成功', description: isLiked ? '已取消对此帖子的点赞' : '感谢您的支持', duration: 2000 })
   }
 
-  // 处理收藏
-  const handleBookmark = async () => {
-    await toggleBookmarkPost(post.id)
-    setIsBookmarked(!isBookmarked)
-    toast({ title: isBookmarked ? '已取消收藏' : '收藏成功', description: isBookmarked ? '已从收藏夹中移除' : '已添加到您的收藏夹', duration: 2000 })
-  }
-
+  // 收藏暂不开发
   // 处理分享
   const handleShare = () => {
-    toast({
-      title: "分享链接已复制",
-      description: "可以分享给更多朋友了",
-      duration: 2000,
-    })
+    try {
+      const url = window.location.href
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url)
+      }
+      toast({ title: '分享链接已复制', description: '可以分享给更多朋友了', duration: 2000 })
+    } catch {
+      toast({ title: '分享', description: '请手动复制地址栏链接', duration: 2000 })
+    }
   }
 
   // 处理举报
@@ -235,7 +294,7 @@ const PostDetailScreen: React.FC = () => {
         showBackButton
         rightAction={
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={handleShare}>
               <Share2 size={20} />
             </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9">
@@ -381,7 +440,6 @@ const PostDetailScreen: React.FC = () => {
             buttons={[
               createLikeButton(post.likes + (isLiked ? 1 : 0), isLiked, handleLike),
               createShareButton(handleShare),
-              createBookmarkButton(undefined, isBookmarked, handleBookmark),
               createReportButton(handleReport)
             ]}
             className="mb-4"
@@ -400,7 +458,7 @@ const PostDetailScreen: React.FC = () => {
 
           {/* 评论区 */}
           <CommentSection
-            comments={allComments}
+            comments={allComments.map(c => ({ ...c, canEdit: true }))}
             totalCount={post.comments}
             onSubmitComment={handleSubmitComment}
             onSubmitReply={handleSubmitReply}
@@ -414,6 +472,8 @@ const PostDetailScreen: React.FC = () => {
             initialCommentsToShow={5}
             pageSize={10}
             className="mt-6"
+            onEditComment={handleEditComment}
+            onDeleteComment={handleDeleteComment}
           />
         </div>
       </ScrollArea>

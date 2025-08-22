@@ -60,4 +60,12 @@ export async function uploadImage(file: File, packageId?: number): Promise<{ fil
   }
   
   return http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
+}
+
+// 上传帖子图片并绑定到帖子
+export async function uploadPostImage(file: File, postId: number): Promise<{ file_path: string; download_url: string; file_size: number }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('post_id', String(postId))
+  return http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
 } 

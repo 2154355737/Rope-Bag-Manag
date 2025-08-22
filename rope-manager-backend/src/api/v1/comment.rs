@@ -142,7 +142,22 @@ async fn get_all_comments(
         return HttpResponse::BadRequest().json(ApiResponse::<()>::error(400, "必须提供合法的 target_type: Post 或 Package"));
     }
 
-    // 公开读取强制只返回 Active
+    // 若提供 target_id，则仅返回顶层评论（排除回复），避免重复
+    if let Some(tid) = query.target_id {
+        let db_target_type = if ttype_lower == "post" { "Post" } else { "Package" };
+        return match comment_service.get_top_level_comments(db_target_type, tid, page, size).await {
+            Ok((comments, total)) => {
+                let response = CommentListResponse { list: comments, total, page, size };
+                HttpResponse::Ok().json(ApiResponse::success(response))
+            },
+            Err(e) => {
+                log::error!("公开获取顶层评论失败: {}", e);
+                HttpResponse::InternalServerError().json(ApiResponse::<()>::error(500, &format!("获取评论列表失败: {}", e)))
+            }
+        };
+    }
+
+    // 公开读取强制只返回 Active（无target_id保留原逻辑）
     let status = Some("Active");
     let target_type = Some(ttype_lower.as_str());
     let start_date = None;

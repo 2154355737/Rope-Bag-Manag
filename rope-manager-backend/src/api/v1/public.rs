@@ -56,12 +56,9 @@ async fn get_public_comments(
     let mut size = query.size.unwrap_or(20);
     if size > 100 { size = 100; }
 
-    // 仅 Active
-    let status = Some("Active");
     let db_target_type = if ttype == "post" { "Post" } else { "Package" };
-    let target_type = Some(db_target_type);
 
-    match comment_service.get_all_comments(page, size, status, target_type, Some(target_id), None, None, None, None).await {
+    match comment_service.get_top_level_comments(db_target_type, target_id, page, size).await {
         Ok((comments, total)) => {
             let resp = CommentListResponse { list: comments, total, page, size };
             HttpResponse::Ok().json(ApiResponse::success(resp))
