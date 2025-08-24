@@ -1,0 +1,18 @@
+[server]
+host = "0.0.0.0"
+port = 15201
+workers = 8
+
+[database]
+url = "sqlite:./data/production.db"
+max_connections = 50
+
+[jwt]
+secret = "${JWT_SECRET}"
+
+[cache]
+redis_url = "${REDIS_URL}"
+
+[email]
+smtp_username = "${SMTP_USERNAME}"
+smtp_password = "${SMTP_PASSWORD}" 
