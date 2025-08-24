@@ -13,8 +13,18 @@ pub fn configure_health_routes(cfg: &mut web::ServiceConfig) {
 pub fn configure_api_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/v1")
-            // 在这里添加更多API路由
-            // .service(web::scope("/users"))
-            // .service(web::scope("/packages"))
+            .configure(handlers::posts::configure)
+            .configure(handlers::resources::configure)
+            .configure(handlers::categories::configure)
+            .configure(handlers::search::configure)
+            .configure(handlers::notifications::configure)
+            .configure(handlers::auth::configure)
+            .configure(handlers::announcements::configure)
+            .configure(handlers::me::configure)
+            .configure(handlers::users::configure)
+            .configure(handlers::admin::configure)
+            .configure(handlers::comments::configure)
+            .configure(handlers::storage::configure)
+            .configure(handlers::debug::configure)
     );
 } 

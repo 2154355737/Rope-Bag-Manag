@@ -1,6 +1,5 @@
-use actix_web::{web, App, HttpServer, middleware::Logger};
+use actix_web::{web, App, HttpServer};
 use actix_cors::Cors;
-use actix_files::Files;
 use tracing::{info, warn};
 
 mod core;
@@ -13,6 +12,7 @@ use crate::config::AppConfig;
 use crate::infrastructure::database::DatabaseManager;
 use crate::shared::errors::AppResult;
 use crate::shared::utils::logging::{init_logging, log_system_info, log_system_shutdown};
+use crate::api::middleware::RequestTracing;
 
 #[actix_web::main]
 async fn main() -> AppResult<()> {
@@ -51,12 +51,8 @@ async fn main() -> AppResult<()> {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .wrap(setup_cors())
-            .wrap(Logger::new(r#"%a "%r" %s %b "%{Referer}i" "%{User-Agent}i" %T"#))
+            .wrap(RequestTracing::new())
             .configure(api::configure_routes)
-            .service(
-                Files::new("/uploads", &config.storage.upload_path)
-                    .show_files_listing()
-            )
     })
     .workers(config.server.workers)
     .bind(&bind_address)

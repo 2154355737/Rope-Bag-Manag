@@ -1,4 +1,4 @@
-# 绳包管理器后端服务 v2.0
+# 绳包管理器后端服务 - 重构版本
 
 ## 项目概述
 
@@ -211,3 +211,34 @@ MIT License
 - 重构核心业务逻辑
 - 优化数据库性能
 - 完善错误处理 
+
+## 日志与调试
+
+后端已统一接入 `tracing` 日志系统，并为所有 HTTP 请求添加了请求跟踪中间件：
+
+- 自动生成并返回 `X-Request-Id` 响应头，方便端到端追踪
+- 记录方法、路径、状态码、耗时、远端地址、User-Agent
+- 错误响应（4xx/5xx）会输出告警/错误级别日志
+- 支持控制台美化输出与文件 JSON 输出（可配置）
+
+配置项位于 `config/*.toml` 的 `[logging]` 部分：
+
+```toml
+[logging]
+level = "info"            # 等级：error,warn,info,debug,trace，也可用 RUST_LOG 覆盖
+file_enabled = true        # 是否写入文件（每日滚动）
+file_path = "./logs"      # 日志目录
+console_enabled = true     # 是否输出到控制台
+json_format = false        # 是否使用 JSON 格式（推荐生产环境开启）
+with_file_info = true      # 是否打印文件与行号
+with_thread_ids = true     # 是否打印线程ID
+with_timestamps = true     # 是否显示时间戳（可在本地调试关闭）
+```
+
+注意：当前实现优先级为文件输出 > 控制台输出。当 `file_enabled=true` 且配置了 `file_path` 时，日志会写入 `server.log`（每日滚动）。否则输出到控制台。
+
+中间件：`api/middleware/mod.rs` 中的 `RequestTracing` 已在入口 `main.rs` 挂载，无需额外配置。
+
+常见问题：
+- 若需要更详细组件日志，可设置环境变量：`RUST_LOG=debug` 或在配置中设置 `level="debug"`。
+- 生产环境建议：`json_format=true`、`file_enabled=true`，并由日志采集器（如 filebeat）接入。 

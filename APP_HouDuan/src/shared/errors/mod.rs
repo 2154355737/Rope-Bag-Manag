@@ -1,5 +1,6 @@
 use actix_web::{HttpResponse, ResponseError};
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 pub type AppResult<T> = Result<T, AppError>;
 
@@ -142,7 +143,14 @@ impl ResponseError for AppError {
                 "内部服务器错误".to_string(),
             ),
         };
-        
+
+        // 错误日志（不包含敏感数据）
+        if code >= 500 {
+            error!(code = code, message = %message, err = ?self, "API error response");
+        } else {
+            warn!(code = code, message = %message, err = ?self, "API error response");
+        }
+         
         HttpResponse::build(status_code).json(ApiResponse::<()>::error(code, message))
     }
 }

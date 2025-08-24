@@ -3,6 +3,8 @@
 
 pub mod user;
 pub mod package;
+pub mod resource;
+pub mod post;
 pub mod category;
 pub mod tag;
 pub mod comment;

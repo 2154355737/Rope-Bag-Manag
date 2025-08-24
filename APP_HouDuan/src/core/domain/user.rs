@@ -12,36 +12,94 @@ pub struct User {
     pub nickname: Option<String>,
     pub avatar_url: Option<String>,
     pub bio: Option<String>,
-    pub role: UserRole,
-    pub status: UserStatus,
+    pub role: String,
+    pub status: String,
     pub settings: serde_json::Value,
     pub stats: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
-#[repr(u8)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum UserRole {
     #[serde(rename = "user")]
-    User = 0,
+    User,
     #[serde(rename = "elder")]
-    Elder = 1,
+    Elder,
     #[serde(rename = "moderator")]
-    Moderator = 2,
+    Moderator,
     #[serde(rename = "admin")]
-    Admin = 3,
+    Admin,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type, PartialEq)]
-#[repr(u8)]
+impl sqlx::Type<sqlx::Sqlite> for UserRole {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Sqlite> for UserRole {
+    fn encode_by_ref(&self, buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>) -> sqlx::encode::IsNull {
+        let value = match self {
+            UserRole::User => "user",
+            UserRole::Elder => "elder",
+            UserRole::Moderator => "moderator",
+            UserRole::Admin => "admin",
+        };
+        <&str as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&value, buf)
+    }
+}
+
+impl sqlx::Decode<'_, sqlx::Sqlite> for UserRole {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'_>) -> Result<Self, sqlx::error::BoxDynError> {
+        let value = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match value {
+            "user" => Ok(UserRole::User),
+            "elder" => Ok(UserRole::Elder),
+            "moderator" => Ok(UserRole::Moderator),
+            "admin" => Ok(UserRole::Admin),
+            _ => Err(format!("Invalid UserRole: {}", value).into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum UserStatus {
     #[serde(rename = "active")]
-    Active = 0,
+    Active,
     #[serde(rename = "suspended")]
-    Suspended = 1,
+    Suspended,
     #[serde(rename = "banned")]
-    Banned = 2,
+    Banned,
+}
+
+impl sqlx::Type<sqlx::Sqlite> for UserStatus {
+    fn type_info() -> sqlx::sqlite::SqliteTypeInfo {
+        <&str as sqlx::Type<sqlx::Sqlite>>::type_info()
+    }
+}
+
+impl sqlx::Encode<'_, sqlx::Sqlite> for UserStatus {
+    fn encode_by_ref(&self, buf: &mut Vec<sqlx::sqlite::SqliteArgumentValue<'_>>) -> sqlx::encode::IsNull {
+        let value = match self {
+            UserStatus::Active => "active",
+            UserStatus::Suspended => "suspended",
+            UserStatus::Banned => "banned",
+        };
+        <&str as sqlx::Encode<sqlx::Sqlite>>::encode_by_ref(&value, buf)
+    }
+}
+
+impl sqlx::Decode<'_, sqlx::Sqlite> for UserStatus {
+    fn decode(value: sqlx::sqlite::SqliteValueRef<'_>) -> Result<Self, sqlx::error::BoxDynError> {
+        let value = <&str as sqlx::Decode<sqlx::Sqlite>>::decode(value)?;
+        match value {
+            "active" => Ok(UserStatus::Active),
+            "suspended" => Ok(UserStatus::Suspended),
+            "banned" => Ok(UserStatus::Banned),
+            _ => Err(format!("Invalid UserStatus: {}", value).into()),
+        }
+    }
 }
 
 #[derive(Debug, Validate, Deserialize)]
@@ -89,8 +147,8 @@ pub struct UserProfile {
     pub nickname: Option<String>,
     pub avatar_url: Option<String>,
     pub bio: Option<String>,
-    pub role: UserRole,
-    pub status: UserStatus,
+    pub role: String,
+    pub status: String,
     pub stats: UserStats,
     pub created_at: DateTime<Utc>,
 }
@@ -147,19 +205,19 @@ impl std::fmt::Display for UserStatus {
 
 impl User {
     pub fn can_access_admin(&self) -> bool {
-        matches!(self.role, UserRole::Admin | UserRole::Moderator)
+        matches!(self.role.as_str(), "admin" | "moderator")
     }
     
     pub fn can_moderate(&self) -> bool {
-        matches!(self.role, UserRole::Admin | UserRole::Moderator | UserRole::Elder)
+        matches!(self.role.as_str(), "admin" | "moderator" | "elder")
     }
     
     pub fn can_review_packages(&self) -> bool {
-        matches!(self.role, UserRole::Admin | UserRole::Moderator | UserRole::Elder)
+        matches!(self.role.as_str(), "admin" | "moderator" | "elder")
     }
     
     pub fn is_active(&self) -> bool {
-        self.status == UserStatus::Active
+        self.status == "active"
     }
     
     pub fn to_profile(&self, stats: UserStats) -> UserProfile {

@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast'
 import { login, register, sendRegisterCode, LoginRequest, RegisterRequest } from '@/api/auth'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
+import { ApiError } from '@/api/client'
 
 const LoginScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -67,9 +68,22 @@ const LoginScreen: React.FC = () => {
       const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || '/'
       navigate(redirectUrl)
     } catch (error: any) {
+      let description = '登录失败，请重试'
+      if (error instanceof ApiError) {
+        // 后端统一：用户不存在/密码错误 -> 400 + { code:1, message: '...' }
+        if (error.status === 400 || error.code === 1) {
+          description = error.message || '用户名或密码错误'
+        } else if (error.status === 401 || error.code === 401) {
+          description = '登录已过期，请重新登录'
+        } else if (error.message) {
+          description = error.message
+        }
+      } else if (error?.message) {
+        description = error.message
+      }
       toast({
         title: "登录失败",
-        description: error.message || "用户名或密码错误",
+        description,
         variant: "destructive"
       })
     } finally {

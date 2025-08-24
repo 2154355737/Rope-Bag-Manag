@@ -8,17 +8,19 @@ use tracing::{info, instrument};
 use crate::config::AppConfig;
 use crate::infrastructure::database::{DatabaseManager, repositories};
 use crate::shared::errors::{AppError, AppResult};
+use crate::infrastructure::storage::{OpenDalStorage, Storage};
 
 /// 应用状态
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AppState {
     pub config: AppConfig,
     pub db: DatabaseManager,
     pub services: ServiceContainer,
+    pub storage: Arc<dyn Storage>,
 }
 
 /// 服务容器
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ServiceContainer {
     pub user_service: Arc<services::UserService>,
     pub package_service: Arc<services::PackageService>,
@@ -26,12 +28,20 @@ pub struct ServiceContainer {
     pub category_service: Arc<services::CategoryService>,
     pub comment_service: Arc<services::CommentService>,
     pub notification_service: Arc<services::NotificationService>,
+    // 新增：帖子与资源服务
+    pub post_service: Arc<services::PostService>,
+    pub resource_service: Arc<services::ResourceService>,
 }
 
 impl AppState {
     #[instrument(skip(config, db_manager))]
     pub async fn new(config: AppConfig, db_manager: DatabaseManager) -> AppResult<Self> {
         let services = ServiceContainer::new(&config, &db_manager).await?;
+        // 初始化存储（OpenDAL FS）
+        let storage = Arc::new(
+            OpenDalStorage::new_fs(&config.storage.upload_path)
+                .map_err(|e| AppError::File(e.to_string()))?
+        ) as Arc<dyn Storage>;
         
         info!("✅ 应用状态初始化完成");
         
@@ -39,6 +49,7 @@ impl AppState {
             config,
             db: db_manager,
             services,
+            storage,
         })
     }
     
@@ -73,6 +84,12 @@ impl ServiceContainer {
         let category_repo = Arc::new(repositories::CategoryRepository::new(db.pool()));
         let comment_repo = Arc::new(repositories::CommentRepository::new(db.pool()));
         let notification_repo = Arc::new(repositories::NotificationRepository::new(db.pool()));
+
+        // 新增仓储：post/resource + like/bookmark
+        let post_repo = Arc::new(repositories::SqlxPostRepository::new(db.pool()));
+        let resource_repo = Arc::new(repositories::SqlxResourceRepository::new(db.pool()));
+        let like_repo = Arc::new(repositories::SqlxLikeRepository::new(db.pool()));
+        let bookmark_repo = Arc::new(repositories::SqlxBookmarkRepository::new(db.pool()));
         
         info!("📦 仓储层初始化完成");
         info!("🛠️ 正在初始化服务层...");
@@ -91,9 +108,21 @@ impl ServiceContainer {
         let category_service = Arc::new(services::CategoryService::new(category_repo));
         let comment_service = Arc::new(services::CommentService::new(
             comment_repo,
-            user_repo,
+            user_repo.clone(),
         ));
         let notification_service = Arc::new(services::NotificationService::new(notification_repo));
+        
+        // 新增：帖子与资源服务
+        let post_service = Arc::new(services::PostService::new(
+            post_repo.clone(),
+            like_repo.clone(),
+            bookmark_repo.clone(),
+        ));
+        let resource_service = Arc::new(services::ResourceService::new(
+            resource_repo.clone(),
+            like_repo.clone(),
+            bookmark_repo.clone(),
+        ));
         
         info!("⚡ 服务层初始化完成");
         
@@ -104,6 +133,8 @@ impl ServiceContainer {
             category_service,
             comment_service,
             notification_service,
+            post_service,
+            resource_service,
         })
     }
 } 

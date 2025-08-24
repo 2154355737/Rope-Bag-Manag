@@ -76,7 +76,7 @@ export async function getCurrentUser(): Promise<User> {
 
 // 获取当前用户详细资料
 export async function getCurrentUserProfile(): Promise<User> {
-  return http.get<User>('/users/profile')
+  return http.get<User>('/me')
 }
 
 // 更新当前用户资料
@@ -88,7 +88,7 @@ export async function updateCurrentUserProfile(data: {
   skills?: string
   avatar_url?: string
 }): Promise<void> {
-  return http.put<void>('/users/profile', data)
+  return http.put<void>('/me', data)
 }
 
 // 刷新token

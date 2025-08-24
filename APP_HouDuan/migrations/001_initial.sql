@@ -238,25 +238,6 @@ CREATE INDEX IF NOT EXISTS idx_user_actions_user_id ON user_actions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_type ON user_actions(action_type);
 CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at);
 
--- 公告表
-CREATE TABLE IF NOT EXISTS announcements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title VARCHAR(200) NOT NULL,
-    content TEXT NOT NULL,
-    type VARCHAR(20) DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'error')),
-    enabled BOOLEAN DEFAULT 1,
-    start_time DATETIME,
-    end_time DATETIME,
-    created_by INTEGER,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
-);
-
--- 公告表索引
-CREATE INDEX IF NOT EXISTS idx_announcements_enabled ON announcements(enabled);
-CREATE INDEX IF NOT EXISTS idx_announcements_time ON announcements(start_time, end_time);
 
 -- 系统设置表
 CREATE TABLE IF NOT EXISTS system_settings (
@@ -334,14 +315,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_target ON subscriptions(target_type, target_id);
 
--- 违禁词表
-CREATE TABLE IF NOT EXISTS forbidden_words (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    word VARCHAR(100) NOT NULL UNIQUE,
-    type VARCHAR(20) DEFAULT 'exact' CHECK (type IN ('exact', 'fuzzy', 'regex')),
-    enabled BOOLEAN DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
 
 -- IP封禁表
 CREATE TABLE IF NOT EXISTS ip_bans (

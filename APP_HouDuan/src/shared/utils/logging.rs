@@ -2,23 +2,109 @@ use std::env;
 use tracing_subscriber::EnvFilter;
 use crate::config::LoggingConfig;
 
+use tracing_subscriber::fmt;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
+use tracing_appender::rolling;
+use tracing_appender::non_blocking::WorkerGuard;
+use once_cell::sync::OnceCell;
+
+static FILE_GUARD: OnceCell<WorkerGuard> = OnceCell::new();
+
 /// 初始化日志系统
 pub fn init_logging(config: &LoggingConfig) -> anyhow::Result<()> {
-    // 设置默认环境变量
     if env::var("RUST_LOG").is_err() {
         env::set_var("RUST_LOG", &config.level);
     }
 
-    // 使用简单的格式化订阅器
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_target(config.with_file_info)
-        .with_thread_ids(config.with_thread_ids)
-        .with_file(config.with_file_info)
-        .with_line_number(config.with_file_info)
-        .init();
+    // Writer 构建函数
+    let build_file_writer = || -> Option<tracing_appender::non_blocking::NonBlocking> {
+        if config.file_enabled {
+            if let Some(dir) = &config.file_path {
+                let appender = rolling::daily(dir, "server.log");
+                let (non_blocking, guard) = tracing_appender::non_blocking(appender);
+                let _ = FILE_GUARD.set(guard);
+                return Some(non_blocking);
+            }
+        }
+        None
+    };
+    let build_console_writer = || -> Option<fn() -> std::io::Stdout> {
+        if config.console_enabled { Some(|| std::io::stdout()) } else { None }
+    };
 
-    Ok(())
+    if config.json_format {
+        if config.with_timestamps {
+            let builder = fmt()
+                .with_env_filter(EnvFilter::from_default_env())
+                .json()
+                .with_target(config.with_file_info)
+                .with_thread_ids(config.with_thread_ids)
+                .with_file(config.with_file_info)
+                .with_line_number(config.with_file_info)
+                .with_level(true);
+
+            match (build_file_writer(), build_console_writer()) {
+                (Some(f), Some(c)) => { builder.with_writer(f.and(c)).init(); }
+                (Some(f), None) => { builder.with_writer(f).init(); }
+                (None, Some(c)) => { builder.with_writer(c).init(); }
+                (None, None) => { builder.with_writer(|| std::io::stdout()).init(); }
+            }
+            return Ok(());
+        } else {
+            let builder = fmt()
+                .with_env_filter(EnvFilter::from_default_env())
+                .json()
+                .without_time()
+                .with_target(config.with_file_info)
+                .with_thread_ids(config.with_thread_ids)
+                .with_file(config.with_file_info)
+                .with_line_number(config.with_file_info)
+                .with_level(true);
+
+            match (build_file_writer(), build_console_writer()) {
+                (Some(f), Some(c)) => { builder.with_writer(f.and(c)).init(); }
+                (Some(f), None) => { builder.with_writer(f).init(); }
+                (None, Some(c)) => { builder.with_writer(c).init(); }
+                (None, None) => { builder.with_writer(|| std::io::stdout()).init(); }
+            }
+            return Ok(());
+        }
+    } else {
+        if config.with_timestamps {
+            let builder = fmt()
+                .with_env_filter(EnvFilter::from_default_env())
+                .with_target(config.with_file_info)
+                .with_thread_ids(config.with_thread_ids)
+                .with_file(config.with_file_info)
+                .with_line_number(config.with_file_info)
+                .with_level(true);
+
+            match (build_file_writer(), build_console_writer()) {
+                (Some(f), Some(c)) => { builder.with_writer(f.and(c)).init(); }
+                (Some(f), None) => { builder.with_writer(f).init(); }
+                (None, Some(c)) => { builder.with_writer(c).init(); }
+                (None, None) => { builder.with_writer(|| std::io::stdout()).init(); }
+            }
+            return Ok(());
+        } else {
+            let builder = fmt()
+                .with_env_filter(EnvFilter::from_default_env())
+                .without_time()
+                .with_target(config.with_file_info)
+                .with_thread_ids(config.with_thread_ids)
+                .with_file(config.with_file_info)
+                .with_line_number(config.with_file_info)
+                .with_level(true);
+
+            match (build_file_writer(), build_console_writer()) {
+                (Some(f), Some(c)) => { builder.with_writer(f.and(c)).init(); }
+                (Some(f), None) => { builder.with_writer(f).init(); }
+                (None, Some(c)) => { builder.with_writer(c).init(); }
+                (None, None) => { builder.with_writer(|| std::io::stdout()).init(); }
+            }
+            return Ok(());
+        }
+    }
 }
 
 /// 便捷宏用于记录性能
