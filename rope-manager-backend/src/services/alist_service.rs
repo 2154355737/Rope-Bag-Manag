@@ -93,7 +93,7 @@ impl AListService {
     pub fn new() -> Self {
         // 默认从环境变量读取，若不存在则使用保底值
         log::info!("🔧 初始化AList服务客户端...");
-        let base_url = std::env::var("ALIST_BASE_URL").unwrap_or_else(|_| "http://alist.tiecode.org.cn".to_string());
+        let base_url = std::env::var("ALIST_BASE_URL").unwrap_or_else(|_| "http://103.36.223.120:15244".to_string());
         let username = std::env::var("ALIST_USERNAME").unwrap_or_else(|_| "2154355737@qq.com".to_string());
         let password = std::env::var("ALIST_PASSWORD").unwrap_or_else(|_| "".to_string());
 

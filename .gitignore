@@ -1,6 +1,3 @@
-nul
-Rust_Vue/src/layouts/mobile/MobileLayout.vue
-node_modules
-rope-manager-backend/data.db
-app/dist/assets/
-rope-manager-backend/target2
+App_v2/jieshengshequ-app/node_modules/
+rope-manager-backend/target/
+rope-manager-backend/target2/

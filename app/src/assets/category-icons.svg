@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
-  <symbol id="icon-knot" viewBox="0 0 24 24"><path fill="#8AA7FF" d="M12 2a5 5 0 0 1 5 5v10a5 5 0 1 1-10 0V7a5 5 0 0 1 5-5zm0 2a3 3 0 0 0-3 3v10a3 3 0 1 0 6 0V7a3 3 0 0 0-3-3z"/></symbol>
-  <symbol id="icon-tools" viewBox="0 0 24 24"><path fill="#5CC3B5" d="M7 2l3 3-2 2-3-3 2-2zm9 2l2 2-8 8-2-2 8-8zm-9 9l2 2-5 5H2v-2l5-5z"/></symbol>
-  <symbol id="icon-video" viewBox="0 0 24 24"><path fill="#F7B84B" d="M4 5h10a2 2 0 0 1 2 2v2l4-2v10l-4-2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></symbol>
-  <symbol id="icon-article" viewBox="0 0 24 24"><path fill="#AC92EB" d="M6 2h12a2 2 0 0 1 2 2v16l-6-3-6 3V4a2 2 0 0 1 2-2z"/></symbol>
-  <symbol id="icon-advanced" viewBox="0 0 24 24"><path fill="#FF6B6B" d="M12 2l7 7-7 7-7-7 7-7zm0 4l-3 3 3 3 3-3-3-3z"/></symbol>
-  <symbol id="icon-safety" viewBox="0 0 24 24"><path fill="#4FC3F7" d="M12 2l8 4v6c0 5-3.6 9.3-8 10-4.4-.7-8-5-8-10V6l8-4z"/></symbol>
-  <symbol id="icon-community" viewBox="0 0 24 24"><path fill="#7ED321" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-7 9a7 7 0 0 1 14 0z"/></symbol>
-</svg> 

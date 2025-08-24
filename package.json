@@ -1,6 +1,0 @@
-{
-	"devDependencies": {
-		"@bufbuild/protobuf": "^2.6.3",
-		"sass-embedded": "^1.90.0"
-	}
-}
