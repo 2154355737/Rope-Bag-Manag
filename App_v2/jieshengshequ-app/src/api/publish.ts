@@ -44,41 +44,58 @@ export interface PublishResponse {
   created_at: string
 }
 
-// 发布资源
+// 发布资源（REST）
 export async function publishResource(data: PublishResourceRequest): Promise<PublishResponse> {
-  return http.post<PublishResponse>('/publish/resource', data)
+  return http.post<PublishResponse>('/resources', data)
 }
 
-// 发布帖子  
+// 发布帖子（REST）
 export async function publishPost(data: PublishPostRequest): Promise<PublishResponse> {
-  return http.post<PublishResponse>('/publish/post', data)
+  return http.post<PublishResponse>('/posts', data)
 }
 
-// 上传文件到指定资源
-export async function uploadResourceFile(resourceId: number, file: File): Promise<{ file_path: string; file_name: string }> {
+// 统一：上传资源文件，经由通用存储端点并绑定 package_id
+export async function uploadResourceFile(resourceId: number, file: File): Promise<{ file_path: string; download_url: string; file_size: number }> {
   const formData = new FormData()
+  // 使用"file"作为字段名
   formData.append('file', file)
+  formData.append('package_id', String(resourceId))
+  console.log('开始上传资源文件:', file.name, '大小:', file.size, '资源ID:', resourceId)
   
-  return http.post<{ file_path: string; file_name: string }>(`/packages/${resourceId}/upload`, formData)
+  // 注意：API_BASE已经包含了/api/v1前缀，所以这里不需要再加
+  // 直接使用不带前缀的路径
+  const url = '/storage/upload';
+  console.log('完整上传URL:', url);
+  return http.post<{ file_path: string; download_url: string; file_size: number }>(url, formData)
 }
 
 // 上传图片
 export async function uploadImage(file: File, packageId?: number): Promise<{ file_path: string; download_url: string; file_size: number }> {
   const formData = new FormData()
+  // 使用"file"作为字段名
   formData.append('file', file)
   if (packageId) {
     formData.append('package_id', packageId.toString())
   }
   
-  return http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
+  console.log('开始上传图片:', file.name, '大小:', file.size)
+  // 注意：API_BASE已经包含了/api/v1前缀，所以这里不需要再加
+  const url = '/storage/upload';
+  console.log('完整上传URL:', url);
+  return http.post<{ file_path: string; download_url: string; file_size: number }>(url, formData)
 }
 
 // 上传帖子图片并绑定到帖子
 export async function uploadPostImage(file: File, postId: number): Promise<{ file_path: string; download_url: string; file_size: number }> {
   const formData = new FormData()
+  // 使用"file"作为字段名
   formData.append('file', file)
   formData.append('post_id', String(postId))
-  return http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
+  console.log('开始上传帖子图片:', file.name, '大小:', file.size, '帖子ID:', postId)
+  // 注意：API_BASE已经包含了/api/v1前缀，所以这里不需要再加
+  const url = '/storage/upload';
+  console.log('完整上传URL:', url);
+  return http.post<{ file_path: string; download_url: string; file_size: number }>(url, formData)
 } 
 
 // 验证文件是否已成功上传到存储系统

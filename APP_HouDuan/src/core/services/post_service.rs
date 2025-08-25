@@ -25,6 +25,29 @@ impl PostService {
         }
     }
     
+    /// 创建新帖子（带事务）
+    #[instrument(skip(self, tx, request))]
+    pub async fn create_post_with_transaction(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        user_id: i64,
+        request: CreatePostRequest,
+    ) -> AppResult<PostDetail> {
+        info!("用户 {} 在事务中创建帖子: {}", user_id, request.title);
+        
+        // 创建帖子数据，初始状态为 draft（等待图片上传验证）
+        let mut create_data = request.to_create_data(user_id);
+        // 确保新创建的帖子是草稿状态，等待图片验证
+        create_data.status = crate::core::domain::post::PostStatus::Draft;
+        
+        let post = self.post_repo.create_with_transaction(tx, create_data).await?;
+        
+        info!("帖子在事务中创建成功: {} (ID: {})", post.title, post.id);
+        
+        // 构建详情响应
+        Ok(post.to_detail(None, false, false))
+    }
+    
     /// 创建新帖子
     #[instrument(skip(self, request))]
     pub async fn create_post(

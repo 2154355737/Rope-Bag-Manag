@@ -25,6 +25,50 @@ impl ResourceService {
         }
     }
     
+    /// 创建新资源（带事务）
+    #[instrument(skip(self, tx, request))]
+    pub async fn create_resource_with_transaction(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+        user_id: i64,
+        request: CreateResourceRequest,
+        file_path: String,
+    ) -> AppResult<ResourceDetail> {
+        info!("用户 {} 在事务中创建资源: {}", user_id, request.title);
+
+        // 确保 slug 唯一（若已存在则自动追加 -2/-3 ...）
+        let mut request = request;
+        let base_slug = request.name.clone();
+        if self.resource_repo.exists_by_name_tx(tx, &request.name).await? {
+            warn!("资源名 {} 已存在，尝试自动去重", request.name);
+            let mut suffix: i32 = 2;
+            loop {
+                let candidate = format!("{}-{}", base_slug, suffix);
+                if !self.resource_repo.exists_by_name_tx(tx, &candidate).await? {
+                    request.name = candidate.clone();
+                    info!("资源名已调整为唯一: {}", request.name);
+                    break;
+                }
+                suffix += 1;
+                if suffix > 99 {
+                    return Err(AppError::Business("资源名冲突过多，请更换标题".to_string()));
+                }
+            }
+        }
+
+        // 创建资源数据，初始状态为 draft（等待文件上传验证）
+        let mut create_data = request.to_create_data(user_id, file_path);
+        // 确保新创建的资源是草稿状态，等待文件验证
+        create_data.status = crate::core::domain::resource::ResourceStatus::Draft;
+        
+        let resource = self.resource_repo.create_with_transaction(tx, create_data).await?;
+        
+        info!("资源在事务中创建成功: {} (ID: {})", resource.title, resource.id);
+        
+        // 构建详情响应
+        Ok(resource.to_detail(None, None, false, false, None))
+    }
+    
     /// 创建新资源
     #[instrument(skip(self, request))]
     pub async fn create_resource(
@@ -34,13 +78,27 @@ impl ResourceService {
         file_path: String,
     ) -> AppResult<ResourceDetail> {
         info!("用户 {} 创建资源: {}", user_id, request.title);
-        
-        // 验证资源名唯一性
+
+        // 确保 slug 唯一（若已存在则自动追加 -2/-3 ...）
+        let mut request = request;
+        let base_slug = request.name.clone();
         if self.resource_repo.exists_by_name(&request.name).await? {
-            warn!("资源名 {} 已存在", request.name);
-            return Err(AppError::Business(format!("资源名 {} 已存在", request.name)));
+            warn!("资源名 {} 已存在，尝试自动去重", request.name);
+            let mut suffix: i32 = 2;
+            loop {
+                let candidate = format!("{}-{}", base_slug, suffix);
+                if !self.resource_repo.exists_by_name(&candidate).await? {
+                    request.name = candidate.clone();
+                    info!("资源名已调整为唯一: {}", request.name);
+                    break;
+                }
+                suffix += 1;
+                if suffix > 99 {
+                    return Err(AppError::Business("资源名冲突过多，请更换标题".to_string()));
+                }
+            }
         }
-        
+
         // 创建资源数据
         let create_data = request.to_create_data(user_id, file_path);
         let resource = self.resource_repo.create(create_data).await?;
@@ -241,6 +299,20 @@ impl ResourceService {
             page: result.page,
             page_size: result.page_size,
         })
+    }
+    
+    /// 生成资源下载链接（可加权限校验/签名）
+    pub async fn prepare_download(&self, resource_id: i64, _user_id: i64) -> AppResult<String> {
+        let resource = self.resource_repo.find_by_id(resource_id).await?
+            .ok_or_else(|| AppError::NotFound("资源不存在".to_string()))?;
+        if !resource.is_downloadable() {
+            return Err(AppError::Forbidden("资源未发布，无法下载".into()));
+        }
+        // 本地直链：返回存储文件访问URL
+        if resource.file_path.is_empty() {
+            return Err(AppError::Business("资源未绑定文件".into()));
+        }
+        Ok(format!("/storage/file/{}", resource.file_path.trim_start_matches('/')))
     }
     
     /// 健康检查

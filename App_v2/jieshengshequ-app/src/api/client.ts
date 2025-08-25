@@ -17,9 +17,29 @@ export class ApiError extends Error {
 }
 
 // 根据环境配置API基础URL
-const API_BASE = import.meta.env.PROD 
-  ? 'http://39.105.113.219:15201/api/v1'  // 生产环境连接到云服务器
-  : '/api/v1'  // 开发环境使用代理
+const isDevelopment = import.meta.env.DEV || 
+                     import.meta.env.MODE === 'development' || 
+                     window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1'
+
+// 直接连接后端，不使用Vite代理
+const API_BASE = isDevelopment
+  ? 'http://127.0.0.1:15201/api/v1'  // 开发环境直接连接后端
+  : 'http://39.105.113.219:15201/api/v1'  // 生产环境连接到云服务器
+
+// Storage API使用不同的基础路径（不包含/api/v1）
+export const STORAGE_API_BASE = isDevelopment
+  ? 'http://127.0.0.1:15201'  // 开发环境
+  : 'http://39.105.113.219:15201'  // 生产环境
+
+// 调试信息：输出当前环境和API_BASE
+console.log('Environment Mode:', import.meta.env.MODE)
+console.log('Environment DEV:', import.meta.env.DEV)
+console.log('Environment PROD:', import.meta.env.PROD)
+console.log('Hostname:', window.location.hostname)
+console.log('isDevelopment:', isDevelopment)
+console.log('API_BASE:', API_BASE)
+console.log('STORAGE_API_BASE:', STORAGE_API_BASE)
 
 function buildQuery(params?: Record<string, any>): string {
 	if (!params) return ''
@@ -82,16 +102,66 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		headers['Content-Type'] = 'application/json'
 	}
 	const token = getToken()
-	if (token) headers['Authorization'] = `Bearer ${token}`
+	if (token) {
+		headers['Authorization'] = `Bearer ${token}`
+		console.log('使用认证Token:', token.substring(0, 10) + '...')
+	} else {
+		console.warn('未找到认证Token，请确保已登录')
+	}
+
+	// 为文件上传设置更长的超时时间
+	const isFileUpload = body instanceof FormData
+	const timeout = isFileUpload ? 300000 : 30000 // 文件上传5分钟，普通请求30秒
+
+	// 调试信息
+	if (isFileUpload) {
+		console.log('准备上传文件:', url)
+		if (body instanceof FormData) {
+			console.log('FormData内容:')
+			for (const pair of (body as FormData).entries()) {
+				if (pair[0] === 'file') {
+					const file = pair[1] as File
+					console.log('- 文件:', file.name, '类型:', file.type, '大小:', file.size)
+				} else {
+					console.log('- 字段:', pair[0], '值:', pair[1])
+				}
+			}
+		}
+	}
 
 	try {
-		const resp = await fetch(`${API_BASE}${url}`, {
+		const controller = new AbortController()
+		const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+		// 对于storage相关的API使用不同的基础路径
+		const baseUrl = url.startsWith('/storage') ? STORAGE_API_BASE : API_BASE
+		const fullUrl = `${baseUrl}${url}`
+		console.log(`发送${method}请求:`, fullUrl)
+		
+		// 调试信息：打印完整请求信息
+		if (body instanceof FormData) {
+			console.log('FormData详细内容:')
+			for (const pair of body.entries()) {
+				if (pair[1] instanceof File) {
+					const file = pair[1] as File
+					console.log(`- 字段名: ${pair[0]}, 文件名: ${file.name}, 类型: ${file.type}, 大小: ${file.size}字节`)
+				} else {
+					console.log(`- 字段名: ${pair[0]}, 值: ${pair[1]}`)
+				}
+			}
+		}
+		
+		const resp = await fetch(fullUrl, {
 			method,
 			headers,
 			body: body ? (body instanceof FormData ? body : JSON.stringify(body)) : undefined,
 			credentials: 'include',
+			signal: controller.signal,
 			...init,
 		})
+
+		clearTimeout(timeoutId)
+		console.log(`请求响应:`, resp.status, resp.statusText)
 
 		// 先尝试解析JSON（即使是非200）
 		const data = await resp.json().catch(() => ({} as any))
@@ -117,10 +187,29 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		}
 		return data as T
 	} catch (error) {
-		// 网络错误或其他错误
-		if (error instanceof TypeError && (error as any).message?.includes('fetch')) {
-			throw new ApiError('网络连接失败，请检查网络或后端服务', undefined)
+		// 处理不同类型的网络错误
+		if (error instanceof ApiError) {
+			throw error
 		}
+		
+		if (error instanceof DOMException && error.name === 'AbortError') {
+			const errorMessage = isFileUpload 
+				? '文件上传超时，请检查网络连接或尝试上传较小的文件' 
+				: '请求超时，请重试'
+			throw new ApiError(errorMessage, 408)
+		}
+		
+		// 网络连接错误
+		if (error instanceof TypeError) {
+			const message = error.message
+			if (message.includes('fetch') || message.includes('Failed to fetch')) {
+				const errorMessage = isFileUpload 
+					? '文件上传失败，请检查网络连接或后端服务状态'
+					: '网络连接失败，请检查网络或后端服务'
+				throw new ApiError(errorMessage, undefined)
+			}
+		}
+		
 		throw error
 	}
 }

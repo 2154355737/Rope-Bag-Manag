@@ -24,7 +24,6 @@ pub fn configure_api_routes(cfg: &mut web::ServiceConfig) {
             .configure(handlers::users::configure)
             .configure(handlers::admin::configure)
             .configure(handlers::comments::configure)
-            .configure(handlers::storage::configure)
             .configure(handlers::debug::configure)
     );
 } 

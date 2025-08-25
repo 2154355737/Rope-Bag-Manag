@@ -516,25 +516,12 @@ const PublishScreen: React.FC = () => {
       return
     }
     
-    // 检查是否有验证失败的文件
-    const hasFailedFiles = Object.values(fileUploadStatus).some(status => status === 'failed')
-    const hasFailedScreenshots = Object.values(screenshotUploadStatus).some(status => status === 'failed')
-    const hasFailedImages = Object.values(imageUploadStatus).some(status => status === 'failed')
-    
-    if (hasFailedFiles || hasFailedScreenshots || hasFailedImages) {
-      const confirmPublish = window.confirm('有文件验证失败，继续发布可能导致文件无法访问。是否仍要继续？')
-      if (!confirmPublish) {
-        return
-      }
-    }
-    
     if (isPublishing) return // 防止重复提交
     if (publishType === 'resource') {
       if (!version.trim() || !category) {
         toast.error('请填写版本信息和选择分类')
         return
       }
-      // 资源文件现在是可选的，不再强制要求上传
     }
 
     setIsPublishing(true)
@@ -542,76 +529,123 @@ const PublishScreen: React.FC = () => {
     try {
       let response: any
       
+      // 新的发布流程：先上传文件，验证成功后再创建记录
       if (publishType === 'resource') {
-        // 发布资源
-        const { publishResource } = await import('@/api/publish')
-        response = await publishResource({
-          title,
-          content,
-          version,
-          category,
-          tags,
-          requirements,
-          files: files.map(f => ({ name: f.name, size: f.size, type: f.type })),
-          screenshots: screenshots.map(s => ({ name: s.name, size: s.size }))
-        })
-        
-        // 如果有文件，逐个上传并验证
+        // 如果有文件需要上传，先上传并验证，然后才创建资源记录
         if (files.length > 0) {
-          const { uploadResourceFile, verifyFile } = await import('@/api/publish')
+          const { uploadImage, verifyFile } = await import('@/api/publish')
+          
+          // 先上传所有文件到临时存储（不绑定到任何资源）
+          let allFilesUploaded = true
+          const uploadedFiles: { name: string; file_path: string; download_url: string; file_size: number }[] = []
+          
           for (const file of files) {
             try {
-              // 更新上传状态为上传中
+              // 检查文件大小 (100MB限制)
+              if (file.size > 100 * 1024 * 1024) {
+                toast.error(`文件 ${file.name} 过大，请选择小于100MB的文件`)
+                setFileUploadStatus(prev => ({ ...prev, [file.name]: 'failed' }))
+                allFilesUploaded = false
+                break
+              }
+
               setFileUploadStatus(prev => ({ ...prev, [file.name]: 'uploading' }))
               
-              const uploadResult = await uploadResourceFile(response.id, file)
+              console.log(`开始上传文件: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`)
+              // 使用uploadImage不绑定packageId，先上传到临时存储
+              const uploadResult = await uploadImage(file)
               
-              // 保存文件路径用于后续验证
-              setFilePaths(prev => ({ ...prev, [file.name]: uploadResult.file_path }))
-              
-              // 更新上传状态为验证中
               setFileUploadStatus(prev => ({ ...prev, [file.name]: 'verifying' }))
+              console.log(`文件 ${file.name} 上传完成，开始验证`)
               
-              // 验证文件是否成功上传到存储系统
               const verifyResult = await verifyFile(uploadResult.file_path)
               if (!verifyResult.exists) {
-                console.warn(`文件 ${file.name} 上传验证失败，文件可能未成功保存`)
-                toast.warning(`文件 ${file.name} 上传可能不完整，请在发布后检查`)
+                console.warn(`文件 ${file.name} 上传验证失败`)
+                toast.error(`文件 ${file.name} 上传失败，请重试`)
                 setFileUploadStatus(prev => ({ ...prev, [file.name]: 'failed' }))
-              } else {
-                console.log(`文件 ${file.name} 上传验证成功`)
-                setFileUploadStatus(prev => ({ ...prev, [file.name]: 'success' }))
+                allFilesUploaded = false
+                break
               }
-            } catch (error) {
-              console.warn(`文件 ${file.name} 上传失败:`, error)
-              toast.error(`文件 ${file.name} 上传失败，请重试`)
+              
+              setFileUploadStatus(prev => ({ ...prev, [file.name]: 'success' }))
+              setFilePaths(prev => ({ ...prev, [file.name]: uploadResult.file_path }))
+              uploadedFiles.push({
+                name: file.name,
+                file_path: uploadResult.file_path,
+                download_url: uploadResult.download_url,
+                file_size: uploadResult.file_size
+              })
+              
+              console.log(`文件 ${file.name} 上传并验证成功`)
+              
+            } catch (error: any) {
+              console.error(`文件 ${file.name} 上传失败:`, error)
+              toast.error(`文件 ${file.name} 上传失败: ${error.message}`)
               setFileUploadStatus(prev => ({ ...prev, [file.name]: 'failed' }))
+              allFilesUploaded = false
+              break
             }
           }
+          
+          // 只有所有文件都上传成功后，才创建资源记录
+          if (!allFilesUploaded) {
+            console.error('文件上传失败，取消资源创建')
+            toast.error('文件上传失败，请重新尝试')
+            setIsPublishing(false)
+            return
+          }
+          
+          // 所有文件上传成功，现在创建资源记录
+          console.log('所有文件上传成功，开始创建资源记录')
+          const { publishResource } = await import('@/api/publish')
+          response = await publishResource({
+            title,
+            content,
+            version,
+            category,
+            tags,
+            requirements,
+            files: uploadedFiles.map(f => ({ name: f.name, size: f.file_size, type: files.find(file => file.name === f.name)?.type })),
+            screenshots: screenshots.map(s => ({ name: s.name, size: s.size }))
+          })
+          
+          console.log('资源记录创建成功:', response)
+          
+        } else {
+          // 没有文件的情况，直接创建资源记录
+          const { publishResource } = await import('@/api/publish')
+          response = await publishResource({
+            title,
+            content,
+            version,
+            category,
+            tags,
+            requirements,
+            files: [],
+            screenshots: screenshots.map(s => ({ name: s.name, size: s.size }))
+          })
         }
         
         // 如果有截图，上传截图并验证
         if (screenshots.length > 0) {
           const { uploadImage, verifyFile } = await import('@/api/publish')
+          let allScreenshotsUploaded = true
+          
           for (const screenshot of screenshots) {
             try {
-              // 更新上传状态为上传中
               setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'uploading' }))
               
-              const uploadResult = await uploadImage(screenshot, response.id)
-              
-              // 保存截图路径用于后续验证
+              const uploadResult = await uploadImage(screenshot)
               setScreenshotPaths(prev => ({ ...prev, [screenshot.name]: uploadResult.file_path }))
               
-              // 更新上传状态为验证中
               setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'verifying' }))
               
-              // 验证截图是否成功上传到存储系统
               const verifyResult = await verifyFile(uploadResult.file_path)
               if (!verifyResult.exists) {
-                console.warn(`截图 ${screenshot.name} 上传验证失败，文件可能未成功保存`)
+                console.warn(`截图 ${screenshot.name} 上传验证失败`)
                 setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'failed' }))
-                toast.warning(`截图 ${screenshot.name} 上传可能不完整`)
+                toast.warning(`截图 ${screenshot.name} 上传失败`)
+                allScreenshotsUploaded = false
               } else {
                 console.log(`截图 ${screenshot.name} 上传验证成功`)
                 setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'success' }))
@@ -619,43 +653,45 @@ const PublishScreen: React.FC = () => {
             } catch (error) {
               console.warn(`截图 ${screenshot.name} 上传失败:`, error)
               setScreenshotUploadStatus(prev => ({ ...prev, [screenshot.name]: 'failed' }))
-              toast.error(`截图 ${screenshot.name} 上传失败`)
+              toast.warning(`截图 ${screenshot.name} 上传失败`)
             }
+          }
+          
+          if (!allScreenshotsUploaded) {
+            toast.warning('部分截图上传失败，但资源已成功发布')
           }
         }
       } else {
-        // 发布帖子
-        const { publishPost } = await import('@/api/publish')
-        response = await publishPost({
-          title,
-          content,
-          tags,
-          images: images.map(img => ({ name: img.name, size: img.size })),
-          code_snippet: codeSnippet
-        })
-        
-        // 如果有图片，上传图片并验证
+        // 帖子发布流程
         if (images.length > 0) {
+          // 如果有图片需要上传，先创建帖子再上传图片
+          const { publishPost } = await import('@/api/publish')
+          response = await publishPost({
+            title,
+            content,
+            tags,
+            images: images.map(img => ({ name: img.name, size: img.size })),
+            code_snippet: codeSnippet
+          })
+          
           const { uploadPostImage, verifyFile } = await import('@/api/publish')
+          let allImagesUploaded = true
+          
           for (const image of images) {
             try {
-              // 更新上传状态为上传中
               setImageUploadStatus(prev => ({ ...prev, [image.name]: 'uploading' }))
               
               const uploadResult = await uploadPostImage(image, response.id)
-              
-              // 保存图片路径用于后续验证
               setImagePaths(prev => ({ ...prev, [image.name]: uploadResult.file_path }))
               
-              // 更新上传状态为验证中
               setImageUploadStatus(prev => ({ ...prev, [image.name]: 'verifying' }))
               
-              // 验证图片是否成功上传到存储系统
               const verifyResult = await verifyFile(uploadResult.file_path)
               if (!verifyResult.exists) {
-                console.warn(`图片 ${image.name} 上传验证失败，文件可能未成功保存`)
+                console.warn(`图片 ${image.name} 上传验证失败`)
                 setImageUploadStatus(prev => ({ ...prev, [image.name]: 'failed' }))
-                toast.warning(`图片 ${image.name} 上传可能不完整`)
+                toast.warning(`图片 ${image.name} 上传失败`)
+                allImagesUploaded = false
               } else {
                 console.log(`图片 ${image.name} 上传验证成功`)
                 setImageUploadStatus(prev => ({ ...prev, [image.name]: 'success' }))
@@ -663,16 +699,30 @@ const PublishScreen: React.FC = () => {
             } catch (error) {
               console.warn(`图片 ${image.name} 上传失败:`, error)
               setImageUploadStatus(prev => ({ ...prev, [image.name]: 'failed' }))
-              toast.error(`图片 ${image.name} 上传失败`)
+              toast.warning(`图片 ${image.name} 上传失败`)
             }
           }
+          
+          if (!allImagesUploaded) {
+            toast.warning('部分图片上传失败，但帖子已成功发布')
+          }
+        } else {
+          // 没有图片的帖子直接创建
+          const { publishPost } = await import('@/api/publish')
+          response = await publishPost({
+            title,
+            content,
+            tags,
+            images: [],
+            code_snippet: codeSnippet
+          })
         }
       }
       
       // 显示成功提示
       const isResource = publishType === 'resource'
       toast.success(`${isResource ? '资源' : '帖子'}发布成功！`, {
-        description: isResource ? '内容已提交审核，审核通过后将自动发布' : '帖子已发布',
+        description: isResource ? '资源已发布，用户可以查看和下载' : '帖子已发布',
         duration: 5000,
       })
       

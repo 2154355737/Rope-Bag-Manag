@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer};
 use actix_cors::Cors;
 use tracing::{info, warn};
+use std::time::Duration;
 
 mod core;
 mod infrastructure;
@@ -50,11 +51,18 @@ async fn main() -> AppResult<()> {
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
+            // 设置文件上传大小限制 (100MB)
+            .app_data(web::PayloadConfig::new(100 * 1024 * 1024))
+            // 设置JSON负载大小限制 (10MB)
+            .app_data(web::JsonConfig::default().limit(10 * 1024 * 1024))
             .wrap(setup_cors())
             .wrap(RequestTracing::new())
             .configure(api::configure_routes)
     })
     .workers(config.server.workers)
+    // 设置连接超时和保持连接超时
+    .client_timeout(Duration::from_secs(300)) // 5分钟客户端超时
+    .client_disconnect_timeout(Duration::from_secs(30)) // 30秒断开超时
     .bind(&bind_address)
     .map_err(|e| shared::errors::AppError::Io(e))?;
     
@@ -131,4 +139,4 @@ async fn create_app_state(
 ) -> AppResult<core::AppState> {
     info!("🔧 正在初始化服务容器...");
     core::AppState::new(config, db_manager).await
-} 
+}

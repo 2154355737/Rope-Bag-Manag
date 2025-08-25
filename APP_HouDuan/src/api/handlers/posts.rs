@@ -2,17 +2,90 @@ use actix_web::{web, HttpResponse, HttpRequest};
 use crate::core::services::PostService;
 use crate::core::domain::post::PostSearchParams;
 use crate::shared::utils::jwt as jwt_util;
+use serde::Deserialize;
+use tracing::{info, warn, error};
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/posts")
             .route("", web::get().to(list_posts))
+            .route("", web::post().to(create_post))
             .route("/{id}", web::get().to(get_post))
             .route("/{id}/like", web::post().to(like_post))
             .route("/{id}/like", web::delete().to(unlike_post))
             .route("/{id}/bookmark", web::post().to(bookmark_post))
             .route("/{id}/bookmark", web::delete().to(unbookmark_post))
     );
+}
+
+#[derive(Deserialize)]
+struct CreatePostReq {
+    title: String,
+    content: String,
+    #[serde(default)] tags: Option<Vec<String>>,
+    #[serde(default)] images: Option<Vec<String>>,
+    #[serde(default)] code_snippet: Option<String>,
+}
+
+async fn create_post(
+    app: web::Data<crate::core::AppState>,
+    req: HttpRequest,
+    payload: web::Json<CreatePostReq>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let uid = extract_uid(&req, &app)?;
+    
+    info!("用户 {} 开始创建帖子: {}", uid, payload.title);
+
+    // 验证必填字段
+    if payload.title.trim().is_empty() || payload.content.trim().is_empty() {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+            "code": 1,
+            "message": "标题和内容不能为空"
+        })));
+    }
+
+    // 开始事务处理
+    let mut tx = app.db.pool().begin().await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("开始事务失败: {}", e)))?;
+
+    let req_model = crate::core::domain::post::CreatePostRequest {
+        title: payload.title.clone(),
+        content: payload.content.clone(),
+        tags: payload.tags.clone(),
+        images: None, // 图片稍后通过文件上传接口处理
+        code_snippet: payload.code_snippet.clone(),
+    };
+
+    // 使用事务创建帖子
+    let post_result = app.services.post_service
+        .create_post_with_transaction(&mut tx, uid, req_model)
+        .await;
+
+    let post_detail = match post_result {
+        Ok(detail) => detail,
+        Err(e) => {
+            // 回滚事务
+            if let Err(rollback_err) = tx.rollback().await {
+                error!("事务回滚失败: {}", rollback_err);
+            }
+            return Err(actix_web::error::ErrorBadRequest(e.to_string()));
+        }
+    };
+
+    // 提交事务
+    if let Err(e) = tx.commit().await {
+        error!("提交事务失败: {}", e);
+        return Err(actix_web::error::ErrorInternalServerError("创建帖子失败"));
+    }
+
+    info!("帖子创建成功，等待图片上传: {} (ID: {})", post_detail.post.title, post_detail.post.id);
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "data": {
+        "id": post_detail.post.id,
+        "title": post_detail.post.title,
+        "status": format!("{:?}", post_detail.post.status).to_lowercase(),
+        "created_at": post_detail.post.created_at,
+    }})))
 }
 
 async fn list_posts(
@@ -42,7 +115,18 @@ async fn get_post(
     let user_id = extract_uid_optional(&req, &svc);
     let result = svc.services.post_service.get_post_detail(id, user_id).await
         .map_err(|e| actix_web::error::ErrorNotFound(e.to_string()))?;
-    Ok(HttpResponse::Ok().json(result))
+
+    let mut v = serde_json::to_value(&result).unwrap_or(serde_json::json!({}));
+    // 标准化 images：JSON 字符串 -> [url]
+    if let Some(img_str) = v.get("images").and_then(|x| x.as_str()).map(|s| s.to_string()) {
+        let arr = serde_json::from_str::<Vec<String>>(&img_str).unwrap_or_default();
+        let urls: Vec<String> = arr
+            .into_iter()
+            .map(|s| if s.starts_with("/storage/") || s.starts_with("http") { s } else { format!("/storage/file/{}", s.trim_start_matches('/')) })
+            .collect();
+        v["images"] = serde_json::json!(urls);
+    }
+    Ok(HttpResponse::Ok().json(serde_json::json!({"code": 0, "data": v})))
 }
 
 async fn like_post(

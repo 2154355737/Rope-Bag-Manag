@@ -756,6 +756,35 @@ impl crate::core::ports::repositories::PostRepository for SqlxPostRepository {
         Ok(rec)
     }
 
+    async fn create_with_transaction(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        data: CreatePostData
+    ) -> AppResult<Post> {
+        let status_str = match data.status {
+            PostStatus::Draft => "draft",
+            PostStatus::Published => "published",
+            PostStatus::Archived => "archived",
+            PostStatus::Banned => "banned",
+        };
+
+        let rec = sqlx::query_as::<_, Post>(
+            "INSERT INTO posts (title, content, author_id, like_count, view_count, comment_count, status, is_featured, is_pinned, tags, images, code_snippet) \
+             VALUES (?, ?, ?, 0, 0, 0, ?, 0, 0, ?, ?, ?) RETURNING id, title, content, author_id, like_count, view_count, comment_count, status, is_featured, is_pinned, tags, images, code_snippet, created_at, updated_at"
+        )
+        .bind(data.title)
+        .bind(data.content)
+        .bind(data.author_id)
+        .bind(status_str)
+        .bind(data.tags)
+        .bind(data.images)
+        .bind(data.code_snippet)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(AppError::Database)?;
+        Ok(rec)
+    }
+
     async fn find_by_id(&self, id: i64) -> AppResult<Option<Post>> {
         let row = sqlx::query_as::<_, Post>(
             "SELECT id, title, content, author_id, like_count, view_count, comment_count, status, is_featured, is_pinned, tags, images, code_snippet, created_at, updated_at FROM posts WHERE id = ?"
@@ -937,29 +966,63 @@ impl SqlxResourceRepository {
 impl crate::core::ports::repositories::ResourceRepository for SqlxResourceRepository {
     async fn create(&self, data: CreateResourceData) -> AppResult<Resource> {
         let status_str = match data.status {
-            ResourceStatus::Draft => "draft",
-            ResourceStatus::Published => "published",
+            ResourceStatus::Draft => "pending",
+            ResourceStatus::Published => "active",
             ResourceStatus::Archived => "archived",
-            ResourceStatus::Banned => "banned",
+            ResourceStatus::Banned => "rejected",
         };
         let rec = sqlx::query_as::<_, Resource>(
             "INSERT INTO packages (name, slug, author_id, version, description, readme, category_id, tags, metadata, stats, status, published_at, file_path, file_size, download_count, like_count, view_count, comment_count, rating, is_featured, is_pinned, requirements, screenshots) \
              VALUES (?, ?, ?, ?, ?, NULL, ?, ?, '{}', '{}', ?, CURRENT_TIMESTAMP, ?, ?, 0, 0, 0, 0, 0.0, 0, 0, ?, ?) \
-             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
+             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
         )
+        .bind(&data.title)
         .bind(&data.name)
-        .bind(&data.name) // slug 简化复用 name
         .bind(data.author_id)
         .bind(&data.version)
         .bind(&data.description)
         .bind(data.category_id)
-        .bind(&data.tags)
+        .bind(data.tags.map(|t| serde_json::to_string(&t).unwrap_or_default()))
         .bind(status_str)
         .bind(&data.file_path)
         .bind(data.file_size)
-        .bind(&data.requirements)
-        .bind(&data.screenshots)
+        .bind(data.requirements.map(|r| serde_json::to_string(&r).unwrap_or_default()))
+        .bind(data.screenshots.map(|s| serde_json::to_string(&s).unwrap_or_default()))
         .fetch_one(&self.pool)
+        .await
+        .map_err(AppError::Database)?;
+        Ok(rec)
+    }
+
+    async fn create_with_transaction(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        data: CreateResourceData
+    ) -> AppResult<Resource> {
+        let status_str = match data.status {
+            ResourceStatus::Draft => "pending",
+            ResourceStatus::Published => "active",
+            ResourceStatus::Archived => "archived",
+            ResourceStatus::Banned => "rejected",
+        };
+        let rec = sqlx::query_as::<_, Resource>(
+            "INSERT INTO packages (name, slug, author_id, version, description, readme, category_id, tags, metadata, stats, status, published_at, file_path, file_size, download_count, like_count, view_count, comment_count, rating, is_featured, is_pinned, requirements, screenshots) \
+             VALUES (?, ?, ?, ?, ?, NULL, ?, ?, '{}', '{}', ?, CURRENT_TIMESTAMP, ?, ?, 0, 0, 0, 0, 0.0, 0, 0, ?, ?) \
+             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
+        )
+        .bind(&data.title)
+        .bind(&data.name)
+        .bind(data.author_id)
+        .bind(&data.version)
+        .bind(&data.description)
+        .bind(data.category_id)
+        .bind(data.tags.map(|t| serde_json::to_string(&t).unwrap_or_default()))
+        .bind(status_str)
+        .bind(&data.file_path)
+        .bind(data.file_size)
+        .bind(data.requirements.map(|r| serde_json::to_string(&r).unwrap_or_default()))
+        .bind(data.screenshots.map(|s| serde_json::to_string(&s).unwrap_or_default()))
+        .fetch_one(&mut **tx)
         .await
         .map_err(AppError::Database)?;
         Ok(rec)
@@ -967,7 +1030,9 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
 
     async fn find_by_id(&self, id: i64) -> AppResult<Option<Resource>> {
         let row = sqlx::query_as::<_, Resource>(
-            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE id = ?"
+            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE id = ?"
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -978,7 +1043,9 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
 
     async fn find_by_name(&self, name: &str) -> AppResult<Option<Resource>> {
         let row = sqlx::query_as::<_, Resource>(
-            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE name = ?"
+            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE slug = ?"
         )
         .bind(name)
         .fetch_optional(&self.pool)
@@ -988,9 +1055,22 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
     }
 
     async fn exists_by_name(&self, name: &str) -> AppResult<bool> {
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(1) FROM packages WHERE name = ?")
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(1) FROM packages WHERE slug = ?")
             .bind(name)
             .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+        Ok(count.0 > 0)
+    }
+
+    async fn exists_by_name_tx(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        name: &str
+    ) -> AppResult<bool> {
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(1) FROM packages WHERE slug = ?")
+            .bind(name)
+            .fetch_one(&mut **tx)
             .await
             .map_err(AppError::Database)?;
         Ok(count.0 > 0)
@@ -999,7 +1079,9 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
     async fn update(&self, id: i64, data: domain_resource::UpdateResourceRequest) -> AppResult<Resource> {
         let rec = sqlx::query_as::<_, Resource>(
             "UPDATE packages SET name = COALESCE(?, name), description = COALESCE(?, description), version = COALESCE(?, version), category_id = COALESCE(?, category_id), tags = COALESCE(?, tags), screenshots = COALESCE(?, screenshots), updated_at = CURRENT_TIMESTAMP WHERE id = ? \
-             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
+             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
         )
         .bind(data.title)
         .bind(data.description)
@@ -1023,7 +1105,7 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
         };
         let rec = sqlx::query_as::<_, Resource>(
             "UPDATE packages SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? \
-             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
+             RETURNING id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at"
         )
         .bind(status_str)
         .bind(id)
@@ -1033,44 +1115,44 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
         Ok(rec)
     }
 
-    async fn search(&self, params: ResourceSearchParams) -> AppResult<PaginatedResult<Resource>> {
-        let mut conditions: Vec<&str> = Vec::new();
-        if let Some(q) = params.query { if !q.is_empty() { conditions.push("(name LIKE ? OR description LIKE ?)"); } }
-        if let Some(cat) = params.category_id { if cat > 0 { conditions.push("category_id = ?"); } }
-        if let Some(is_featured) = params.is_featured { if is_featured { conditions.push("is_featured = 1"); } }
+    async fn search(&self, params: ResourceSearchParams) -> AppResult<crate::shared::types::pagination::PaginatedResult<Resource>> {
+        let mut conditions = Vec::new();
+        let mut binds: Vec<serde_json::Value> = Vec::new();
+        if let Some(q) = params.query { conditions.push("(name LIKE ? OR description LIKE ?)".to_string()); binds.push(serde_json::Value::String(format!("%{}%", q))); binds.push(serde_json::Value::String(format!("%{}%", q))); }
+        if let Some(cat) = params.category_id { conditions.push("category_id = ?".to_string()); binds.push(serde_json::Value::from(cat)); }
         let where_clause = if conditions.is_empty() { String::from("") } else { format!(" WHERE {}", conditions.join(" AND ")) };
 
         let count_sql = format!("SELECT COUNT(1) as cnt FROM packages{}", where_clause);
-        let list_sql = format!("SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages{} ORDER BY created_at DESC LIMIT ? OFFSET ?", where_clause);
+        let list_sql = format!("SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages{} ORDER BY created_at DESC LIMIT ? OFFSET ?", where_clause);
 
         let page = params.page.max(1);
         let page_size = params.page_size.min(100).max(1);
         let offset = (page - 1) * page_size;
 
-        let total: (i64,) = sqlx::query_as::<_, (i64,)>(count_sql.as_str())
-            .fetch_one(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-
-        let items: Vec<Resource> = sqlx::query_as::<_, Resource>(list_sql.as_str())
-            .bind(page_size)
-            .bind(offset)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
-
-        Ok(PaginatedResult { data: items, total: total.0, page, page_size })
+        let mut q = sqlx::query_as::<_, Resource>(&list_sql);
+        let mut qc = sqlx::query(&count_sql);
+        let mut i = 0;
+        while i < binds.len() {
+            let v = &binds[i];
+            if let Some(s) = v.as_str() { q = q.bind(s); qc = qc.bind(s); }
+            else if let Some(n) = v.as_i64() { q = q.bind(n); qc = qc.bind(n); }
+            i += 1;
+        }
+        q = q.bind(page_size).bind(offset);
+        let items: Vec<Resource> = q.fetch_all(&self.pool).await.map_err(AppError::Database)?;
+        let total_row = qc.fetch_one(&self.pool).await.map_err(AppError::Database)?;
+        let total = total_row.try_get::<i64, _>("cnt").unwrap_or(0);
+        Ok(crate::shared::types::pagination::PaginatedResult { data: items, total, page, page_size })
     }
 
-    async fn find_by_author(&self, author_id: i64, page: i64, page_size: i64) -> AppResult<PaginatedResult<Resource>> {
+    async fn find_by_author(&self, author_id: i64, page: i64, page_size: i64) -> AppResult<crate::shared::types::pagination::PaginatedResult<Resource>> {
         let offset = (page - 1) * page_size;
-        let total: (i64,) = sqlx::query_as("SELECT COUNT(1) FROM packages WHERE author_id = ?")
-            .bind(author_id)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(AppError::Database)?;
         let items: Vec<Resource> = sqlx::query_as(
-            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE author_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
+            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages WHERE author_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?"
         )
         .bind(author_id)
         .bind(page_size)
@@ -1078,12 +1160,19 @@ impl crate::core::ports::repositories::ResourceRepository for SqlxResourceReposi
         .fetch_all(&self.pool)
         .await
         .map_err(AppError::Database)?;
-        Ok(PaginatedResult { data: items, total: total.0, page, page_size })
+        let (count_row,): (i64,) = sqlx::query_as("SELECT COUNT(1) FROM packages WHERE author_id = ?")
+            .bind(author_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(AppError::Database)?;
+        Ok(crate::shared::types::pagination::PaginatedResult { data: items, total: count_row, page, page_size })
     }
 
     async fn find_popular(&self, limit: i64) -> AppResult<Vec<Resource>> {
         let items: Vec<Resource> = sqlx::query_as(
-            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, COALESCE(rating, 0.0) as rating, status, COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages ORDER BY download_count DESC, like_count DESC LIMIT ?"
+            "SELECT id, name as title, name as name, description, version, author_id, COALESCE(category_id, 0) as category_id, COALESCE(file_path, '') as file_path, COALESCE(file_size, 0) as file_size, COALESCE(download_count, 0) as download_count, COALESCE(like_count, 0) as like_count, COALESCE(view_count, 0) as view_count, COALESCE(comment_count, 0) as comment_count, CAST(COALESCE(rating, 0.0) AS REAL) as rating, \
+             CASE status WHEN 'pending' THEN 'draft' WHEN 'active' THEN 'published' WHEN 'archived' THEN 'archived' WHEN 'rejected' THEN 'banned' ELSE 'draft' END as status, \
+             COALESCE(is_featured, 0) as is_featured, COALESCE(is_pinned, 0) as is_pinned, requirements, tags, screenshots, created_at, updated_at FROM packages ORDER BY download_count DESC, like_count DESC LIMIT ?"
         )
         .bind(limit)
         .fetch_all(&self.pool)

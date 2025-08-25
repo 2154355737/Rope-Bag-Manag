@@ -13,6 +13,13 @@ pub trait ResourceRepository: Send + Sync {
     /// 创建资源
     async fn create(&self, data: resource::CreateResourceData) -> AppResult<resource::Resource>;
     
+    /// 创建资源（带事务）
+    async fn create_with_transaction(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        data: resource::CreateResourceData
+    ) -> AppResult<resource::Resource>;
+    
     /// 根据ID查找资源
     async fn find_by_id(&self, id: i64) -> AppResult<Option<resource::Resource>>;
     
@@ -21,6 +28,13 @@ pub trait ResourceRepository: Send + Sync {
     
     /// 检查资源名是否存在
     async fn exists_by_name(&self, name: &str) -> AppResult<bool>;
+    
+    /// 检查资源名是否存在（带事务）
+    async fn exists_by_name_tx(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        name: &str
+    ) -> AppResult<bool>;
     
     /// 更新资源
     async fn update(&self, id: i64, data: resource::UpdateResourceRequest) -> AppResult<resource::Resource>;
@@ -55,6 +69,13 @@ pub trait ResourceRepository: Send + Sync {
 pub trait PostRepository: Send + Sync {
     /// 创建帖子
     async fn create(&self, data: post::CreatePostData) -> AppResult<post::Post>;
+    
+    /// 创建帖子（带事务）
+    async fn create_with_transaction(
+        &self, 
+        tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>, 
+        data: post::CreatePostData
+    ) -> AppResult<post::Post>;
     
     /// 根据ID查找帖子
     async fn find_by_id(&self, id: i64) -> AppResult<Option<post::Post>>;

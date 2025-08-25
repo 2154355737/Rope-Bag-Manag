@@ -7,3 +7,7 @@ APP_HouDuan/target/debug/
 文档/AI学习规则文档/
 APP_HouDuan/sqlite-tools
 APP_HouDuan/logs/
+.codebuddy/
+APP_HouDuan/logs/
+App_v2/废弃/
+rope-manager-backend/

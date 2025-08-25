@@ -82,10 +82,14 @@ export async function userCheckIn(): Promise<void> {
 // 上传头像
 export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
   const formData = new FormData()
-  formData.append('avatar', file)
+  // 使用统一的"file"字段名，与其他上传函数保持一致
+  formData.append('file', file)
   
-  const response = await http.post<{ avatar_url: string }>('/users/upload-avatar', formData)
-  return response
+  // 使用统一的storage/upload端点
+  const result = await http.post<{ file_path: string; download_url: string; file_size: number }>('/storage/upload', formData)
+  
+  // 转换响应格式以匹配原有接口
+  return { avatar_url: result.download_url }
 }
 
 // 获取我的资源

@@ -19,16 +19,30 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:15201',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('代理错误:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('代理请求:', req.method, req.url, '-> ', proxyReq.path);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('代理响应:', proxyRes.statusCode, req.url);
+          });
+        },
       },
       '/uploads': {
         target: 'http://127.0.0.1:15201',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path,
       },
       '/health': {
         target: 'http://127.0.0.1:15201',
         changeOrigin: true,
+        secure: false,
         rewrite: (path) => path,
       },
     },
