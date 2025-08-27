@@ -117,7 +117,27 @@ async fn get_all_comments(
         return match comment_service.get_all_comments(
             page, size, status, target_type, query.target_id, query.user_id, start_date, end_date, query.search.as_deref(),
         ).await {
-            Ok((comments, total)) => {
+            Ok((mut comments, total)) => {
+                // 计算前缀
+                let cfg = crate::config::Config::load().unwrap_or_default();
+                let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                if base_prefix.is_none() {
+                    let ci = http_req.connection_info();
+                    let scheme = ci.scheme();
+                    let host = ci.host();
+                    if !host.is_empty() {
+                        base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                    }
+                }
+                if let Some(bp) = base_prefix.as_ref() {
+                    for c in comments.iter_mut() {
+                        if let Some(ref mut avatar) = c.author_avatar {
+                            if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                                *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                            }
+                        }
+                    }
+                }
                 let response = CommentListResponse { list: comments, total, page, size };
                 HttpResponse::Ok().json(ApiResponse::success(response))
             },
@@ -160,7 +180,27 @@ async fn get_all_comments(
             }
         }
         return match comment_service.get_top_level_comments(db_target_type, tid, page, size).await {
-            Ok((comments, total)) => {
+            Ok((mut comments, total)) => {
+                // 计算前缀
+                let cfg = crate::config::Config::load().unwrap_or_default();
+                let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                if base_prefix.is_none() {
+                    let ci = http_req.connection_info();
+                    let scheme = ci.scheme();
+                    let host = ci.host();
+                    if !host.is_empty() {
+                        base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                    }
+                }
+                if let Some(bp) = base_prefix.as_ref() {
+                    for c in comments.iter_mut() {
+                        if let Some(ref mut avatar) = c.author_avatar {
+                            if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                                *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                            }
+                        }
+                    }
+                }
                 let response = CommentListResponse { list: comments, total, page, size };
                 HttpResponse::Ok().json(ApiResponse::success(response))
             },
@@ -180,7 +220,27 @@ async fn get_all_comments(
     match comment_service.get_all_comments(
         page, size, status, target_type, query.target_id, None, start_date, end_date, None,
     ).await {
-        Ok((comments, total)) => {
+        Ok((mut comments, total)) => {
+            // 计算前缀
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
             let response = CommentListResponse { list: comments, total, page, size };
             HttpResponse::Ok().json(ApiResponse::success(response))
         },
@@ -623,6 +683,7 @@ async fn pin_comment(
 // 获取资源评论
 #[get("")]
 async fn get_package_comments(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     query: web::Query<CommentQueryParams>,
     comment_service: web::Data<CommentService>,
@@ -632,7 +693,27 @@ async fn get_package_comments(
     let size = query.size.unwrap_or(20);
     
     match comment_service.get_package_comments(package_id, page, size).await {
-        Ok((comments, total)) => {
+        Ok((mut comments, total)) => {
+            // 计算前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
             let response = CommentListResponse {
                 list: comments,
                 total,
@@ -652,6 +733,7 @@ async fn get_package_comments(
 
 // 获取用户评论
 pub async fn get_user_comments(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     query: web::Query<CommentQueryParams>,
     auth_user: AuthenticatedUser,
@@ -670,7 +752,27 @@ pub async fn get_user_comments(
     let size = query.size.unwrap_or(20);
     
     match comment_service.get_user_comments(user_id, page, size).await {
-        Ok((comments, total)) => {
+        Ok((mut comments, total)) => {
+            // 计算前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
             let response = CommentListResponse {
                 list: comments,
                 total,

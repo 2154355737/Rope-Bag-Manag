@@ -169,7 +169,7 @@ async fn get_post(
     let post_id = path.into_inner();
     
     match post_service.get_post(post_id).await {
-        Ok(Some(post)) => {
+        Ok(Some(mut post)) => {
             // 非管理员访问未审核通过的帖子：返回403
             let is_admin = AuthHelper::is_admin(&http_req);
             if !is_admin {
@@ -179,6 +179,25 @@ async fn get_post(
             }
             // 增加浏览量
             let _ = post_service.increment_view_count(post_id).await;
+            // 绝对化作者头像与 images
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() { base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string()); }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                // 目前 Post 结构不含作者头像字段，这里仅处理 images[]
+                if let Some(ref mut images) = post.images {
+                    for url in images.iter_mut() {
+                        if !url.starts_with("http://") && !url.starts_with("https://") && url.starts_with("/uploads/") {
+                            *url = format!("{}/{}", bp, url.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
             
             Ok(HttpResponse::Ok().json(json!({
                 "code": 0,
@@ -621,6 +640,7 @@ struct CommentQuery { page: Option<i32>, size: Option<i32> }
 
 // 获取帖子评论（平面列表）
 async fn get_post_comments(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     query: web::Query<CommentQuery>,
     comment_service: web::Data<crate::services::comment_service::CommentService>,
@@ -629,11 +649,33 @@ async fn get_post_comments(
     let page = query.page.unwrap_or(1);
     let size = query.size.unwrap_or(20);
     match comment_service.get_post_comments(post_id, page, size).await {
-        Ok((comments, total)) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {"list": comments, "total": total, "page": page, "size": size}
-        }))),
+        Ok((mut comments, total)) => {
+            // 计算前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {"list": comments, "total": total, "page": page, "size": size}
+            })))
+        },
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": format!("获取帖子评论失败: {}", e)

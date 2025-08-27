@@ -77,11 +77,26 @@ impl AppBuilder {
             .allowed_origin("https://localhost")
             .allowed_origin("capacitor://localhost")
             .allowed_origin("ionic://localhost")
+            // Capacitor HTTP 插件
+            .allowed_origin("http://10.0.2.2:15201")
+            .allowed_origin("http://127.0.0.1:15201")
+            // 移动应用 User-Agent
+            .allowed_origin_fn(|origin, req_head| {
+                // 允许来自移动应用的请求
+                if let Some(user_agent) = req_head.headers().get("user-agent") {
+                    if let Ok(ua_str) = user_agent.to_str() {
+                        return ua_str.contains("CapacitorApp") || ua_str.contains("Mobile");
+                    }
+                }
+                false
+            })
             // 允许 Tauri WebView（tauri:// 协议）
             .allowed_origin_fn(|origin, _req_head| {
                 let o = origin.as_bytes();
                 o.starts_with(b"tauri://") || o == b"null" || o == b"file://"
             })
+            // 临时允许所有来源（用于调试移动应用问题）
+            .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![
                 actix_web::http::header::AUTHORIZATION,

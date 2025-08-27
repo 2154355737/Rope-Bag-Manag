@@ -6,4 +6,11 @@
             <certificates src="user"/>
         </trust-anchors>
     </base-config>
+    <!-- 明确允许特定域名的HTTP访问 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">39.105.113.219</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
 </network-security-config> 

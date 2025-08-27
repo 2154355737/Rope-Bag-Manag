@@ -17,6 +17,7 @@ import { getAnnouncements } from '../api/announcements'
 import { getResources } from '../api/resources'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { getCategories, Category } from '@/api/categories'
+import { App as CapacitorApp } from '@capacitor/app'
 
 // 内容数据接口
 interface ContentItem {
@@ -334,6 +335,35 @@ const HomeScreen: React.FC = () => {
     trendingKeywords().then(setHotKeywords).catch(() => setHotKeywords([]))
     getUnreadCount().then(data => setUnread(data.count)).catch(() => setUnread(0))
   }, [])
+
+  // 首屏兜底：短延时后仍为空则强制刷新一次
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const tabState = tabsData[activeTab]
+      if (tabState && !tabState.loading && tabState.data.length === 0) {
+        loadTabData(activeTab, true)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [activeTab, tabsData])
+
+  // 窗口聚焦/页面可见/网络恢复/应用恢复时刷新当前标签
+  useEffect(() => {
+    const onFocus = () => loadTabData(activeTab, true)
+    const onVisible = () => { if (document.visibilityState === 'visible') loadTabData(activeTab, true) }
+    const onOnline = () => loadTabData(activeTab, true)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('online', onOnline)
+    const sub = CapacitorApp?.addListener?.('resume', () => loadTabData(activeTab, true))
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('online', onOnline)
+      // @ts-ignore
+      sub?.remove?.()
+    }
+  }, [activeTab])
 
   // 搜索建议
   useEffect(() => {

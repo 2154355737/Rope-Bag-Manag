@@ -293,11 +293,30 @@ async fn get_current_user_profile(
     };
     
     match user_service.get_user_by_id(user.id).await {
-        Ok(Some(user)) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": user
-        }))),
+        Ok(Some(mut user)) => {
+            if let Some(avatar) = &mut user.avatar_url {
+                if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                    let cfg = crate::config::Config::load().unwrap_or_default();
+                    let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                    if base_prefix.is_none() {
+                        let ci = http_req.connection_info();
+                        let scheme = ci.scheme();
+                        let host = ci.host();
+                        if !host.is_empty() {
+                            base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                        }
+                    }
+                    if let Some(bp) = base_prefix.as_ref() {
+                        *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                    }
+                }
+            }
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": user
+            })))
+        },
         Ok(None) => Ok(HttpResponse::NotFound().json(json!({
             "code": 404,
             "message": "用户不存在"
@@ -832,7 +851,13 @@ async fn upload_avatar(
             }
             
             // 生成访问URL
-            let avatar_url = format!("/uploads/结绳社区/头像/{}/{}", user.username, new_filename);
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let base_prefix = if let Some(base) = cfg.public_base_url() { base.trim_end_matches('/') } else { "" };
+            let avatar_url = if base_prefix.is_empty() {
+                format!("/uploads/结绳社区/头像/{}/{}", user.username, new_filename)
+            } else {
+                format!("{}/uploads/结绳社区/头像/{}/{}", base_prefix, user.username, new_filename)
+            };
             
             // 更新用户头像URL
             let update_req = UpdateUserRequest {

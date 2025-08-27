@@ -20,6 +20,7 @@ pub struct ServerConfig {
     pub port: u16,
     pub workers: usize,
     pub timeout: u64,
+    pub public_base_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +72,7 @@ impl Default for Config {
                 port: 15201,
                 workers: 4,
                 timeout: 30,
+                public_base_url: None,
             },
             database: DatabaseConfig {
                 url: "data.db".to_string(),
@@ -173,6 +175,12 @@ impl Config {
         if let Ok(timeout) = env::var("TIMEOUT") {
             config.server.timeout = timeout.parse().unwrap_or(30);
         }
+        if let Ok(public_base_url) = env::var("PUBLIC_BASE_URL") {
+            let trimmed = public_base_url.trim().to_string();
+            if !trimmed.is_empty() {
+                config.server.public_base_url = Some(trimmed);
+            }
+        }
 
         // 数据库配置
         if let Ok(url) = env::var("DATABASE_URL") {
@@ -248,5 +256,9 @@ impl Config {
 
     pub fn server_address(&self) -> String {
         format!("{}:{}", self.server.host, self.server.port)
+    }
+
+    pub fn public_base_url(&self) -> Option<&str> {
+        self.server.public_base_url.as_deref()
     }
 }

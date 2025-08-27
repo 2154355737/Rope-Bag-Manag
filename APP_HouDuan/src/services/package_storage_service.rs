@@ -117,8 +117,15 @@ impl PackageStorageService {
         let storage_service = {
             let cfg = crate::config::Config::load().unwrap_or_default();
             let uploads_dir = cfg.upload_path().to_string();
-            log::info!("💾 使用本地存储: {}", uploads_dir);
-            LocalStorageService::new_with_params(uploads_dir, "/uploads".to_string())
+            // 根据 PUBLIC_BASE_URL 决定前缀，LocalStorageService::new() 已自动处理
+            LocalStorageService::new_with_params(
+                uploads_dir,
+                if let Some(base) = cfg.public_base_url() {
+                    format!("{}/uploads", base.trim_end_matches('/'))
+                } else {
+                    "/uploads".to_string()
+                }
+            )
         };
         
         let storage_base_path = "/结绳社区".to_string();
@@ -152,7 +159,14 @@ impl PackageStorageService {
         let storage_service = {
             let cfg = crate::config::Config::load().unwrap_or_default();
             let uploads_dir = cfg.upload_path().to_string();
-            LocalStorageService::new_with_params(uploads_dir, "/uploads".to_string())
+            LocalStorageService::new_with_params(
+                uploads_dir,
+                if let Some(base) = cfg.public_base_url() {
+                    format!("{}/uploads", base.trim_end_matches('/'))
+                } else {
+                    "/uploads".to_string()
+                }
+            )
         };
         
         let storage_base_path = "/结绳社区".to_string();

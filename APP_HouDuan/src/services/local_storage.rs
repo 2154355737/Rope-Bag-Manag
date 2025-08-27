@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[derive(Debug, Clone)]
 pub struct LocalStorageService {
     uploads_dir: String,       // 物理存储根目录（如 uploads）
-    url_prefix: String,        // 对外访问前缀（固定为 /uploads）
+    url_prefix: String,        // 对外访问前缀（固定为 /uploads 或绝对前缀 + /uploads）
     storage_subdir: String,    // 业务子目录（默认 image/结绳社区）
     last_error: Option<String>,
 }
@@ -40,9 +40,16 @@ impl LocalStorageService {
     pub fn new() -> Self {
         let config = crate::config::Config::load().unwrap_or_default();
         let uploads_dir = config.upload_path().to_string();
+        // 计算前缀：优先使用 PUBLIC_BASE_URL
+        let url_prefix = if let Some(base) = config.public_base_url() {
+            let b = base.trim_end_matches('/');
+            format!("{}/uploads", b)
+        } else {
+            "/uploads".to_string()
+        };
         Self {
             uploads_dir,
-            url_prefix: "/uploads".to_string(),
+            url_prefix,
             storage_subdir: "结绳社区".to_string(),
             last_error: None,
         }
@@ -111,7 +118,7 @@ impl LocalStorageService {
     }
 
     pub async fn get_download_link(&mut self, file_path: &str) -> Result<String> {
-        // 接受 "/image/..." 或 "/uploads/..."，统一返回 "/uploads/..."
+        // 接受 "/image/..." 或 "/uploads/..."，统一返回 "<prefix>/..."
         let rel = if file_path.starts_with("/uploads/") {
             file_path.trim_start_matches("/uploads").to_string()
         } else {

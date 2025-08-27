@@ -1,4 +1,4 @@
-use actix_web::{web, get, HttpResponse};
+use actix_web::{web, get, HttpResponse, HttpRequest};
 use serde_json::json;
 use crate::models::ApiResponse;
 use crate::models::CommentListResponse;
@@ -40,6 +40,7 @@ async fn app_launch(req: web::Json<AppLaunchReq>, admin_service: web::Data<Admin
 
 #[get("/comments")]
 async fn get_public_comments(
+    http_req: HttpRequest,
     query: web::Query<PublicCommentQuery>,
     comment_service: web::Data<CommentService>,
 ) -> HttpResponse {
@@ -59,7 +60,27 @@ async fn get_public_comments(
     let db_target_type = if ttype == "post" { "Post" } else { "Package" };
 
     match comment_service.get_top_level_comments(db_target_type, target_id, page, size).await {
-        Ok((comments, total)) => {
+        Ok((mut comments, total)) => {
+            // 计算前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
             let resp = CommentListResponse { list: comments, total, page, size };
             HttpResponse::Ok().json(ApiResponse::success(resp))
         },

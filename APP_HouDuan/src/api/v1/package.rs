@@ -465,6 +465,17 @@ async fn get_packages(
             // 为每个资源补充作者昵称与头像
             let mut enriched: Vec<serde_json::Value> = Vec::with_capacity(packages.len());
             let user_repo = UserRepository::new("data.db").ok();
+            // 读取公共前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix_opt = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix_opt.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix_opt = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
+            }
             for p in packages {
                 let mut v = serde_json::to_value(&p).unwrap_or_else(|_| json!({}));
                 if let serde_json::Value::Object(ref mut map) = v {
@@ -477,10 +488,63 @@ async fn get_packages(
                     if let Some(repo) = &user_repo {
                         if let Ok(Some(u)) = repo.find_by_username(&p.author).await {
                             let name = u.nickname.clone().unwrap_or(u.username.clone());
-                            let avatar = u.avatar_url.clone().unwrap_or_default();
+                            let mut avatar = u.avatar_url.clone().unwrap_or_default();
+                            if let Some(bp) = base_prefix_opt.as_ref() {
+                                if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                                    avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                                }
+                            }
                             map.insert("author_name".to_string(), json!(name));
                             map.insert("author_avatar".to_string(), json!(avatar));
                             map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+                        }
+                    }
+
+                    // 统一将资源内的URL转换为绝对URL
+                    if let Some(bp) = base_prefix_opt.as_ref() {
+                        // file_url
+                        if let Some(v) = map.get_mut("file_url") {
+                            if let Some(s) = v.as_str() {
+                                if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                    *v = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                }
+                            }
+                        }
+                        // cover_image
+                        if let Some(v) = map.get_mut("cover_image") {
+                            if let Some(s) = v.as_str() {
+                                if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                    *v = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                }
+                            }
+                        }
+                        // screenshots
+                        if let Some(v) = map.get_mut("screenshots") {
+                            if let Some(arr) = v.as_array_mut() {
+                                for item in arr.iter_mut() {
+                                    if let Some(s) = item.as_str() {
+                                        if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                            *item = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // included_files[].download_url
+                        if let Some(v) = map.get_mut("included_files") {
+                            if let Some(arr) = v.as_array_mut() {
+                                for item in arr.iter_mut() {
+                                    if let Some(obj) = item.as_object_mut() {
+                                        if let Some(u) = obj.get_mut("download_url") {
+                                            if let Some(s) = u.as_str() {
+                                                if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                                    *u = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -578,14 +642,114 @@ async fn get_package(
             map.entry("comment_count").or_insert(json!(comments));
         }
 
+        // 读取公共前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+        let cfg = crate::config::Config::load().unwrap_or_default();
+        let mut base_prefix_opt = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+        if base_prefix_opt.is_none() {
+            let ci = http_req.connection_info();
+            let scheme = ci.scheme();
+            let host = ci.host();
+            if !host.is_empty() {
+                base_prefix_opt = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+            }
+        }
+
         // 补充作者昵称与头像
         if let Ok(repo) = UserRepository::new("data.db") {
             if let Ok(Some(u)) = repo.find_by_username(&package.author).await {
                 let name = u.nickname.clone().unwrap_or(u.username.clone());
-                let avatar = u.avatar_url.clone().unwrap_or_default();
+                let mut avatar = u.avatar_url.clone().unwrap_or_default();
+                if let Some(bp) = base_prefix_opt.as_ref() {
+                    if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                        avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                    }
+                }
                 map.insert("author_name".to_string(), json!(name));
                 map.insert("author_avatar".to_string(), json!(avatar));
                 map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+            }
+        }
+
+        // 统一将资源内的URL转换为绝对URL
+        if let Some(bp) = base_prefix_opt.as_ref() {
+            // file_url
+            if let Some(v) = map.get_mut("file_url") {
+                if let Some(s) = v.as_str() {
+                    if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                        *v = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                    }
+                }
+            }
+            // cover_image
+            if let Some(v) = map.get_mut("cover_image") {
+                if let Some(s) = v.as_str() {
+                    if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                        *v = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                    }
+                }
+            }
+            // screenshots
+            if let Some(v) = map.get_mut("screenshots") {
+                if let Some(arr) = v.as_array_mut() {
+                    for item in arr.iter_mut() {
+                        if let Some(s) = item.as_str() {
+                            if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                *item = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                            }
+                        }
+                    }
+                }
+            }
+            // included_files[].download_url
+            if let Some(v) = map.get_mut("included_files") {
+                if let Some(arr) = v.as_array_mut() {
+                    for item in arr.iter_mut() {
+                        if let Some(obj) = item.as_object_mut() {
+                            if let Some(u) = obj.get_mut("download_url") {
+                                if let Some(s) = u.as_str() {
+                                    if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                        *u = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // files[].download_url (别名)
+            if let Some(v) = map.get_mut("files") {
+                if let Some(arr) = v.as_array_mut() {
+                    for item in arr.iter_mut() {
+                        if let Some(obj) = item.as_object_mut() {
+                            if let Some(u) = obj.get_mut("download_url") {
+                                if let Some(s) = u.as_str() {
+                                    if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                        *u = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // 再次确保作者头像字段为绝对URL（如上方未命中）
+            if let Some(v) = map.get_mut("author_avatar") {
+                if let Some(s) = v.as_str() {
+                    if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                        *v = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                    }
+                }
+            }
+            if let Some(v) = map.get_mut("author_detail") {
+                if let Some(obj) = v.as_object_mut() {
+                    if let Some(a) = obj.get_mut("avatar") {
+                        if let Some(s) = a.as_str() {
+                            if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                *a = json!(format!("{}/{}", bp, s.trim_start_matches('/')));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -827,11 +991,60 @@ async fn download_package(
         ip_address, 
         user_agent
     ).await {
-        Ok(file_path) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": file_path
-        }))),
+        Ok(file_path) => {
+            // 将 file_path 转换为绝对下载链接
+            let download_url = async {
+                // 优先使用存储服务生成（带 PUBLIC_BASE_URL）
+                if let Ok(mut storage_service) = crate::services::package_storage_service::PackageStorageService::get_instance("data.db").await {
+                    if let Ok(url) = storage_service.get_package_download_url(&file_path).await {
+                        return url;
+                    }
+                }
+                // 回退：根据 PUBLIC_BASE_URL 或请求拼接
+                let cfg = crate::config::Config::load().unwrap_or_default();
+                let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                if base_prefix.is_none() {
+                    let ci = req.connection_info();
+                    let scheme = ci.scheme();
+                    let host = ci.host();
+                    if !host.is_empty() { base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string()); }
+                }
+                if let Some(bp) = base_prefix.as_ref() {
+                    if file_path.starts_with("/uploads/") {
+                        format!("{}/{}", bp, file_path.trim_start_matches('/'))
+                    } else {
+                        // 统一映射到 /uploads 前缀
+                        format!("{}/uploads{}", bp, if file_path.starts_with('/') { file_path.clone() } else { format!("/{}", file_path) })
+                    }
+                } else {
+                    // 无法拼接时，返回原始路径
+                    file_path.clone()
+                }
+            }.await;
+            // 确保最终为绝对URL
+            let final_url = if download_url.starts_with("http://") || download_url.starts_with("https://") {
+                download_url
+            } else {
+                let cfg = crate::config::Config::load().unwrap_or_default();
+                let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                if base_prefix.is_none() {
+                    let ci = req.connection_info();
+                    let scheme = ci.scheme();
+                    let host = ci.host();
+                    if !host.is_empty() { base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string()); }
+                }
+                if let Some(bp) = base_prefix.as_ref() {
+                    format!("{}/{}", bp, download_url.trim_start_matches('/'))
+                } else {
+                    download_url
+                }
+            };
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": final_url
+            })))
+        },
         Err(e) => {
             // 如果是安全检测阻止的下载，返回403状态码
             if e.to_string().contains("下载被阻止") {
@@ -963,6 +1176,7 @@ async fn get_package_categories(
 
 // 获取包评论
 async fn get_package_comments(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     query: web::Query<crate::api::v1::comment::CommentQueryParams>,
     comment_service: web::Data<CommentService>,
@@ -971,16 +1185,38 @@ async fn get_package_comments(
     let page = query.page.unwrap_or(1);
     let size = query.size.unwrap_or(20);
     match comment_service.get_package_comments(package_id, page, size).await {
-        Ok((comments, total)) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "data": {
-              "list": comments,
-              "total": total,
-              "page": page,
-              "size": size
+        Ok((mut comments, total)) => {
+            // 计算前缀（优先 PUBLIC_BASE_URL，否则从请求推断）
+            let cfg = crate::config::Config::load().unwrap_or_default();
+            let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+            if base_prefix.is_none() {
+                let ci = http_req.connection_info();
+                let scheme = ci.scheme();
+                let host = ci.host();
+                if !host.is_empty() {
+                    base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                }
             }
-        }))),
+            if let Some(bp) = base_prefix.as_ref() {
+                for c in comments.iter_mut() {
+                    if let Some(ref mut avatar) = c.author_avatar {
+                        if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                            *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                        }
+                    }
+                }
+            }
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": {
+                  "list": comments,
+                  "total": total,
+                  "page": page,
+                  "size": size
+                }
+            })))
+        },
         Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
             "code": 500,
             "message": e.to_string()

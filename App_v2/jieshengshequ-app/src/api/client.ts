@@ -17,26 +17,20 @@ export class ApiError extends Error {
 }
 
 // 根据环境配置API基础URL
-const isDevelopment = import.meta.env.DEV || 
-                     import.meta.env.MODE === 'development' || 
-                     window.location.hostname === 'localhost' || 
-                     window.location.hostname === '127.0.0.1'
+const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development'
 
-// 直接连接后端，不使用Vite代理
-const API_BASE = isDevelopment
-  ? '/api/v1'  // 开发环境走Vite代理，避免CORS
-  : 'http://39.105.113.219:15201/api/v1'  // 生产环境连接到云服务器
+// 允许通过环境变量覆盖（构建时注入）：VITE_API_BASE / VITE_STORAGE_API_BASE
+const API_BASE = import.meta.env.VITE_API_BASE
+  || (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
 
-// Storage API使用不同的基础路径（不包含/api/v1）
-export const STORAGE_API_BASE = isDevelopment
-  ? '/api/v1'  // 开发环境走Vite代理
-  : 'http://39.105.113.219:15201/api/v1'  // 生产环境
+// Storage API（默认同 API_BASE，可单独覆盖）
+export const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_BASE
+  || (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
 
 // 调试信息：输出当前环境和API_BASE
 console.log('Environment Mode:', import.meta.env.MODE)
 console.log('Environment DEV:', import.meta.env.DEV)
 console.log('Environment PROD:', import.meta.env.PROD)
-console.log('Hostname:', window.location.hostname)
 console.log('isDevelopment:', isDevelopment)
 console.log('API_BASE:', API_BASE)
 console.log('STORAGE_API_BASE:', STORAGE_API_BASE)

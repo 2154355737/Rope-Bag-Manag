@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: '结绳社区',
   webDir: 'dist',
   server: {
-    androidScheme: 'http'
+    androidScheme: 'http',
+    // 在生产环境中清除任何服务器配置，确保使用构建后的静态文件
+    cleartext: true
   },
   android: {
     allowMixedContent: true,
