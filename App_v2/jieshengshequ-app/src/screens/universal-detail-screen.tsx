@@ -443,12 +443,15 @@ const UniversalDetailScreen: React.FC = () => {
 
   const getPageTitle = (): string => {
     if (!item) return '加载中...'
-    switch (item.type) {
-      case 'post': return '帖子详情'
-      case 'resource': return '资源详情'
-      case 'announcement': return '公告详情'
-      default: return '详情'
+    
+    // 截断标题，防止过长
+    const truncateTitle = (title: string, maxLength: number = 20) => {
+      if (title.length <= maxLength) return title
+      return title.substring(0, maxLength) + '...'
     }
+    
+    // 返回截断后的实际标题而不是固定的类型标题
+    return truncateTitle(item.title)
   }
 
   const handleShare = () => {
@@ -533,6 +536,9 @@ const UniversalDetailScreen: React.FC = () => {
   const handleSubmitComment = async (content: string) => {
     if (!item) return
     try {
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
       const targetType = item.type === 'resource' ? 'package' : item.type
       await apiCreateComment(targetType as any, item.id, content)
       // 重新加载第一页
@@ -551,6 +557,12 @@ const UniversalDetailScreen: React.FC = () => {
       setComments(mapped)
       setHasMoreComments((refreshed.total || 0) > (refreshed.page || 1) * (refreshed.size || 10))
       setCommentTotal(refreshed.total || mapped.length)
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
       toast({ title: "评论成功", description: "您的评论已发布" })
     } catch (error) {
       console.error('评论失败:', error)
@@ -841,7 +853,7 @@ const UniversalDetailScreen: React.FC = () => {
       <div className="flex-1 pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
         <ScrollArea className="h-full">
           <motion.div 
-            className="container max-w-2xl mx-auto px-4 py-3 space-y-3 pb-safe-bottom"
+            className="container max-w-2xl mx-auto px-4 py-3 space-y-3 pb-safe-bottom overflow-hidden"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -849,13 +861,13 @@ const UniversalDetailScreen: React.FC = () => {
           
           {/* 标题和作者信息 */}
             <Card>
-              <CardContent className="p-4">
+              <CardContent className="p-4 overflow-hidden">
               <div className="flex items-start gap-3 mb-4">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={item.author.avatar} />
                   <AvatarFallback>{item.author.name[0]}</AvatarFallback>
                     </Avatar>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-sm">{item.author.name}</span>
                     {item.author.verified && <CheckCircle size={14} className="text-blue-500" />}
@@ -867,7 +879,7 @@ const UniversalDetailScreen: React.FC = () => {
                     </div>
                 </div>
 
-              <h1 className="text-xl font-bold mb-3 leading-tight">{item.title}</h1>
+              <h1 className="text-xl font-bold mb-3 leading-tight break-words hyphens-auto">{item.title}</h1>
 
                 {/* 标签 */}
                 {item.tags.length > 0 && (
@@ -1144,7 +1156,7 @@ const ContentRenderer: React.FC<{
                   <div className="space-y-2">
                     {item.requirements.map((req, index) => (
                       <div key={index} className="flex items-center gap-2 p-2 bg-muted rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        					<CheckCircle className="h-4 w-4 text-green-500" />
                         <span className="text-sm">{req}</span>
                       </div>
                     ))}

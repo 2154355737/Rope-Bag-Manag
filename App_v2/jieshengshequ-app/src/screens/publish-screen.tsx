@@ -31,6 +31,7 @@ const PublishScreen: React.FC = () => {
   const [publishType, setPublishType] = useState<PublishType>(editType)
   const [isPublishing, setIsPublishing] = useState(false)
   const [isLoading, setIsLoading] = useState(isEditMode)
+  const [publishSuccess, setPublishSuccess] = useState(false)
 
   // 通用字段
   const [title, setTitle] = useState('')
@@ -502,10 +503,8 @@ const PublishScreen: React.FC = () => {
           toast.success('资源更新成功')
         }
         
-        // 延迟跳转回我的内容页
-        setTimeout(() => {
-          navigate('/my-content')
-        }, 2000)
+        // 设置发布成功状态
+        setPublishSuccess(true)
         
       } catch (error: any) {
         console.error('更新失败:', error)
@@ -756,27 +755,19 @@ const PublishScreen: React.FC = () => {
       
       // 显示成功提示
       const isResource = publishType === 'resource'
-      toast.success(`${isResource ? '资源' : '帖子'}发布成功！`, {
-        description: isResource ? '资源已发布，用户可以查看和下载' : '帖子已发布',
+      toast.success(`${isResource ? '资源' : '帖子'}提交成功！`, {
+        description: isResource ? '资源已提交审核，审核通过后用户可以查看和下载' : '帖子已提交审核，审核通过后其他用户可以浏览',
         duration: 5000,
       })
       
-      // 重置表单
-      setTitle('')
-      setContent('')
-      setTags([])
-      setVersion('')
-      setCategory('')
-      setFiles([])
-      setImages([])
-      setScreenshots([])
-      setRequirements([])
-      setCodeSnippet('')
+      // 设置发布成功状态
+      setPublishSuccess(true)
       
       // 延迟跳转，让用户看到成功提示
-      setTimeout(() => {
-        navigate('/')
-      }, 2000)
+      // 注释掉自动跳转，让用户主动选择下一步操作
+      // setTimeout(() => {
+      //   navigate('/')
+      // }, 2000)
       
     } catch (error: any) {
       console.error('发布失败:', error)
@@ -784,6 +775,120 @@ const PublishScreen: React.FC = () => {
     } finally {
       setIsPublishing(false)
     }
+  }
+
+    // 发布成功界面
+  if (publishSuccess) {
+    const isResource = publishType === 'resource'
+    
+    // 编辑模式的成功界面
+    if (isEditMode) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md">
+            <CardContent className="text-center py-8">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h2 className="text-xl font-bold text-green-600 mb-2">
+                  {isResource ? '资源更新成功！' : '帖子更新成功！'}
+                </h2>
+                <p className="text-muted-foreground mb-4">
+                  {isResource ? '您的资源已成功更新。' : '您的帖子已成功更新。'}
+                </p>
+              </div>
+              
+              <div className="space-y-3">
+                <Button 
+                  onClick={() => navigate('/my-content')} 
+                  className="w-full"
+                >
+                  查看我的内容
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => navigate('/')} 
+                  className="w-full"
+                >
+                  返回首页
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+    
+    // 发布模式的成功界面（需要审核）
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="text-center py-8">
+            <div className="mb-6">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Clock className="w-8 h-8 text-blue-600" />
+              </div>
+              <h2 className="text-xl font-bold text-blue-600 mb-2">
+                {isResource ? '资源提交成功！' : '帖子提交成功！'}
+              </h2>
+              <p className="text-muted-foreground mb-4">
+                {isResource ? '您的资源已成功提交，正在等待管理员审核。' : '您的帖子已成功提交，正在等待管理员审核。'}
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start space-x-3">
+                  <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">审核说明：</p>
+                    <ul className="space-y-1 text-blue-700">
+                      <li>• 审核时间通常为1-3个工作日</li>
+                      <li>• 审核通过后用户即可查看和{isResource ? '下载' : '浏览'}</li>
+                      <li>• 可在"我的内容"页面查看审核状态</li>
+                      <li>• 如有问题，我们会通过站内消息通知您</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/my-content')} 
+                className="w-full"
+              >
+                查看我的内容
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setPublishSuccess(false)
+                  setTitle('')
+                  setContent('')
+                  setTags([])
+                  setVersion('')
+                  setCategory('')
+                  setFiles([])
+                  setImages([])
+                  setScreenshots([])
+                  setRequirements([])
+                  setCodeSnippet('')
+                }} 
+                className="w-full"
+              >
+                继续发布其他内容
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate('/')} 
+                className="w-full"
+              >
+                返回首页
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

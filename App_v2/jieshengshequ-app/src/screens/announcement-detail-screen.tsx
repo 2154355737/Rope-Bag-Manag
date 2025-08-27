@@ -152,16 +152,30 @@ const AnnouncementDetailScreen: React.FC = () => {
   // 评论区事件处理
   const handleSubmitComment = async (content: string) => {
     if (!announcement) return
-    await apiCreateComment('Post', announcement.id, content)
-    // 重新加载第一页，刷新总数
     try {
-      const cr = await apiGetComments('post' as any, announcement.id, 1, 10, true)
-      const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: (c.created_at || '').slice(11, 19), likes: c.likes || 0, isLiked: false, replies: [] }))
-      setComments(mapped)
-      setCommentTotal(cr.total || mapped.length)
-      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
-    } catch {}
-    toast({ title: '反馈已提交', description: '感谢您的反馈，我们会认真处理' })
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
+      await apiCreateComment('Post', announcement.id, content)
+      // 重新加载第一页，刷新总数
+      try {
+        const cr = await apiGetComments('post' as any, announcement.id, 1, 10, true)
+        const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: (c.created_at || '').slice(11, 19), likes: c.likes || 0, isLiked: false, replies: [] }))
+        setComments(mapped)
+        setCommentTotal(cr.total || mapped.length)
+        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      } catch {}
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
+      toast({ title: '反馈已提交', description: '感谢您的反馈，我们会认真处理' })
+    } catch (error) {
+      console.error('评论提交失败:', error)
+      toast({ title: '评论发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {

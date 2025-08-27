@@ -132,12 +132,16 @@ const TopNavigation: React.FC<TopNavigationProps> = ({
           {(title || subtitle) && (
             <div className="flex flex-col min-w-0 flex-1">
               {title && (
-                <h1 className="text-lg font-semibold truncate leading-tight">
-                  {title}
-                </h1>
+                <div className="flex items-center gap-2.5">
+                  {/* 简洁装饰线 */}
+                  <div className="w-0.5 h-4 bg-primary rounded-full flex-shrink-0"></div>
+                  <h1 className="text-lg font-semibold truncate leading-tight">
+                    {title}
+                  </h1>
+                </div>
               )}
               {subtitle && (
-                <p className="text-sm text-muted-foreground truncate leading-tight">
+                <p className="text-sm text-muted-foreground/80 truncate leading-tight ml-3 mt-0.5">
                   {subtitle}
                 </p>
               )}

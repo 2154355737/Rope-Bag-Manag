@@ -81,7 +81,7 @@ const RelatedRecommendations: React.FC<RelatedRecommendationsProps> = ({
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'post': return 'text-blue-600 bg-blue-50'
-      case 'resource': return 'text-green-600 bg-green-50'
+      		case 'resource': return 'text-green-600 bg-green-50'
       case 'announcement': return 'text-orange-600 bg-orange-50'
       default: return 'text-gray-600 bg-gray-50'
     }

@@ -237,32 +237,60 @@ const PostDetailScreen: React.FC = () => {
 
   // 评论区事件处理
   const handleSubmitComment = async (content: string) => {
-    await apiCreateComment('Post', post.id, content)
-    const cr = await apiGetComments('post', post.id, 1, 10, true)
-    const mapped = (cr.list || []).map((c: any) => ({
-      id: c.id,
-      author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
-      content: c.content,
-      time: formatTimeOfDay(c.created_at || ''),
-      likes: c.likes || 0,
-      isLiked: false,
-      replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })),
-      canEdit: true,
-    }))
-    setAllComments(mapped)
-    setCommentTotal(cr.total || mapped.length)
-    toast({ title: '评论发送成功', description: '您的评论已发布' })
+    try {
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
+      await apiCreateComment('Post', post.id, content)
+      const cr = await apiGetComments('post', post.id, 1, 10, true)
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })),
+        canEdit: true,
+      }))
+      setAllComments(mapped)
+      setCommentTotal(cr.total || mapped.length)
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
+      toast({ title: '评论发送成功', description: '您的评论已发布' })
+    } catch (error) {
+      console.error('评论提交失败:', error)
+      toast({ title: '评论发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {
-    await apiReplyComment(commentId, content)
-    // 刷新当前第一页以包含最新回复
-    const cr = await apiGetComments('post', post.id, 1, 10)
-    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
-    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-    const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })) }))
-    setAllComments(mapped)
-    toast({ title: '回复发送成功', description: '您的回复已发布' })
+    try {
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
+      await apiReplyComment(commentId, content)
+      // 刷新当前第一页以包含最新回复
+      const cr = await apiGetComments('post', post.id, 1, 10)
+      const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+      const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+      const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })) }))
+      setAllComments(mapped)
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
+      toast({ title: '回复发送成功', description: '您的回复已发布' })
+    } catch (error) {
+      console.error('回复提交失败:', error)
+      toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   const handleEditComment = async (commentId: number, content: string) => {

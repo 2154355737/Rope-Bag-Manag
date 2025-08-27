@@ -49,11 +49,18 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   ]
 
   const handleNext = () => {
+    console.log('📱 引导页面下一步:', { currentPage, total: 2 })
     if (currentPage < 2) {
       setCurrentPage(currentPage + 1)
     } else {
+      console.log('✅ 引导页面完成，调用onComplete')
       onComplete()
     }
+  }
+
+  const handleSkip = () => {
+    console.log('⏭️ 用户点击跳过引导页')
+    onComplete()
   }
 
   return (
@@ -63,8 +70,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="absolute top-4 right-4">
-        <Button variant="ghost" size="sm" onClick={onComplete}>
+      <div className="absolute top-4 right-4 z-10">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={handleSkip}
+          className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+        >
           跳过
         </Button>
       </div>

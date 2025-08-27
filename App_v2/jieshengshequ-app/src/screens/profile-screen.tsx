@@ -87,7 +87,7 @@ const ProfileScreen: React.FC = () => {
         return {
           text: '已发布',
           variant: 'default' as const,
-          className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+          		className: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
         }
       case 'pending':
       case 'draft':
@@ -578,7 +578,7 @@ END:VCARD`
             
             {/* 在线状态指示器 */}
             <div className="flex items-center gap-1 mt-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              			<div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-xs text-muted-foreground">在线</span>
             </div>
           </div>

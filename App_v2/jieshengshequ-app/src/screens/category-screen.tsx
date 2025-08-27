@@ -15,7 +15,13 @@ import {
   Loader2,
   RefreshCw,
   TrendingUp,
-  Calendar
+  Calendar,
+  SlidersHorizontal,
+  X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Pin
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -44,6 +50,7 @@ interface Resource {
   rating: number
   createdAt: string
   isPinned: boolean
+  isHot: boolean
   categoryId?: number
 }
 
@@ -56,10 +63,22 @@ interface Category {
 }
 
 // 排序选项
-type SortOption = 'latest' | 'popular' | 'downloads' | 'rating'
+type SortOption = 'latest' | 'popular' | 'downloads' | 'rating' | 'views' | 'title'
+
+// 排序方向
+type SortDirection = 'asc' | 'desc'
 
 // 显示模式
 type ViewMode = 'grid' | 'list'
+
+// 筛选选项
+interface FilterOptions {
+  minDownloads: number
+  minRating: number
+  hasImage: boolean
+  isPinned: boolean | null
+  dateRange: string
+}
 
 const CategoryScreen: React.FC = () => {
   const { getActiveTab, setActiveTab } = useNavigation()
@@ -120,6 +139,7 @@ const CategoryScreen: React.FC = () => {
         rating: item.rating || 0,
         createdAt: item.created_at || new Date().toISOString(),
         isPinned: item.is_pinned || false,
+        isHot: item.is_featured || item.is_hot || false,
         categoryId: item.category_id
       }))
       
@@ -151,21 +171,32 @@ const CategoryScreen: React.FC = () => {
     // 排序
     filtered.sort((a, b) => {
       switch (sortBy) {
-      case 'latest':
+        case 'latest':
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      case 'popular':
+        case 'popular':
           return (b.views + b.likes) - (a.views + a.likes)
-      case 'downloads':
+        case 'downloads':
           return b.downloads - a.downloads
-      case 'rating':
+        case 'rating':
           return b.rating - a.rating
         default:
           return 0
       }
     })
 
-    // 置顶资源排在前面
-    return filtered.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0))
+    // 置顶资源排在最前面，然后是精华资源
+    return filtered.sort((a, b) => {
+      // 置顶优先级最高
+      if (a.isPinned !== b.isPinned) {
+        return b.isPinned ? 1 : -1
+      }
+      // 如果都不是置顶或都是置顶，则精华排在前面
+      if (a.isHot !== b.isHot) {
+        return b.isHot ? 1 : -1
+      }
+      // 如果状态相同，保持原排序
+      return 0
+    })
   }, [resources, searchQuery, sortBy])
 
   // 初始化数据
@@ -190,17 +221,29 @@ const CategoryScreen: React.FC = () => {
   const handleRefresh = useCallback(() => {
     loadResources(selectedCategory, true)
   }, [loadResources, selectedCategory])
+  
+  // 清空搜索
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('')
+  }, [])
 
   // 获取排序选项的显示文本
   const getSortText = (sort: SortOption) => {
     const sortTexts = {
       latest: '最新发布',
       popular: '最受欢迎',
-      downloads: '下载最多',
-      rating: '评分最高'
+      downloads: '下载量',
+      rating: '评分',
+      views: '浏览量',
+      title: '标题'
     }
     return sortTexts[sort]
   }
+  
+  // 检查是否有搜索内容
+  const hasSearch = useMemo(() => {
+    return searchQuery.trim() !== ''
+  }, [searchQuery])
 
   // 格式化数字显示
   const formatNumber = (num: number) => {
@@ -247,36 +290,45 @@ const CategoryScreen: React.FC = () => {
       >
         <Card className="overflow-hidden h-full hover:shadow-lg transition-all duration-200 border border-border/60 bg-card shadow-sm">
           {/* 图片区域 */}
-          <div className="relative aspect-[4/3] overflow-hidden">
-            {resource.image ? (
-              <img 
-                src={resource.image} 
-                alt={resource.title}
-                className="w-full h-full object-cover transition-transform duration-200"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <Grid3X3 size={24} className="mx-auto mb-1" />
-                  <span className="text-xs">暂无封面</span>
+          <div className="relative aspect-[4/3]">
+            <div className="absolute inset-0 overflow-hidden">
+              {resource.image ? (
+                <img 
+                  src={resource.image} 
+                  alt={resource.title}
+                  className="w-full h-full object-cover transition-transform duration-200"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary/15 to-accent/15 flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <Grid3X3 size={24} className="mx-auto mb-1" />
+                    <span className="text-xs">暂无封面</span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             
-            {/* 置顶标记 */}
-            {resource.isPinned && (
-              <div className="absolute top-2 left-2">
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-primary/90 text-primary-foreground">
+            {/* 置顶和精华标记 */}
+            <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
+              {resource.isPinned && (
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-500 text-white shadow-sm">
+                  <Pin size={10} className="mr-1" />
                   置顶
                 </Badge>
-              </div>
-            )}
+              )}
+              {resource.isHot && (
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-amber-500 text-white shadow-sm">
+                  <Star size={10} className="mr-1 fill-current" />
+                  精华
+                </Badge>
+              )}
+            </div>
             
             {/* 评分 */}
             {resource.rating > 0 && (
-              <div className="absolute top-2 right-2">
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-background/90 text-foreground flex items-center gap-1">
+              <div className="absolute top-2 right-2 z-10">
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-background/90 text-foreground flex items-center gap-1 shadow-sm">
                   <Star size={10} className="fill-yellow-400 text-yellow-400" />
                   {resource.rating.toFixed(1)}
                 </Badge>
@@ -389,15 +441,22 @@ const CategoryScreen: React.FC = () => {
                   )}
                 </div>
                 
-                {/* 置顶和评分 */}
-                <div className="flex items-center gap-1 flex-shrink-0">
+                {/* 置顶、精华和评分 */}
+                <div className="flex items-center gap-1 flex-shrink-0 flex-wrap">
                   {resource.isPinned && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-primary/90 text-primary-foreground">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-orange-500 text-white shadow-sm">
+                      <Pin size={8} className="mr-0.5" />
                       置顶
                     </Badge>
                   )}
+                  {resource.isHot && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-amber-500 text-white shadow-sm">
+                      <Star size={8} className="mr-0.5 fill-current" />
+                      精华
+                    </Badge>
+                  )}
                   {resource.rating > 0 && (
-                    <Badge variant="outline" className="text-xs px-1.5 py-0 flex items-center gap-1">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 flex items-center gap-1 shadow-sm">
                       <Star size={8} className="fill-yellow-400 text-yellow-400" />
                       {resource.rating.toFixed(1)}
                     </Badge>
@@ -454,7 +513,7 @@ const CategoryScreen: React.FC = () => {
       {/* 顶部导航 */}
       <TopNavigation
         title="分类"
-        subtitle={`发现 ${filteredAndSortedResources.length} 个精彩资源`}
+        subtitle={`${hasSearch ? '搜索到' : '发现'} ${filteredAndSortedResources.length} 个${hasSearch ? '匹配' : '精彩'}资源`}
         rightAction={
           <div className="flex items-center gap-2">
             <Button
@@ -494,45 +553,45 @@ const CategoryScreen: React.FC = () => {
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                      <Input
+                <Input
                   placeholder="搜索资源..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 h-9 text-sm"
-                      />
-                    </div>
+                />
+              </div>
 
               <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
                 <SelectTrigger className="w-32 h-9 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="latest">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest">
                     <div className="flex items-center gap-2">
                       <Calendar size={12} />
                       最新
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="popular">
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="popular">
                     <div className="flex items-center gap-2">
                       <TrendingUp size={12} />
                       热门
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="downloads">
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="downloads">
                     <div className="flex items-center gap-2">
                       <Download size={12} />
                       下载
                     </div>
-                        </SelectItem>
-                        <SelectItem value="rating">
+                  </SelectItem>
+                  <SelectItem value="rating">
                     <div className="flex items-center gap-2">
                       <Star size={12} />
                       评分
                     </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
               
               <Tabs value={viewMode} onValueChange={(value) => setActiveTab('category', value)}>
                 <TabsList className="h-9">
@@ -544,7 +603,7 @@ const CategoryScreen: React.FC = () => {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-                      </div>
+            </div>
                     </div>
                   </div>
 

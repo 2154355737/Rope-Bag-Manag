@@ -88,6 +88,23 @@ function redirectToLogin(): void {
 	}
 }
 
+// 定义不需要认证的公开接口路径
+const PUBLIC_ENDPOINTS = [
+	'/posts',
+	'/resources', 
+	'/categories',
+	'/search/trending',
+	'/announcements'
+]
+
+// 检查是否为公开接口
+function isPublicEndpoint(url: string): boolean {
+	return PUBLIC_ENDPOINTS.some(endpoint => url.includes(endpoint)) || 
+		   url.includes('/posts/') || 
+		   url.includes('/resources/') || 
+		   url.includes('/announcements/')
+}
+
 async function request<T>(method: HttpMethod, url: string, body?: any, init?: RequestInit): Promise<T> {
 	const headers: HeadersInit = {
 		'Accept': 'application/json',
@@ -96,11 +113,16 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 	if (body && !(body instanceof FormData)) {
 		headers['Content-Type'] = 'application/json'
 	}
+	
 	const token = getToken()
+	const isPublic = isPublicEndpoint(url)
+	
 	if (token) {
 		headers['Authorization'] = `Bearer ${token}`
+		if (!isPublic) {
 		console.log('使用认证Token:', token.substring(0, 10) + '...')
-	} else {
+		}
+	} else if (!isPublic) {
 		console.warn('未找到认证Token，请确保已登录')
 	}
 

@@ -93,7 +93,7 @@ const MyContentScreen: React.FC = () => {
       case 'active':
         return { 
           text: '已发布', 
-          className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          		className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
           icon: CheckCircle 
         }
       case 'draft':

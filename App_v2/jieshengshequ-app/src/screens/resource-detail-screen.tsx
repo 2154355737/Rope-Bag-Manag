@@ -388,20 +388,48 @@ const ResourceDetailScreen = (): JSX.Element => {
 
   // 评论区事件处理
   const handleSubmitComment = async (content: string) => {
-    await createComment('Package', resource.id, content)
-    const cr = await getComments('resource' as any, resource.id, 1, 10, true)
-    const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
-    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
-    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-    const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
-    setComments(mapped)
-    setCommentTotal(cr.total || mapped.length)
-    toast({ title: '评论发送成功', description: '您的评论已发布' })
+    try {
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
+      await createComment('Package', resource.id, content)
+      const cr = await getComments('resource' as any, resource.id, 1, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
+      const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
+      const mapped = base.map((c, idx) => ({ ...c, replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })) }))
+      setComments(mapped)
+      setCommentTotal(cr.total || mapped.length)
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
+      toast({ title: '评论发送成功', description: '您的评论已发布' })
+    } catch (error) {
+      console.error('评论提交失败:', error)
+      toast({ title: '评论发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   const handleSubmitReply = async (commentId: number, content: string) => {
-    await apiReplyComment(commentId, content)
-    toast({ title: '回复发送成功', description: '您的回复已发布' })
+    try {
+      // 记录当前滚动位置
+      const currentScrollY = window.scrollY
+      
+      await apiReplyComment(commentId, content)
+      
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentScrollY)
+      }, 100)
+      
+      toast({ title: '回复发送成功', description: '您的回复已发布' })
+    } catch (error) {
+      console.error('回复提交失败:', error)
+      toast({ title: '回复发送失败', description: '请稍后重试', variant: 'destructive' })
+    }
   }
 
   // 加载更多评论
@@ -790,7 +818,7 @@ const ResourceDetailScreen = (): JSX.Element => {
               <ul className="space-y-2">
                 {resource.requirements.map((req, idx) => (
                   <li key={idx} className="flex items-start text-sm">
-                    <CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                    					<CheckCircle size={14} className="text-green-500 mr-2 mt-0.5 flex-shrink-0" />
                     <span className="text-overflow-protection">{req}</span>
                   </li>
                 ))}
@@ -814,7 +842,7 @@ const ResourceDetailScreen = (): JSX.Element => {
                       <div className="flex items-center flex-1 min-w-0">
                         {/* 文件类型图标 */}
                         {file.type === '压缩包' && <Package size={18} className="text-orange-500 mr-3 flex-shrink-0" />}
-                        {file.type === '安装程序' && <Download size={18} className="text-green-500 mr-3 flex-shrink-0" />}
+                        				{file.type === '安装程序' && <Download size={18} className="text-emerald-500 mr-3 flex-shrink-0" />}
                         {file.type === '移动应用' && <Smartphone size={18} className="text-blue-500 mr-3 flex-shrink-0" />}
                         {file.type === '文档' && <FileText size={18} className="text-gray-500 mr-3 flex-shrink-0" />}
                         {['Java代码', 'JS代码', 'Python代码', 'C++代码'].includes(file.type) && <FileText size={18} className="text-purple-500 mr-3 flex-shrink-0" />}

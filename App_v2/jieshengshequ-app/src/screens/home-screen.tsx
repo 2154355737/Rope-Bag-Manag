@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, X, Eye, Download, Calendar, Loader2 } from 'lucide-react'
+import { Bell, Code, BookOpen, Zap, Star, Clock, Bookmark, Pin, Eye, Download, Calendar, Loader2, Package } from 'lucide-react'
+import { SkeletonCard } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+
 import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import TopNavigation from '@/components/ui/top-navigation'
 import { getUnreadCount } from '../api/notifications'
-import { trendingKeywords, suggestKeywords } from '../api/search'
+import { trendingKeywords } from '../api/search'
 import { fetchFeed } from '../api/feed'
 import { getPosts } from '../api/posts'
 import { getAnnouncements } from '../api/announcements'
@@ -54,11 +55,8 @@ interface TabDataState {
 const HomeScreen: React.FC = () => {
   const navigate = useNavigate()
   const { getActiveTab, setActiveTab } = useNavigation()
-  const [searchFocused, setSearchFocused] = useState(false)
-  const [searchValue, setSearchValue] = useState('')
-  const [isDropdownInteracting, setIsDropdownInteracting] = useState(false)
+
   const [hotKeywords, setHotKeywords] = useState<string[]>([])
-  const [suggestions, setSuggestions] = useState<string[]>([])
   const [unread, setUnread] = useState(0)
   
   // 获取当前活跃的标签页
@@ -288,7 +286,7 @@ const HomeScreen: React.FC = () => {
   const categoryIcons = [Code, BookOpen, Zap, Star, Clock, Bookmark]
   const categoryColors = [
     'bg-blue-100 dark:bg-blue-900',
-    'bg-green-100 dark:bg-green-900',
+    				'bg-green-100 dark:bg-green-900',
     'bg-yellow-100 dark:bg-yellow-900',
     'bg-purple-100 dark:bg-purple-900',
     'bg-red-100 dark:bg-red-900',
@@ -312,7 +310,7 @@ const HomeScreen: React.FC = () => {
         // 使用备用分类数据
         setCategories([
           { id: 1, name: '基础语法', icon: Code, color: 'bg-blue-100 dark:bg-blue-900' },
-          { id: 2, name: '学习资源', icon: BookOpen, color: 'bg-green-100 dark:bg-green-900' },
+          		{ id: 2, name: '学习资源', icon: BookOpen, color: 'bg-green-100 dark:bg-green-900' },
           { id: 3, name: '实战项目', icon: Zap, color: 'bg-yellow-100 dark:bg-yellow-900' },
           { id: 4, name: '精选内容', icon: Star, color: 'bg-purple-100 dark:bg-purple-900' },
           { id: 5, name: '最近更新', icon: Clock, color: 'bg-red-100 dark:bg-red-900' },
@@ -381,17 +379,7 @@ const HomeScreen: React.FC = () => {
     }
   }, [activeTab])
 
-  // 搜索建议
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (searchValue.trim()) {
-        suggestKeywords(searchValue.trim()).then(setSuggestions).catch(() => setSuggestions([]))
-      } else {
-        setSuggestions([])
-      }
-    }, 250)
-    return () => clearTimeout(t)
-  }, [searchValue])
+
 
   // 渲染内容卡片
   const renderContentCard = (card: ContentItem) => (
@@ -402,92 +390,94 @@ const HomeScreen: React.FC = () => {
       transition={{ duration: 0.3 }}
     >
       <Card 
-        className={`overflow-hidden relative cursor-pointer hover:shadow-md transition-shadow ${card.isTop ? 'ring-2 ring-orange-200 dark:ring-orange-800 ring-opacity-50' : ''}`}
+        className={`relative cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 border-l-2 group ${
+          card.isTop 
+            ? 'border-l-orange-400 bg-orange-50/30 dark:bg-orange-950/20 hover:border-l-orange-500' 
+            : card.type === 'resource' 
+              				? 'border-l-green-400 hover:border-l-green-500'
+              : card.type === 'announcement'
+                ? 'border-l-blue-400 hover:border-l-blue-500'
+                : 'border-l-purple-400 hover:border-l-purple-500'
+        }`}
         onClick={() => handleCardClick(card)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-center mb-3">
-            <Avatar className="h-6 w-6 mr-2">
-              <AvatarImage src={card.author.avatar} />
-              <AvatarFallback>{card.author.name[0]}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm">{card.author.name}</span>
-            <div className="ml-auto flex items-center gap-2">
-              {card.category && (
-                <Badge variant="outline" className="text-xs">
-                  {card.category.name}
-                </Badge>
-              )}
-              {card.type === 'announcement' && (
-                <Badge variant="outline" className="text-xs">
-                  公告
-                </Badge>
-              )}
+        <CardContent className="p-3 overflow-hidden">
+          {/* 头部信息 - 更紧凑 */}
+          <div className="flex items-center justify-between mb-2 overflow-hidden">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+              <Avatar className="h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110">
+                <AvatarImage src={card.author.avatar} />
+                <AvatarFallback className="text-xs">{card.author.name[0]}</AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-muted-foreground truncate max-w-[80px]">{card.author.name}</span>
+              
+              {/* 类型标识 */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                				{card.type === 'resource' && <Package size={12} className="text-green-500" />}
+                {card.type === 'announcement' && <Bell size={12} className="text-blue-500" />}
+                {card.type === 'post' && <BookOpen size={12} className="text-purple-500" />}
+              </div>
+            </div>
+            
+            {/* 状态标签 - 更小更紧凑 */}
+            <div className="flex items-center gap-1 flex-shrink-0 z-10">
               {card.isTop && (
-                <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs border-0">
-                  <Pin size={10} className="mr-1" />
+                <Badge className="bg-orange-500 text-white text-[10px] px-1 py-0 h-4 border-0 shadow-sm">
+                  <Pin size={8} className="mr-0.5" />
                   置顶
                 </Badge>
               )}
-            </div>
-          </div>
-          
-          <h3 className="font-medium text-lg mb-2">{card.title}</h3>
-          <p className="text-muted-foreground text-sm mb-3">{card.description}</p>
-          
-          {/* 标签区域 - 只在有标签时显示 */}
-          {(card.tags && card.tags.length > 0) || card.isHot ? (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {card.tags && card.tags.slice(0, 3).map((tag, idx) => (
-                <Badge key={idx} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {card.tags && card.tags.length > 3 && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  +{card.tags.length - 3}
-                </Badge>
-              )}
               {card.isHot && (
-                <Badge className="bg-amber-100 text-amber-700 border-amber-200 text-xs">
-                  <Star size={12} className="mr-1" /> 精华
+                <Badge className="bg-amber-500 text-white text-[10px] px-1 py-0 h-4 border-0 shadow-sm">
+                  <Star size={8} className="mr-0.5 fill-current" />
+                  精华
                 </Badge>
               )}
             </div>
-          ) : null}
-        </CardContent>
-        
-        <CardFooter className="p-4 pt-3 border-t">
-          <div className="flex items-center text-muted-foreground text-xs space-x-4">
-            <div className="flex items-center">
-              <Calendar size={14} className="mr-1" />
-              {formatDate(card.date)}
-            </div>
-            <div className="flex items-center">
-              <Eye size={14} className="mr-1" />
-              {formatNumber(card.views)}
-            </div>
-            <div className="flex items-center">
-              <Star size={14} className="mr-1" />
-              {formatNumber(card.likes)}
-            </div>
-            {card.type === 'resource' && (
-              <div className="flex items-center">
-                <Download size={14} className="mr-1" />
-                {formatNumber(card.downloads || 0)}
-              </div>
-            )}
           </div>
-        </CardFooter>
+          
+          {/* 标题 - 限制行数防止溢出 */}
+          <h3 className="font-medium text-base mb-1.5 line-clamp-2 leading-tight break-words hyphens-auto overflow-hidden">{card.title}</h3>
+          
+          {/* 描述 - 更小字体，限制行数 */}
+          <p className="text-muted-foreground text-xs mb-2 line-clamp-2 leading-relaxed break-words overflow-hidden">{card.description}</p>
+          
+
+          
+          {/* 底部统计信息 - 单行紧凑布局 */}
+          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-border/50 overflow-hidden">
+            <div className="flex items-center gap-3 overflow-hidden">
+              <div className="flex items-center gap-0.5">
+                <Eye size={10} className="flex-shrink-0" />
+                <span className="truncate">{formatNumber(card.views)}</span>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <Star size={10} className="flex-shrink-0" />
+                <span className="truncate">{formatNumber(card.likes)}</span>
+              </div>
+              {card.type === 'resource' && (
+                <div className="flex items-center gap-0.5">
+                  <Download size={10} className="flex-shrink-0" />
+                  <span className="truncate">{formatNumber(card.downloads || 0)}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-0.5 text-[10px] flex-shrink-0">
+              <Calendar size={10} />
+              <span className="truncate max-w-[60px]">{formatDate(card.date)}</span>
+            </div>
+          </div>
+        </CardContent>
       </Card>
     </motion.div>
   )
 
   // 渲染加载状态
   const renderLoadingState = () => (
-    <div className="flex flex-col items-center justify-center py-12 space-y-4">
-      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">加载中...</p>
+    <div className="space-y-4">
+      {[...Array(3)].map((_, index) => (
+        <SkeletonCard key={index} />
+      ))}
     </div>
   )
 
@@ -572,125 +562,74 @@ const HomeScreen: React.FC = () => {
         showNotificationButton
         notificationCount={unread}
         showSearchButton
-        onSearchClick={() => setSearchFocused(true)}
+        onSearchClick={() => navigate('/search')}
       />
 
       {/* 内容区域 - 为固定导航栏留出空间 */}
       <div className="pt-nav"> {/* 固定导航栏高度 + 安全区域 */}
-        {/* 搜索框 */}
-        <div className="p-4">
-        <div className="relative">
-          <Input
-            id="search-input"
-            name="search"
-            placeholder="搜索资源、话题、用户..."
-            className="pl-10 pr-4 py-6 rounded-full"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => {
-              // 延迟关闭，允许点击下拉框内容
-              setTimeout(() => {
-                if (!isDropdownInteracting) {
-                  setSearchFocused(false)
-                }
-              }, 150)
-            }}
-            autoComplete="search"
-          />
-          <Search className="absolute left-3 top-3 text-muted-foreground" size={20} />
-          {searchValue && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-2 top-2 h-8 w-8 p-0 hover:bg-muted"
-              onClick={() => {
-                setSearchValue('')
-                setSearchFocused(false)
-                setIsDropdownInteracting(false)
-              }}
-            >
-              <X size={16} />
-            </Button>
-          )}
-          {searchFocused && (
-            <div
-              className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-[60] max-h-80 overflow-y-auto"
-              onMouseEnter={() => setIsDropdownInteracting(true)}
-              onMouseLeave={() => setIsDropdownInteracting(false)}
-            >
-            <div className="mb-4">
-              <h3 className="text-sm font-medium mb-2">热门搜索</h3>
-              <div className="flex flex-wrap gap-2">
-                {(hotKeywords.length ? hotKeywords : ['结绳入门','数据结构','项目实战','性能优化','面试题']).map((tag) => (
-                  <Badge 
-                    key={tag}
-                    variant="outline" 
-                    className="cursor-pointer hover:bg-accent transition-colors"
-                    onClick={() => {
-                      setSearchValue(tag)
-                      setSearchFocused(false)
-                      setIsDropdownInteracting(false)
-                    }}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">搜索历史</h3>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                {(suggestions.length ? suggestions : ['结绳语言基础教程','如何优化结绳代码']).map((s) => (
-                  <div
-                    key={s}
-                    className="flex items-center cursor-pointer hover:bg-accent rounded-md p-2 -m-2 transition-colors"
-                    onClick={() => {
-                      setSearchValue(s)
-                      setSearchFocused(false)
-                      setIsDropdownInteracting(false)
-                    }}
-                  >
-                    <Clock size={14} className="mr-2" />
-                    <span>{s}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* 分类快捷入口 */}
-      <div className="p-4">
-        <h2 className="text-lg font-medium mb-4">快速导航</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {categories.map((category, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="flex flex-col items-center"
-            >
-              <div className={`flex items-center justify-center w-14 h-14 rounded-full ${category.color} mb-2`}>
-                <category.icon size={24} className="text-foreground" />
-              </div>
-                                <span className="text-xs text-center">{category.name}</span>
-            </motion.div>
-          ))}
+      <div className="p-4 max-w-4xl mx-auto">
+        <div className="relative">
+          {/* 装饰性标题 */}
+          <div className="flex items-center mb-6">
+            <div className="flex-shrink-0 w-1 h-6 bg-gradient-to-b from-primary to-primary/60 rounded-full mr-3"></div>
+            <h2 className="text-lg font-medium">快速导航</h2>
+            <div className="flex-1 ml-4 h-px bg-gradient-to-r from-border to-transparent"></div>
+          </div>
+          
+          {/* 导航网格 */}
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {categories.map((category, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ 
+                  scale: 1.05,
+                  transition: { duration: 0.2 }
+                }}
+                whileTap={{ scale: 0.95 }}
+                className="flex flex-col items-center cursor-pointer group"
+              >
+                {/* 图标容器 - 添加悬停效果和阴影 */}
+                <div className={`
+                  relative flex items-center justify-center w-14 h-14 rounded-2xl mb-3
+                  ${category.color} 
+                  transition-all duration-300 
+                  group-hover:shadow-lg group-hover:shadow-primary/20
+                  group-hover:-translate-y-1
+                  before:absolute before:inset-0 before:rounded-2xl 
+                  before:bg-gradient-to-br before:from-white/20 before:to-transparent
+                  before:opacity-0 group-hover:before:opacity-100 before:transition-opacity
+                `}>
+                  <category.icon size={24} className="text-foreground relative z-10" />
+                  
+                  {/* 装饰性光晕效果 */}
+                  <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
+                </div>
+                
+                {/* 文字标签 - 添加悬停效果 */}
+                <span className="text-xs text-center transition-colors duration-200 group-hover:text-primary font-medium">
+                  {category.name}
+                </span>
+              </motion.div>
+            ))}
+          </div>
+          
+          {/* 底部装饰线 */}
+          <div className="mt-6 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
         </div>
       </div>
 
       {/* 内容标签页 */}
-      <div className="px-4 flex-1">
+      <div className="px-4 flex-1 max-w-4xl mx-auto">
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full mb-4">
-          <TabsList className="grid grid-cols-3">
-            <TabsTrigger value="posts">帖子</TabsTrigger>
-            <TabsTrigger value="announcements">公告</TabsTrigger>
-            <TabsTrigger value="resources">资源</TabsTrigger>
+          <TabsList className="grid grid-cols-3 max-w-md mx-auto md:max-w-lg">
+            <TabsTrigger value="posts" className="text-xs md:text-sm">帖子</TabsTrigger>
+            <TabsTrigger value="announcements" className="text-xs md:text-sm">公告</TabsTrigger>
+            <TabsTrigger value="resources" className="text-xs md:text-sm">资源</TabsTrigger>
           </TabsList>
         </Tabs>
         

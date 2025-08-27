@@ -31,6 +31,7 @@ import StorageManager from './utils/storage'
 import { useTokenCheck } from './hooks/useTokenCheck'
 import { NavigationProvider } from './contexts/NavigationContext'
 import { AuthProvider } from './contexts/AuthContext'
+import ScrollRestoration from './components/ScrollRestoration'
 
 // 内部组件，用于在AuthProvider内部使用token检查
 const AppContent: React.FC = () => {
@@ -39,6 +40,7 @@ const AppContent: React.FC = () => {
   return (
     <NavigationProvider>
       <BackButtonHandler />
+      <ScrollRestoration enabled={false} />
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<HomeScreen />} />
