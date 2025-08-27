@@ -81,12 +81,39 @@ async fn get_posts(
     // 默认仅显示已发布 + 审核通过的帖子
     if q.status.is_none() { q.status = Some("Published".to_string()); }
     match post_service.get_posts(q).await {
-        Ok(response) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "success",
-            "msg": "success",
-            "data": response
-        }))),
+        Ok(response) => {
+            // 在API层统一补充作者头像/author_detail
+            let mut enriched: Vec<serde_json::Value> = Vec::with_capacity(response.list.len());
+            if let Ok(user_repo) = crate::repositories::user_repo::UserRepository::new("data.db") {
+                for p in &response.list {
+                    let mut v = serde_json::to_value(p).unwrap_or_else(|_| json!({}));
+                    if let serde_json::Value::Object(ref mut map) = v {
+                        if let Ok(Some(u)) = user_repo.find_by_id(p.author_id).await {
+                            let name = u.nickname.clone().unwrap_or(u.username.clone());
+                            let avatar = u.avatar_url.clone().unwrap_or_default();
+                            map.insert("author_name".to_string(), json!(name));
+                            map.insert("author_avatar".to_string(), json!(avatar));
+                            map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+                        }
+                    }
+                    enriched.push(v);
+                }
+            } else {
+                enriched = response.list.into_iter().map(|p| serde_json::to_value(p).unwrap_or_else(|_| json!({}))).collect();
+            }
+
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "msg": "success",
+                "data": {
+                    "list": enriched,
+                    "total": response.total,
+                    "page": response.page,
+                    "size": response.size
+                }
+            })))
+        },
         Err(e) => {
             log::error!("获取帖子列表失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({

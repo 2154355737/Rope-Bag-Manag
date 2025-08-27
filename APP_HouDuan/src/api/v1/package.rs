@@ -467,9 +467,15 @@ async fn get_packages(
             let user_repo = UserRepository::new("data.db").ok();
             for p in packages {
                 let mut v = serde_json::to_value(&p).unwrap_or_else(|_| json!({}));
-                if let Some(repo) = &user_repo {
-                    if let Ok(Some(u)) = repo.find_by_username(&p.author).await {
-                        if let serde_json::Value::Object(ref mut map) = v {
+                if let serde_json::Value::Object(ref mut map) = v {
+                    // 统计字段：view_count 与 comment_count
+                    if let Ok((views, comments)) = package_service.get_view_and_comment_counts(p.id).await {
+                        map.insert("view_count".to_string(), json!(views));
+                        map.insert("comment_count".to_string(), json!(comments));
+                    }
+                    // 作者信息
+                    if let Some(repo) = &user_repo {
+                        if let Ok(Some(u)) = repo.find_by_username(&p.author).await {
                             let name = u.nickname.clone().unwrap_or(u.username.clone());
                             let avatar = u.avatar_url.clone().unwrap_or_default();
                             map.insert("author_name".to_string(), json!(name));
