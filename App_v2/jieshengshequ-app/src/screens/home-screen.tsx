@@ -355,13 +355,29 @@ const HomeScreen: React.FC = () => {
     window.addEventListener('focus', onFocus)
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onOnline)
-    const sub = CapacitorApp?.addListener?.('resume', () => loadTabData(activeTab, true))
+    
+    let listenerPromise: Promise<any> | null = null
+    if (CapacitorApp?.addListener) {
+      listenerPromise = CapacitorApp.addListener('resume', () => loadTabData(activeTab, true))
+        .catch((error) => {
+          console.warn('Failed to add Capacitor App resume listener:', error)
+          return null
+        })
+    }
+    
     return () => {
       window.removeEventListener('focus', onFocus)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('online', onOnline)
-      // @ts-ignore
-      sub?.remove?.()
+      if (listenerPromise) {
+        listenerPromise.then((listener) => {
+          if (listener && typeof listener.remove === 'function') {
+            listener.remove().catch((error: any) => {
+              console.warn('Failed to remove Capacitor App resume listener:', error)
+            })
+          }
+        })
+      }
     }
   }, [activeTab])
 
