@@ -320,40 +320,38 @@ const UniversalDetailScreen: React.FC = () => {
         
         // 加载评论
         try {
-        const targetType = type === 'resource' ? 'package' : type
-          const commentResponse = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
-          const user = getLocalUser()
-          const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
-          
-          const mappedComments = (commentResponse.list || []).map((c: any) => ({
-          id: c.id,
-            author: { 
-              name: c.author_name || '用户', 
-              avatar: c.author_avatar || '' 
-            },
-          content: c.content,
-          time: formatTimeOfDay(c.created_at || ''),
-          likes: c.likes || 0,
-          isLiked: false,
-            replies: (c.replies || []).map((r: any) => ({
-              id: r.id,
-              author: { 
-                name: r.author_name || '用户', 
-                avatar: r.author_avatar || '' 
-              },
-              content: r.content,
-              time: formatTimeOfDay(r.created_at || ''),
-              likes: r.likes || 0,
+          const targetType = type === 'resource' ? 'package' : type
+          if (type !== 'announcement') {
+            const commentResponse = await apiGetComments(targetType as any, parseInt(id), 1, 10, true)
+            const user = getLocalUser()
+            const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+            const mappedComments = (commentResponse.list || []).map((c: any) => ({
+              id: c.id,
+              author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+              content: c.content,
+              time: formatTimeOfDay(c.created_at || ''),
+              likes: c.likes || 0,
               isLiked: false,
-              canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id)
-            })),
-            canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id)
-          }))
-          
-          setComments(mappedComments)
-          setHasMoreComments((commentResponse.total || 0) > (commentResponse.page || 1) * (commentResponse.size || 10))
-          setCommentTotal(commentResponse.total || mappedComments.length)
-      } catch (error) {
+              replies: (c.replies || []).map((r: any) => ({
+                id: r.id,
+                author: { name: r.author_name || '用户', avatar: r.author_avatar || '' },
+                content: r.content,
+                time: formatTimeOfDay(r.created_at || ''),
+                likes: r.likes || 0,
+                isLiked: false,
+                canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id)
+              })),
+              canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id)
+            }))
+            setComments(mappedComments)
+            setHasMoreComments((commentResponse.total || 0) > (commentResponse.page || 1) * (commentResponse.size || 10))
+            setCommentTotal(commentResponse.total || mappedComments.length)
+          } else {
+            setComments([])
+            setHasMoreComments(false)
+            setCommentTotal(0)
+          }
+        } catch (error) {
           console.log('加载评论失败:', error)
         }
         
@@ -699,7 +697,7 @@ const UniversalDetailScreen: React.FC = () => {
     // 实现加载更多评论
     setIsLoadingComments(true)
     try {
-      if (!item) return []
+      if (!item || item.type === 'announcement') return []
       const targetType = item.type === 'resource' ? 'package' : item.type
       const commentResponse = await apiGetComments(targetType as any, item.id, page, 10, true)
       const user = getLocalUser()
@@ -952,21 +950,23 @@ const UniversalDetailScreen: React.FC = () => {
             />
           )}
 
-            {/* 评论区 */}
-            <CommentSection
-            comments={comments}
-            totalCount={commentTotal}
-              onSubmitComment={handleSubmitComment}
-            onSubmitReply={handleReplyComment}
-              onLoadMoreComments={handleLoadMoreComments}
-              hasMoreComments={hasMoreComments}
-              isLoadingComments={isLoadingComments}
-            placeholder="写下你的看法..."
-              maxLength={200}
-              initialCommentsToShow={5}
-              onEditComment={handleEditComment}
-              onDeleteComment={handleDeleteComment}
-            />
+            {/* 评论区：公告不展示 */}
+            {item.type !== 'announcement' && (
+              <CommentSection
+                comments={comments}
+                totalCount={commentTotal}
+                onSubmitComment={handleSubmitComment}
+                onSubmitReply={handleReplyComment}
+                onLoadMoreComments={handleLoadMoreComments}
+                hasMoreComments={hasMoreComments}
+                isLoadingComments={isLoadingComments}
+                placeholder="写下你的看法..."
+                maxLength={200}
+                initialCommentsToShow={5}
+                onEditComment={handleEditComment}
+                onDeleteComment={handleDeleteComment}
+              />
+            )}
           
           </motion.div>
         </ScrollArea>

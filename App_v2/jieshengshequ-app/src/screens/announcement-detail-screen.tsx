@@ -531,24 +531,6 @@ const AnnouncementDetailScreen: React.FC = () => {
           onMoreClick={() => navigate('/home')}
         />
       </div>
-
-      {/* 评论区 */}
-      <div className="p-4">
-        <CommentSection
-          comments={comments}
-          totalCount={commentTotal}
-          onSubmitComment={handleSubmitComment}
-          onSubmitReply={handleSubmitReply}
-          onLikeComment={handleLikeComment}
-          onReportComment={handleReportComment}
-          onLoadMoreComments={handleLoadMoreComments}
-          hasMoreComments={hasMoreComments}
-          isLoadingComments={isLoadingComments}
-          placeholder="对此公告有疑问或建议..."
-          maxLength={200}
-          initialCommentsToShow={5}
-        />
-      </div>
       </div> {/* 结束内容区域 */}
     </div>
   )
