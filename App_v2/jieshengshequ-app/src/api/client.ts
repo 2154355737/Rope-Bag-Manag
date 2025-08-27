@@ -24,13 +24,13 @@ const isDevelopment = import.meta.env.DEV ||
 
 // 直接连接后端，不使用Vite代理
 const API_BASE = isDevelopment
-  ? 'http://127.0.0.1:15201/api/v1'  // 开发环境直接连接后端
+  ? '/api/v1'  // 开发环境走Vite代理，避免CORS
   : 'http://39.105.113.219:15201/api/v1'  // 生产环境连接到云服务器
 
 // Storage API使用不同的基础路径（不包含/api/v1）
 export const STORAGE_API_BASE = isDevelopment
-  ? 'http://127.0.0.1:15201'  // 开发环境
-  : 'http://39.105.113.219:15201'  // 生产环境
+  ? '/api/v1'  // 开发环境走Vite代理
+  : 'http://39.105.113.219:15201/api/v1'  // 生产环境
 
 // 调试信息：输出当前环境和API_BASE
 console.log('Environment Mode:', import.meta.env.MODE)
@@ -97,6 +97,7 @@ function redirectToLogin(): void {
 async function request<T>(method: HttpMethod, url: string, body?: any, init?: RequestInit): Promise<T> {
 	const headers: HeadersInit = {
 		'Accept': 'application/json',
+		'Cache-Control': 'no-cache',
 	}
 	if (body && !(body instanceof FormData)) {
 		headers['Content-Type'] = 'application/json'

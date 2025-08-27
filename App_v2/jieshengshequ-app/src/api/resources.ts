@@ -1,6 +1,6 @@
 import { http } from './client'
 
-export async function getResources(params?: { page?: number; pageSize?: number; category_id?: number; tag?: string; search?: string }) {
+export async function getResources(params?: { page?: number; page_size?: number; category_id?: number; tag?: string; search?: string }) {
 	const data = await http.get<{ list: any[]; total: number; page: number; page_size: number }>(`/resources`, params)
 	return data
 }

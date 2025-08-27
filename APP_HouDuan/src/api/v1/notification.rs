@@ -1,0 +1,75 @@
+use actix_web::{web, HttpResponse};
+use serde_json::json;
+use crate::services::notification_service::NotificationService;
+use crate::middleware::auth::AuthenticatedUser;
+use crate::models::notification::NotificationQuery;
+
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/notifications")
+            .route("", web::get().to(list_notifications))
+            .route("/unread-count", web::get().to(unread_count))
+            .route("/{id}/read", web::post().to(mark_read))
+            .route("/mark-all-read", web::post().to(mark_all_read))
+            .route("/delete-read", web::delete().to(delete_read))
+            .route("/{id}", web::delete().to(delete_by_id))
+            // 别名：对齐前端
+            .route("/count", web::get().to(unread_count))
+            .route("/read-all", web::post().to(mark_all_read))
+            .route("/clear-read", web::delete().to(delete_read))
+    );
+}
+
+async fn list_notifications(q: web::Query<NotificationQuery>, svc: web::Data<NotificationService>, user: Option<AuthenticatedUser>) -> HttpResponse {
+    if let Some(user) = user {
+        match svc.list(user.id, q.into_inner()).await {
+            Ok(list) => HttpResponse::Ok().json(json!({"code":0, "data": {"list": list}})),
+            Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+        }
+    } else {
+        // 未登录返回空列表
+        HttpResponse::Ok().json(json!({"code":0, "data": {"list": []}}))
+    }
+}
+
+async fn unread_count(svc: web::Data<NotificationService>, user: Option<AuthenticatedUser>) -> HttpResponse {
+    if let Some(user) = user {
+        match svc.unread_count(user.id).await {
+            Ok(count) => HttpResponse::Ok().json(json!({"code":0, "data": {"count": count}})),
+            Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+        }
+    } else {
+        // 未登录返回0
+        HttpResponse::Ok().json(json!({"code":0, "data": {"count": 0}}))
+    }
+}
+
+async fn mark_read(path: web::Path<i32>, svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    let id = path.into_inner();
+    match svc.mark_read(user.id, id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"ok"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+async fn mark_all_read(svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    match svc.mark_all_read(user.id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"ok"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+async fn delete_read(svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    match svc.delete_read(user.id).await {
+        Ok(count) => HttpResponse::Ok().json(json!({"code":0, "data": {"deleted_count": count}, "message": format!("已清理 {} 条已读通知", count)})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+}
+
+async fn delete_by_id(path: web::Path<i32>, svc: web::Data<NotificationService>, user: AuthenticatedUser) -> HttpResponse {
+    let id = path.into_inner();
+    match svc.delete_by_id(user.id, id).await {
+        Ok(_) => HttpResponse::Ok().json(json!({"code":0, "message":"删除成功"})),
+        Err(e) => HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()}))
+    }
+} 

@@ -140,12 +140,29 @@ const HomeScreen: React.FC = () => {
 
   // 数据映射函数
   const mapApiDataToContentItem = (item: any, type: 'post' | 'resource' | 'announcement'): ContentItem => {
+    // 处理tags字段，确保它是数组格式
+    let tags: string[] = []
+    if (item.tags) {
+      if (Array.isArray(item.tags)) {
+        tags = item.tags
+      } else if (typeof item.tags === 'string') {
+        try {
+          // 尝试解析JSON字符串
+          const parsed = JSON.parse(item.tags)
+          tags = Array.isArray(parsed) ? parsed : []
+        } catch {
+          // 如果解析失败，当作单个标签处理
+          tags = [item.tags]
+        }
+      }
+    }
+    
     return {
       id: item.id,
       type,
       title: item.title,
       description: item.description || item.summary || '',
-      tags: item.tags || [],
+      tags,
       author: item.author_detail ? {
         id: item.author_detail.id,
         name: item.author_detail.nickname || item.author_detail.name,
@@ -212,7 +229,7 @@ const HomeScreen: React.FC = () => {
           break
 
         case 'resources':
-          response = await getResources({ page: 1, pageSize: 20 })
+          response = await getResources({ page: 1, page_size: 20 })
           mappedData = (response.list || []).map((item: any) => 
             mapApiDataToContentItem(item, 'resource')
           )

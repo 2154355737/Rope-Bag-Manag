@@ -193,12 +193,15 @@ const PostDetailScreen: React.FC = () => {
   // 评论区事件处理
   const handleSubmitComment = async (content: string) => {
     await apiCreateComment('Post', post.id, content)
-    const cr = await apiGetComments('post', post.id, 1, 10)
-    const base = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || '用户', avatar: c.author_avatar || '' }, content: c.content, time: formatTimeOfDay(c.created_at || ''), likes: c.likes || 0, isLiked: false, replies: [] as any[] }))
-    const repliesArr = await Promise.all(base.map(c => apiGetCommentReplies(c.id).catch(() => [])))
-    const mapped = base.map((c, idx) => ({
-      ...c,
-      replies: (repliesArr[idx] || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+    const cr = await apiGetComments('post', post.id, 1, 10, true)
+    const mapped = (cr.list || []).map((c: any) => ({
+      id: c.id,
+      author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+      content: c.content,
+      time: formatTimeOfDay(c.created_at || ''),
+      likes: c.likes || 0,
+      isLiked: false,
+      replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false })),
       canEdit: true,
     }))
     setAllComments(mapped)

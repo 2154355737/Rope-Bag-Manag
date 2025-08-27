@@ -188,7 +188,74 @@ const UniversalDetailScreen: React.FC = () => {
             throw new Error('不支持的内容类型')
         }
         
-        // 统一数据格式
+        // 处理tags字段，确保它是数组格式
+        let tags: string[] = []
+        if (data.tags) {
+          if (Array.isArray(data.tags)) {
+            tags = data.tags
+          } else if (typeof data.tags === 'string') {
+            try {
+              // 尝试解析JSON字符串
+              const parsed = JSON.parse(data.tags)
+              tags = Array.isArray(parsed) ? parsed : []
+            } catch {
+              // 如果解析失败，当作单个标签处理
+              tags = [data.tags]
+            }
+          }
+        }
+
+        // 处理requirements字段，确保它是数组格式
+        let requirements: string[] = []
+        if (data.requirements) {
+          if (Array.isArray(data.requirements)) {
+            requirements = data.requirements
+          } else if (typeof data.requirements === 'string') {
+            try {
+              // 尝试解析JSON字符串
+              const parsed = JSON.parse(data.requirements)
+              requirements = Array.isArray(parsed) ? parsed : []
+            } catch {
+              // 如果解析失败，当作单个需求处理
+              requirements = [data.requirements]
+            }
+          }
+        }
+
+        // 处理files字段，确保它是数组格式
+        let files: any[] = []
+        if (data.files) {
+          if (Array.isArray(data.files)) {
+            files = data.files
+          } else if (typeof data.files === 'string') {
+            try {
+              // 尝试解析JSON字符串
+              const parsed = JSON.parse(data.files)
+              files = Array.isArray(parsed) ? parsed : []
+            } catch {
+              // 如果解析失败，返回空数组
+              files = []
+            }
+          }
+        }
+
+        // 处理screenshots字段，确保它是数组格式
+        let screenshots: string[] = []
+        if (data.screenshots) {
+          if (Array.isArray(data.screenshots)) {
+            screenshots = data.screenshots
+          } else if (typeof data.screenshots === 'string') {
+            try {
+              // 尝试解析JSON字符串
+              const parsed = JSON.parse(data.screenshots)
+              screenshots = Array.isArray(parsed) ? parsed : []
+            } catch {
+              // 如果解析失败，返回空数组
+              screenshots = []
+            }
+          }
+        }
+
         const unifiedItem: UniversalDetailItem = {
               id: data.id,
           type: type as any,
@@ -202,7 +269,7 @@ const UniversalDetailScreen: React.FC = () => {
               },
               content: data.content,
           description: data.description,
-              tags: data.tags || [],
+              tags,
               stats: {
             likes: data.like_count || data.likes || 0,
             comments: data.comment_count || data.comments || 0,
@@ -217,9 +284,9 @@ const UniversalDetailScreen: React.FC = () => {
           version: data.version,
           fileSize: data.file_size,
           downloadUrl: data.download_url || data.file_url,
-          files: data.files,
-          requirements: data.requirements,
-          screenshots: data.screenshots,
+          files: files,
+          requirements: requirements,
+          screenshots: screenshots,
           safetyStatus: data.safety_status,
           
           // 帖子特有
@@ -340,11 +407,11 @@ const UniversalDetailScreen: React.FC = () => {
             type: 'general',
             message: '无法加载详情信息，请稍后重试'
           })
-        toast({
-          title: "加载失败",
-          description: "无法加载详情信息，请稍后重试",
-          variant: "destructive"
-        })
+          toast({
+            title: "加载失败",
+            description: "无法加载详情信息，请稍后重试",
+            variant: "destructive"
+          })
         }
       } finally {
         setLoading(false)

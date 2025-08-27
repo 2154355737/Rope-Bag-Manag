@@ -89,7 +89,7 @@ export function deletePackage(id: number) {
 export function uploadPackageFile(id: number, file: File) {
   const formData = new FormData()
   formData.append('file', file)
-  return defHttp.post<any>({ url: uploadUrl(id), data: formData }, { isTransformResponse: false })
+  return defHttp.post<any>({ url: uploadUrl(id), data: formData, headers: { 'Content-Type': 'multipart/form-data' } })
 }
 
 export function reviewPackage(id: number, data: ReviewPayload) {

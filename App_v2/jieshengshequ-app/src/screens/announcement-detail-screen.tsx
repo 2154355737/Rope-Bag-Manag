@@ -56,7 +56,7 @@ const AnnouncementDetailScreen: React.FC = () => {
         setRecommendedItems(recommendations)
         // 加载第一页评论（公告使用 target_type=post or announcement? 按后端公开接口仅支持 post/package，这里统一按 post 读取）
         try {
-          const cr = await apiGetComments('post' as any, a.id, 1, 10)
+          const cr = await apiGetComments('post' as any, a.id, 1, 10, true)
           const mapped = (cr.list || []).map((c: any) => ({
             id: c.id,
             author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' },
@@ -64,7 +64,7 @@ const AnnouncementDetailScreen: React.FC = () => {
             time: (c.created_at || '').slice(11, 19),
             likes: c.likes || 0,
             isLiked: false,
-            replies: []
+            replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: (r.created_at || '').slice(11, 19), likes: r.likes || 0, isLiked: false }))
           }))
           setComments(mapped)
           setCommentTotal(cr.total || mapped.length)
@@ -155,7 +155,7 @@ const AnnouncementDetailScreen: React.FC = () => {
     await apiCreateComment('Post', announcement.id, content)
     // 重新加载第一页，刷新总数
     try {
-      const cr = await apiGetComments('post' as any, announcement.id, 1, 10)
+      const cr = await apiGetComments('post' as any, announcement.id, 1, 10, true)
       const mapped = (cr.list || []).map((c: any) => ({ id: c.id, author: { name: c.author_name || c.username || '用户', avatar: c.author_avatar || '' }, content: c.content, time: (c.created_at || '').slice(11, 19), likes: c.likes || 0, isLiked: false, replies: [] }))
       setComments(mapped)
       setCommentTotal(cr.total || mapped.length)

@@ -114,9 +114,8 @@
     if (!fileRef.value) return
     const form = new FormData()
     form.append('file', fileRef.value)
-    await defHttp.post({ url: '/api/v1/storage/upload', data: form }, { isTransformResponse: false })
-    const res = await defHttp.post<any>({ url: '/api/v1/storage/download-link', data: { file_path: fileRef.value.name } })
-    const url = res?.data?.download_url || res?.download_url
+    const res = await defHttp.post<any>({ url: '/api/v1/storage/upload', data: form, headers: { 'Content-Type': 'multipart/form-data' } })
+    const url = res?.download_url || res?.data?.download_url
     if (url) {
       formState.value.latest_download_url = url
       createMessage.success('上传成功，已生成下载链接')
