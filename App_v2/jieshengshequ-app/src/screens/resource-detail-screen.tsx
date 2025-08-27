@@ -432,9 +432,85 @@ const ResourceDetailScreen = (): JSX.Element => {
 
   const handleEditComment = async (commentId: number, content: string) => {
     await apiUpdateComment(commentId, content)
+    // 编辑后强制刷新第一页评论
+    try {
+      const cr = await getComments('resource' as any, resource.id, 1, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      const mapped = (cr.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+        canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id),
+      }))
+      setComments(mapped)
+      setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+      setCommentTotal(cr.total || mapped.length)
+    } catch {}
   }
   const handleDeleteComment = async (commentId: number) => {
     await apiDeleteComment(commentId)
+    // 重新拉取第一页评论，保持与后端一致
+    try {
+      const cr = await getComments('resource' as any, resource.id, 1, 10, true)
+      const me = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      let mapped: Comment[] = []
+      if ((cr.list || []).length === 0) {
+        try {
+          const flat = await http.get<{ list: any[]; total: number; page: number; size: number }>(`/resources/${resource.id}/comments`, { page: 1, size: 10 })
+          const parents = (flat.list || []).filter((c: any) => !c.parent_id)
+          const replies = (flat.list || []).filter((c: any) => !!c.parent_id)
+          mapped = parents.map((c: any) => ({
+            id: c.id,
+            author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+            content: c.content,
+            time: formatTimeOfDay(c.created_at || ''),
+            likes: c.likes || 0,
+            isLiked: false,
+            replies: replies.filter((r: any) => r.parent_id === c.id).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+            canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id),
+          }))
+          setHasMoreComments(((flat.total || 0) > (flat.page || 1) * (flat.size || 10)))
+          setCommentTotal(flat.total || mapped.length)
+        } catch {
+          try {
+            const mine = await getMyComments({ page: 1, size: 50 })
+            const related = (mine.list || []).filter((c: any) => (c.target_type === 'Package' || c.target_type === 'package') && c.target_id === resource.id)
+            const parents = related.filter((c: any) => !c.parent_id)
+            const replies = related.filter((c: any) => !!c.parent_id)
+            mapped = parents.map((c: any) => ({
+              id: c.id,
+              author: { name: c.author_name || c.username || '我', avatar: c.author_avatar || '' },
+              content: c.content,
+              time: formatTimeOfDay(c.created_at || ''),
+              likes: c.likes || 0,
+              isLiked: false,
+              replies: replies.filter((r: any) => r.parent_id === c.id).map((r: any) => ({ id: r.id, author: { name: r.author_name || r.username || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: true })),
+              canEdit: true,
+            }))
+            setHasMoreComments(false)
+            setCommentTotal(related.length)
+          } catch {}
+        }
+      } else {
+        mapped = (cr.list || []).map((c: any) => ({
+          id: c.id,
+          author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+          content: c.content,
+          time: formatTimeOfDay(c.created_at || ''),
+          likes: c.likes || 0,
+          isLiked: false,
+          replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!me && (isPrivileged(me.role) || me.id === r.user_id) })),
+          canEdit: !!me && (isPrivileged(me.role) || me.id === c.user_id),
+        }))
+        setHasMoreComments(((cr.total || 0) > (cr.page || 1) * (cr.size || 10)))
+        setCommentTotal(cr.total || mapped.length)
+      }
+      setComments(mapped)
+    } catch {}
   }
 
   const handleLikeComment = async (commentId: number) => {

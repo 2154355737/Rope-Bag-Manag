@@ -29,7 +29,7 @@ import InteractionButtons, {
 import { getPost, toggleLikePost, getPostLikeStatus } from '@/api/posts'
 import { getResource, toggleLikeResource, getResourceLikeStatus, downloadResource } from '@/api/resources'
 import { getAnnouncement } from '@/api/announcements'
-import { createComment as apiCreateComment, replyComment as apiReplyComment, getComments as apiGetComments } from '@/api/comments'
+import { createComment as apiCreateComment, replyComment as apiReplyComment, getComments as apiGetComments, updateComment as apiUpdateComment, deleteComment as apiDeleteComment } from '@/api/comments'
 import { getLocalUser } from '@/api/auth'
 import { getContentBasedRecommendations } from '@/utils/recommendations'
 
@@ -537,20 +537,75 @@ const UniversalDetailScreen: React.FC = () => {
     try {
       const targetType = item.type === 'resource' ? 'package' : item.type
       await apiCreateComment(targetType as any, item.id, content)
-      // 重新加载评论
-      // 这里可以优化为直接添加到本地状态
-      toast({
-        title: "评论成功",
-        description: "您的评论已发布"
-      })
+      // 重新加载第一页
+      const refreshed = await apiGetComments(targetType as any, item.id, 1, 10, true)
+      const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      const mapped = (refreshed.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
+      }))
+      setComments(mapped)
+      setHasMoreComments((refreshed.total || 0) > (refreshed.page || 1) * (refreshed.size || 10))
+      setCommentTotal(refreshed.total || mapped.length)
+      toast({ title: "评论成功", description: "您的评论已发布" })
     } catch (error) {
       console.error('评论失败:', error)
-      toast({
-        title: "评论失败",
-        description: "发布评论失败，请稍后重试",
-        variant: "destructive"
-      })
+      toast({ title: "评论失败", description: "发布评论失败，请稍后重试", variant: "destructive" })
     }
+  }
+
+  const handleEditComment = async (commentId: number, content: string) => {
+    if (!item) return
+    const targetType = item.type === 'resource' ? 'package' : item.type
+    await apiUpdateComment(commentId, content)
+    try {
+      const refreshed = await apiGetComments(targetType as any, item.id, 1, 10, true)
+      const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      const mapped = (refreshed.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
+      }))
+      setComments(mapped)
+      setHasMoreComments((refreshed.total || 0) > (refreshed.page || 1) * (refreshed.size || 10))
+      setCommentTotal(refreshed.total || mapped.length)
+      toast({ title: '已保存' })
+    } catch {}
+  }
+
+  const handleDeleteComment = async (commentId: number) => {
+    if (!item) return
+    const targetType = item.type === 'resource' ? 'package' : item.type
+    await apiDeleteComment(commentId)
+    try {
+      const refreshed = await apiGetComments(targetType as any, item.id, 1, 10, true)
+      const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
+      const mapped = (refreshed.list || []).map((c: any) => ({
+        id: c.id,
+        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        content: c.content,
+        time: formatTimeOfDay(c.created_at || ''),
+        likes: c.likes || 0,
+        isLiked: false,
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
+      }))
+      setComments(mapped)
+      setHasMoreComments((refreshed.total || 0) > (refreshed.page || 1) * (refreshed.size || 10))
+      setCommentTotal(refreshed.total || mapped.length)
+      toast({ title: '已删除' })
+    } catch {}
   }
 
   const handleReplyComment = async (commentId: number, content: string) => {
@@ -909,7 +964,9 @@ const UniversalDetailScreen: React.FC = () => {
             placeholder="写下你的看法..."
               maxLength={200}
               initialCommentsToShow={5}
-          />
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
+            />
           
           </motion.div>
         </ScrollArea>

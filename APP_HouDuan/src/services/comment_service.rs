@@ -187,23 +187,9 @@ impl CommentService {
     }
 
     // 删除评论
-    pub async fn delete_comment(&self, comment_id: i32, is_admin: bool) -> Result<()> {
-
-        if is_admin {
-            // 管理员执行物理删除
-            self.comment_repo.delete_comment(comment_id).await?;
-            return Ok(());
-        }
-
-        // 普通用户软删除
-        let mut comment = match self.comment_repo.get_comment_by_id(comment_id).await? {
-            Some(c) => c,
-            None => return Err(anyhow::anyhow!("评论不存在")),
-        };
-        comment.status = "Deleted".to_string();
-        comment.updated_at = Utc::now();
-        self.comment_repo.update_comment(&comment).await?;
-        Ok(())
+    pub async fn delete_comment(&self, comment_id: i32, _is_admin: bool) -> Result<()> {
+        // 改为物理删除（包含直接回复，见仓库层实现）
+        self.comment_repo.delete_comment(comment_id).await
     }
 
     // 获取评论回复
@@ -232,20 +218,11 @@ impl CommentService {
         Ok(())
     }
 
-    // 批量删除评论
+    // 批量删除评论（物理删除）
     pub async fn batch_delete_comments(&self, comment_ids: Vec<i32>) -> Result<()> {
         for comment_id in comment_ids {
-            // 使用软删除
-            let mut comment = match self.comment_repo.get_comment_by_id(comment_id).await? {
-                Some(c) => c,
-                None => continue, // 评论不存在，跳过
-            };
-
-            comment.status = "Deleted".to_string();
-            comment.updated_at = Utc::now();
-            self.comment_repo.update_comment(&comment).await?;
+            let _ = self.comment_repo.delete_comment(comment_id).await;
         }
-
         Ok(())
     }
 

@@ -367,6 +367,9 @@ impl CommentRepository {
     // 删除评论（物理删除）
     pub async fn delete_comment(&self, comment_id: i32) -> Result<()> {
         let conn = self.conn.lock().await;
+        // 先删除该评论的直接回复
+        conn.execute("DELETE FROM comments WHERE parent_id = ?", params![comment_id])?;
+        // 再删除该评论
         conn.execute("DELETE FROM comments WHERE id = ?", params![comment_id])?;
         Ok(())
     }
