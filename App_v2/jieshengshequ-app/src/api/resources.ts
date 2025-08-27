@@ -10,11 +10,13 @@ export async function getResource(id: number) {
 }
 
 export async function getResourceComments(id: number, page=1, pageSize=10) {
-	return http.get<{ list: any[]; total: number; page: number; size: number }>(`/resources/${id}/comments`, { page, size: pageSize })
+	/* deprecated: use getComments('resource'|'package', id, ...) in comments.ts */
+	throw new Error('Deprecated: use comments.getComments("resource"|"package", id, ...) instead')
 }
 
 export async function createResourceComment(id: number, content: string) {
-	return http.post<any>(`/resources/${id}/comments`, { content })
+	/* deprecated: use createComment('Package', id, content) in comments.ts */
+	throw new Error('Deprecated: use comments.createComment("Package", id, content) instead')
 }
 
 // 旧的 toggle（仅POST），保留兼容但不再使用

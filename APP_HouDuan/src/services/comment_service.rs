@@ -91,11 +91,14 @@ impl CommentService {
             }
         }
 
+        // 标准化目标类型，避免大小写不一致
+        let normalized_target_type = if target_type.eq_ignore_ascii_case("post") { "Post".to_string() } else { "Package".to_string() };
+
         let now = Utc::now();
         let mut comment = Comment {
             id: 0, // 由数据库生成
             user_id,
-            target_type,
+            target_type: normalized_target_type,
             target_id,
             content,
             status: "Active".to_string(),
@@ -336,6 +339,11 @@ impl CommentService {
     // 获取资源评论
     pub async fn get_package_comments(&self, package_id: i32, page: i32, size: i32) -> Result<(Vec<Comment>, i64)> {
         self.comment_repo.get_comments_by_target("Package", package_id, page, size).await
+    }
+
+    // 获取帖子评论（平面列表，包含顶层与回复，过滤 Deleted）
+    pub async fn get_post_comments(&self, post_id: i32, page: i32, size: i32) -> Result<(Vec<Comment>, i64)> {
+        self.comment_repo.get_comments_by_target("Post", post_id, page, size).await
     }
 
     // 获取用户评论

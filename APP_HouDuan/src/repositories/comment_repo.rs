@@ -169,7 +169,7 @@ impl CommentRepository {
         let conn = self.conn.lock().await;
         
         // 计算总记录数
-        let count_sql = "SELECT COUNT(*) FROM comments WHERE target_type = ? AND target_id = ? AND status != 'Deleted'";
+        let count_sql = "SELECT COUNT(*) FROM comments WHERE UPPER(target_type) = UPPER(?) AND target_id = ? AND status != 'Deleted'";
         let total: i64 = conn.query_row(
             count_sql,
             params![target_type, target_id],
@@ -181,7 +181,7 @@ impl CommentRepository {
                           c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number 
                    FROM comments c 
                    LEFT JOIN users u ON c.user_id = u.id 
-                   WHERE c.target_type = ? AND c.target_id = ? AND c.status != 'Deleted' 
+                   WHERE UPPER(c.target_type) = UPPER(?) AND c.target_id = ? AND c.status != 'Deleted' 
                    ORDER BY c.pinned DESC, c.created_at DESC 
                    LIMIT ? OFFSET ?";
         
@@ -231,7 +231,7 @@ impl CommentRepository {
         let conn = self.conn.lock().await;
 
         // 计算总记录数（仅顶层，Active）
-        let count_sql = "SELECT COUNT(*) FROM comments WHERE target_type = ? AND target_id = ? AND status = 'Active' AND parent_id IS NULL";
+        let count_sql = "SELECT COUNT(*) FROM comments WHERE UPPER(target_type) = UPPER(?) AND target_id = ? AND status = 'Active' AND parent_id IS NULL";
         let total: i64 = conn.query_row(count_sql, params![target_type, target_id], |row| row.get(0))?;
 
         // 查询列表（仅顶层，Active）
@@ -239,7 +239,7 @@ impl CommentRepository {
                           c.likes, c.dislikes, c.pinned, c.created_at, c.updated_at, COALESCE(u.nickname, u.username) as author_name, u.username, u.role, u.avatar_url, u.qq_number \
                    FROM comments c \
                    LEFT JOIN users u ON c.user_id = u.id \
-                   WHERE c.target_type = ? AND c.target_id = ? AND c.status = 'Active' AND c.parent_id IS NULL \
+                   WHERE UPPER(c.target_type) = UPPER(?) AND c.target_id = ? AND c.status = 'Active' AND c.parent_id IS NULL \
                    ORDER BY c.pinned DESC, c.created_at DESC \
                    LIMIT ? OFFSET ?";
 

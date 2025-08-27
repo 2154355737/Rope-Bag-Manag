@@ -52,6 +52,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::get().to(check_like_status))
             )
             .service(
+                web::resource("/{id}/comments")
+                    .route(web::get().to(get_post_comments))
+            )
+            .service(
                 web::resource("/{id}/bookmark")
                     .route(web::post().to(bookmark_post))
                     .route(web::delete().to(unbookmark_post))
@@ -583,4 +587,29 @@ async fn report_post(
         let _ = svc.log_user_action(&req).await;
     }
     Ok(HttpResponse::Ok().json(serde_json::json!({"code":0, "message":"success"})))
+} 
+
+#[derive(serde::Deserialize)]
+struct CommentQuery { page: Option<i32>, size: Option<i32> }
+
+// 获取帖子评论（平面列表）
+async fn get_post_comments(
+    path: web::Path<i32>,
+    query: web::Query<CommentQuery>,
+    comment_service: web::Data<crate::services::comment_service::CommentService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let post_id = path.into_inner();
+    let page = query.page.unwrap_or(1);
+    let size = query.size.unwrap_or(20);
+    match comment_service.get_post_comments(post_id, page, size).await {
+        Ok((comments, total)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": {"list": comments, "total": total, "page": page, "size": size}
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("获取帖子评论失败: {}", e)
+        })))
+    }
 } 

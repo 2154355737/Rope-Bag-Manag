@@ -7,12 +7,12 @@ const mapType = (t?: string) => ({ Error: 'important', Warning: 'warning', Info:
 const mapPriority = (p?: number) => (p && p >= 5 ? 'high' : 'low')
 
 export async function getAnnouncements(params?: { page?: number; pageSize?: number; tag?: string }) {
-	// 优先使用顶层别名 /announcements；失败时回退到 /public/announcements
+	// 优先使用 /public/announcements；若路由调整或受限，再回退到 /announcements
 	let data: { list: any[] }
 	try {
-		data = await http.get<{ list: any[] }>(`/announcements`, params)
-	} catch {
 		data = await http.get<{ list: any[] }>(`/public/announcements`, params)
+	} catch {
+		data = await http.get<{ list: any[] }>(`/announcements`, params)
 	}
 	return (data.list || []).map(a => ({
 		id: a.id,
@@ -26,12 +26,12 @@ export async function getAnnouncements(params?: { page?: number; pageSize?: numb
 }
 
 export async function getAnnouncement(id: number) {
-	// 优先 /announcements/{id}；失败时回退到 /public/announcements/{id}
+	// 优先 /public/announcements/{id}；失败时回退到 /announcements/{id}
 	let raw: any
 	try {
-		raw = await http.get<any>(`/announcements/${id}`)
-	} catch {
 		raw = await http.get<any>(`/public/announcements/${id}`)
+	} catch {
+		raw = await http.get<any>(`/announcements/${id}`)
 	}
 	const detail: AnnouncementDetail = {
 		id: raw.id,
