@@ -12,3 +12,46 @@ APP_HouDuan/logs/
 App_v2/废弃/
 rope-manager-backend/
 资源登记/
+
+# 忽略大文件和压缩文件
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tar.bz2
+APP_HouDuan/APP_HouDuan.zip
+
+# 忽略可能的大型二进制文件
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 忽略数据库备份文件
+*.db.backup
+*.db-backup
+*.backup
+
+# 忽略临时文件
+temp/
+tmp/
+*.tmp
+
+# APP_HouDuan 相关忽略规则
+APP_HouDuan/target/
+APP_HouDuan/Cargo.lock
+APP_HouDuan/data/*.db
+APP_HouDuan/data/*.db-journal
+APP_HouDuan/data.db*
+APP_HouDuan/uploads/
+APP_HouDuan/*.log
+APP_HouDuan/.env
+APP_HouDuan/sql_old_backup/
+APP_HouDuan/文档/
+APP_HouDuan/rope-manager-backend.exe
+
+# IDE 和系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
