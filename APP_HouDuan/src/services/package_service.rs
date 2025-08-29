@@ -177,7 +177,7 @@ impl PackageService {
         let updated_package = Package {
             id: package_id,
             name: req.name.clone().unwrap_or(package.name),
-            author: package.author,
+            author: req.author.clone().unwrap_or(package.author),
             version: req.version.clone().or(package.version),
             description: req.description.clone().or(package.description),
             category_id: req.category_id.or(package.category_id),

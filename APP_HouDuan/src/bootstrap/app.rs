@@ -80,32 +80,39 @@ impl AppBuilder {
             // Capacitor HTTP 插件
             .allowed_origin("http://10.0.2.2:15201")
             .allowed_origin("http://127.0.0.1:15201")
-            // 移动应用 User-Agent
+            // 移动应用的特殊来源
             .allowed_origin_fn(|origin, req_head| {
-                // 允许来自移动应用的请求
+                let origin_str = origin.as_bytes();
+                // 允许 file:// 协议（移动应用本地文件）
+                if origin_str.starts_with(b"file://") {
+                    return true;
+                }
+                // 允许 null 来源（某些移动应用会发送 null origin）
+                if origin_str == b"null" {
+                    return true;
+                }
+                // 允许来自移动应用的请求（通过 User-Agent 判断）
                 if let Some(user_agent) = req_head.headers().get("user-agent") {
                     if let Ok(ua_str) = user_agent.to_str() {
-                        return ua_str.contains("CapacitorApp") || ua_str.contains("Mobile");
+                        return ua_str.contains("CapacitorApp") || 
+                               ua_str.contains("Mobile") ||
+                               ua_str.contains("Android");
                     }
                 }
                 false
             })
-            // 允许 Tauri WebView（tauri:// 协议）
-            .allowed_origin_fn(|origin, _req_head| {
-                let o = origin.as_bytes();
-                o.starts_with(b"tauri://") || o == b"null" || o == b"file://"
-            })
-            // 临时允许所有来源（用于调试移动应用问题）
-            .allow_any_origin()
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec![
                 actix_web::http::header::AUTHORIZATION,
                 actix_web::http::header::CONTENT_TYPE,
                 actix_web::http::header::ACCEPT,
-                actix_web::http::header::COOKIE,
-                actix_web::http::header::SET_COOKIE,
+                actix_web::http::header::CACHE_CONTROL,
+                actix_web::http::header::PRAGMA,
+                actix_web::http::header::EXPIRES,
+                actix_web::http::header::USER_AGENT,
+                actix_web::http::header::ORIGIN,
             ])
-            .supports_credentials() // 支持Cookie
+            .supports_credentials() // 支持认证
             .max_age(3600)
     }
     
@@ -129,6 +136,7 @@ impl AppBuilder {
             .app_data(web::Data::new(services.tag_service.clone()))
             .app_data(web::Data::new(services.notification_service.clone()))
             .app_data(web::Data::new(services.download_security_service.clone()))
-            .app_data(web::Data::new(services.security_action_service.clone()));
+            .app_data(web::Data::new(services.security_action_service.clone()))
+            .app_data(web::Data::new(services.anti_fraud_service.clone()));
     }
 }

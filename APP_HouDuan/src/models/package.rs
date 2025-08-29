@@ -110,6 +110,8 @@ pub struct UpdatePackageRequest {
     pub cover_image: Option<String>,      // 封面图片URL
     pub requirements: Option<Vec<String>>, // 系统要求列表
     pub included_files: Option<Vec<PackageFile>>, // 包含的文件列表
+    // 管理员可修改作者字段
+    pub author: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

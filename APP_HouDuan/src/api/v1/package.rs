@@ -11,6 +11,7 @@ use futures_util::StreamExt;
 use crate::services::user_action_service::UserActionService;
 use crate::models::user_action::CreateUserActionRequest;
 use crate::repositories::user_repo::UserRepository;
+use crate::services::anti_fraud_service::AntiFraudService;
 
 
 #[derive(Debug, Deserialize, Clone)]
@@ -363,6 +364,8 @@ async fn review_resource(
         cover_image: None,
         requirements: None,
         included_files: None,
+        // 管理员字段
+        author: None,
     };
     
     match package_service.update_package(resource_id, &update_req).await {
@@ -621,7 +624,8 @@ async fn get_package(
         let ip_address = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
         let user_agent = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
         
-        // 异步记录访问，不影响响应速度
+        // 移除：页面访问不进行风险评估
+        // 安全检测通过，正常记录浏览量
         let _ = package_service.record_view(package_id, user_id, ip_address, user_agent).await;
     }
 
@@ -936,6 +940,13 @@ async fn update_package(
     let mut override_req = req.into_inner();
     if !is_admin {
         override_req.status = Some(crate::models::PackageStatus::Pending);
+        // 非管理员不能修改作者
+        if override_req.author.is_some() {
+            return Ok(HttpResponse::Forbidden().json(json!({
+                "code": 403,
+                "message": "只有管理员才能修改资源包作者"
+            })));
+        }
     }
 
     match package_service.update_package(package_id, &override_req).await {

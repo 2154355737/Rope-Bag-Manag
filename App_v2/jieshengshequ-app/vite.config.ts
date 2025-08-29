@@ -17,7 +17,7 @@ export default defineConfig({
     host: '0.0.0.0', // 允许外部访问
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:15201',
+        target: 'http://39.105.113.219:15201',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
@@ -34,13 +34,13 @@ export default defineConfig({
         },
       },
       '/uploads': {
-        target: 'http://127.0.0.1:15201',
+        target: 'http://39.105.113.219:15201',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,
       },
       '/health': {
-        target: 'http://127.0.0.1:15201',
+        target: 'http://39.105.113.219:15201',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path,

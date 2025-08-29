@@ -58,6 +58,7 @@ const HomeScreen: React.FC = () => {
 
   const [hotKeywords, setHotKeywords] = useState<string[]>([])
   const [unread, setUnread] = useState(0)
+  const [retryCount, setRetryCount] = useState<Record<string, number>>({}) // 新增：重试计数器
   
   // 获取当前活跃的标签页
   const rawActiveTab = getActiveTab('home', 'posts')
@@ -159,7 +160,7 @@ const HomeScreen: React.FC = () => {
     return {
       id: item.id,
       type,
-      title: item.title,
+      title: type === 'resource' ? (item.name || item.title || '未命名资源') : item.title,
       description: item.description || item.summary || '',
       tags,
       author: item.author_detail ? {
@@ -196,6 +197,11 @@ const HomeScreen: React.FC = () => {
     // 如果数据较新且不是刷新操作，则跳过加载
     if (!refresh && currentState.data.length > 0 && (now - currentState.lastUpdate) < 30000) {
       return
+    }
+
+    // 如果是刷新操作，重置重试计数器
+    if (refresh) {
+      setRetryCount(prev => ({ ...prev, [tabType]: 0 }))
     }
 
     // 设置加载状态
@@ -273,6 +279,9 @@ const HomeScreen: React.FC = () => {
       newTab = 'posts'
     }
     
+    // 重置新标签页的重试计数器
+    setRetryCount(prev => ({ ...prev, [newTab]: 0 }))
+    
     setActiveTab('home', newTab)
     // 立即加载新标签页的数据
     loadTabData(newTab)
@@ -334,16 +343,26 @@ const HomeScreen: React.FC = () => {
     getUnreadCount().then(data => setUnread(data.count)).catch(() => setUnread(0))
   }, [])
 
-  // 首屏兜底：短延时后仍为空则强制刷新一次
+  // 首屏兜底：短延时后仍为空则强制刷新一次（但限制重试次数）
   useEffect(() => {
     const t = setTimeout(() => {
       const tabState = tabsData[activeTab]
-      if (tabState && !tabState.loading && tabState.data.length === 0) {
+      const currentRetryCount = retryCount[activeTab] || 0
+      
+      // 只有在没有数据、不在加载中、重试次数少于3次时才重试
+      if (tabState && 
+          !tabState.loading && 
+          tabState.data.length === 0 && 
+          !tabState.error &&
+          currentRetryCount < 3) {
+        
+        console.log(`Tab ${activeTab} is empty, retrying... (attempt ${currentRetryCount + 1}/3)`)
+        setRetryCount(prev => ({ ...prev, [activeTab]: currentRetryCount + 1 }))
         loadTabData(activeTab, true)
       }
     }, 300)
     return () => clearTimeout(t)
-  }, [activeTab, tabsData])
+  }, [activeTab, tabsData, retryCount])
 
   // 窗口聚焦/页面可见/网络恢复/应用恢复时刷新当前标签
   useEffect(() => {
@@ -504,9 +523,15 @@ const HomeScreen: React.FC = () => {
       resources: '暂无资源'
     }
     
+    const currentRetryCount = retryCount[tabType] || 0
+    const maxRetries = 3
+    
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4">
         <p className="text-sm text-muted-foreground">{messages[tabType as keyof typeof messages]}</p>
+        {currentRetryCount >= maxRetries && (
+          <p className="text-xs text-muted-foreground">已尝试刷新 {currentRetryCount} 次</p>
+        )}
         <Button 
           variant="outline" 
           onClick={() => loadTabData(tabType, true)}

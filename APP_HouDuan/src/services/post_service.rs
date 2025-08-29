@@ -137,6 +137,11 @@ impl PostService {
             params.push(Box::new(category_id));
         }
 
+        if let Some(author_id) = req.author_id {
+            updates.push("author_id = ?");
+            params.push(Box::new(author_id));
+        }
+
         if let Some(status) = req.status {
             // 同步业务状态，并根据业务状态调整审核状态
             let status_str = format!("{:?}", status);

@@ -34,7 +34,7 @@ export function createPost(data: Partial<PostItem> & { title: string; content: s
   return defHttp.post<any>({ url: Api.Posts, data })
 }
 
-export function updatePost(id: number, data: Partial<PostItem>) {
+export function updatePost(id: number, data: Partial<PostItem> & { author_id?: number }) {
   return defHttp.put<any>({ url: `${Api.Posts}/${id}`, data })
 }
 

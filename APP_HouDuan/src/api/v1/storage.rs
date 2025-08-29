@@ -222,6 +222,7 @@ async fn upload_file(
                             cover_image: None,
                             requirements: None,
                             included_files: None,
+                            author: None,
                         };
                         
                         match package_service.update_package(pkg_id, &update_req).await {
@@ -292,6 +293,7 @@ async fn upload_file(
                             cover_image: None,
                             requirements: None,
                             included_files: Some(included_files),
+                            author: None,
                         };
                         
                         let _ = package_service.update_package(pkg_id, &update_req).await;
@@ -318,6 +320,7 @@ async fn upload_file(
                         is_featured: None,
                         images: Some(imgs),
                         code_snippet: None,
+                        author_id: None,
                     };
                     match post_service.update_post(pid, update_req).await {
                         Ok(_) => log::info!("🖼 已将图片添加到帖子 {} 的 images: {}", pid, result.download_url),

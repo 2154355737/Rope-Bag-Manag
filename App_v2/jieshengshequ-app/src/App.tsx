@@ -148,15 +148,9 @@ const App: React.FC = () => {
     setShowOnboarding(false)
   }
 
-  // 跳过启动页
-  const handleSkipSplash = () => {
-    console.log('⏭️ 用户跳过启动页')
-    setShowSplash(false)
-  }
-
   // 显示启动页
   if (showSplash) {
-    return <SplashScreen onSkip={handleSkipSplash} />
+    return <SplashScreen />
   }
 
   // 显示引导页（仅首次启动时）

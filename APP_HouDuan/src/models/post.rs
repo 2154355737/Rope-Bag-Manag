@@ -79,6 +79,8 @@ pub struct UpdatePostRequest {
     // 新增字段 - 支持前端发布页面
     pub images: Option<Vec<String>>,    // 图片URLs
     pub code_snippet: Option<String>,   // 代码片段
+    // 管理员可修改作者字段
+    pub author_id: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

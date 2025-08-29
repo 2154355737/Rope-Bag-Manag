@@ -28,7 +28,31 @@ impl DownloadSecurityService {
         self
     }
 
-    // 检查下载是否允许
+    // 持久化下载安全配置到数据库
+    pub async fn persist_config(&self, new_config: DownloadSecurityConfig) -> Result<()> {
+        self.repo.save_download_security_config(&new_config).await
+    }
+
+    // 读取“有效”的配置（数据库中优先，否则回退内置）
+    pub async fn get_effective_config(&self) -> Result<DownloadSecurityConfig> {
+        if let Some(cfg) = self.repo.load_download_security_config().await? {
+            Ok(cfg)
+        } else {
+            Ok(self.config.clone())
+        }
+    }
+
+    // 获取合并统计（下载异常 + 视图安全统计）
+    pub async fn get_combined_stats(&self, hours: i32) -> Result<serde_json::Value> {
+        let download_stats = self.get_anomaly_stats(hours).await?;
+        let view_stats = self.repo.get_view_security_stats(hours).await?;
+        Ok(serde_json::json!({
+            "download": download_stats,
+            "view": view_stats,
+        }))
+    }
+
+    // 检查下载是否允许（动态配置）
     pub async fn check_download_allowed(
         &self,
         user_id: Option<i32>,
@@ -45,6 +69,9 @@ impl DownloadSecurityService {
             anomaly_details: None,
         };
 
+        // 读取有效配置（DB优先）
+        let effective_cfg = self.get_effective_config().await.unwrap_or(self.config.clone());
+
         // 0. IP封禁检查（最高优先级）
         if let Some(security_service) = &self.security_action_service {
             if let Ok(is_banned) = security_service.is_ip_banned(ip_address).await {
@@ -57,21 +84,21 @@ impl DownloadSecurityService {
         }
 
         // 1. 频率限制检查
-        if self.config.enable_rate_limiting {
+        if effective_cfg.enable_rate_limiting {
             if let Err(e) = self.check_rate_limits(user_id, package_id, ip_address, &mut result).await {
                 error!("频率限制检查失败: {}", e);
             }
         }
 
         // 2. 异常检测
-        if self.config.enable_anomaly_detection && result.is_allowed {
+        if effective_cfg.enable_anomaly_detection && result.is_allowed {
             if let Err(e) = self.detect_anomalies(user_id, package_id, ip_address, user_agent, &mut result).await {
                 error!("异常检测失败: {}", e);
             }
         }
 
         // 3. 统计异常检测
-        if self.config.enable_statistical_analysis && result.is_allowed {
+        if effective_cfg.enable_statistical_analysis && result.is_allowed {
             if let Err(e) = self.detect_statistical_anomalies(package_id, &mut result).await {
                 error!("统计异常检测失败: {}", e);
             }
@@ -227,7 +254,7 @@ impl DownloadSecurityService {
         Ok(())
     }
 
-    // 检测可疑模式
+    // 检测可疑模式（阈值动态读取）
     async fn detect_suspicious_patterns(
         &self,
         user_id: Option<i32>,
@@ -269,7 +296,15 @@ impl DownloadSecurityService {
             suspicious_factors.push(format!("资源24小时内下载{}次", resource_downloads));
         }
 
-        let is_anomaly = confidence >= self.config.suspicious_pattern_threshold;
+        // 使用动态配置阈值
+        let threshold = self
+            .repo
+            .load_download_security_config()
+            .await?
+            .unwrap_or(self.config.clone())
+            .suspicious_pattern_threshold;
+
+        let is_anomaly = confidence >= threshold;
         let severity = if confidence >= 0.8 { "high" } else if confidence >= 0.6 { "medium" } else { "low" };
 
         Ok(AnomalyDetectionResult {
@@ -277,7 +312,7 @@ impl DownloadSecurityService {
             anomaly_type: if is_anomaly { Some("suspicious_pattern".to_string()) } else { None },
             severity: if is_anomaly { Some(severity.to_string()) } else { None },
             details: if is_anomaly { 
-                Some(json!({
+                Some(serde_json::json!({
                     "confidence": confidence,
                     "factors": suspicious_factors
                 }).to_string())

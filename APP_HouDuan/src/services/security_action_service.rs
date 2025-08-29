@@ -17,10 +17,13 @@ impl SecurityActionService {
         Ok(Self { repo, config })
     }
 
-    // 检查IP是否被封禁
+    // 检查IP是否被封禁（动态配置）
     pub async fn is_ip_banned(&self, ip_address: &str) -> Result<bool> {
+        // 动态读取配置
+        let effective = self.load_effective_config().await.unwrap_or(self.config.clone());
+
         // 检查白名单
-        if self.config.enable_ip_whitelist {
+        if effective.enable_ip_whitelist {
             if self.repo.is_ip_whitelisted(ip_address).await? {
                 return Ok(false);
             }
@@ -45,8 +48,11 @@ impl SecurityActionService {
         Ok(false)
     }
 
-    // 自动处理异常
+    // 自动处理异常（动态配置）
     pub async fn handle_anomaly(&self, anomaly: &DownloadAnomaly) -> Result<()> {
+        // 动态读取配置
+        let cfg = self.load_effective_config().await.unwrap_or(self.config.clone());
+
         let ip_address = if let Some(ip) = &anomaly.ip_address {
             ip.clone()
         } else {
@@ -56,15 +62,15 @@ impl SecurityActionService {
         // 根据异常严重程度决定处理方式
         match anomaly.severity.as_str() {
             "critical" => {
-                if self.config.critical_anomaly_auto_ban {
+                if cfg.critical_anomaly_auto_ban {
                     self.ban_ip(&ip_address, &anomaly.anomaly_type, "critical", None).await?;
                 }
             }
             "high" => {
                 // 检查异常次数
                 let anomaly_count = self.repo.get_ip_anomaly_count(&ip_address, 24).await?;
-                if anomaly_count >= self.config.auto_ban_threshold {
-                    self.ban_ip(&ip_address, &anomaly.anomaly_type, "high", Some(self.config.ban_duration_hours)).await?;
+                if anomaly_count >= cfg.auto_ban_threshold {
+                    self.ban_ip(&ip_address, &anomaly.anomaly_type, "high", Some(cfg.ban_duration_hours)).await?;
                 }
             }
             "medium" => {
@@ -94,7 +100,7 @@ impl SecurityActionService {
         }
 
         // 发送管理员通知
-        if self.config.enable_admin_notification && anomaly.severity == "critical" {
+        if cfg.enable_admin_notification && anomaly.severity == "critical" {
             self.send_admin_notification(anomaly).await?;
         }
 
@@ -210,18 +216,19 @@ impl SecurityActionService {
         Ok(())
     }
 
-    // 获取封禁统计
+    // 获取封禁统计（动态配置）
     pub async fn get_ban_stats(&self) -> Result<serde_json::Value> {
         let total_bans = self.repo.get_total_ip_bans().await?;
         let active_bans = self.repo.get_active_ip_bans().await?;
         let recent_bans = self.repo.get_recent_ip_bans(24).await?;
+        let cfg = self.load_effective_config().await.unwrap_or(self.config.clone());
 
         Ok(json!({
             "total_bans": total_bans,
             "active_bans": active_bans,
             "recent_bans_24h": recent_bans,
-            "auto_ban_enabled": self.config.enable_auto_ban,
-            "whitelist_enabled": self.config.enable_ip_whitelist
+            "auto_ban_enabled": cfg.enable_auto_ban,
+            "whitelist_enabled": cfg.enable_ip_whitelist
         }))
     }
 
@@ -243,5 +250,19 @@ impl SecurityActionService {
     // 获取IP白名单
     pub async fn get_ip_whitelist(&self) -> Result<Vec<serde_json::Value>> {
         self.repo.get_ip_whitelist().await
+    }
+
+    // 持久化安全配置到数据库
+    pub async fn persist_config(&self, new_config: SecurityConfig) -> Result<()> {
+        self.repo.save_security_action_config(&new_config).await
+    }
+
+    // 读取有效配置（数据库优先，否则回退到内存配置）
+    pub async fn load_effective_config(&self) -> Result<SecurityConfig> {
+        if let Some(cfg) = self.repo.load_security_action_config().await? {
+            Ok(cfg)
+        } else {
+            Ok(self.config.clone())
+        }
     }
 } 

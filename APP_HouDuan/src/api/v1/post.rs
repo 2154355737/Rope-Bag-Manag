@@ -85,15 +85,45 @@ async fn get_posts(
             // 在API层统一补充作者头像/author_detail
             let mut enriched: Vec<serde_json::Value> = Vec::with_capacity(response.list.len());
             if let Ok(user_repo) = crate::repositories::user_repo::UserRepository::new("data.db") {
+                // 计算前缀
+                let cfg = crate::config::Config::load().unwrap_or_default();
+                let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                if base_prefix.is_none() {
+                    let ci = _http_req.connection_info();
+                    let scheme = ci.scheme();
+                    let host = ci.host();
+                    if !host.is_empty() {
+                        base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                    }
+                }
                 for p in &response.list {
                     let mut v = serde_json::to_value(p).unwrap_or_else(|_| json!({}));
                     if let serde_json::Value::Object(ref mut map) = v {
                         if let Ok(Some(u)) = user_repo.find_by_id(p.author_id).await {
                             let name = u.nickname.clone().unwrap_or(u.username.clone());
-                            let avatar = u.avatar_url.clone().unwrap_or_default();
+                            let mut avatar = u.avatar_url.clone().unwrap_or_default();
+                            if let Some(bp) = base_prefix.as_ref() {
+                                if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                                    avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                                }
+                            }
                             map.insert("author_name".to_string(), json!(name));
                             map.insert("author_avatar".to_string(), json!(avatar));
                             map.insert("author_detail".to_string(), json!({"name": name, "avatar": avatar}));
+                        }
+                        // 绝对化 images 内的相对路径
+                        if let Some(images_value) = map.get_mut("images") {
+                            if let serde_json::Value::Array(arr) = images_value {
+                                if let Some(bp) = base_prefix.as_ref() {
+                                    for item in arr.iter_mut() {
+                                        if let serde_json::Value::String(s) = item {
+                                            if !s.starts_with("http://") && !s.starts_with("https://") && s.starts_with("/uploads/") {
+                                                *s = format!("{}/{}", bp, s.trim_start_matches('/'));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     enriched.push(v);
@@ -177,8 +207,34 @@ async fn get_post(
                     return Ok(HttpResponse::Forbidden().json(json!({ "code": 403, "message": "帖子未审核通过" })));
                 }}
             }
-            // 增加浏览量
-            let _ = post_service.increment_view_count(post_id).await;
+            // 安全检测并增加浏览量
+            let user_id = AuthHelper::verify_user(&http_req).ok().map(|u| u.id);
+            let ip_address = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+            let user_agent = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+            
+            // 移除：页面访问不进行风险评估
+            
+            // 安全检测通过，增加浏览量
+            // 访客用户不增加浏览量（仅记录安全日志与行为），已登录用户才自增
+            if user_id.is_some() {
+                let _ = post_service.increment_view_count(post_id).await;
+            }
+
+            // 新增：记录用户浏览行为到 user_actions（用于反作弊频率统计）
+            if ip_address.is_some() || user_id.is_some() {
+                if let Some(svc) = http_req.app_data::<web::Data<crate::services::user_action_service::UserActionService>>().cloned() {
+                    let req = crate::models::user_action::CreateUserActionRequest {
+                        user_id,
+                        action_type: "View".to_string(),
+                        target_type: Some("Post".to_string()),
+                        target_id: Some(post_id),
+                        details: None,
+                        ip_address: ip_address.clone(),
+                        user_agent: user_agent.clone(),
+                    };
+                    let _ = svc.log_user_action(&req).await;
+                }
+            }
             // 绝对化作者头像与 images
             let cfg = crate::config::Config::load().unwrap_or_default();
             let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
@@ -266,7 +322,17 @@ async fn update_post(
         }
     }
 
-    match post_service.update_post(post_id, req.into_inner()).await {
+    // 权限检查：只有管理员可以修改作者
+    let mut update_req = req.into_inner();
+    let is_admin = user.role == crate::models::UserRole::Admin || user.role == crate::models::UserRole::Elder;
+    if !is_admin && update_req.author_id.is_some() {
+        return Ok(HttpResponse::Forbidden().json(json!({
+            "code": 403,
+            "message": "只有管理员才能修改帖子作者"
+        })));
+    }
+
+    match post_service.update_post(post_id, update_req).await {
         Ok(_) => Ok(HttpResponse::Ok().json(json!({
             "code": 0,
             "message": "帖子更新成功"
@@ -404,16 +470,66 @@ async fn get_post_tags(
 
 // 增加浏览量
 async fn increment_view_count(
+    http_req: HttpRequest,
     path: web::Path<i32>,
     post_service: web::Data<PostService>,
+    anti_fraud_service: web::Data<crate::services::anti_fraud_service::AntiFraudService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let post_id = path.into_inner();
     
+    // 进行安全检测
+    let user_id = AuthHelper::verify_user(&http_req).ok().map(|u| u.id);
+    let ip_address = http_req.connection_info().realip_remote_addr().map(|s| s.to_string());
+    let user_agent = http_req.headers().get("User-Agent").and_then(|h| h.to_str().ok()).map(|s| s.to_string());
+    
+    if let (Some(ref ip), Some(ref ua)) = (&ip_address, &user_agent) {
+        match anti_fraud_service.check_view_security(user_id, post_id, ip, ua).await {
+            Ok(security_check) => {
+                if !security_check.is_allowed {
+                    // 记录安全检查日志并拒绝请求
+                    let _ = anti_fraud_service.log_security_check(
+                        user_id,
+                        ip,
+                        "view",
+                        post_id,
+                        &security_check
+                    ).await;
+                    log::warn!("帖子浏览量安全检测失败: {} (风险评分: {})", security_check.reason, security_check.risk_score);
+                    return Ok(HttpResponse::TooManyRequests().json(json!({
+                        "code": 429,
+                        "message": "操作过于频繁，请稍后再试"
+                    })));
+                }
+            },
+            Err(e) => {
+                log::error!("安全检测服务异常: {}", e);
+                // 安全服务异常时仍允许访问，但记录错误
+            }
+        }
+    }
+    
     match post_service.increment_view_count(post_id).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({
-            "code": 0,
-            "message": "浏览量增加成功"
-        }))),
+        Ok(_) => {
+            // 新增：记录用户浏览行为
+            if ip_address.is_some() || user_id.is_some() {
+                if let Some(svc) = http_req.app_data::<web::Data<crate::services::user_action_service::UserActionService>>().cloned() {
+                    let req = crate::models::user_action::CreateUserActionRequest {
+                        user_id,
+                        action_type: "View".to_string(),
+                        target_type: Some("Post".to_string()),
+                        target_id: Some(post_id),
+                        details: None,
+                        ip_address: ip_address.clone(),
+                        user_agent: user_agent.clone(),
+                    };
+                    let _ = svc.log_user_action(&req).await;
+                }
+            }
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "浏览量增加成功"
+            })))
+        },
         Err(e) => {
             log::error!("增加浏览量失败: {}", e);
             Ok(HttpResponse::InternalServerError().json(json!({

@@ -169,7 +169,33 @@ async fn get_all_comments(
         if query.include_replies.unwrap_or(false) {
             // 返回带嵌套回复的结构
             match comment_service.get_top_level_comments_with_replies(db_target_type, tid, page, size).await {
-                Ok((comments, total)) => {
+                Ok((mut comments, total)) => {
+                    // 计算前缀
+                    let cfg = crate::config::Config::load().unwrap_or_default();
+                    let mut base_prefix = cfg.public_base_url().map(|s| s.trim_end_matches('/').to_string());
+                    if base_prefix.is_none() {
+                        let ci = http_req.connection_info();
+                        let scheme = ci.scheme();
+                        let host = ci.host();
+                        if !host.is_empty() {
+                            base_prefix = Some(format!("{}://{}", scheme, host).trim_end_matches('/').to_string());
+                        }
+                    }
+                    if let Some(bp) = base_prefix.as_ref() {
+                        fn absolutize_avatar(node: &mut crate::models::CommentResponse, bp: &str) {
+                            if let Some(ref mut avatar) = node.author_avatar {
+                                if !avatar.starts_with("http://") && !avatar.starts_with("https://") && avatar.starts_with("/uploads/") {
+                                    *avatar = format!("{}/{}", bp, avatar.trim_start_matches('/'));
+                                }
+                            }
+                            if let Some(ref mut replies) = node.replies {
+                                for r in replies.iter_mut() {
+                                    absolutize_avatar(r, bp);
+                                }
+                            }
+                        }
+                        for c in comments.iter_mut() { absolutize_avatar(c, bp); }
+                    }
                     let response = crate::models::CommentListWithRepliesResponse { list: comments, total, page, size };
                     return HttpResponse::Ok().json(ApiResponse::success(response));
                 },

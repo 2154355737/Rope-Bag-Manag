@@ -4,22 +4,6 @@ version = "0.1.0"
 edition = "2021"
 default-run = "rope-manager-backend"
 
-# 清理后的二进制定义 - 只保留常用工具的快捷方式
-[[bin]]
-name = "check_db_schema"
-path = "tools/database/check_db_schema.rs"
-
-[[bin]]
-name = "patch_database" 
-path = "tools/database/patch_database.rs"
-
-[[bin]]
-name = "generate_admin_password"
-path = "tools/admin/generate_admin_password.rs"
-
-[[bin]]
-name = "simple_test"
-path = "tools/test/simple_test.rs"
 
 [dependencies]
 # Web框架

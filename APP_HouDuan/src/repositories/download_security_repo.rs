@@ -14,9 +14,62 @@ pub struct DownloadSecurityRepository {
 impl DownloadSecurityRepository {
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path)?;
-        
-        // 初始化表结构（已在主初始化脚本中创建）
-        // 这里不需要再次创建表，因为在main.rs中已经执行了init.sql
+
+        // 幂等创建缺失的表，避免运行时错误（若迁移未执行）
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS download_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                package_id INTEGER NOT NULL,
+                ip_address TEXT NOT NULL,
+                user_agent TEXT,
+                download_time TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS download_rate_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rule_type TEXT NOT NULL,
+                target_id INTEGER,
+                time_window INTEGER NOT NULL,
+                max_downloads INTEGER NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS download_anomalies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                anomaly_type TEXT NOT NULL,
+                user_id INTEGER,
+                package_id INTEGER,
+                ip_address TEXT,
+                details TEXT,
+                severity TEXT NOT NULL,
+                is_resolved INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                resolved_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS resource_access_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                package_id INTEGER NOT NULL,
+                date TEXT NOT NULL,
+                view_count INTEGER NOT NULL DEFAULT 0,
+                download_count INTEGER NOT NULL DEFAULT 0,
+                unique_visitors INTEGER NOT NULL DEFAULT 0,
+                unique_downloaders INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                UNIQUE(package_id, date)
+            );
+            CREATE TABLE IF NOT EXISTS ip_whitelist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip_address TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                created_by TEXT
+            );
+            "#
+        )?;
         
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
@@ -450,5 +503,104 @@ impl DownloadSecurityRepository {
         .collect::<Result<Vec<_>, _>>()?;
         
         Ok(whitelist)
+    }
+
+    // 保存系统配置(JSON)
+    pub async fn save_config_json(&self, key: &str, value: &str) -> Result<()> {
+        let conn = self.conn.lock().await;
+        conn.execute(
+            "INSERT OR REPLACE INTO system_settings (key, value, description, updated_at) VALUES (?, ?, (SELECT description FROM system_settings WHERE key = ?), datetime('now'))",
+            params![key, value, key],
+        )?;
+        Ok(())
+    }
+
+    // 读取系统配置(JSON)
+    pub async fn load_config_json(&self, key: &str) -> Result<Option<String>> {
+        let conn = self.conn.lock().await;
+        let mut stmt = conn.prepare(
+            "SELECT value FROM system_settings WHERE key = ?"
+        )?;
+        let mut rows = stmt.query(params![key])?;
+        if let Some(row) = rows.next()? {
+            let v: String = row.get(0)?;
+            Ok(Some(v))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // 保存下载安全配置
+    pub async fn save_download_security_config(&self, cfg: &DownloadSecurityConfig) -> Result<()> {
+        let json_val = serde_json::to_string(cfg)?;
+        self.save_config_json("download_security_config", &json_val).await
+    }
+
+    // 读取下载安全配置
+    pub async fn load_download_security_config(&self) -> Result<Option<DownloadSecurityConfig>> {
+        if let Some(v) = self.load_config_json("download_security_config").await? {
+            let parsed: DownloadSecurityConfig = serde_json::from_str(&v)?;
+            Ok(Some(parsed))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // 保存安全动作配置
+    pub async fn save_security_action_config(&self, cfg: &SecurityConfig) -> Result<()> {
+        let json_val = serde_json::to_string(cfg)?;
+        self.save_config_json("security_action_config", &json_val).await
+    }
+
+    // 读取安全动作配置
+    pub async fn load_security_action_config(&self) -> Result<Option<SecurityConfig>> {
+        if let Some(v) = self.load_config_json("security_action_config").await? {
+            let parsed: SecurityConfig = serde_json::from_str(&v)?;
+            Ok(Some(parsed))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // 视图安全统计（来自 security_logs 表）
+    pub async fn get_view_security_stats(&self, hours: i32) -> Result<serde_json::Value> {
+        let conn = self.conn.lock().await;
+        let start_time = Utc::now() - Duration::hours(hours as i64);
+        let start = start_time.format("%Y-%m-%d %H:%M:%S").to_string();
+
+        // 总被拦截的 view 请求
+        let blocked_views: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM security_logs WHERE action_type = 'view' AND is_allowed = 0 AND created_at >= ?",
+            params![start],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        // 高风险 view 请求
+        let high_risk_views: i32 = conn.query_row(
+            "SELECT COUNT(*) FROM security_logs WHERE action_type = 'view' AND risk_score >= 50 AND created_at >= ?",
+            params![start],
+            |row| row.get(0),
+        ).unwrap_or(0);
+
+        // Top IPs
+        let mut stmt = conn.prepare(
+            "SELECT ip_address, COUNT(*) as c \
+             FROM security_logs \
+             WHERE action_type = 'view' AND created_at >= ? AND (is_allowed = 0 OR risk_score >= 50) \
+             GROUP BY ip_address ORDER BY c DESC LIMIT 5"
+        )?;
+        let ip_rows = stmt.query_map(params![start], |row| {
+            let ip: String = row.get(0)?;
+            let c: i32 = row.get(1)?;
+            Ok(serde_json::json!({"ip": ip, "count": c}))
+        })?;
+        let mut top_ips = Vec::new();
+        for r in ip_rows { top_ips.push(r?); }
+
+        Ok(serde_json::json!({
+            "blocked_views": blocked_views,
+            "high_risk_views": high_risk_views,
+            "top_ips": top_ips
+        }))
     }
 } 

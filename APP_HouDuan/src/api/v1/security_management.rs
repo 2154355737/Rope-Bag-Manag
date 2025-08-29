@@ -27,6 +27,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 .route(web::get().to(get_security_config))
                 .route(web::put().to(update_security_config))
             )
+            .service(
+                web::resource("/view-stats")
+                .route(web::get().to(get_view_security_stats))
+            )
     );
 }
 
@@ -279,19 +283,25 @@ async fn get_security_config(
         })));
     }
 
-    let config = security_service.get_config();
-    Ok(HttpResponse::Ok().json(json!({
-        "code": 0,
-        "message": "success",
-        "data": config
-    })))
+    // 改为返回数据库优先的有效配置
+    match security_service.load_effective_config().await {
+        Ok(cfg) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": cfg
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
 }
 
 // 更新安全配置
 async fn update_security_config(
     req: HttpRequest,
     config: web::Json<SecurityConfig>,
-    _security_service: web::Data<SecurityActionService>,
+    security_service: web::Data<SecurityActionService>,
 ) -> Result<HttpResponse, actix_web::Error> {
     // 检查管理员权限
     use crate::utils::auth_helper::AuthHelper;
@@ -302,10 +312,44 @@ async fn update_security_config(
         })));
     }
 
-    // 这里需要实现更新配置的逻辑
+    // 持久化安全配置
+    let cfg = config.into_inner();
+    if let Err(e) = security_service.persist_config(cfg.clone()).await {
+        return Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": format!("配置保存失败: {}", e)
+        })));
+    }
+
     Ok(HttpResponse::Ok().json(json!({
         "code": 0,
         "message": "配置更新成功",
-        "data": config.into_inner()
+        "data": cfg
     })))
+}
+
+// 新增：获取视图安全统计（转发下载安全服务统计中的view部分）
+async fn get_view_security_stats(
+    req: HttpRequest,
+    download_security: web::Data<crate::services::download_security_service::DownloadSecurityService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    use crate::utils::auth_helper::AuthHelper;
+    if !AuthHelper::is_admin(&req) {
+        return Ok(HttpResponse::Forbidden().json(json!({
+            "code": 403,
+            "message": "只有管理员可以查看"
+        })));
+    }
+
+    match download_security.get_combined_stats(24).await {
+        Ok(stats) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0,
+            "message": "success",
+            "data": stats.get("view").cloned().unwrap_or(json!({}))
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
 } 

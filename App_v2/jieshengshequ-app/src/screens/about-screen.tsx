@@ -16,9 +16,9 @@ const AboutScreen: React.FC = () => {
   // 应用信息
   const appInfo = {
     name: '结绳社区',
-    version: '2.1.0',
-    buildNumber: '20250819',
-    releaseDate: '2025年8月19日',
+    version: '2.1.5',
+    buildNumber: '20250117',
+    releaseDate: '2025年1月17日',
     description: '一个基于 React + TypeScript + Capacitor 构建的跨平台移动社区应用，专注于提供现代化的用户体验和原生性能。',
     logo: '🪢'
   }
@@ -79,6 +79,17 @@ const AboutScreen: React.FC = () => {
 
   // 更新日志
   const changelog = [
+    {
+      version: '2.1.5',
+      date: '2025-01-17',
+      changes: [
+        '优化启动页面设计和动画效果',
+        '修复首页资源卡片标题显示问题',
+        '修复分类页面数据显示和分页功能',
+        '解决首页无数据时无限刷新问题',
+        '提升整体用户体验'
+      ]
+    },
     {
       version: '2.1.0',
       date: '2025-08-19',

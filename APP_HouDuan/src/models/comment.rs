@@ -50,6 +50,8 @@ pub struct CommentResponse {
     pub id: i32,
     pub user_id: i32,
     pub author_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_avatar: Option<String>,
     pub target_type: String,
     pub target_id: i32,
     pub content: String,

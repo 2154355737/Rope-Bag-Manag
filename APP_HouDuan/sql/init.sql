@@ -203,6 +203,20 @@ CREATE TABLE IF NOT EXISTS download_security_logs (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- 安全检查日志表
+CREATE TABLE IF NOT EXISTS security_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    ip_address TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    resource_id INTEGER,
+    is_allowed BOOLEAN NOT NULL,
+    risk_score INTEGER NOT NULL,
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
 -- ========================================
 -- 3. 创建核心索引
 -- ========================================
@@ -226,6 +240,12 @@ CREATE INDEX IF NOT EXISTS idx_comments_status ON comments(status);
 -- 行为日志索引
 CREATE INDEX IF NOT EXISTS idx_user_actions_user_id ON user_actions(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at);
+
+-- 安全日志索引
+CREATE INDEX IF NOT EXISTS idx_security_logs_ip ON security_logs(ip_address);
+CREATE INDEX IF NOT EXISTS idx_security_logs_user ON security_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_logs_created ON security_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_security_logs_action ON security_logs(action_type);
 
 -- ========================================
 -- 4. 插入默认数据

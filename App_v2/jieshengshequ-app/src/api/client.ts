@@ -126,9 +126,9 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		console.warn('未找到认证Token，请确保已登录')
 	}
 
-	// 为文件上传设置更长的超时时间
+	// 为文件上传设置更长的超时时间，移动端网络较慢需要更长超时
 	const isFileUpload = body instanceof FormData
-	const timeout = isFileUpload ? 300000 : 30000 // 文件上传5分钟，普通请求30秒
+	const timeout = isFileUpload ? 300000 : 30000 // 文件上传5分钟，普通请求60秒
 
 	// 调试信息
 	if (isFileUpload) {
@@ -181,7 +181,13 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		console.log(`请求响应:`, resp.status, resp.statusText)
 
 		// 先尝试解析JSON（即使是非200）
-		const data = await resp.json().catch(() => ({} as any))
+		const data = await resp.json().catch(err => {
+			console.error('JSON解析失败:', err)
+			return {} as any
+		})
+		
+		// 调试信息：输出响应数据
+		console.log('API响应数据:', JSON.stringify(data, null, 2))
 
 		// 处理401未授权错误
 		if (resp.status === 401) {
@@ -202,6 +208,8 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		if (!resp.ok) {
 			throw new ApiError((data && (data as any).message) || resp.statusText || '请求失败', resp.status, undefined, data)
 		}
+		
+		// 直接返回数据（处理后端直接返回数据的情况）
 		return data as T
 	} catch (error) {
 		// 处理不同类型的网络错误

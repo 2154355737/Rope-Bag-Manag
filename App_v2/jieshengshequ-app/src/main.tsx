@@ -9,6 +9,11 @@ import { ThemeProvider } from './components/theme-provider.tsx'
 import { Toaster } from './components/ui/toaster.tsx'
 import { SafeAreaProvider } from './components/safe-area-provider.tsx'
 
+// 在生产环境中导入网络调试工具
+if (import.meta.env.PROD) {
+  import('./utils/networkDebug')
+}
+
 const AppTree = (
   <BrowserRouter
     future={{

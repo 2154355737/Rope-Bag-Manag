@@ -209,8 +209,8 @@
 
   const fetchUsageStats = async () => {
     const [launchRes, dauRes] = await Promise.all([
-      defHttp.get<any>({ url: '/api/v1/admin/app-launches/daily', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
-      defHttp.get<any>({ url: '/api/v1/admin/users/dau', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
+      defHttp.get<any>({ url: '/api/v1/admin/app/launch-daily-stats', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
+      defHttp.get<any>({ url: '/api/v1/admin/app/dau-stats', params: { days: 30 } }, { errorMessageMode: 'none' }).catch(() => ({ list: [] })),
     ])
     const launches = (launchRes as any)?.list || []
     const daus = (dauRes as any)?.list || []

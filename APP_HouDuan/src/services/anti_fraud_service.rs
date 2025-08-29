@@ -34,6 +34,7 @@ pub struct ResourceStats {
     pub recent_activity_spike: bool,
 }
 
+#[derive(Clone)]
 pub struct AntiFraudService {
     conn: Arc<Mutex<Connection>>,
 }
@@ -97,7 +98,7 @@ impl AntiFraudService {
         let mut reasons = Vec::new();
 
         // 检查用户行为模式
-        let behavior_pattern = self.analyze_user_behavior(user_id, ip_address, user_agent, "PageView").await?;
+        let behavior_pattern = self.analyze_user_behavior(user_id, ip_address, user_agent, "View").await?;
         
         // 检查访问频率
         self.check_view_frequency(&behavior_pattern, &mut risk_score, &mut reasons);
@@ -105,7 +106,7 @@ impl AntiFraudService {
         // 检查机器人行为
         self.check_bot_behavior(&behavior_pattern, &mut risk_score, &mut reasons);
 
-        let is_allowed = risk_score < 80; // 访问的容忍度稍高
+        let is_allowed = risk_score < 50; // 严格的风险阈值
 
         Ok(SecurityCheck {
             is_allowed,
@@ -121,7 +122,7 @@ impl AntiFraudService {
         
         // 获取总访问量
         let total_views = conn.query_row(
-            "SELECT COUNT(*) FROM user_actions WHERE target_id = ? AND action_type = 'PageView'",
+            "SELECT COUNT(*) FROM user_actions WHERE target_id = ? AND action_type = 'View'",
             params![resource_id],
             |row| Ok(row.get::<_, i32>(0)?)
         ).unwrap_or(0);
@@ -356,14 +357,14 @@ impl AntiFraudService {
         risk_score: &mut i32,
         reasons: &mut Vec<String>,
     ) {
-        // 访问频率检查，标准比下载宽松
-        if pattern.action_count_1h > 100 {
-            *risk_score += 30;
+        // 访问频率检查 - 严格防刷
+        if pattern.action_count_1h > 3 {  // 1小时内超过3次就警告
+            *risk_score += 50;
             reasons.push(format!("1小时访问{}次，频率过高", pattern.action_count_1h));
         }
 
-        if pattern.action_count_24h > 1000 {
-            *risk_score += 25;
+        if pattern.action_count_24h > 10 {  // 24小时内超过10次就高风险
+            *risk_score += 40;
             reasons.push(format!("24小时访问{}次，频率异常", pattern.action_count_24h));
         }
     }

@@ -86,7 +86,10 @@ const CategoryScreen: React.FC = () => {
   // 状态管理
   const [categories, setCategories] = useState<Category[]>([])
   const [resources, setResources] = useState<Resource[]>([])
+  const [totalCount, setTotalCount] = useState(0) // 新增：总数量
+  const [currentPage, setCurrentPage] = useState(1) // 新增：当前页数
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false) // 新增：加载更多状态
   const [refreshing, setRefreshing] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string | number>('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -112,15 +115,17 @@ const CategoryScreen: React.FC = () => {
   }, [])
 
   // 加载资源数据
-  const loadResources = useCallback(async (categoryId: string | number = 'all', refresh = false) => {
+  const loadResources = useCallback(async (categoryId: string | number = 'all', refresh = false, page = 1, loadMore = false) => {
     if (refresh) {
       setRefreshing(true)
+    } else if (loadMore) {
+      setLoadingMore(true)
     } else {
       setLoading(true)
     }
     
     try {
-      const params: any = { page: 1, page_size: 50 }
+      const params: any = { page, page_size: 100 } // 增加到100条
       if (categoryId !== 'all') {
         params.category_id = categoryId
       }
@@ -143,12 +148,23 @@ const CategoryScreen: React.FC = () => {
         categoryId: item.category_id
       }))
       
-      setResources(resourceList)
+      if (page === 1) {
+        setResources(resourceList)
+      } else {
+        // 追加数据而不是替换
+        setResources(prev => [...prev, ...resourceList])
+      }
+      setTotalCount(response.total || resourceList.length) // 保存总数量
+      setCurrentPage(page)
     } catch (error) {
       console.error('加载资源失败:', error)
-      setResources([])
+      if (page === 1) {
+        setResources([])
+        setTotalCount(0)
+      }
     } finally {
       setLoading(false)
+      setLoadingMore(false)
       setRefreshing(false)
   }
   }, [])
@@ -214,14 +230,24 @@ const CategoryScreen: React.FC = () => {
   const handleCategoryChange = useCallback((categoryId: string | number) => {
     setSelectedCategory(categoryId)
     setSearchQuery('') // 清空搜索
-    loadResources(categoryId)
+    setCurrentPage(1) // 重置页面
+    loadResources(categoryId, false, 1)
   }, [loadResources])
 
   // 处理刷新
   const handleRefresh = useCallback(() => {
-    loadResources(selectedCategory, true)
+    setCurrentPage(1) // 重置到第一页
+    loadResources(selectedCategory, true, 1)
   }, [loadResources, selectedCategory])
   
+  // 处理加载更多
+  const handleLoadMore = useCallback(() => {
+    if (!loadingMore && resources.length < totalCount) {
+      const nextPage = currentPage + 1
+      loadResources(selectedCategory, false, nextPage, true)
+    }
+  }, [loadResources, selectedCategory, currentPage, loadingMore, resources.length, totalCount])
+
   // 清空搜索
   const handleClearSearch = useCallback(() => {
     setSearchQuery('')
@@ -513,7 +539,7 @@ const CategoryScreen: React.FC = () => {
       {/* 顶部导航 */}
       <TopNavigation
         title="分类"
-        subtitle={`${hasSearch ? '搜索到' : '发现'} ${filteredAndSortedResources.length} 个${hasSearch ? '匹配' : '精彩'}资源`}
+        subtitle={`${hasSearch ? '搜索到' : '发现'} ${hasSearch ? filteredAndSortedResources.length : totalCount} 个${hasSearch ? '匹配' : '精彩'}资源`}
         rightAction={
           <div className="flex items-center gap-2">
             <Button
@@ -658,6 +684,29 @@ const CategoryScreen: React.FC = () => {
               </motion.div>
           </TabsContent>
         </Tabs>
+          )}
+          
+          {/* 加载更多按钮 */}
+          {!loading && !searchQuery && resources.length > 0 && resources.length < totalCount && (
+            <div className="flex justify-center mt-6">
+              <Button 
+                onClick={handleLoadMore} 
+                disabled={loadingMore}
+                variant="outline"
+                className="px-8"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin mr-2" />
+                    加载中...
+                  </>
+                ) : (
+                  <>
+                    加载更多 ({resources.length}/{totalCount})
+                  </>
+                )}
+              </Button>
+            </div>
           )}
       </div>
       </div>

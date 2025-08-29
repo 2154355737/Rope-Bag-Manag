@@ -22,6 +22,7 @@ use crate::services::{
     security_action_service::SecurityActionService,
     email_service::EmailService,
     package_storage_service::PackageStorageService,
+    anti_fraud_service::AntiFraudService,
 };
 use crate::repositories::{
     UserRepository,
@@ -54,6 +55,7 @@ pub struct ServiceContainer {
     pub download_security_service: DownloadSecurityService,
     pub security_action_service: SecurityActionService,
     pub email_service: Arc<RwLock<EmailService>>,
+    pub anti_fraud_service: AntiFraudService,
     
     // 仓库实例
     pub user_repo: UserRepository,
@@ -83,6 +85,9 @@ impl ServiceContainer {
         // 创建安全服务
         let (download_security_service, security_action_service) = 
             Self::create_security_services(&db_url).await?;
+        
+        // 创建反欺诈服务
+        let anti_fraud_service = Self::create_anti_fraud_service(&db_url).await?;
         
         // 创建通知服务
         let notification_service = Self::create_notification_service(&db_url).await?;
@@ -118,6 +123,7 @@ impl ServiceContainer {
             download_security_service,
             security_action_service,
             email_service,
+            anti_fraud_service,
             user_repo: repositories.user_repo,
             package_repo: repositories.package_repo,
             system_repo: repositories.system_repo,
@@ -219,6 +225,18 @@ impl ServiceContainer {
         .with_security_action_service(security_action_service.clone());
         
         Ok((download_security_service, security_action_service))
+    }
+    
+    /// 创建反欺诈服务
+    async fn create_anti_fraud_service(db_url: &str) -> Result<AntiFraudService, BootstrapError> {
+        info!("🔍 初始化反欺诈服务...");
+        
+        let conn = Arc::new(tokio::sync::Mutex::new(
+            rusqlite::Connection::open(db_url)
+                .map_err(|e| BootstrapError::Service(format!("创建反欺诈服务数据库连接失败: {}", e)))?
+        ));
+        
+        Ok(AntiFraudService::new(conn))
     }
     
     /// 创建通知服务

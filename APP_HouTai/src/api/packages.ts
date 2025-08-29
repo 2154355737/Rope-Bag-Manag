@@ -53,6 +53,7 @@ export interface UpdatePackagePayload {
   is_pinned?: boolean
   is_featured?: boolean
   review_comment?: string
+  author?: string
 }
 
 export interface ReviewPayload {

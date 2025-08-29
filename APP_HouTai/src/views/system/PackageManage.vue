@@ -1,7 +1,7 @@
 <template>
   <PageWrapper title="资源包管理" content="系统资源包列表">
     <Card :loading="loading" class="!mb-4">
-      <Button type="primary" @click="handleCreate">新建资源</Button>
+      <Button v-if="canCreatePackage" type="primary" @click="handleCreate">新建资源</Button>
       <div class="mt-2" style="display: flex; gap: 12px">
         <div ref="downloadChartRef" style="flex: 1; height: 260px"></div>
         <div ref="hotChartRef" style="flex: 1; height: 260px"></div>
@@ -20,10 +20,10 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <Space>
-              <Button type="link" @click="handleEdit(record)">编辑</Button>
-              <Button type="link" @click="() => handleReview(record, 'approved')">通过</Button>
-              <Button type="link" danger @click="() => handleReview(record, 'rejected')">驳回</Button>
-              <Button type="link" danger @click="() => handleDelete(record)">删除</Button>
+              <Button v-if="canEditPackage(record)" type="link" @click="handleEdit(record)">编辑</Button>
+              <Button v-if="canReviewPackage(record)" type="link" @click="() => handleReview(record, 'approved')">通过</Button>
+              <Button v-if="canReviewPackage(record)" type="link" danger @click="() => handleReview(record, 'rejected')">驳回</Button>
+              <Button v-if="canDeletePackage(record)" type="link" danger @click="() => handleDelete(record)">删除</Button>
             </Space>
           </template>
         </template>
@@ -55,16 +55,19 @@
         <FormItem label="标签">
           <Select v-model:value="formState.tags" mode="tags" placeholder="输入后回车添加标签" />
         </FormItem>
-        <FormItem label="置顶">
+        <FormItem v-if="isAdminUser" label="作者">
+          <Select v-model:value="formState.author" :options="userOptions" placeholder="选择作者" />
+        </FormItem>
+        <FormItem v-if="isAdminUser" label="置顶">
           <Switch v-model:checked="formState.is_pinned" />
         </FormItem>
-        <FormItem label="精选">
+        <FormItem v-if="isAdminUser" label="精选">
           <Switch v-model:checked="formState.is_featured" />
         </FormItem>
-        <FormItem label="审核状态" v-if="currentId">
+        <FormItem v-if="isAdminUser && currentId" label="审核状态">
           <Select v-model:value="formState.status" :options="statusOptions" />
         </FormItem>
-        <FormItem label="审核说明" v-if="currentId">
+        <FormItem v-if="isAdminUser && currentId" label="审核说明">
           <Input v-model:value="formState.review_comment" placeholder="审核备注" />
         </FormItem>
         <FormItem label="上传文件" v-if="currentId">
@@ -76,15 +79,18 @@
 </template>
 
 <script lang="ts" setup>
-  import { ref, onMounted, nextTick } from 'vue'
+  import { ref, onMounted, nextTick, computed } from 'vue'
   import { Card, Table, Modal, Form, Input, Select, Switch, Button, Tag, Space } from 'ant-design-vue'
   import { PageWrapper } from '/@/components/Page'
   import { getPackages, createPackage, updatePackage, deletePackage, uploadPackageFile, reviewPackage, type PackageItem, getTopDownloads, getTopLikes } from '/@/api/packages'
   import { getCategories } from '/@/api/dashboard'
+  import { getUsers, type UserItem } from '/@/api/users'
   import { useMessage } from '/@/hooks/web/useMessage'
+  import { useUserStore } from '/@/store/modules/user'
   import * as echarts from 'echarts'
 
   const { createMessage } = useMessage()
+  const userStore = useUserStore()
 
   // FormItem 别名，确保样式
   const FormItem = Form.Item
@@ -92,6 +98,34 @@
   const loading = ref(true)
   const dataSource = ref<PackageItem[]>([])
   const categoryOptions = ref<any[]>([])
+  const userOptions = ref<{ label: string; value: string }[]>([])
+
+  // 权限计算
+  const currentUser = computed(() => userStore.getUserInfo)
+  const isAdminUser = computed(() => {
+    const userInfo = currentUser.value as any
+    const role = userInfo?.role || userInfo?.roles?.[0]?.value
+    return role === 'admin' || role === 'elder'
+  })
+
+  // 权限检查函数
+  const canCreatePackage = computed(() => {
+    return !!currentUser.value?.userId // 已登录用户都可以创建资源包
+  })
+
+  const canEditPackage = (record: PackageItem) => {
+    if (!currentUser.value?.userId) return false
+    return isAdminUser.value || record.author === currentUser.value.username
+  }
+
+  const canDeletePackage = (record: PackageItem) => {
+    if (!currentUser.value?.userId) return false
+    return isAdminUser.value || record.author === currentUser.value.username
+  }
+
+  const canReviewPackage = (record: PackageItem) => {
+    return isAdminUser.value && record.status === 'Pending'
+  }
 
   const downloadChartRef = ref<HTMLDivElement | null>(null)
   const hotChartRef = ref<HTMLDivElement | null>(null)
@@ -138,13 +172,13 @@
   const columns = [
     { title: 'ID', dataIndex: 'id', key: 'id', width: 80 },
     { title: '标题', dataIndex: 'name', key: 'name' },
-    { title: '作者', dataIndex: 'author', key: 'author' },
-    { title: '分类', dataIndex: 'category_id', key: 'category_id' },
-    { title: '状态', dataIndex: 'status', key: 'status' },
-    { title: '访问', dataIndex: 'view_count', key: 'view_count' },
-    { title: '下载', dataIndex: 'download_count', key: 'download_count' },
-    { title: '点赞', dataIndex: 'like_count', key: 'like_count' },
-    { title: '操作', key: 'action', width: 220 },
+    { title: '作者', dataIndex: 'author', key: 'author', width: 120 },
+    { title: '分类', dataIndex: 'category_id', key: 'category_id', width: 100 },
+    { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+    { title: '访问', dataIndex: 'view_count', key: 'view_count', width: 80 },
+    { title: '下载', dataIndex: 'download_count', key: 'download_count', width: 80 },
+    { title: '点赞', dataIndex: 'like_count', key: 'like_count', width: 80 },
+    { title: '操作', key: 'action', width: 280 },
   ]
 
   const statusColor = (s: string) => ({ Active: 'success', Pending: 'warning', Rejected: 'error', Inactive: 'default', Deleted: 'default' }[s] || 'default')
@@ -160,6 +194,7 @@
     description: '',
     category_id: undefined,
     tags: [] as string[],
+    author: '',
     is_pinned: false,
     is_featured: false,
     status: 'Pending',
@@ -180,7 +215,7 @@
 
   const handleCreate = () => {
     currentId.value = null
-    formState.value = { name: '', version: '', description: '', category_id: undefined, tags: [], is_pinned: false, is_featured: false, status: 'Pending', review_comment: '' }
+    formState.value = { name: '', version: '', description: '', category_id: undefined, tags: [], author: currentUser.value?.username || '', is_pinned: false, is_featured: false, status: 'Pending', review_comment: '' }
     editOpen.value = true
   }
 
@@ -192,6 +227,7 @@
       description: record.description,
       category_id: record.category_id,
       tags: record.tags || [],
+      author: record.author,
       is_pinned: record.is_pinned,
       is_featured: record.is_featured,
       status: record.status,
@@ -244,12 +280,14 @@
   const fetchList = async () => {
     try {
       loading.value = true
-      const [res, cats] = await Promise.all([
+      const [res, cats, users] = await Promise.all([
         getPackages({ page: 1, page_size: 20 }),
         getCategories(),
+        isAdminUser.value ? getUsers({ page: 1, page_size: 100 }) : Promise.resolve({ list: [] }),
       ])
       dataSource.value = res.list || []
       categoryOptions.value = (cats || []).map((c: any) => ({ label: c.name, value: c.id }))
+      userOptions.value = (users.list || []).map((u: UserItem) => ({ label: u.username + (u.nickname ? ` (${u.nickname})` : ''), value: u.username }))
       loading.value = false
       await nextTick()
       await fetchRanks()

@@ -17,5 +17,6 @@ pub mod tag_service; // 添加标签服务
 pub mod download_security_service; // 添加下载安全服务
 pub mod security_action_service; // 添加安全操作服务
 pub mod notification_service; // 新增通知服务
+pub mod anti_fraud_service; // 反欺诈服务
 
  
