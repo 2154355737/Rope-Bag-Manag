@@ -22,3 +22,6 @@ Thumbs.db
 
 # 环境变量
 .env 
+
+sql_old_backup/
+文档/
