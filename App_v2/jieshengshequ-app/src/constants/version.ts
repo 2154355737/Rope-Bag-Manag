@@ -9,10 +9,10 @@ export const APP_VERSION = {
   BUILD_NUMBER: '218',
   
   /** 构建日期 */
-  BUILD_DATE: '2025-01-08',
+  BUILD_DATE: '2025-09-04',
   
   /** 发布日期 */
-  RELEASE_DATE: '2025年1月8日',
+  RELEASE_DATE: '2025年9月4日',
   
   /** 版本代号 */
   CODE_NAME: 'Avatar Navigation',
@@ -21,7 +21,7 @@ export const APP_VERSION = {
   API_VERSION: 'v1',
   
   /** 最小支持的后端版本 */
-  MIN_BACKEND_VERSION: '1.0.0'
+  MIN_BACKEND_VERSION: '2.0.0'
 } as const
 
 /**
