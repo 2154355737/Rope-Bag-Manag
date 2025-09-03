@@ -6,11 +6,18 @@ export interface Notification {
   title: string
   content: string
   link?: string
-  notif_type?: string
-  related_type?: string
+  notif_type?: 'follow' | 'like' | 'comment' | 'post' | 'resource' | 'system'
+  related_type?: 'user' | 'post' | 'resource' | 'comment'
   related_id?: number
   is_read: boolean
   created_at: string
+  // 关注相关的额外字段
+  trigger_user?: {
+    id: number
+    username: string
+    nickname: string
+    avatar_url?: string
+  }
 }
 
 export interface NotificationQuery {

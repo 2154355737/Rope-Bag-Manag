@@ -1,6 +1,6 @@
 import React from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Home, Layers, PlusCircle, MessageSquare, User } from 'lucide-react'
+import { Home, Layers, PlusCircle, Trophy, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/components/theme-provider'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -14,7 +14,7 @@ const Layout: React.FC = () => {
     { path: '/home', icon: Home, label: '首页' },
     { path: '/category', icon: Layers, label: '分类' },
     { path: '/publish', icon: PlusCircle, label: '发布' },
-    { path: '/messages', icon: MessageSquare, label: '通知' },
+    { path: '/ranking', icon: Trophy, label: '排行' },
     { path: '/profile', icon: User, label: '我的' },
   ]
 
@@ -32,12 +32,9 @@ const Layout: React.FC = () => {
       </div>
       
       {/* 底部导航栏 - 现代化设计 */}
-      <div className="fixed bottom-0 left-0 right-0 z-[9999] bottom-navigation">
-        {/* 背景层 - 毛玻璃效果 */}
-        <div className="absolute inset-0 bg-background/80 backdrop-blur-xl border-t border-border/50" />
-        
+      <div className="fixed bottom-0 left-0 right-0 z-[9999] bg-background/80 backdrop-blur-xl border-t border-border/50">
         {/* 导航内容 */}
-        <div className="relative px-2 pb-safe">
+        <div className="relative px-2 py-2">
           <div className="flex items-center justify-around h-16">
             {navItems.map((item, index) => {
               const Icon = item.icon
@@ -155,7 +152,7 @@ const Layout: React.FC = () => {
         
         {/* 底部装饰线 - 移到导航栏内部 */}
         <motion.div 
-          className="absolute bottom-safe left-1/2 transform -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-primary via-accent to-secondary rounded-full opacity-40"
+          className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-primary via-accent to-secondary rounded-full opacity-40"
           animate={{ 
             opacity: [0.2, 0.6, 0.2],
             scaleX: [0.8, 1, 0.8]

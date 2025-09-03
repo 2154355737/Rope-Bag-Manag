@@ -131,12 +131,15 @@ impl AppBuilder {
             .app_data(web::Data::new(services.user_action_service.clone()))
             .app_data(web::Data::new(services.email_service.clone()))
             .app_data(web::Data::new(services.subscription_repo.clone()))
-            .app_data(web::Data::new(services.package_repo.clone()))
+            .app_data(web::Data::new(Arc::new(services.package_repo.clone())))
             .app_data(web::Data::new(services.post_service.clone()))
             .app_data(web::Data::new(services.tag_service.clone()))
             .app_data(web::Data::new(services.notification_service.clone()))
             .app_data(web::Data::new(services.download_security_service.clone()))
             .app_data(web::Data::new(services.security_action_service.clone()))
-            .app_data(web::Data::new(services.anti_fraud_service.clone()));
+            .app_data(web::Data::new(services.anti_fraud_service.clone()))
+            .app_data(web::Data::new(Arc::new(services.follow_repo.clone())))
+            .app_data(web::Data::new(Arc::new(services.user_repo.clone())))
+            .app_data(web::Data::new(Arc::new(services.post_repo.clone())));
     }
 }

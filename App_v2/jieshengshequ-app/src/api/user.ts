@@ -13,6 +13,11 @@ export async function getMyProfile() {
   return http.get<any>('/me')
 }
 
+// 获取其他用户资料
+export async function getUserProfile(userId: number) {
+  return http.get<any>(`/users/${userId}/profile`)
+}
+
 // 更新当前用户资料（与后端 UpdateUserRequest 字段保持兼容）
 export async function updateMyProfile(payload: Partial<{ username: string; nickname: string; bio: string; email: string; location: string; website: string; skills: string; avatar_url: string }>) {
   return http.put<any>('/me', payload)

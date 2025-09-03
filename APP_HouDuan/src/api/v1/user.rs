@@ -113,6 +113,10 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                     .route(web::put().to(update_user))
                     .route(web::delete().to(delete_user))
             )
+            .service(
+                web::resource("/{id}/profile")
+                    .route(web::get().to(get_user_profile))
+            )
     );
 
     // 新增：/me 别名集合
@@ -215,6 +219,61 @@ async fn get_user(
             "message": "success",
             "data": user
         }))),
+        Ok(None) => Ok(HttpResponse::NotFound().json(json!({
+            "code": 404,
+            "message": "用户不存在"
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({
+            "code": 500,
+            "message": e.to_string()
+        })))
+    }
+}
+
+async fn get_user_profile(
+    path: web::Path<i32>,
+    user_service: web::Data<UserService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user_id = path.into_inner();
+    match user_service.get_user_by_id(user_id).await {
+        Ok(Some(user)) => {
+            // 构建完整的用户资料信息，包括统计数据
+            let profile = json!({
+                "id": user.id,
+                "username": user.username,
+                "nickname": user.nickname,
+                "avatar_url": if let Some(avatar) = user.avatar_url {
+                    if avatar.starts_with("http://") || avatar.starts_with("https://") {
+                        avatar
+                    } else if avatar.starts_with("/") {
+                        format!("http://localhost:15201{}", avatar)
+                    } else {
+                        format!("http://localhost:15201/{}", avatar)
+                    }
+                } else {
+                    format!("https://api.dicebear.com/7.x/avataaars/svg?seed={}", user.id)
+                },
+                "bio": user.bio,
+                "location": user.location,
+                "website": user.website,
+                "skills": user.skills,
+                "followers_count": 0, // TODO: 从关注表获取
+                "following_count": 0, // TODO: 从关注表获取
+                "posts_count": 0, // TODO: 从帖子表获取
+                "resources_count": 0, // TODO: 从资源表获取
+                "total_likes": 0, // TODO: 从点赞统计获取
+                "total_views": 0, // TODO: 从浏览统计获取
+                "total_downloads": user.download_count,
+                "created_at": user.created_at.format("%Y-%m-%d").to_string(),
+                "is_following": false // TODO: 根据当前用户判断是否关注
+            });
+            
+            Ok(HttpResponse::Ok().json(json!({
+                "code": 0,
+                "message": "success",
+                "data": profile
+            })))
+        },
         Ok(None) => Ok(HttpResponse::NotFound().json(json!({
             "code": 404,
             "message": "用户不存在"

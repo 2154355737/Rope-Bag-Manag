@@ -24,6 +24,10 @@ pub mod storage;
 pub mod search;
 // 新增发布模块
 pub mod publish;
+// 新增排行榜模块
+pub mod ranking;
+// 新增关注模块
+pub mod follow;
 
 use actix_web::web;
 
@@ -49,7 +53,9 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(notification::configure_routes)
         .configure(storage::configure_routes)
         .configure(search::configure_routes)
-        .configure(publish::configure_routes); // 添加发布路由
+        .configure(publish::configure_routes) // 添加发布路由
+        .configure(ranking::configure_routes) // 添加排行榜路由
+        .configure(follow::configure_routes); // 添加关注路由
 
     // 添加公共API路由
     public::public_routes(cfg);

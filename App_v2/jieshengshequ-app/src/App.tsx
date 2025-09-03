@@ -10,6 +10,8 @@ import ProfileScreen from './screens/profile-screen'
 import UniversalDetailScreen from './screens/universal-detail-screen'
 import AnnouncementRedirect from './screens/announcement-redirect'
 import PublishScreen from './screens/publish-screen'
+import RankingScreen from './screens/ranking-screen'
+import UserProfileScreen from './screens/user-profile-screen'
 import SettingsScreen from './screens/settings-screen'
 import EditProfileScreen from './screens/edit-profile-screen'
 import MyContentScreen from './screens/my-content-screen'
@@ -47,11 +49,13 @@ const AppContent: React.FC = () => {
           <Route path="home" element={<HomeScreen />} />
           <Route path="category" element={<CategoryScreen />} />
           <Route path="community" element={<CommunityScreen />} />
+          <Route path="ranking" element={<RankingScreen />} />
           <Route path="messages" element={<ProtectedRoute><MessagesScreen /></ProtectedRoute>} />
           <Route path="profile" element={<ProtectedRoute><ProfileScreen /></ProtectedRoute>} />
           <Route path="publish" element={<ProtectedRoute><PublishScreen /></ProtectedRoute>} />
           <Route path="post/:id" element={<UniversalDetailScreen />} />
           <Route path="resource/:id" element={<UniversalDetailScreen />} />
+          <Route path="user/:userId" element={<UserProfileScreen />} />
           <Route path="announcement" element={<AnnouncementRedirect />} />
           <Route path="announcement/:id" element={<UniversalDetailScreen />} />
           <Route path="settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />

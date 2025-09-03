@@ -35,6 +35,8 @@ use crate::repositories::{
     user_action_repo::UserActionRepository,
     notification_repo::NotificationRepository,
     mail_repo::MailRepository,
+    follow_repo::FollowRepository,
+    post_repo::PostRepository,
 };
 use crate::models::download_security::{DownloadSecurityConfig, SecurityConfig};
 use super::BootstrapError;
@@ -62,6 +64,8 @@ pub struct ServiceContainer {
     pub package_repo: PackageRepository,
     pub system_repo: SystemRepository,
     pub subscription_repo: SubscriptionRepository,
+    pub follow_repo: FollowRepository,
+    pub post_repo: PostRepository,
     
     // JWT工具
     pub jwt_utils: crate::utils::jwt::JwtUtils,
@@ -128,6 +132,8 @@ impl ServiceContainer {
             package_repo: repositories.package_repo,
             system_repo: repositories.system_repo,
             subscription_repo: repositories.subscription_repo,
+            follow_repo: repositories.follow_repo,
+            post_repo: repositories.post_repo,
             jwt_utils: crate::utils::jwt::JwtUtils::new(jwt_secret),
         })
     }
@@ -167,6 +173,12 @@ impl ServiceContainer {
         let notification_repo = NotificationRepository::new(db_url)
             .map_err(|e| BootstrapError::Service(format!("创建通知仓库失败: {}", e)))?;
         
+        let follow_repo = FollowRepository::new(db_url)
+            .map_err(|e| BootstrapError::Service(format!("创建关注仓库失败: {}", e)))?;
+        
+        let post_repo = PostRepository::new(db_url)
+            .map_err(|e| BootstrapError::Service(format!("创建帖子仓库失败: {}", e)))?;
+        
         Ok(RepositoryContainer {
             user_repo,
             package_repo,
@@ -177,6 +189,8 @@ impl ServiceContainer {
             email_verification_repo,
             subscription_repo,
             notification_repo,
+            follow_repo,
+            post_repo,
         })
     }
     
@@ -374,6 +388,8 @@ struct RepositoryContainer {
     email_verification_repo: EmailVerificationRepository,
     subscription_repo: SubscriptionRepository,
     notification_repo: NotificationRepository,
+    follow_repo: FollowRepository,
+    post_repo: PostRepository,
 }
 
 /// 业务服务容器

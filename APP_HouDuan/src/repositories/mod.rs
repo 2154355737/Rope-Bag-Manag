@@ -9,11 +9,14 @@ pub mod subscription_repo;
 pub mod mail_repo; // 添加邮件仓库
 pub mod download_security_repo; // 添加下载安全仓库
 pub mod notification_repo; // 新增通知仓库
+pub mod follow_repo; // 新增关注仓库
+pub mod post_repo; // 新增帖子仓库
 
 pub use user_repo::*;
 pub use package_repo::*;
 pub use comment_repo::*;
 pub use system_repo::*;
+pub use post_repo::*;
 
 pub use email_verification_repo::*;
 pub use subscription_repo::*;

@@ -18,6 +18,65 @@ impl UserRepository {
         })
     }
 
+    pub async fn get_user_ranking(&self, offset: i64, limit: i64) -> Result<(Vec<User>, i64)> {
+        let conn = self.conn.lock().await;
+        
+        // 获取用户排行榜数据（按star排序）
+        let mut stmt = conn.prepare(
+            "SELECT id, username, email, password_hash, nickname, bio, location, website, skills, role, star, ban_status, 
+                    ban_reason, qq_number, avatar_url, login_count, upload_count, download_count, 
+                    created_at, last_login, is_admin 
+             FROM users 
+             WHERE ban_status = 'normal' 
+             ORDER BY star DESC, upload_count DESC, download_count DESC 
+             LIMIT ? OFFSET ?"
+        )?;
+
+        let users = stmt.query_map(params![limit, offset], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                email: row.get(2)?,
+                password_hash: row.get(3)?,
+                nickname: row.get(4)?,
+                bio: row.get(5)?,
+                location: row.get(6)?,
+                website: row.get(7)?,
+                skills: row.get(8)?,
+                role: match row.get::<_, String>(9)?.to_lowercase().as_str() {
+                    "admin" => crate::models::UserRole::Admin,
+                    "moderator" => crate::models::UserRole::Moderator,
+                    "elder" => crate::models::UserRole::Elder,
+                    _ => crate::models::UserRole::User,
+                },
+                star: row.get(10)?,
+                ban_status: match row.get::<_, String>(11)?.as_str() {
+                    "suspended" => crate::models::BanStatus::Suspended,
+                    "banned" => crate::models::BanStatus::Banned,
+                    _ => crate::models::BanStatus::Normal,
+                },
+                ban_reason: row.get(12)?,
+                qq_number: row.get(13)?,
+                avatar_url: row.get(14)?,
+                login_count: row.get(15)?,
+                upload_count: row.get(16)?,
+                download_count: row.get(17)?,
+                created_at: row.get(18)?,
+                last_login: row.get(19)?,
+                is_admin: row.get(20)?,
+            })
+        })?.collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // 获取总数
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM users WHERE ban_status = 'normal'",
+            [],
+            |row| row.get(0)
+        )?;
+
+        Ok((users, total))
+    }
+
     pub async fn get_all_users(&self) -> Result<Vec<User>> {
         let conn = self.conn.lock().await;
         let mut stmt = conn.prepare(

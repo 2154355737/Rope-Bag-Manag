@@ -20,12 +20,14 @@ export class ApiError extends Error {
 const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development'
 
 // 允许通过环境变量覆盖（构建时注入）：VITE_API_BASE / VITE_STORAGE_API_BASE
+//|| (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
 const API_BASE = import.meta.env.VITE_API_BASE
-  || (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
+  || (isDevelopment ? 'http://localhost:15201/api/v1' : 'http://39.105.113.219:15201/api/v1')
 
 // Storage API（默认同 API_BASE，可单独覆盖）
+//|| (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
 export const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_BASE
-  || (isDevelopment ? '/api/v1' : 'http://39.105.113.219:15201/api/v1')
+  || (isDevelopment ? 'http://localhost:15201/api/v1' : 'http://39.105.113.219:15201/api/v1')
 
 // 调试信息：输出当前环境和API_BASE
 console.log('Environment Mode:', import.meta.env.MODE)

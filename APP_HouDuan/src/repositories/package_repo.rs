@@ -19,6 +19,78 @@ impl PackageRepository {
         })
     }
 
+    /// 获取资源排行榜
+    pub async fn get_package_ranking(&self, offset: i64, limit: i64) -> Result<(Vec<Package>, i64)> {
+        let conn = self.conn.lock().await;
+        
+        // 获取资源排行榜数据（按下载量排序）
+        let sql = "SELECT id, name, author, version, description, file_url, file_size, \
+                   download_count, like_count, favorite_count, category_id, status, \
+                   created_at, updated_at, reviewer_id, reviewed_at, review_comment, \
+                   is_pinned, is_featured, screenshots, cover_image, requirements, included_files \
+                   FROM packages \
+                   WHERE status = 'active' \
+                   ORDER BY download_count DESC, like_count DESC, created_at DESC \
+                   LIMIT ? OFFSET ?";
+        
+        let mut stmt = conn.prepare(sql)?;
+
+        let packages = stmt.query_map(params![limit, offset], |row| {
+            // 解析JSON字段的辅助函数
+            let parse_json_array = |json_str: Option<String>| -> Option<Vec<String>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            
+            // 解析PackageFile数组的函数
+            let parse_package_files = |json_str: Option<String>| -> Option<Vec<crate::models::package::PackageFile>> {
+                json_str.and_then(|s| serde_json::from_str(&s).ok())
+            };
+            
+            Ok(Package {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                author: row.get(2)?,
+                version: row.get(3)?,
+                description: row.get(4)?,
+                file_url: row.get(5)?,
+                file_size: row.get(6)?,
+                download_count: row.get(7)?,
+                like_count: row.get(8)?,
+                favorite_count: row.get(9)?,
+                category_id: row.get(10)?,
+                status: match row.get::<_, String>(11)?.as_str() {
+                    "pending" => crate::models::PackageStatus::Pending,
+                    "active" => crate::models::PackageStatus::Active,
+                    "rejected" => crate::models::PackageStatus::Rejected,
+                    "inactive" => crate::models::PackageStatus::Inactive,
+                    "deleted" => crate::models::PackageStatus::Deleted,
+                    _ => crate::models::PackageStatus::Pending,
+                },
+                created_at: row.get(12)?,
+                updated_at: row.get(13)?,
+                reviewer_id: row.get(14)?,
+                reviewed_at: row.get(15)?,
+                review_comment: row.get(16)?,
+                is_pinned: row.get(17).unwrap_or(false),
+                is_featured: row.get(18).unwrap_or(false),
+                screenshots: parse_json_array(row.get(19).ok()),
+                cover_image: row.get(20).ok(),
+                requirements: parse_json_array(row.get(21).ok()),
+                included_files: parse_package_files(row.get(22).ok()),
+                tags: None, // TODO: 从标签关联表获取
+            })
+        })?.collect::<std::result::Result<Vec<_>, _>>()?;
+
+        // 获取总数
+        let total: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM packages WHERE status = 'active'",
+            [],
+            |row| row.get(0)
+        )?;
+
+        Ok((packages, total))
+    }
+
     /// 获取指定包的浏览量和评论数
     pub async fn get_view_and_comment_counts(&self, package_id: i32) -> Result<(i32, i32)> {
         let conn = self.conn.lock().await;
