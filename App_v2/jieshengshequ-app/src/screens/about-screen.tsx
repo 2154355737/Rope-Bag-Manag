@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from '@/hooks/use-toast'
 import TopNavigation from '@/components/ui/top-navigation'
+import { APP_VERSION } from '@/constants/version'
 
 const AboutScreen: React.FC = () => {
   const navigate = useNavigate()
@@ -16,9 +17,9 @@ const AboutScreen: React.FC = () => {
   // 应用信息
   const appInfo = {
     name: '结绳社区',
-    version: '2.1.5',
-    buildNumber: '20250117',
-    releaseDate: '2025年1月17日',
+    version: APP_VERSION.VERSION,
+    buildNumber: APP_VERSION.BUILD_DATE,
+    releaseDate: APP_VERSION.RELEASE_DATE,
     description: '一个基于 React + TypeScript + Capacitor 构建的跨平台移动社区应用，专注于提供现代化的用户体验和原生性能。',
     logo: '🪢'
   }
@@ -79,6 +80,18 @@ const AboutScreen: React.FC = () => {
 
   // 更新日志
   const changelog = [
+    {
+      version: APP_VERSION.VERSION,
+      date: APP_VERSION.BUILD_DATE,
+      changes: [
+        '新增头像点击跳转功能：通用详细页和评论区头像支持点击跳转到用户资料页',
+        '统一导航栏组件：排行页和用户资料页使用统一的顶部导航栏组件',
+        '完善安全区域支持：添加完整的多设备屏幕适配',
+        '优化用户体验：添加悬停效果和交互反馈',
+        '修复后端依赖注入和数据库兼容性问题',
+        '改进移动端响应式布局和触摸交互'
+      ]
+    },
     {
       version: '2.1.5',
       date: '2025-01-17',

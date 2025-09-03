@@ -271,7 +271,7 @@ const TermsScreen: React.FC = () => {
                 </div>
                 <Separator className="my-4" />
                 <div className="text-xs text-muted-foreground">
-                  结绳社区服务条款 v2.1 | 最后更新：2025年8月19日
+                  结绳社区服务条款 v2.1.8 | 最后更新：2025年1月8日
                 </div>
               </div>
             </CardContent>

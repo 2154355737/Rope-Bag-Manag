@@ -456,7 +456,7 @@ const PrivacyScreen: React.FC = () => {
              </p>
              <Separator className="my-4" />
              <div className="text-xs text-muted-foreground">
-               结绳社区隐私政策 v2.1 | 最后更新：2025年8月19日
+               结绳社区隐私政策 v2.1.8 | 最后更新：2025年1月8日
              </div>
           </CardContent>
         </Card>
