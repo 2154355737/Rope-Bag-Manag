@@ -183,10 +183,31 @@ async function request<T>(method: HttpMethod, url: string, body?: any, init?: Re
 		console.log(`请求响应:`, resp.status, resp.statusText)
 
 		// 先尝试解析JSON（即使是非200）
-		const data = await resp.json().catch(err => {
-			console.error('JSON解析失败:', err)
-			return {} as any
-		})
+		let data: any = {}
+		const contentType = resp.headers.get('content-type')
+		
+		if (contentType && contentType.includes('application/json')) {
+			// 如果响应头表明是JSON，尝试解析
+			try {
+				data = await resp.json()
+			} catch (err) {
+				console.error('JSON解析失败:', err)
+				// 获取原始响应文本用于调试
+				const textResponse = await resp.text().catch(() => '无法获取响应文本')
+				console.error('原始响应内容:', textResponse)
+				throw new ApiError(`JSON解析失败: ${textResponse}`, resp.status, undefined, { rawResponse: textResponse })
+			}
+		} else {
+			// 如果不是JSON响应，获取文本内容
+			try {
+				const textResponse = await resp.text()
+				console.error('收到非JSON响应:', textResponse)
+				throw new ApiError(`服务器返回非JSON响应: ${textResponse}`, resp.status, undefined, { rawResponse: textResponse })
+			} catch (err) {
+				console.error('获取响应文本失败:', err)
+				throw new ApiError('服务器响应格式错误', resp.status)
+			}
+		}
 		
 		// 调试信息：输出响应数据
 		console.log('API响应数据:', JSON.stringify(data, null, 2))

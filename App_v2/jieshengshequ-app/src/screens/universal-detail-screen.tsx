@@ -327,14 +327,14 @@ const UniversalDetailScreen: React.FC = () => {
             const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
             const mappedComments = (commentResponse.list || []).map((c: any) => ({
               id: c.id,
-              author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+              author: { id: c.user_id, name: c.author_name || '用户', avatar: c.author_avatar || '' },
               content: c.content,
               time: formatTimeOfDay(c.created_at || ''),
               likes: c.likes || 0,
               isLiked: false,
               replies: (c.replies || []).map((r: any) => ({
                 id: r.id,
-                author: { name: r.author_name || '用户', avatar: r.author_avatar || '' },
+                author: { id: r.user_id, name: r.author_name || '用户', avatar: r.author_avatar || '' },
                 content: r.content,
                 time: formatTimeOfDay(r.created_at || ''),
                 likes: r.likes || 0,
@@ -546,12 +546,12 @@ const UniversalDetailScreen: React.FC = () => {
       const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (refreshed.list || []).map((c: any) => ({
         id: c.id,
-        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        author: { id: c.user_id, name: c.author_name || '用户', avatar: c.author_avatar || '' },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { id: r.user_id, name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
         canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
       }))
       setComments(mapped)
@@ -579,12 +579,12 @@ const UniversalDetailScreen: React.FC = () => {
       const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (refreshed.list || []).map((c: any) => ({
         id: c.id,
-        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        author: { id: c.user_id, name: c.author_name || '用户', avatar: c.author_avatar || '' },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { id: r.user_id, name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
         canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
       }))
       setComments(mapped)
@@ -603,12 +603,12 @@ const UniversalDetailScreen: React.FC = () => {
       const user = getLocalUser(); const isPrivileged = (role?: string) => (role === 'admin' || role === 'elder')
       const mapped = (refreshed.list || []).map((c: any) => ({
         id: c.id,
-        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        author: { id: c.user_id, name: c.author_name || '用户', avatar: c.author_avatar || '' },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
         isLiked: false,
-        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
+        replies: (c.replies || []).map((r: any) => ({ id: r.id, author: { id: r.user_id, name: r.author_name || '用户', avatar: r.author_avatar || '' }, content: r.content, time: formatTimeOfDay(r.created_at || ''), likes: r.likes || 0, isLiked: false, canEdit: !!user && (isPrivileged(user.role) || user.id === r.user_id) })),
         canEdit: !!user && (isPrivileged(user.role) || user.id === c.user_id),
       }))
       setComments(mapped)
@@ -718,6 +718,7 @@ const UniversalDetailScreen: React.FC = () => {
       const newComments = (commentResponse.list || []).map((c: any) => ({
         id: c.id,
         author: { 
+          id: c.user_id,
           name: c.author_name || '用户', 
           avatar: c.author_avatar || '' 
         },
@@ -728,6 +729,7 @@ const UniversalDetailScreen: React.FC = () => {
         replies: (c.replies || []).map((r: any) => ({
           id: r.id,
           author: { 
+            id: r.user_id,
             name: r.author_name || '用户', 
             avatar: r.author_avatar || '' 
           },
@@ -863,13 +865,21 @@ const UniversalDetailScreen: React.FC = () => {
             <Card>
               <CardContent className="p-4 overflow-hidden">
               <div className="flex items-start gap-3 mb-4">
-                <Avatar className="h-10 w-10">
+                <Avatar 
+                  className="h-10 w-10 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+                  onClick={() => navigate(`/user/${item.author.id}`)}
+                >
                   <AvatarImage src={item.author.avatar} />
                   <AvatarFallback>{item.author.name[0]}</AvatarFallback>
                     </Avatar>
                 <div className="flex-1 min-w-0 overflow-hidden">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{item.author.name}</span>
+                    <span 
+                      className="font-medium text-sm cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => navigate(`/user/${item.author.id}`)}
+                    >
+                      {item.author.name}
+                    </span>
                     {item.author.verified && <CheckCircle size={14} className="text-blue-500" />}
                       </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -977,6 +987,11 @@ const UniversalDetailScreen: React.FC = () => {
                 initialCommentsToShow={5}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
+                onAuthorClick={(authorName, authorId) => {
+                  if (authorId) {
+                    navigate(`/user/${authorId}`)
+                  }
+                }}
               />
             )}
           

@@ -18,7 +18,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
 // 获取所有分类
 async fn get_categories(
     system_repo: web::Data<SystemRepository>,
-    package_repo: web::Data<PackageRepository>,
+    package_repo: web::Data<std::sync::Arc<PackageRepository>>,
 ) -> HttpResponse {
     // 从数据库获取分类
     match system_repo.get_categories().await {

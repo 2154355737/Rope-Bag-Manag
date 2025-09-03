@@ -76,7 +76,7 @@ impl AuthHelper {
         let token = Self::extract_token(req).ok_or(AuthError::TokenMissing)?;
         
         // 2. 从app_data中获取JWT Utils
-        let jwt_utils = req.app_data::<actix_web::web::Data<JwtUtils>>()
+        let jwt_utils = req.app_data::<actix_web::web::Data<std::sync::Arc<JwtUtils>>>()
             .ok_or(AuthError::TokenInvalid)?;
         let claims = jwt_utils.verify_token(&token).map_err(|_| AuthError::TokenInvalid)?;
         

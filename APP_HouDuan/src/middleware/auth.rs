@@ -66,7 +66,7 @@ impl FromRequest for AuthenticatedUser {
         // 3. 验证获取到的token
         if let Some(token_value) = token {
                     // 从应用数据中获取 JwtUtils
-                    if let Some(jwt_utils) = req.app_data::<actix_web::web::Data<crate::utils::jwt::JwtUtils>>() {
+                    if let Some(jwt_utils) = req.app_data::<actix_web::web::Data<std::sync::Arc<crate::utils::jwt::JwtUtils>>>() {
                 match jwt_utils.verify_token(token_value) {
                             Ok(claims) => {
                                 let role = match claims.role.as_str() {
@@ -102,7 +102,7 @@ pub fn extract_user_id(req: &HttpRequest) -> Option<i32> {
             if auth_str.starts_with("Bearer ") {
                 let token = &auth_str[7..];
                 
-                if let Some(jwt_utils) = req.app_data::<actix_web::web::Data<crate::utils::jwt::JwtUtils>>() {
+                if let Some(jwt_utils) = req.app_data::<actix_web::web::Data<std::sync::Arc<crate::utils::jwt::JwtUtils>>>() {
                     if let Ok(claims) = jwt_utils.verify_token(token) {
                             return Some(claims.user_id);
                     }

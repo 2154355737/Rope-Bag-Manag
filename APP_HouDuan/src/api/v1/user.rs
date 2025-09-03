@@ -10,6 +10,10 @@ use crate::services::post_service::PostService;
 use actix_multipart::Multipart;
 use futures_util::TryStreamExt;
 use std::io::Write;
+use crate::repositories::follow_repo::FollowRepository;
+use crate::utils::jwt::JwtUtils;
+use crate::repositories::user_repo::UserRepository;
+use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
 struct GetUsersQuery {
@@ -115,7 +119,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             )
             .service(
                 web::resource("/{id}/profile")
-                    .route(web::get().to(get_user_profile))
+                    .route(web::get().to(get_user_profile_adapter))
             )
             .service(
                 web::resource("/{id}/posts")
@@ -128,6 +132,24 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/{id}/latest-content")
                     .route(web::get().to(get_user_latest_content))
+            )
+            // 关注相关路由
+            .service(
+                web::resource("/{id}/follow")
+                    .route(web::post().to(follow_user_adapter))
+                    .route(web::delete().to(unfollow_user_adapter))
+            )
+            .service(
+                web::resource("/{id}/follow-status")
+                    .route(web::get().to(check_follow_status_adapter))
+            )
+            .service(
+                web::resource("/{id}/followers")
+                    .route(web::get().to(get_user_followers_adapter))
+            )
+            .service(
+                web::resource("/{id}/following")
+                    .route(web::get().to(get_user_following_adapter))
             )
     );
 
@@ -170,6 +192,15 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .service(
                 web::resource("/comments")
                     .route(web::get().to(get_my_comments))
+            )
+            // 关注相关路由
+            .service(
+                web::resource("/followers")
+                    .route(web::get().to(crate::api::v1::follow::get_my_followers))
+            )
+            .service(
+                web::resource("/following")
+                    .route(web::get().to(crate::api::v1::follow::get_my_following))
             )
     );
 }
@@ -244,9 +275,25 @@ async fn get_user(
 
 async fn get_user_profile(
     path: web::Path<i32>,
+    req: HttpRequest,
     user_service: web::Data<UserService>,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+    jwt_utils: web::Data<Arc<JwtUtils>>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id = path.into_inner();
+    
+    // 获取当前登录用户ID（如果有的话）
+    let current_user_id = match req.headers().get("authorization") {
+        Some(header) => match header.to_str() {
+            Ok(auth_str) if auth_str.starts_with("Bearer ") => {
+                let token = &auth_str[7..];
+                jwt_utils.verify_token(token).map(|claims| claims.user_id).ok()
+            }
+            _ => None
+        }
+        None => None
+    };
+    
     match user_service.get_user_by_id(user_id).await {
         Ok(Some(user)) => {
             // 获取真实的统计数据
@@ -257,6 +304,20 @@ async fn get_user_profile(
             let resources_count: i64 = conn.query_row("SELECT COUNT(*) FROM packages WHERE author = ? AND status = 'active'", rusqlite::params![user.username], |r| r.get(0)).unwrap_or(0);
             let total_views: i64 = conn.query_row("SELECT COALESCE(SUM(view_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
             let total_likes: i64 = conn.query_row("SELECT COALESCE(SUM(like_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+            
+            // 获取关注统计
+            let follow_stats = follow_repo.get_follow_stats(user_id).await.unwrap_or_default();
+            
+            // 检查当前用户是否关注这个用户
+            let is_following = if let Some(current_id) = current_user_id {
+                if current_id != user_id {
+                    follow_repo.is_following(current_id, user_id).await.unwrap_or(false)
+                } else {
+                    false // 用户不能关注自己
+                }
+            } else {
+                false // 未登录用户
+            };
             
             // 构建完整的用户资料信息，包括统计数据
             let profile = json!({
@@ -278,15 +339,15 @@ async fn get_user_profile(
                 "location": user.location,
                 "website": user.website,
                 "skills": user.skills,
-                "followers_count": 0, // TODO: 从关注表获取
-                "following_count": 0, // TODO: 从关注表获取
+                "followers_count": follow_stats.followers_count,
+                "following_count": follow_stats.following_count,
                 "posts_count": posts_count as i32,
                 "resources_count": resources_count as i32,
                 "total_likes": total_likes as i32,
                 "total_views": total_views as i32,
                 "total_downloads": user.download_count,
                 "created_at": user.created_at.format("%Y-%m-%d").to_string(),
-                "is_following": false // TODO: 根据当前用户判断是否关注
+                "is_following": is_following
             });
             
             Ok(HttpResponse::Ok().json(json!({
@@ -1131,4 +1192,60 @@ async fn get_user_latest_content(
             "total": content_list.len()
         }
     })))
+} 
+
+// 关注功能适配器函数 - 将 {id} 参数转换为 follow 函数期望的格式
+async fn follow_user_adapter(
+    path: web::Path<i32>,
+    req: HttpRequest,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+    user_repo: web::Data<Arc<UserRepository>>,
+    jwt_utils: web::Data<Arc<JwtUtils>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    crate::api::v1::follow::follow_user(path, req, follow_repo, user_repo, jwt_utils).await
+}
+
+async fn unfollow_user_adapter(
+    path: web::Path<i32>,
+    req: HttpRequest,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+    jwt_utils: web::Data<Arc<JwtUtils>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    crate::api::v1::follow::unfollow_user(path, req, follow_repo, jwt_utils).await
+}
+
+async fn check_follow_status_adapter(
+    path: web::Path<i32>,
+    req: HttpRequest,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+    jwt_utils: web::Data<Arc<JwtUtils>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    crate::api::v1::follow::check_follow_status(path, req, follow_repo, jwt_utils).await
+}
+
+async fn get_user_followers_adapter(
+    path: web::Path<i32>,
+    query: web::Query<crate::api::v1::follow::FollowQuery>,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    crate::api::v1::follow::get_user_followers(path, query, follow_repo).await
+}
+
+async fn get_user_following_adapter(
+    path: web::Path<i32>,
+    query: web::Query<crate::api::v1::follow::FollowQuery>,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    crate::api::v1::follow::get_user_following(path, query, follow_repo).await
+}
+
+// 用户资料适配器函数 - 添加关注状态检查
+async fn get_user_profile_adapter(
+    path: web::Path<i32>,
+    req: HttpRequest,
+    user_service: web::Data<UserService>,
+    follow_repo: web::Data<Arc<FollowRepository>>,
+    jwt_utils: web::Data<Arc<JwtUtils>>,
+) -> Result<HttpResponse, actix_web::Error> {
+    get_user_profile(path, req, user_service, follow_repo, jwt_utils).await
 } 

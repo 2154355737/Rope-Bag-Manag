@@ -54,8 +54,8 @@ pub fn configure_api(cfg: &mut web::ServiceConfig) {
         .configure(storage::configure_routes)
         .configure(search::configure_routes)
         .configure(publish::configure_routes) // 添加发布路由
-        .configure(ranking::configure_routes) // 添加排行榜路由
-        .configure(follow::configure_routes); // 添加关注路由
+        .configure(ranking::configure_routes); // 添加排行榜路由
+        // 关注路由已合并到用户路由中
 
     // 添加公共API路由
     public::public_routes(cfg);

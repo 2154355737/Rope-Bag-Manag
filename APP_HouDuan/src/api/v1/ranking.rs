@@ -3,6 +3,7 @@ use log::{info, error};
 use serde::{Deserialize, Serialize};
 use crate::repositories::user_repo::UserRepository;
 use crate::repositories::package_repo::PackageRepository;
+use crate::repositories::post_repo::PostRepository;
 use std::sync::Arc;
 
 /// 构建完整的头像URL
@@ -201,7 +202,7 @@ pub async fn get_resource_ranking(
 /// 获取帖子排行榜
 pub async fn get_post_ranking(
     query: web::Query<RankingQuery>,
-    post_repo: web::Data<Arc<crate::repositories::PostRepository>>,
+    post_repo: web::Data<Arc<PostRepository>>,
     user_repo: web::Data<Arc<UserRepository>>,
 ) -> Result<HttpResponse> {
     let page = query.page.unwrap_or(1);

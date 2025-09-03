@@ -12,6 +12,7 @@ import { toast } from '@/hooks/use-toast'
 export interface Comment {
   id: number
   author: {
+    id?: number
     name: string
     avatar: string
     verified?: boolean
@@ -36,6 +37,7 @@ interface CommentSectionProps {
   onLoadMoreComments?: (page: number) => Promise<Comment[]>
   onEditComment?: (commentId: number, content: string) => Promise<void> | void
   onDeleteComment?: (commentId: number) => Promise<void> | void
+  onAuthorClick?: (authorName: string, authorId?: number) => void
   placeholder?: string
   maxLength?: number
   className?: string
@@ -56,6 +58,7 @@ const CommentSection: React.FC<CommentSectionProps> = ({
   onLoadMoreComments,
   onEditComment,
   onDeleteComment,
+  onAuthorClick,
   placeholder = "发表评论...",
   maxLength = 200,
   className = "",
@@ -271,7 +274,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({
       <Card className={isReply ? "bg-muted/30" : ""}>
         <CardContent className="p-3">
           <div className="flex items-start">
-            <Avatar className={`${isReply ? 'h-6 w-6' : 'h-8 w-8'} mr-2 shrink-0`}>
+            <Avatar 
+              className={`${isReply ? 'h-6 w-6' : 'h-8 w-8'} mr-2 shrink-0 ${onAuthorClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all' : ''}`}
+              onClick={() => onAuthorClick?.(comment.author.name, comment.author.id)}
+            >
               <AvatarImage src={comment.author.avatar} />
               <AvatarFallback>{comment.author.name[0]}</AvatarFallback>
             </Avatar>
@@ -279,7 +285,10 @@ const CommentSection: React.FC<CommentSectionProps> = ({
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-1">
-                  <span className={`font-medium ${isReply ? 'text-sm' : 'text-sm'}`}>
+                  <span 
+                    className={`font-medium ${isReply ? 'text-sm' : 'text-sm'} ${onAuthorClick ? 'cursor-pointer hover:text-primary transition-colors' : ''}`}
+                    onClick={() => onAuthorClick?.(comment.author.name, comment.author.id)}
+                  >
                     {comment.author.name}
                   </span>
                   {comment.author.verified && (

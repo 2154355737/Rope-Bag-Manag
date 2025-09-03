@@ -43,6 +43,7 @@ const PostDetailScreen: React.FC = () => {
     id: parseInt(id || '1'),
     title: '加载中...',
     author: {
+      id: undefined,
       name: '加载中...',
       avatar: '',
       verified: false,
@@ -115,7 +116,7 @@ const PostDetailScreen: React.FC = () => {
         const updatedPost = {
           id: p.id,
           title: p.title || '帖子标题',
-          author: { name: p.author?.name || p.author_name || '用户', avatar: p.author?.avatar || '' , verified: false },
+          author: { id: p.author?.id || p.author_id, name: p.author?.name || p.author_name || '用户', avatar: p.author?.avatar || '' , verified: false },
           content: p.content || p.title,
           images: Array.isArray(p.images) ? p.images : [],
           code: p.code_snippet || undefined,
@@ -245,7 +246,7 @@ const PostDetailScreen: React.FC = () => {
       const cr = await apiGetComments('post', post.id, 1, 10, true)
       const mapped = (cr.list || []).map((c: any) => ({
         id: c.id,
-        author: { name: c.author_name || '用户', avatar: c.author_avatar || '' },
+        author: { id: c.user_id, name: c.author_name || '用户', avatar: c.author_avatar || '' },
         content: c.content,
         time: formatTimeOfDay(c.created_at || ''),
         likes: c.likes || 0,
@@ -453,13 +454,21 @@ const PostDetailScreen: React.FC = () => {
             <CardContent className="p-4 min-w-0">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
-                  <Avatar className="h-10 w-10 mr-2">
+                  <Avatar 
+                    className="h-10 w-10 mr-2 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+                    onClick={() => post.author.id && navigate(`/user/${post.author.id}`)}
+                  >
                     <AvatarImage src={post.author.avatar} />
                     <AvatarFallback>{post.author.name[0]}</AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="flex items-center">
-                      <span className="font-medium">{post.author.name}</span>
+                      <span 
+                        className="font-medium cursor-pointer hover:text-primary transition-colors"
+                        onClick={() => post.author.id && navigate(`/user/${post.author.id}`)}
+                      >
+                        {post.author.name}
+                      </span>
                       {post.author.verified && (
                         <CheckCircle size={14} className="ml-1 text-blue-500" />
                       )}
@@ -614,6 +623,11 @@ const PostDetailScreen: React.FC = () => {
             className="mt-6"
             onEditComment={handleEditComment}
             onDeleteComment={handleDeleteComment}
+            onAuthorClick={(authorName, authorId) => {
+              if (authorId) {
+                navigate(`/user/${authorId}`)
+              }
+            }}
           />
         </div>
       </ScrollArea>

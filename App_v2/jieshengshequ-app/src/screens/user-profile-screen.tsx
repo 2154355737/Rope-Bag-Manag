@@ -184,6 +184,9 @@ const UserProfileScreen: React.FC = () => {
       } : null)
     } catch (error) {
       console.error('关注操作失败:', error)
+      // TODO: 添加用户友好的错误提示，例如使用toast通知
+      // 这里可以添加一个错误状态来显示错误信息给用户
+      alert(profile.is_following ? '取消关注失败，请稍后重试' : '关注失败，请稍后重试')
     } finally {
       setFollowing(false)
     }

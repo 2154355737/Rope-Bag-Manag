@@ -68,7 +68,7 @@ pub struct ServiceContainer {
     pub post_repo: PostRepository,
     
     // JWT工具
-    pub jwt_utils: crate::utils::jwt::JwtUtils,
+    pub jwt_utils: std::sync::Arc<crate::utils::jwt::JwtUtils>,
 }
 
 impl ServiceContainer {
@@ -134,7 +134,7 @@ impl ServiceContainer {
             subscription_repo: repositories.subscription_repo,
             follow_repo: repositories.follow_repo,
             post_repo: repositories.post_repo,
-            jwt_utils: crate::utils::jwt::JwtUtils::new(jwt_secret),
+            jwt_utils: std::sync::Arc::new(crate::utils::jwt::JwtUtils::new(jwt_secret)),
         })
     }
     

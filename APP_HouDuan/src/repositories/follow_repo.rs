@@ -50,9 +50,128 @@ pub struct FollowUser {
 impl FollowRepository {
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path)?;
+        
+        // 创建关注相关的表（如果不存在）
+        Self::create_tables(&conn)?;
+        
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
+    }
+    
+    /// 修复现有数据库中的触发器
+    pub async fn fix_triggers(&self) -> Result<()> {
+        let conn = self.conn.lock().await;
+        
+        // 删除现有触发器
+        conn.execute("DROP TRIGGER IF EXISTS update_follow_stats_on_insert", [])?;
+        conn.execute("DROP TRIGGER IF EXISTS update_follow_stats_on_delete", [])?;
+        
+        // 重新创建触发器
+        Self::create_triggers(&conn)?;
+        
+        Ok(())
+    }
+    
+    /// 创建触发器
+    fn create_triggers(conn: &Connection) -> Result<()> {
+        // 删除现有触发器（如果存在）
+        conn.execute("DROP TRIGGER IF EXISTS update_follow_stats_on_insert", [])?;
+        conn.execute("DROP TRIGGER IF EXISTS update_follow_stats_on_delete", [])?;
+        
+        // 创建触发器：插入关注关系时更新统计
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS update_follow_stats_on_insert
+            AFTER INSERT ON user_follows
+            BEGIN
+                INSERT OR REPLACE INTO user_follow_stats (user_id, followers_count, following_count, updated_at)
+                VALUES (
+                    NEW.followed_id,
+                    COALESCE((SELECT followers_count FROM user_follow_stats WHERE user_id = NEW.followed_id), 0) + 1,
+                    COALESCE((SELECT following_count FROM user_follow_stats WHERE user_id = NEW.followed_id), 0),
+                    datetime('now')
+                );
+                
+                INSERT OR REPLACE INTO user_follow_stats (user_id, followers_count, following_count, updated_at)
+                VALUES (
+                    NEW.follower_id,
+                    COALESCE((SELECT followers_count FROM user_follow_stats WHERE user_id = NEW.follower_id), 0),
+                    COALESCE((SELECT following_count FROM user_follow_stats WHERE user_id = NEW.follower_id), 0) + 1,
+                    datetime('now')
+                );
+            END",
+            []
+        )?;
+        
+        // 创建触发器：删除关注关系时更新统计
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS update_follow_stats_on_delete
+            AFTER DELETE ON user_follows
+            BEGIN
+                UPDATE user_follow_stats 
+                SET followers_count = MAX(0, followers_count - 1),
+                    updated_at = datetime('now')
+                WHERE user_id = OLD.followed_id;
+                
+                UPDATE user_follow_stats 
+                SET following_count = MAX(0, following_count - 1),
+                    updated_at = datetime('now')
+                WHERE user_id = OLD.follower_id;
+            END",
+            []
+        )?;
+        
+        Ok(())
+    }
+    
+    /// 创建关注相关的表
+    fn create_tables(conn: &Connection) -> Result<()> {
+        // 创建用户关注表
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS user_follows (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                follower_id INTEGER NOT NULL,
+                followed_id INTEGER NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (followed_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(follower_id, followed_id),
+                CHECK(follower_id != followed_id)
+            )",
+            []
+        )?;
+        
+        // 创建索引
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_follows_follower ON user_follows(follower_id)",
+            []
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_follows_followed ON user_follows(followed_id)",
+            []
+        )?;
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_follows_created_at ON user_follows(created_at)",
+            []
+        )?;
+        
+        // 创建用户关注统计表
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS user_follow_stats (
+                user_id INTEGER PRIMARY KEY,
+                followers_count INTEGER DEFAULT 0,
+                following_count INTEGER DEFAULT 0,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )",
+            []
+        )?;
+        
+        // 创建触发器
+        Self::create_triggers(conn)?;
+        
+        Ok(())
     }
 
     /// 关注用户
