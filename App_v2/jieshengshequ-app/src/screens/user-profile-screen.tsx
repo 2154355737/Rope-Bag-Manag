@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { followUser, unfollowUser, checkFollowStatus } from '@/api/follow'
+import TopNavigation from '@/components/ui/top-navigation'
 
 // 用户信息接口
 interface UserProfile {
@@ -407,24 +408,19 @@ const UserProfileScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-      {/* 头部导航 */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="flex items-center justify-between px-6 py-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 -ml-2 rounded-full hover:bg-muted/50 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-semibold">{profile.nickname}</h1>
-          <button className="p-2 -mr-2 rounded-full hover:bg-muted/50 transition-colors">
-            <MoreHorizontal className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title={profile.nickname}
+        subtitle={`@${profile.username}`}
+        showBackButton
+        showMoreButton
+        leftAction={<User className="w-5 h-5 text-primary ml-2" />}
+      />
 
-      {/* 用户信息卡片 */}
-      <div className="px-6 py-6">
+      {/* 主要内容区域 */}
+      <div className="pt-nav">
+        {/* 用户信息卡片 */}
+        <div className="px-6 py-6">
         <div className="bg-card/50 rounded-2xl border border-border/50 p-6 backdrop-blur-sm">
           {/* 头像和基本信息 */}
           <div className="flex items-start gap-4 mb-6">
@@ -598,6 +594,7 @@ const UserProfileScreen: React.FC = () => {
               {activeTab === 'resources' && renderContentList('resources')}
             </motion.div>
           </AnimatePresence>
+        </div>
         </div>
       </div>
     </div>

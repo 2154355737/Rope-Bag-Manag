@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Trophy, Star, Eye, Heart, Download, MessageSquare, TrendingUp, Award, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUserRanking, getResourceRanking, getPostRanking } from '../api/ranking'
+import TopNavigation from '@/components/ui/top-navigation'
 
 // 排行榜数据接口
 interface UserRanking {
@@ -374,18 +375,19 @@ const RankingScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
-      {/* 头部 */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-primary" />
-            排行榜
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">社区活跃度排行</p>
-        </div>
+      {/* 顶部导航栏 */}
+      <TopNavigation
+        title="排行榜"
+        subtitle="社区活跃度排行"
+        showBackButton
+        leftAction={<Trophy className="w-5 h-5 text-primary ml-2" />}
+      />
 
+      {/* 主要内容区域 */}
+      <div className="pt-nav">
         {/* 标签切换 */}
-        <div className="px-6 pb-4">
+        <div className="sticky top-[var(--top-navigation-height)] z-10 bg-background/80 backdrop-blur-xl border-b border-border/50">
+        <div className="px-6 py-4">
           <div className="flex bg-muted/30 rounded-xl p-1 backdrop-blur-sm">
             {tabs.map((tab) => {
               const Icon = tab.icon
@@ -438,6 +440,7 @@ const RankingScreen: React.FC = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
     </div>
   )
