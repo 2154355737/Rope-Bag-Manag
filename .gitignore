@@ -23,6 +23,7 @@ APP_HouDuan/APP_HouDuan.zip
 
 # 忽略可能的大型二进制文件
 *.exe
+*.bat
 *.dll
 *.so
 *.dylib
@@ -58,3 +59,4 @@ Thumbs.db
 APP_HouDuan/data.db
 APP_HouDuan/data.db-shm
 APP_HouDuan/data.db-wal
+run_fix.bat

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getUserProfile } from '../api/user'
+import { getUserProfile, getUserLatestContent, getUserPosts, getUserResources } from '../api/user'
 import { ApiError } from '../api/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -69,8 +69,10 @@ const UserProfileScreen: React.FC = () => {
   const navigate = useNavigate()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [contents, setContents] = useState<UserContent[]>([])
+  const [tabContents, setTabContents] = useState<{[key: string]: UserContent[]}>({})
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [loading, setLoading] = useState(true)
+  const [tabLoading, setTabLoading] = useState<{[key: string]: boolean}>({})
   const [following, setFollowing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -87,27 +89,15 @@ const UserProfileScreen: React.FC = () => {
         setProfile(userProfile)
         setError(null)
 
-        // 暂时使用模拟的内容数据，后续可以调用用户的帖子和资源API
-        setContents([
-          {
-            id: 1,
-            type: 'post',
-            title: '结绳语言最佳实践指南',
-            description: '从零开始学习结绳编程语言，包含基础语法、进阶特性和实战项目。',
-            stats: { views: 25640, likes: 1240, comments: 189 },
-            created_at: '2024-01-10',
-            tags: ['最佳实践', '教程', '经验分享']
-          },
-          {
-            id: 2,
-            type: 'resource',
-            title: '结绳语言核心库 v2.5',
-            description: '包含常用算法和数据结构的核心库，支持最新语言特性。',
-            stats: { downloads: 15420, likes: 890, rating: 4.8 },
-            created_at: '2024-01-15',
-            tags: ['核心库', '算法', '数据结构']
-          }
-        ])
+        // 获取用户的最新内容
+        try {
+          const latestContent = await getUserLatestContent(Number(userId), { limit: 6 })
+          setContents(latestContent.list || [])
+        } catch (contentError) {
+          console.error('获取用户内容失败:', contentError)
+          // 如果获取内容失败，设置为空数组，不影响用户资料的显示
+          setContents([])
+        }
         
         setLoading(false)
       } catch (error) {
@@ -126,6 +116,55 @@ const UserProfileScreen: React.FC = () => {
 
     loadUserProfile()
   }, [userId])
+
+  // 加载特定类型的内容
+  const loadTabContent = async (type: 'posts' | 'resources') => {
+    if (!userId || tabContents[type] || tabLoading[type]) return
+    
+    setTabLoading(prev => ({ ...prev, [type]: true }))
+    
+    try {
+      let contentData
+      if (type === 'posts') {
+        contentData = await getUserPosts(Number(userId), { page: 1, pageSize: 20 })
+      } else {
+        contentData = await getUserResources(Number(userId), { page: 1, pageSize: 20 })
+      }
+      
+      // 转换数据格式以匹配UserContent接口
+      const formattedContent = contentData.list.map((item: any) => ({
+        id: item.id,
+        type: type === 'posts' ? 'post' : 'resource',
+        title: item.title || item.name,
+        description: item.description || item.content?.substring(0, 100),
+        stats: {
+          views: item.view_count,
+          likes: item.like_count,
+          comments: item.comment_count,
+          downloads: item.download_count,
+          rating: item.rating
+        },
+        created_at: item.created_at,
+        tags: item.tags || []
+      }))
+      
+      setTabContents(prev => ({ ...prev, [type]: formattedContent }))
+    } catch (error) {
+      console.error(`加载${type}失败:`, error)
+      setTabContents(prev => ({ ...prev, [type]: [] }))
+    } finally {
+      setTabLoading(prev => ({ ...prev, [type]: false }))
+    }
+  }
+
+  // 当切换到posts或resources标签页时加载内容
+  useEffect(() => {
+    if (activeTab === 'posts') {
+      loadTabContent('posts')
+    } else if (activeTab === 'resources') {
+      loadTabContent('resources')
+    }
+  }, [activeTab, userId])
 
   // 关注/取消关注
   const handleFollowToggle = async () => {
@@ -241,11 +280,35 @@ const UserProfileScreen: React.FC = () => {
   )
 
   const renderContentList = (type: 'posts' | 'resources') => {
-    const filteredContents = contents.filter(content => content.type === type.slice(0, -1) as 'post' | 'resource')
+    const currentContents = tabContents[type] || []
+    const isLoading = tabLoading[type] || false
+    
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+            <p className="text-sm text-muted-foreground mt-2">加载中...</p>
+          </div>
+        </div>
+      )
+    }
+    
+    if (currentContents.length === 0) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <p className="text-muted-foreground">
+              {type === 'posts' ? '暂无帖子' : '暂无资源'}
+            </p>
+          </div>
+        </div>
+      )
+    }
     
     return (
       <div className="space-y-3">
-        {filteredContents.map((content) => (
+        {currentContents.map((content) => (
           <motion.div
             key={content.id}
             className="p-4 rounded-xl bg-card/50 border border-border/50 hover:bg-card/80 transition-all duration-200"
@@ -395,9 +458,45 @@ const UserProfileScreen: React.FC = () => {
               <span>加入于 {new Date(profile.created_at).toLocaleDateString()}</span>
             </div>
             {profile.skills && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="w-4 h-4" />
-                <span>{profile.skills}</span>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-4 h-4" />
+                  <span>技能专长</span>
+                </div>
+                <div className="flex flex-wrap gap-2 ml-6">
+                  {(() => {
+                    // 处理技能数据：可能是字符串（逗号分隔）或数组
+                    let skillsArray: string[] = []
+                    if (profile.skills) {
+                      skillsArray = typeof profile.skills === 'string' 
+                        ? profile.skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
+                        : Array.isArray(profile.skills) ? profile.skills : []
+                    }
+                    
+                    return skillsArray.slice(0, 8).map((skill, index) => (
+                      <span 
+                        key={index} 
+                        className="inline-flex items-center px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-full"
+                      >
+                        {skill}
+                      </span>
+                    ))
+                  })()}
+                  {(() => {
+                    let skillsArray: string[] = []
+                    if (profile.skills) {
+                      skillsArray = typeof profile.skills === 'string' 
+                        ? profile.skills.split(',').map(s => s.trim()).filter(s => s.length > 0)
+                        : Array.isArray(profile.skills) ? profile.skills : []
+                    }
+                    
+                    return skillsArray.length > 8 && (
+                      <span className="inline-flex items-center px-2 py-1 text-xs text-muted-foreground border border-dashed border-muted-foreground rounded-full">
+                        +{skillsArray.length - 8}
+                      </span>
+                    )
+                  })()}
+                </div>
               </div>
             )}
           </div>

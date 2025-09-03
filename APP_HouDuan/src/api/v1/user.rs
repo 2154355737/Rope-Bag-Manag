@@ -117,6 +117,18 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
                 web::resource("/{id}/profile")
                     .route(web::get().to(get_user_profile))
             )
+            .service(
+                web::resource("/{id}/posts")
+                    .route(web::get().to(get_user_posts))
+            )
+            .service(
+                web::resource("/{id}/resources")
+                    .route(web::get().to(get_user_resources))
+            )
+            .service(
+                web::resource("/{id}/latest-content")
+                    .route(web::get().to(get_user_latest_content))
+            )
     );
 
     // 新增：/me 别名集合
@@ -237,6 +249,15 @@ async fn get_user_profile(
     let user_id = path.into_inner();
     match user_service.get_user_by_id(user_id).await {
         Ok(Some(user)) => {
+            // 获取真实的统计数据
+            use rusqlite::Connection;
+            let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+            
+            let posts_count: i64 = conn.query_row("SELECT COUNT(*) FROM posts WHERE author_id = ? AND status = 'Published'", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+            let resources_count: i64 = conn.query_row("SELECT COUNT(*) FROM packages WHERE author = ? AND status = 'active'", rusqlite::params![user.username], |r| r.get(0)).unwrap_or(0);
+            let total_views: i64 = conn.query_row("SELECT COALESCE(SUM(view_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+            let total_likes: i64 = conn.query_row("SELECT COALESCE(SUM(like_count),0) FROM posts WHERE author_id = ?", rusqlite::params![user.id], |r| r.get(0)).unwrap_or(0);
+            
             // 构建完整的用户资料信息，包括统计数据
             let profile = json!({
                 "id": user.id,
@@ -259,10 +280,10 @@ async fn get_user_profile(
                 "skills": user.skills,
                 "followers_count": 0, // TODO: 从关注表获取
                 "following_count": 0, // TODO: 从关注表获取
-                "posts_count": 0, // TODO: 从帖子表获取
-                "resources_count": 0, // TODO: 从资源表获取
-                "total_likes": 0, // TODO: 从点赞统计获取
-                "total_views": 0, // TODO: 从浏览统计获取
+                "posts_count": posts_count as i32,
+                "resources_count": resources_count as i32,
+                "total_likes": total_likes as i32,
+                "total_views": total_views as i32,
                 "total_downloads": user.download_count,
                 "created_at": user.created_at.format("%Y-%m-%d").to_string(),
                 "is_following": false // TODO: 根据当前用户判断是否关注
@@ -959,5 +980,155 @@ async fn upload_avatar(
     Ok(HttpResponse::BadRequest().json(json!({
         "code": 400,
         "message": "未找到有效的图片文件"
+    })))
+}
+
+// 获取特定用户的帖子
+async fn get_user_posts(
+    path: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+    post_service: web::Data<PostService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user_id = path.into_inner();
+    let page = query.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    let page_size = query.get("pageSize").and_then(|v| v.as_u64()).unwrap_or(10) as i32;
+    let params = crate::models::PostQueryParams { 
+        page: Some((page as u32)), 
+        page_size: Some((page_size as u32)), 
+        category_id: None, 
+        author_id: Some(user_id), 
+        status: Some("Published".to_string()), // 只显示已发布的帖子
+        search: None, 
+        tags: None, 
+        is_pinned: None, 
+        is_featured: None 
+    };
+    match post_service.get_posts(params).await {
+        Ok(resp) => Ok(HttpResponse::Ok().json(json!({"code":0, "message":"success", "data": resp}))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
+}
+
+// 获取特定用户的资源
+async fn get_user_resources(
+    path: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user_id = path.into_inner();
+    let page = query.get("page").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
+    let page_size = query.get("pageSize").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
+    
+    // 通过用户ID获取用户名
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let username: String = match conn.query_row("SELECT username FROM users WHERE id = ?", rusqlite::params![user_id], |r| r.get(0)) {
+        Ok(name) => name,
+        Err(_) => return Ok(HttpResponse::NotFound().json(json!({"code":404, "message": "用户不存在"})))
+    };
+    
+    match package_service.get_packages_advanced(page, page_size, None, Some(username), Some("active".to_string())).await {
+        Ok((list, total)) => Ok(HttpResponse::Ok().json(json!({
+            "code": 0, 
+            "message": "success", 
+            "data": {
+                "list": list,
+                "total": total,
+                "page": page,
+                "pageSize": page_size,
+                "totalPages": (total as f64 / page_size as f64).ceil() as u32
+            }
+        }))),
+        Err(e) => Ok(HttpResponse::InternalServerError().json(json!({"code":500, "message": e.to_string()})))
+    }
+}
+
+// 获取特定用户的最新内容（帖子和资源混合）
+async fn get_user_latest_content(
+    path: web::Path<i32>,
+    query: web::Query<serde_json::Value>,
+    post_service: web::Data<PostService>,
+    package_service: web::Data<PackageService>,
+) -> Result<HttpResponse, actix_web::Error> {
+    let user_id = path.into_inner();
+    let limit = query.get("limit").and_then(|v| v.as_u64()).unwrap_or(6) as u32;
+    
+    // 获取用户名
+    use rusqlite::Connection;
+    let conn = crate::repositories::get_connection().map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+    let username: String = match conn.query_row("SELECT username FROM users WHERE id = ?", rusqlite::params![user_id], |r| r.get(0)) {
+        Ok(name) => name,
+        Err(_) => return Ok(HttpResponse::NotFound().json(json!({"code":404, "message": "用户不存在"})))
+    };
+    
+    let mut content_list = Vec::new();
+    
+    // 获取用户的帖子（最新的几条）
+    let post_params = crate::models::PostQueryParams {
+        page: Some(1),
+        page_size: Some(limit),
+        category_id: None,
+        author_id: Some(user_id),
+        status: Some("Published".to_string()),
+        search: None,
+        tags: None,
+        is_pinned: None,
+        is_featured: None
+    };
+    
+    if let Ok(posts_resp) = post_service.get_posts(post_params).await {
+        for post in posts_resp.list {
+            content_list.push(json!({
+                "id": post.id,
+                "type": "post",
+                "title": post.title,
+                "description": post.content.chars().take(100).collect::<String>() + if post.content.len() > 100 { "..." } else { "" },
+                "stats": {
+                    "views": post.view_count,
+                    "likes": post.like_count,
+                    "comments": post.comment_count
+                },
+                "created_at": post.created_at,
+                "tags": post.tags.unwrap_or_default()
+            }));
+        }
+    }
+    
+    // 获取用户的资源（最新的几条）
+    if let Ok((resources_list, _total)) = package_service.get_packages_advanced(1, limit, None, Some(username), Some("active".to_string())).await {
+        for resource in resources_list {
+            content_list.push(json!({
+                "id": resource.id,
+                "type": "resource",
+                "title": resource.name,
+                "description": resource.description.unwrap_or_default(),
+                "stats": {
+                    "downloads": resource.download_count,
+                    "likes": resource.like_count,
+                    "rating": 4.5 // 暂时固定值，后续可以从评分表获取
+                },
+                "created_at": resource.created_at,
+                "tags": [] // 暂时为空，后续可以从标签关联表获取
+            }));
+        }
+    }
+    
+    // 按创建时间排序
+    content_list.sort_by(|a, b| {
+        let a_time = a["created_at"].as_str().unwrap_or("");
+        let b_time = b["created_at"].as_str().unwrap_or("");
+        b_time.cmp(a_time) // 降序排列
+    });
+    
+    // 限制返回数量
+    content_list.truncate(limit as usize);
+    
+    Ok(HttpResponse::Ok().json(json!({
+        "code": 0,
+        "message": "success",
+        "data": {
+            "list": content_list,
+            "total": content_list.len()
+        }
     })))
 } 

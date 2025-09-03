@@ -154,3 +154,36 @@ export async function getMyLikesStats() {
   }>('/users/my-likes/stats')
   return response
 } 
+
+// 获取特定用户的帖子
+export async function getUserPosts(userId: number, params?: { page?: number; pageSize?: number }) {
+  const response = await http.get<{ 
+    list: any[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }>(`/users/${userId}/posts`, params)
+  return response
+}
+
+// 获取特定用户的资源
+export async function getUserResources(userId: number, params?: { page?: number; pageSize?: number }) {
+  const response = await http.get<{ 
+    list: any[]
+    total: number
+    page: number
+    pageSize: number
+    totalPages: number
+  }>(`/users/${userId}/resources`, params)
+  return response
+}
+
+// 获取特定用户的最新内容（帖子和资源混合，按时间排序）
+export async function getUserLatestContent(userId: number, params?: { limit?: number }) {
+  const response = await http.get<{ 
+    list: any[]
+    total: number
+  }>(`/users/${userId}/latest-content`, params)
+  return response
+} 
